@@ -5,7 +5,7 @@ This repository collects information on the [Sindoh 3DWOX
 
 ## Overview
 
-The hardware is based on a Marvell `mv61x0` (88PA6110?); the CPU calls itself “PJ4B-MP ARMv7 rev 1
+The hardware is based on a Marvell `mv61x0` (88PA6170); the CPU calls itself “PJ4B-MP ARMv7 rev 1
 (v7l)”:
 
 ```
