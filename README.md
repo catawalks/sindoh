@@ -79,7 +79,7 @@ ttyS0), so starting a login shell will cause a sort-of second boot, potentially 
 The `/app/auto_update.sh` will search for a `update.she` (encrypted shell script) on an inserted USB
 stick in the `_update_rodin`, `_update_rodin_up` or `_update_rodin_eco` directory, depending on the
 exact printer model. This shell script is decrypted from aes-256-cbc with the key (and IV == key)
-stored in `/app/crypto_key.dat`, which is itself encrypted with aes-256-cbc; key and IV `SINDOH`.
-The update encryption key and IV for the 3DWOX 1 is `sindoh024601779U`. Finally, the `.she` file is
+stored in `/app/crypto_key.dat`. Depending on the model, 'crypto_key.dat' is either encrypted with aes-256-cbc; key and IV `SINDOH` or is encrypted with des3 with blank password. The old `DP200` based models use the des3 and blank password and the newer `3DWOX 1` models use the aes-256-cbc encryption with `SINDOH`
+The update encryption key and IV for the 3DWOX 1 is `sindoh024601779U` and for the DP200 is `sindoh024601779`. Finally, the `.she` file is
 expected to be a bzip2’ed tar archive that gets extracted to `/tmp`. See
 [`pack_firmware.sh`](pack_firmware.sh) for an example.
