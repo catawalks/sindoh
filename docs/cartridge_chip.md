@@ -1,7 +1,8 @@
 # DP200 filament cartridge chip
 
 Status 2026-10-21: chip identified and fully read (read-only) from one
-**empty** cartridge. The field meanings below are hypotheses; a second
+cartridge whose spool the user had taken out (not used up; the chip says
+98.7 of 232 m used). The field meanings below are hypotheses; a second
 cartridge (full, or another colour or material) will confirm them.
 
 ## Hardware path
@@ -84,7 +85,9 @@ How the stock app (`marvell_lspsdk_3dp_gemstone-debug_stripped.elf`, symbols in 
 - **Units:** `engine_showSmartICInfo` prints `Used ePulse: %d->%d mm` with
   mm = ePulse × 500 × 0.00217948. 0.00217948 = 1/458.83, the extruder's
   steps/mm, so **1 ePulse = 500 extruder steps = 1.0897 mm**. This
-  cartridge: 90 591 ePulse ≈ **98.7 m used of 232 m** (≈ 42 %).
+  cartridge: 90 591 ePulse ≈ **98.7 m used of 232 m** (≈ 42 %). That's
+  consistent: the user removed the spool from this cartridge, it was not
+  used up. So ~133 m were left when it was last in the printer.
 - **Derived fields:** `engine_calcFilament` derives used/remaining cm and
   percent, and the fuse count (+0x4c, "Fuse %dp <- 0x%04x") from the pages
   6–7 bitmap.
