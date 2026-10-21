@@ -91,7 +91,8 @@ cp -n $PORT/install/rootfs/home/klipper/printer_data/config/moonraker.conf $KHOM
 # printer.cfg is the user's file (only created if missing)
 cp $PORT/klipper/config/dp200_printer.cfg $PORT/klipper/config/dp200_macros.cfg $KHOME/printer_data/config/
 cp -n $PORT/klipper/config/printer.cfg $KHOME/printer_data/config/printer.cfg || true
-cp $PORT/klipper/extras/upc_stats.py $PORT/klipper/extras/upc_clockcheck.py $KHOME/klipper/klippy/extras/
+cp $PORT/klipper/extras/upc_stats.py $PORT/klipper/extras/upc_clockcheck.py \
+   $PORT/klipper/extras/dp200_cartridge.py $KHOME/klipper/klippy/extras/
 chown -R $KUSER:$KUSER $KHOME
 echo "dp200-klipper" > /etc/hostname
 echo "== inside: done ($(du -sh /usr /home /opt 2>/dev/null | tr '\n' ' '))"
