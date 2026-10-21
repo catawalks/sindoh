@@ -1,0 +1,132 @@
+From 714d0a34704855c83da62cee81d162c75938b803 Mon Sep 17 00:00:00 2001
+From: catawalks <catawalks@gmail.com>
+Date: Tue, 20 Oct 2026 21:18:25 +0000
+Subject: [PATCH 2/3] upc: Add upc_stats and upc_clockcheck host modules
+
+upc_stats: UPC_STEP_STATS reports the step pulse and step-engine busy
+counters of the DP200 FM core, used to diagnose step-rate limits.
+
+upc_clockcheck: repeats the MCU frequency check 30 s after start-up and
+withdraws the start-up warning when the settled clock estimate agrees
+(the first clock samples of the UPC cores arrive through a busy
+shared-memory bridge and read 1-2 % low).
+
+Signed-off-by: catawalks <catawalks@gmail.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ klippy/extras/upc_clockcheck.py | 58 +++++++++++++++++++++++++++++++++
+ klippy/extras/upc_stats.py      | 37 +++++++++++++++++++++
+ 2 files changed, 95 insertions(+)
+ create mode 100644 klippy/extras/upc_clockcheck.py
+ create mode 100644 klippy/extras/upc_stats.py
+
+diff --git a/klippy/extras/upc_clockcheck.py b/klippy/extras/upc_clockcheck.py
+new file mode 100644
+index 0000000..29c6b8c
+--- /dev/null
++++ b/klippy/extras/upc_clockcheck.py
+@@ -0,0 +1,58 @@
++# Re-check the MCU clock frequency once the clock estimate has settled
++#
++# At klippy:ready, klippy/mcu.py compares each MCU's configured CLOCK_FREQ
++# with the host's clock estimate and adds a runtime warning ("MCU 'io'
++# configured for 396Mhz but running at 389Mhz!") when they differ by more than
++# 1 %. On the DP200 the UPC cores' first clock samples arrive through the
++# shared-memory bridge while it is busy with the identify/config traffic, so
++# the estimate at that moment is often 1-2 % low; seconds later it settles at
++# 395.9x MHz (0.02 % off). This module repeats the same check SETTLE seconds
++# after ready and withdraws the warning when the settled estimate agrees.
++# A real frequency problem keeps its warning.
++#
++#   [upc_clockcheck]
++#   #settle_time: 30
++#
++# Copyright (C) 2026  This file may be distributed under the terms of the
++# GNU GPLv3 license.
++import logging
++
++class UPCClockCheck:
++    def __init__(self, config):
++        self.printer = config.get_printer()
++        self.settle = config.getfloat('settle_time', 30., minval=2.)
++        self.printer.register_event_handler("klippy:ready", self._ready)
++
++    def _ready(self):
++        reactor = self.printer.get_reactor()
++        reactor.register_timer(self._recheck, reactor.monotonic() + self.settle)
++
++    def _recheck(self, eventtime):
++        pconfig = self.printer.lookup_object('configfile')
++        for name, mcu in self.printer.lookup_objects(module='mcu'):
++            mcu_name = mcu.get_name()
++            mcu_freq = mcu.seconds_to_clock(1.)
++            calc_freq = mcu.estimated_print_time(eventtime + 1.) - mcu.estimated_print_time(eventtime)
++            calc_freq = calc_freq * mcu_freq
++            mhz = int(mcu_freq / 1000000. + 0.5)
++            if abs(mcu_freq - calc_freq) > mcu_freq * 0.01:
++                logging.info("upc_clockcheck: MCU '%s' still at %.3f MHz",
++                             mcu_name, calc_freq / 1e6)
++                continue
++            prefix = "MCU '%s' configured for %dMhz but running at" % (mcu_name, mhz)
++            stale = [w for w in pconfig.status_warnings
++                     if w.get('type') == 'runtime_warning'
++                     and w.get('message', '').startswith(prefix)]
++            if not stale:
++                continue
++            for w in stale:
++                pconfig.deprecated.pop(tuple(list(w.items())), None)
++            pconfig.status_warnings = [w for w in pconfig.status_warnings
++                                       if w not in stale]
++            logging.info("upc_clockcheck: MCU '%s' settled at %.3f MHz;"
++                         " start-up frequency warning withdrawn",
++                         mcu_name, calc_freq / 1e6)
++        return self.printer.get_reactor().NEVER
++
++def load_config(config):
++    return UPCClockCheck(config)
+diff --git a/klippy/extras/upc_stats.py b/klippy/extras/upc_stats.py
+new file mode 100644
+index 0000000..f9349e5
+--- /dev/null
++++ b/klippy/extras/upc_stats.py
+@@ -0,0 +1,37 @@
++# DP200 / UPC port diagnostics: report the step-engine counters of the FM
++# MCU (pulses issued, pulses requested while the engine was still busy).
++#
++# Install: copy to ~/klipper/klippy/extras/, add [upc_stats] to printer.cfg.
++# G-code: UPC_STEP_STATS
++#
++# Copyright (C) 2026  This file may be distributed under the terms of the
++# GNU GPLv3 license.
++
++ENGINES = (('X', 0), ('Y', 1), ('Z', 2), ('E', 3))
++
++class UpcStats:
++    def __init__(self, config):
++        self.printer = config.get_printer()
++        self.mcu = self.printer.lookup_object('mcu')     # FM core
++        self.query = None
++        self.mcu.register_config_callback(self._build_config)
++        gcode = self.printer.lookup_object('gcode')
++        gcode.register_command('UPC_STEP_STATS', self.cmd_UPC_STEP_STATS,
++                               desc=self.cmd_UPC_STEP_STATS_help)
++    def _build_config(self):
++        self.query = self.mcu.lookup_query_command(
++            "upc_step_stats engine=%c",
++            "upc_step_stats_result engine=%c pulses=%u busy_hits=%u")
++    cmd_UPC_STEP_STATS_help = "Report UPC step-engine pulse / busy-hit counters"
++    def cmd_UPC_STEP_STATS(self, gcmd):
++        if self.query is None:
++            raise gcmd.error("upc_stats: FM MCU not configured")
++        lines = []
++        for name, n in ENGINES:
++            r = self.query.send([n])
++            lines.append("%s (engine %d): pulses=%d busy_hits=%d"
++                         % (name, n, r['pulses'], r['busy_hits']))
++        gcmd.respond_info("\n".join(lines))
++
++def load_config(config):
++    return UpcStats(config)
+-- 
+2.47.3
+

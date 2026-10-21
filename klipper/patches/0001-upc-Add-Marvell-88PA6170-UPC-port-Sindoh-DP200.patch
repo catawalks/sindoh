@@ -1,0 +1,1778 @@
+From 71e4bd54815e4583bc40d9a638667c647963b811 Mon Sep 17 00:00:00 2001
+From: catawalks <catawalks@gmail.com>
+Date: Tue, 20 Oct 2026 21:18:21 +0000
+Subject: [PATCH 1/3] upc: Add Marvell 88PA6170 UPC port (Sindoh DP200)
+
+The Sindoh 3DWOX DP200 runs its motion and I/O on the two UPC
+coprocessors (ARMv5) of its Marvell 88PA6170 SoC. This adds a Klipper
+MCU port for them (MACH_UPC): the FM core drives the steppers, the IO
+core the heaters, fans and ADC. Host communication goes through
+shared memory, bridged to a pseudo-tty by upctool on the Linux side.
+
+config/dp200_fm.config and config/dp200_io.config build the two images.
+
+Signed-off-by: catawalks <catawalks@gmail.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config/dp200_fm.config   |  21 +++
+ config/dp200_io.config   |  21 +++
+ src/Kconfig              |   3 +
+ src/upc/Kconfig          |  68 ++++++++
+ src/upc/Makefile         |  37 ++++
+ src/upc/adc.c            | 125 ++++++++++++++
+ src/upc/gpio.c           | 364 +++++++++++++++++++++++++++++++++++++++
+ src/upc/gpio.h           |  54 ++++++
+ src/upc/include/setjmp.h |  11 ++
+ src/upc/include/string.h |  15 ++
+ src/upc/internal.h       |  47 +++++
+ src/upc/main.c           | 299 ++++++++++++++++++++++++++++++++
+ src/upc/start.S          | 125 ++++++++++++++
+ src/upc/timer.c          | 116 +++++++++++++
+ src/upc/upc.lds.S        |  57 ++++++
+ src/upc/upc_hw.h         | 134 ++++++++++++++
+ src/upc/upc_ipc.h        | 113 ++++++++++++
+ 17 files changed, 1610 insertions(+)
+ create mode 100644 config/dp200_fm.config
+ create mode 100644 config/dp200_io.config
+ create mode 100644 src/upc/Kconfig
+ create mode 100644 src/upc/Makefile
+ create mode 100644 src/upc/adc.c
+ create mode 100644 src/upc/gpio.c
+ create mode 100644 src/upc/gpio.h
+ create mode 100644 src/upc/include/setjmp.h
+ create mode 100644 src/upc/include/string.h
+ create mode 100644 src/upc/internal.h
+ create mode 100644 src/upc/main.c
+ create mode 100644 src/upc/start.S
+ create mode 100644 src/upc/timer.c
+ create mode 100644 src/upc/upc.lds.S
+ create mode 100644 src/upc/upc_hw.h
+ create mode 100644 src/upc/upc_ipc.h
+
+diff --git a/config/dp200_fm.config b/config/dp200_fm.config
+new file mode 100644
+index 0000000..c0c057b
+--- /dev/null
++++ b/config/dp200_fm.config
+@@ -0,0 +1,21 @@
++# Klipper build config: Sindoh DP200 UPC FM core (steppers, endstops)
++# Use: cp dp200_fm.config ~/klipper/.config && make olddefconfig && make
++CONFIG_MACH_UPC=y
++CONFIG_UPC_CORE_FM=y
++# Timer: XENA Timer1, ~395.8 MHz (measured with the probe firmware)
++CONFIG_CLOCK_FREQ=396000000
++CONFIG_UPC_TIMER_ADDR=0x08001144
++CONFIG_UPC_THUMB=y
++CONFIG_UPC_STEP_HALF_TICKS=400
++# Trim optional features to fit the 16 KiB ITCM
++CONFIG_WANT_HARD_PWM=y
++# buttons: needed by filament_switch_sensor (xena46 lever) and
++# filament_motion_sensor (dsens7 encoder). FM image 15432 B with it.
++CONFIG_WANT_BUTTONS=y
++# CONFIG_WANT_TMCUART is not set
++# CONFIG_WANT_NEOPIXEL is not set
++# CONFIG_WANT_PULSE_COUNTER is not set
++# CONFIG_WANT_ST7920 is not set
++# CONFIG_WANT_HD44780 is not set
++# CONFIG_WANT_HX71X is not set
++# CONFIG_WANT_CS1237 is not set
+diff --git a/config/dp200_io.config b/config/dp200_io.config
+new file mode 100644
+index 0000000..31cbea2
+--- /dev/null
++++ b/config/dp200_io.config
+@@ -0,0 +1,21 @@
++# Klipper build config: Sindoh DP200 UPC IO core (heaters, fans, thermistors)
++# Use: cp dp200_io.config ~/klipper/.config && make olddefconfig && make
++CONFIG_MACH_UPC=y
++CONFIG_UPC_CORE_IO=y
++# Timer: XENA Timer1, ~395.8 MHz (measured with the probe firmware)
++CONFIG_CLOCK_FREQ=396000000
++CONFIG_UPC_TIMER_ADDR=0x08001144
++CONFIG_UPC_THUMB=y
++CONFIG_UPC_ADC_SETTLE_US=10000
++# Trim optional features to fit the 16 KiB ITCM
++CONFIG_WANT_ADC=y
++CONFIG_WANT_HARD_PWM=y
++# CONFIG_WANT_TRIGGER_ANALOG is not set
++# CONFIG_WANT_BUTTONS is not set
++# CONFIG_WANT_TMCUART is not set
++# CONFIG_WANT_NEOPIXEL is not set
++# CONFIG_WANT_PULSE_COUNTER is not set
++# CONFIG_WANT_ST7920 is not set
++# CONFIG_WANT_HD44780 is not set
++# CONFIG_WANT_HX71X is not set
++# CONFIG_WANT_CS1237 is not set
+diff --git a/src/Kconfig b/src/Kconfig
+index 7041ee0..9df4694 100644
+--- a/src/Kconfig
++++ b/src/Kconfig
+@@ -26,6 +26,8 @@ choice
+         bool "Raspberry Pi RP2040/RP235x"
+     config MACH_PRU
+         bool "Beaglebone PRU"
++    config MACH_UPC
++        bool "Marvell 88PA6170 UPC (Sindoh DP200)"
+     config MACH_AR100
+         bool "Allwinner A64 AR100"
+     config MACH_LINUX
+@@ -43,6 +45,7 @@ source "src/hc32f460/Kconfig"
+ source "src/rp2040/Kconfig"
+ source "src/pru/Kconfig"
+ source "src/ar100/Kconfig"
++source "src/upc/Kconfig"
+ source "src/linux/Kconfig"
+ source "src/simulator/Kconfig"
+ 
+diff --git a/src/upc/Kconfig b/src/upc/Kconfig
+new file mode 100644
+index 0000000..d8ba07d
+--- /dev/null
++++ b/src/upc/Kconfig
+@@ -0,0 +1,68 @@
++# Kconfig settings for the Marvell 88PA6170 UPC cores (Sindoh DP200)
++
++if MACH_UPC
++
++config UPC_SELECT
++    bool
++    default y
++    select HAVE_GPIO
++    select HAVE_GPIO_ADC if UPC_CORE_IO
++    select HAVE_GPIO_HARD_PWM
++    select HAVE_LIMITED_CODE_SIZE
++    select SERIAL
++
++config BOARD_DIRECTORY
++    string
++    default "upc"
++
++choice
++    prompt "UPC core"
++    config UPC_CORE_FM
++        bool "FM core (/dev/upc1) - steppers, endstops, motor current"
++    config UPC_CORE_IO
++        bool "IO core (/dev/upc0) - heaters, fans, thermistors"
++endchoice
++
++config MCU
++    string
++    default "upc_fm" if UPC_CORE_FM
++    default "upc_io"
++
++config CLOCK_FREQ
++    int "Timer frequency in Hz"
++    default 396000000
++    help
++      XENA Timer1 measured on the printer at 395.76-395.85 MHz
++      (2 x the 198 MHz dithered bus clock). Klipper's clock sync
++      corrects the small remaining offset.
++
++config UPC_TIMER_ADDR
++    hex "One-shot down-counter used as timebase (XENA Timer1)"
++    default 0x08001144
++
++config UPC_THUMB
++    bool "Compile in Thumb mode (needed to fit 16 KiB; verified on hardware)"
++    default y
++
++config UPC_ITCM_SIZE
++    hex "ITCM size in bytes (upc.ko only accepts 0x4000)"
++    default 0x4000
++
++config UPC_DYNMEM_SIZE
++    int "Bytes of DTCM for move queues and other dynamic objects"
++    default 16384
++
++config UPC_STEP_HALF_TICKS
++    int "Step pulse half period in stepper-engine ticks (200 MHz)"
++    default 400
++    help
++      Each step is issued as a one-pulse hardware move: the STEP line is
++      high for this many 5 ns ticks, then low for the same time. 400 =
++      2 us high, comfortably above the A4982's 1 us minimum.
++
++config UPC_ADC_SETTLE_US
++    int "Wait after selecting an ADC input before reading (microseconds)"
++    depends on UPC_CORE_IO
++    default 10000
++
++endif
+diff --git a/src/upc/Makefile b/src/upc/Makefile
+new file mode 100644
+index 0000000..bd37868
+--- /dev/null
++++ b/src/upc/Makefile
+@@ -0,0 +1,37 @@
++# Additional build rules for the Marvell 88PA6170 UPC cores (Sindoh DP200)
++
++CROSS_PREFIX=arm-none-eabi-
++
++dirs-y += src/upc src/generic
++
++# No -ffreestanding/-fno-builtin: Klipper's generated compile_time_request.c
++# needs strcmp() on constant strings folded at compile time.
++CFLAGS += -march=armv5te -mfloat-abi=soft -fno-pie -Os -Isrc/upc/include
++ifeq ($(CONFIG_UPC_THUMB),y)
++CFLAGS += -mthumb -mthumb-interwork
++else
++CFLAGS += -marm
++endif
++
++CFLAGS_klipper.elf += -nostdlib -nostartfiles -static
++CFLAGS_klipper.elf += -T $(OUT)src/upc/upc.ld -Wl,--gc-sections -lgcc
++$(OUT)klipper.elf: $(OUT)src/upc/upc.ld
++
++# Add source files
++src-y += upc/main.c upc/timer.c upc/gpio.c
++src-y += generic/crc16_ccitt.c generic/timer_irq.c generic/serial_irq.c
++src-$(CONFIG_WANT_ADC) += upc/adc.c
++
++OBJS_klipper.elf += $(OUT)src/upc/start.o
++
++$(OUT)src/upc/start.o: src/upc/start.S $(OUT)autoconf.h
++	@echo "  Assembling $@"
++	$(Q)$(CC) $(filter-out -flto=auto -fwhole-program,$(CFLAGS)) -c $< -o $@
++
++# Raw ITCM image for 'upctool load'
++target-y += $(OUT)klipper.bin
++
++$(OUT)klipper.bin: $(OUT)klipper.elf
++	@echo "  Creating ITCM image $@"
++	$(Q)$(OBJCOPY) -O binary $< $@
++	$(Q)$(PYTHON) -c "import os,sys; n=os.path.getsize(sys.argv[1]); print('  ITCM image: %d of %d bytes' % (n, $(CONFIG_UPC_ITCM_SIZE))); sys.exit(n > $(CONFIG_UPC_ITCM_SIZE))" $@
+diff --git a/src/upc/adc.c b/src/upc/adc.c
+new file mode 100644
+index 0000000..06e0064
+--- /dev/null
++++ b/src/upc/adc.c
+@@ -0,0 +1,125 @@
++// dec_adc support (IO core) - thermistor inputs
++//
++// Copyright (C) 2026  This file may be distributed under the terms of the
++// GNU GPLv3 license.
++//
++// The register sequence is replayed from the stock IO firmware (functions
++// io_2764, io_2870, io_28fc, io_2944 and io_0680). The stock code selects
++// one input per timer tick and reads the 10-entry FIFO on the next tick;
++// we do the same with a configurable settle time. A reading is the stock
++// "drop min and max, average 8" of the 10 FIFO samples, in raw 10-bit
++// units, so ADC_MAX = 1023 and the draft thermistor tables (code/2048 of
++// the stock 11-bit value) map 1:1 to raw/1023.
++
++#include "autoconf.h" // CONFIG_UPC_ADC_SETTLE_US
++#include "board/misc.h" // timer_read_time
++#include "command.h" // shutdown
++#include "gpio.h" // gpio_adc_setup
++#include "internal.h" // reg_write
++#include "sched.h" // sched_shutdown
++
++DECL_CONSTANT("ADC_MAX", ADC_RAW_MAX);
++
++enum { ADC_IDLE, ADC_SETTLING, ADC_SETTLED };
++static uint8_t adc_inited, adc_state, adc_cur_sel = 0xff;
++static uint32_t adc_ready_time;
++
++static void
++adc_hw_init(void)
++{
++    // io_2764: reset sequencer state
++    reg_write(ADC_BASE + 0x0c0, 0);
++    reg_write(ADC_BASE + 0x0d4, 0);
++    for (uint32_t a = 0x020; a <= 0x090; a += 8)
++        reg_write(ADC_BASE + a, reg_read(ADC_BASE + a) & 0xf9ffffff);
++    for (uint32_t a = 0x280; a <= 0x2bc; a += 4)
++        reg_write(ADC_BASE + a, 0);
++    adc_inited = 1;
++}
++
++static void
++adc_select(uint8_t sel)
++{
++    uint32_t ctrl = reg_read(ADC_CTRL);
++    reg_write(ADC_CTRL, ctrl | 1);
++    reg_write(ADC_CTRL, (ctrl & 0x27f8) | ADC_CTRL_RUN);
++    reg_write(ADC_CFG1, ADC_CFG1_VAL);
++    reg_write(ADC_CFG2, (reg_read(ADC_CFG2) & 0xf0000000) | 0x19);
++    uint32_t word = ADC_MUX_WORD(sel);
++    for (int i = 0; i < 9; i++)
++        reg_write(ADC_MUX(i), word);
++    reg_write(ADC_MUX_LAST, word & ~0x10000u);
++    reg_write(ADC_SEQ, (reg_read(ADC_SEQ) & 0xffffff0f) | 0x8000000f);
++}
++
++struct gpio_adc
++gpio_adc_setup(uint8_t pin)
++{
++    if (pin < PIN_ADC_BASE || pin >= PIN_ADC_BASE + PIN_ADC_COUNT)
++        shutdown("Not a valid ADC pin");
++    if (!adc_inited)
++        adc_hw_init();
++    return (struct gpio_adc){ .sel = pin - PIN_ADC_BASE };
++}
++
++// Try to sample a value. Returns zero if sample ready, otherwise
++// returns the number of clock ticks the caller should wait before
++// retrying this function.
++//
++// Selecting an input costs one settle period; further samples of the
++// same input are read back-to-back from the FIFO. Klipper samples one
++// sensor sample_count times in a row, so each report needs only one
++// settle per sensor.
++uint32_t
++gpio_adc_sample(struct gpio_adc g)
++{
++    uint32_t now = timer_read_time();
++    if (adc_cur_sel == g.sel) {
++        if (adc_state == ADC_SETTLED)
++            return 0;
++        if (adc_state == ADC_SETTLING) {
++            int32_t diff = adc_ready_time - now;
++            if (diff > 0)
++                return diff;
++            adc_state = ADC_SETTLED;
++            return 0;
++        }
++    } else if (adc_state == ADC_SETTLING) {
++        // Another input is settling - try again shortly
++        return timer_from_us(500);
++    }
++    adc_select(g.sel);
++    adc_cur_sel = g.sel;
++    adc_state = ADC_SETTLING;
++    uint32_t wait = timer_from_us(CONFIG_UPC_ADC_SETTLE_US);
++    adc_ready_time = now + wait;
++    return wait;
++}
++
++// Read a value; use only after gpio_adc_sample() returns zero
++uint16_t
++gpio_adc_read(struct gpio_adc g)
++{
++    uint32_t sum = 0, lo = 0xffff, hi = 0;
++    for (int i = 0; i < ADC_FIFO_LEN; i++) {
++        uint32_t v = reg_read(ADC_FIFO(i)) & 0x3fff;
++        if (v > ADC_RAW_MAX)
++            v = ADC_RAW_MAX;
++        sum += v;
++        if (v < lo)
++            lo = v;
++        if (v > hi)
++            hi = v;
++    }
++    return (sum - lo - hi + 4) / 8;
++}
++
++// Cancel a sample that may have been started with gpio_adc_sample()
++void
++gpio_adc_cancel_sample(struct gpio_adc g)
++{
++    if (adc_cur_sel == g.sel && adc_state == ADC_SETTLING) {
++        adc_state = ADC_IDLE;
++        adc_cur_sel = 0xff;
++    }
++}
+diff --git a/src/upc/gpio.c b/src/upc/gpio.c
+new file mode 100644
+index 0000000..aea3f70
+--- /dev/null
++++ b/src/upc/gpio.c
+@@ -0,0 +1,364 @@
++// GPIO, hardware PWM and stepper-engine "pins" for the UPC cores
++//
++// Copyright (C) 2026  This file may be distributed under the terms of the
++// GNU GPLv3 license.
++//
++// The DP200 has no plain GPIOs reachable from the UPC for its motors and
++// heaters. Instead:
++//  - inputs (endstops etc.) are XENA input pins, read from XIRD/XIRD1;
++//  - heater/fan/clutch/solenoid/motor-current outputs are dec_pwm blocks,
++//    used either at a static level (digital out, Klipper soft PWM) or as
++//    real hardware PWM;
++//  - STEP lines come from the "Gogin" stepper engines. A virtual step pin
++//    issues a one-pulse hardware move on each idle->active transition, so
++//    Klipper's normal step/unstep toggling produces exactly one pulse per
++//    step. DIR and driver-enable are bits in the engine registers.
++
++#include "autoconf.h" // CONFIG_UPC_STEP_HALF_TICKS
++#include "board/irq.h" // irq_save
++#include "command.h" // shutdown
++#include "gpio.h" // gpio_out_setup
++#include "internal.h" // reg_write
++#include "sched.h" // sched_shutdown
++
++DECL_ENUMERATION_RANGE("pin", "xena0", PIN_XENA_BASE, PIN_XENA_COUNT);
++DECL_ENUMERATION_RANGE("pin", "pwm1", PIN_PWM_FIRST, PIN_PWM_COUNT);
++DECL_ENUMERATION_RANGE("pin", "smot_step0", PIN_STEP_BASE, SMOT_COUNT);
++DECL_ENUMERATION_RANGE("pin", "smot_dir0", PIN_DIR_BASE, SMOT_COUNT);
++DECL_ENUMERATION_RANGE("pin", "smot_en0", PIN_EN_BASE, SMOT_COUNT);
++DECL_ENUMERATION_RANGE("pin", "adc0", PIN_ADC_BASE, PIN_ADC_COUNT);
++DECL_ENUMERATION_RANGE("pin", "dsens0", PIN_DSENS_BASE, PIN_DSENS_COUNT);
++
++static uint8_t step_level[SMOT_COUNT], step_idle[SMOT_COUNT];
++static uint8_t dir_level[SMOT_COUNT], en_level[SMOT_COUNT];
++static uint8_t pwm_level[PIN_PWM_COUNT + 1];
++static uint32_t pwm_owned, smot_owned;
++
++static int
++pin_in(uint8_t pin, uint8_t base, uint8_t count)
++{
++    return pin >= base && pin < base + count;
++}
++
++
++/****************************************************************
++ * dec_pwm blocks
++ ****************************************************************/
++
++// Per-block configuration bits (everything except RUN and LEVEL), as left
++// by the stock firmware (dumped from the printer with devmem after a stock
++// boot). Without the stock app nobody else sets them.
++static uint32_t
++pwm_config_bits(uint8_t block)
++{
++    switch (block) {
++    case 6:  return 0x5a;   // clutch: FM microcode writes 0x5a off / 0x5e on
++    case 7:  return 0x18;
++    case 8:  return 0x2a;   // solenoid: FM microcode writes 0x2a off / 0x2e on
++    case 0x1b: case 0x1c: case 0x1d: case 0x1e: case 0x1f:
++        return 0x0a;        // A4982 REF current
++    default: return 0x28;   // fans, heaters (stock IO init: 0x20 | 0x08)
++    }
++}
++
++static void
++pwm_claim(uint8_t block)
++{
++    if (pwm_owned & (1u << (block - 1)))
++        return;
++    pwm_owned |= 1u << (block - 1);
++    uint32_t b = PWM_BLOCK(block);
++    // Output low and stopped, with the stock configuration bits
++    uint32_t c = pwm_config_bits(block) & ~(PWM_CTRL_LEVEL | PWM_CTRL_RUN);
++    reg_write(b + PWM_CTRL, c);
++    upc_lock();
++    reg_write(PWM_GLOBAL_EN, reg_read(PWM_GLOBAL_EN) | (1u << (block - 1)));
++    upc_unlock();
++}
++
++static void
++pwm_static(uint8_t block, uint8_t val)
++{
++    uint32_t b = PWM_BLOCK(block), c = reg_read(b + PWM_CTRL);
++    c = val ? c | PWM_CTRL_LEVEL : c & ~PWM_CTRL_LEVEL;
++    reg_write(b + PWM_CTRL, c);
++    reg_write(b + PWM_CTRL, c & ~PWM_CTRL_RUN);
++    pwm_level[block] = !!val;
++}
++
++DECL_CONSTANT("PWM_MAX", 255);
++
++// Default periods (in PWM clock ticks) used by the stock firmware
++static uint16_t
++pwm_default_period(uint8_t block)
++{
++    if (block >= 1 && block <= 4)
++        return 100;                 // fans
++    if (block == 5 || block == 0x18)
++        return 1000;                // nozzle / bed heater
++    if (block >= 0x1b && block <= 0x1f)
++        return 200;                 // A4982 REF current
++    return 100;
++}
++
++struct gpio_pwm
++gpio_pwm_setup(uint8_t pin, uint32_t cycle_time, uint32_t val)
++{
++    if (!pin_in(pin, PIN_PWM_FIRST, PIN_PWM_COUNT))
++        shutdown("Not a valid PWM pin");
++    // cycle_time is in MCU clock ticks; the dec_pwm clock is unknown, so
++    // the stock period for each block is used instead.
++    struct gpio_pwm g = { .block = pin - PIN_PWM_BASE };
++    g.period = pwm_default_period(g.block);
++    pwm_claim(g.block);
++    gpio_pwm_write(g, val);
++    return g;
++}
++
++void
++gpio_pwm_write(struct gpio_pwm g, uint32_t val)
++{
++    uint32_t high = (val * g.period) / 255;
++    if (!high) {
++        pwm_static(g.block, 0);
++        return;
++    }
++    if (high >= g.period) {
++        pwm_static(g.block, 1);
++        return;
++    }
++    uint32_t b = PWM_BLOCK(g.block);
++    reg_write(b + PWM_HIGH, high);
++    reg_write(b + PWM_LOW, g.period - high);
++    reg_write(b + PWM_CTRL, reg_read(b + PWM_CTRL) | PWM_CTRL_RUN);
++}
++
++
++/****************************************************************
++ * Stepper engines
++ ****************************************************************/
++
++static void
++smot_claim(uint8_t n)
++{
++    if (!CONFIG_UPC_CORE_FM)
++        shutdown("Stepper engines belong to the FM core");
++    if (smot_owned & (1u << n))
++        return;
++    smot_owned |= 1u << n;
++    uint32_t b = SMOT_BASE(n);
++    reg_write(b + SMOT_ABORT, SMOT_DONE_BIT);
++    reg_write(b + SMOT_CLEAR, SMOT_DONE_BIT);
++    reg_write(b + SMOT_ENABLE, 1);
++    reg_write(b + SMOT_PERIOD, CONFIG_UPC_STEP_HALF_TICKS);
++    reg_write(b + SMOT_CTRL, SMOT_CTRL_STOCK | (dir_level[n] ? SMOT_CTRL_DIR : 0));
++}
++
++// Step-rate diagnostics: above ~20k steps/s steps get lost (measured
++// 2026-10-18). Count pulses and pulses requested while the engine still
++// reports busy (+0x64 bit 8); in that case wait for the running pulse (a
++// few us) instead of overwriting it. upc_step_stats reports the counters.
++static uint32_t smot_pulses[SMOT_COUNT], smot_busy_hits[SMOT_COUNT];
++
++static inline void
++smot_pulse(uint8_t n)
++{
++    uint32_t b = SMOT_BASE(n);
++    smot_pulses[n]++;
++    if (reg_read(b + SMOT_STATUS) & SMOT_DONE_BIT) {
++        smot_busy_hits[n]++;
++        // one pulse is 2 edges of CONFIG_UPC_STEP_HALF_TICKS: bound the wait
++        for (uint32_t i = 0; i < 4096; i++)
++            if (!(reg_read(b + SMOT_STATUS) & SMOT_DONE_BIT))
++                break;
++    }
++    reg_write(b + SMOT_CLEAR, SMOT_DONE_BIT);
++    reg_write(b + SMOT_CMD, (2u << 16) | SMOT_MODE_CONST);
++    reg_write(b + SMOT_START, 1);
++}
++
++#if CONFIG_UPC_CORE_FM
++void
++command_upc_step_stats(uint32_t *args)
++{
++    uint8_t n = args[0];
++    if (n >= SMOT_COUNT)
++        shutdown("Invalid engine");
++    sendf("upc_step_stats_result engine=%c pulses=%u busy_hits=%u"
++          , n, smot_pulses[n], smot_busy_hits[n]);
++}
++DECL_COMMAND(command_upc_step_stats, "upc_step_stats engine=%c");
++#endif
++
++static void
++smot_set_dir(uint8_t n, uint8_t val)
++{
++    dir_level[n] = !!val;
++    reg_write(SMOT_BASE(n) + SMOT_CTRL
++              , SMOT_CTRL_STOCK | (val ? SMOT_CTRL_DIR : 0));
++}
++
++static void
++smot_set_disable(uint8_t n, uint8_t val)
++{
++    en_level[n] = !!val;
++    uint32_t a = SMOT_BASE(n) + SMOT_CFG, c = reg_read(a);
++    reg_write(a, val ? c | 1 : c & ~1u);
++}
++
++
++/****************************************************************
++ * Digital outputs
++ ****************************************************************/
++
++struct gpio_out
++gpio_out_setup(uint8_t pin, uint8_t val)
++{
++    struct gpio_out g = { .pin = pin };
++    if (pin_in(pin, PIN_PWM_FIRST, PIN_PWM_COUNT)) {
++        pwm_claim(pin - PIN_PWM_BASE);
++    } else if (pin_in(pin, PIN_STEP_BASE, SMOT_COUNT)) {
++        uint8_t n = pin - PIN_STEP_BASE;
++        smot_claim(n);
++        step_idle[n] = step_level[n] = !!val;
++        return g;
++    } else if (pin_in(pin, PIN_DIR_BASE, SMOT_COUNT)) {
++        smot_claim(pin - PIN_DIR_BASE);
++    } else if (pin_in(pin, PIN_EN_BASE, SMOT_COUNT)) {
++        smot_claim(pin - PIN_EN_BASE);
++    } else {
++        shutdown("Not an output pin");
++    }
++    gpio_out_write(g, val);
++    return g;
++}
++
++void
++gpio_out_reset(struct gpio_out g, uint8_t val)
++{
++    if (pin_in(g.pin, PIN_STEP_BASE, SMOT_COUNT)) {
++        uint8_t n = g.pin - PIN_STEP_BASE;
++        step_idle[n] = step_level[n] = !!val;
++        return;
++    }
++    gpio_out_write(g, val);
++}
++
++void
++gpio_out_write(struct gpio_out g, uint8_t val)
++{
++    uint8_t pin = g.pin;
++    if (pin_in(pin, PIN_PWM_FIRST, PIN_PWM_COUNT)) {
++        pwm_static(pin - PIN_PWM_BASE, val);
++    } else if (pin_in(pin, PIN_STEP_BASE, SMOT_COUNT)) {
++        uint8_t n = pin - PIN_STEP_BASE;
++        val = !!val;
++        if (val != step_level[n]) {
++            step_level[n] = val;
++            if (val != step_idle[n])
++                smot_pulse(n);
++        }
++    } else if (pin_in(pin, PIN_DIR_BASE, SMOT_COUNT)) {
++        smot_set_dir(pin - PIN_DIR_BASE, val);
++    } else if (pin_in(pin, PIN_EN_BASE, SMOT_COUNT)) {
++        smot_set_disable(pin - PIN_EN_BASE, val);
++    }
++}
++
++void
++gpio_out_toggle_noirq(struct gpio_out g)
++{
++    uint8_t pin = g.pin;
++    if (pin_in(pin, PIN_STEP_BASE, SMOT_COUNT)) {
++        uint8_t n = pin - PIN_STEP_BASE;
++        uint8_t val = step_level[n] ^ 1;
++        step_level[n] = val;
++        if (val != step_idle[n])
++            smot_pulse(n);
++    } else if (pin_in(pin, PIN_DIR_BASE, SMOT_COUNT)) {
++        uint8_t n = pin - PIN_DIR_BASE;
++        smot_set_dir(n, !dir_level[n]);
++    } else if (pin_in(pin, PIN_EN_BASE, SMOT_COUNT)) {
++        uint8_t n = pin - PIN_EN_BASE;
++        smot_set_disable(n, !en_level[n]);
++    } else if (pin_in(pin, PIN_PWM_FIRST, PIN_PWM_COUNT)) {
++        uint8_t block = pin - PIN_PWM_BASE;
++        pwm_static(block, !pwm_level[block]);
++    }
++}
++
++void
++gpio_out_toggle(struct gpio_out g)
++{
++    irqstatus_t flag = irq_save();
++    gpio_out_toggle_noirq(g);
++    irq_restore(flag);
++}
++
++
++/****************************************************************
++ * Digital inputs
++ ****************************************************************/
++
++// dec_sensor block (0xf9301000): +0x210 is a sensor status word. Bit 8 is
++// the stock "LV" bed-levelling sensor (FM probing command 0x2a stops when
++// it sets). The stock IO firmware configures the block at boot; do the
++// same if nobody has (values from the stock init trace).
++static void
++dsens_init(void)
++{
++    if (reg_read(DEC_SENSOR_BASE + 0x200) == 0x180)
++        return;
++    static const uint32_t init[][2] = {
++        { 0x070, 0x340 }, { 0x074, 0xa }, { 0x078, 0xc80001 }, { 0x07c, 0x100c8 },
++        { 0x080, 0x340 }, { 0x084, 0xa }, { 0x088, 0xc80001 }, { 0x08c, 0x100c8 },
++        { 0x200, 0x180 },
++    };
++    for (uint32_t i = 0; i < ARRAY_SIZE(init); i++)
++        reg_write(DEC_SENSOR_BASE + init[i][0], init[i][1]);
++}
++
++struct gpio_in
++gpio_in_setup(uint8_t pin, int8_t pull_up)
++{
++    if (pin_in(pin, PIN_DSENS_BASE, PIN_DSENS_COUNT))
++        dsens_init();
++    else if (!pin_in(pin, PIN_XENA_BASE, PIN_XENA_COUNT))
++        shutdown("Not an input pin");
++    // Pull resistors are fixed on the board; pull_up is ignored.
++    return (struct gpio_in){ .pin = pin };
++}
++
++void
++gpio_in_reset(struct gpio_in g, int8_t pull_up)
++{
++}
++
++uint8_t
++gpio_in_read(struct gpio_in g)
++{
++    uint32_t v;
++    if (g.pin >= PIN_DSENS_BASE)
++        v = reg_read(DEC_SENSOR_BASE + 0x210);
++    else
++        v = reg_read(g.pin < 32 ? XENA_XIRD : XENA_XIRD1);
++    return (v >> (g.pin & 31)) & 1;
++}
++
++
++/****************************************************************
++ * Emergency off (fault handler / firmware shutdown)
++ ****************************************************************/
++
++void
++gpio_all_off(void)
++{
++    for (uint8_t block = 1; block <= PIN_PWM_COUNT; block++)
++        if (pwm_owned & (1u << (block - 1)))
++            pwm_static(block, 0);
++    for (uint8_t n = 0; n < SMOT_COUNT; n++)
++        if (smot_owned & (1u << n)) {
++            reg_write(SMOT_BASE(n) + SMOT_ABORT, SMOT_DONE_BIT);
++            smot_set_disable(n, 1);
++        }
++}
+diff --git a/src/upc/gpio.h b/src/upc/gpio.h
+new file mode 100644
+index 0000000..8e6f4cc
+--- /dev/null
++++ b/src/upc/gpio.h
+@@ -0,0 +1,54 @@
++#ifndef __UPC_GPIO_H
++#define __UPC_GPIO_H
++
++#include <stdint.h> // uint8_t
++
++// Pin numbering (names are declared in gpio.c):
++//   0..63    xena0..xena63      XENA input pins (endstops, sensors)
++//   65..96   pwm1..pwm32        dec_pwm blocks (static level or hard PWM)
++//   100..104 smot_step0..4      hardware stepper engine: one pulse per step
++//   105..109 smot_dir0..4       engine direction bit
++//   110..114 smot_en0..4        engine driver-disable bit (1 = disabled)
++//   120..127 adc0..adc7         dec_adc mux select (0 nozzle, 1 bed)
++//   128..159 dsens0..dsens31    dec_sensor +0x210 status bits (dsens8 = LV
++//                               bed-levelling sensor)
++enum {
++    PIN_XENA_BASE = 0, PIN_XENA_COUNT = 64,
++    PIN_PWM_BASE = 64, PIN_PWM_FIRST = 65, PIN_PWM_COUNT = 32,
++    PIN_STEP_BASE = 100, PIN_DIR_BASE = 105, PIN_EN_BASE = 110,
++    PIN_ADC_BASE = 120, PIN_ADC_COUNT = 8,
++    PIN_DSENS_BASE = 128, PIN_DSENS_COUNT = 32,
++};
++
++struct gpio_out {
++    uint8_t pin;
++};
++struct gpio_out gpio_out_setup(uint8_t pin, uint8_t val);
++void gpio_out_reset(struct gpio_out g, uint8_t val);
++void gpio_out_toggle_noirq(struct gpio_out g);
++void gpio_out_toggle(struct gpio_out g);
++void gpio_out_write(struct gpio_out g, uint8_t val);
++
++struct gpio_in {
++    uint8_t pin;
++};
++struct gpio_in gpio_in_setup(uint8_t pin, int8_t pull_up);
++void gpio_in_reset(struct gpio_in g, int8_t pull_up);
++uint8_t gpio_in_read(struct gpio_in g);
++
++struct gpio_pwm {
++    uint8_t block;
++    uint16_t period;
++};
++struct gpio_pwm gpio_pwm_setup(uint8_t pin, uint32_t cycle_time, uint32_t val);
++void gpio_pwm_write(struct gpio_pwm g, uint32_t val);
++
++struct gpio_adc {
++    uint8_t sel;
++};
++struct gpio_adc gpio_adc_setup(uint8_t pin);
++uint32_t gpio_adc_sample(struct gpio_adc g);
++uint16_t gpio_adc_read(struct gpio_adc g);
++void gpio_adc_cancel_sample(struct gpio_adc g);
++
++#endif // gpio.h
+diff --git a/src/upc/include/setjmp.h b/src/upc/include/setjmp.h
+new file mode 100644
+index 0000000..9a26e61
+--- /dev/null
++++ b/src/upc/include/setjmp.h
+@@ -0,0 +1,11 @@
++#ifndef __UPC_SETJMP_H
++#define __UPC_SETJMP_H
++// Minimal setjmp for the freestanding UPC build (implemented in start.S).
++// Saves r4-r11, sp and lr.
++
++typedef int jmp_buf[10];
++
++int setjmp(jmp_buf env) __attribute__((returns_twice));
++void longjmp(jmp_buf env, int val) __attribute__((noreturn));
++
++#endif // setjmp.h
+diff --git a/src/upc/include/string.h b/src/upc/include/string.h
+new file mode 100644
+index 0000000..fea45a9
+--- /dev/null
++++ b/src/upc/include/string.h
+@@ -0,0 +1,15 @@
++#ifndef __UPC_STRING_H
++#define __UPC_STRING_H
++// The few string functions Klipper's core uses (implemented in main.c).
++// The UPC build is freestanding and does not link a C library.
++
++#include <stddef.h> // size_t
++
++void *memcpy(void *dst, const void *src, size_t n);
++void *memmove(void *dst, const void *src, size_t n);
++void *memset(void *dst, int c, size_t n);
++int memcmp(const void *a, const void *b, size_t n);
++void *memchr(const void *s, int c, size_t n);
++int strcmp(const char *a, const char *b);
++
++#endif // string.h
+diff --git a/src/upc/internal.h b/src/upc/internal.h
+new file mode 100644
+index 0000000..402f393
+--- /dev/null
++++ b/src/upc/internal.h
+@@ -0,0 +1,47 @@
++#ifndef __UPC_INTERNAL_H
++#define __UPC_INTERNAL_H
++
++#include <stdint.h>
++#include "autoconf.h" // CONFIG_UPC_CORE_FM
++#include "upc_hw.h"
++#include "upc_ipc.h"
++
++#if CONFIG_UPC_CORE_FM
++ #define UPC_CORE_ID 1
++ #define UPC_IPC_OFFSET IPC_FM_OFFSET
++#else
++ #define UPC_CORE_ID 0
++ #define UPC_IPC_OFFSET IPC_IO_OFFSET
++#endif
++
++#define UPC_IPC ((struct ipc_header *)(UPC_DTCM_BASE + UPC_IPC_OFFSET))
++#define UPC_SHARED ((struct ipc_shared *)(UPC_DTCM_BASE + IPC_SHARED_OFFSET))
++
++static inline uint32_t reg_read(uint32_t addr)
++{
++    return *(volatile uint32_t *)addr;
++}
++
++static inline void reg_write(uint32_t addr, uint32_t val)
++{
++    *(volatile uint32_t *)addr = val;
++}
++
++// Peterson lock between the two UPC cores (main.c)
++void upc_lock(void);
++void upc_unlock(void);
++
++// main.c
++void console_poll(void);
++void upc_outputs_off(void);
++
++// timer.c
++void timer_boot(void);
++uint8_t timer_pending(void);
++void timer_clear_pending(void);
++void timer_set(uint32_t next);
++
++// gpio.c
++void gpio_all_off(void);
++
++#endif // internal.h
+diff --git a/src/upc/main.c b/src/upc/main.c
+new file mode 100644
+index 0000000..06842bc
+--- /dev/null
++++ b/src/upc/main.c
+@@ -0,0 +1,299 @@
++// Main entry, console and fault handling for the UPC cores
++//
++// Copyright (C) 2026  This file may be distributed under the terms of the
++// GNU GPLv3 license.
++//
++// Modelled on the AR100 port: no interrupts, everything is polled from
++// irq_poll(). The "serial port" is a pair of byte rings in DTCM that
++// 'upctool bridge' on Linux connects to a pty for klippy.
++
++#include <stddef.h> // size_t
++#include <string.h> // memcpy
++#include "autoconf.h" // CONFIG_MCU
++#include "board/irq.h" // irq_disable
++#include "board/misc.h" // dynmem_start
++#include "command.h" // DECL_CONSTANT_STR
++#include "generic/serial_irq.h" // serial_rx_byte
++#include "generic/timer_irq.h" // timer_dispatch_many_polling
++#include "internal.h" // UPC_IPC
++#include "sched.h" // sched_main
++
++DECL_CONSTANT_STR("MCU", CONFIG_MCU);
++
++#define RING_MASK (IPC_RING_SIZE - 1)
++
++
++/****************************************************************
++ * Freestanding C library helpers (gcc may emit calls to these)
++ ****************************************************************/
++
++void * __visible
++memcpy(void *dst, const void *src, size_t n)
++{
++    uint8_t *d = dst;
++    const uint8_t *s = src;
++    while (n--)
++        *d++ = *s++;
++    return dst;
++}
++
++void * __visible
++memmove(void *dst, const void *src, size_t n)
++{
++    uint8_t *d = dst;
++    const uint8_t *s = src;
++    if (d < s) {
++        while (n--)
++            *d++ = *s++;
++    } else {
++        d += n;
++        s += n;
++        while (n--)
++            *--d = *--s;
++    }
++    return dst;
++}
++
++void * __visible
++memset(void *dst, int c, size_t n)
++{
++    uint8_t *d = dst;
++    while (n--)
++        *d++ = c;
++    return dst;
++}
++
++int __visible
++memcmp(const void *a, const void *b, size_t n)
++{
++    const uint8_t *x = a, *y = b;
++    for (; n--; x++, y++)
++        if (*x != *y)
++            return *x - *y;
++    return 0;
++}
++
++int __visible
++strcmp(const char *a, const char *b)
++{
++    while (*a && *a == *b)
++        a++, b++;
++    return (uint8_t)*a - (uint8_t)*b;
++}
++
++void * __visible
++memchr(const void *s, int c, size_t n)
++{
++    const uint8_t *p = s;
++    for (; n--; p++)
++        if (*p == (uint8_t)c)
++            return (void *)p;
++    return NULL;
++}
++
++
++/****************************************************************
++ * Dynamic memory pool (move queues etc.)
++ ****************************************************************/
++
++static uint32_t dynmem_pool[CONFIG_UPC_DYNMEM_SIZE / 4];
++
++void *
++dynmem_start(void)
++{
++    return dynmem_pool;
++}
++
++void *
++dynmem_end(void)
++{
++    return &dynmem_pool[ARRAY_SIZE(dynmem_pool)];
++}
++
++
++/****************************************************************
++ * Cross-core lock (Peterson's algorithm on uncached DTCM)
++ ****************************************************************/
++
++void
++upc_lock(void)
++{
++    struct ipc_shared *s = UPC_SHARED;
++    const uint32_t me = UPC_CORE_ID, other = 1 - UPC_CORE_ID;
++    s->flag[me] = 1;
++    s->turn = other;
++    barrier();
++    while (s->flag[other] && s->turn == other)
++        ;
++}
++
++void
++upc_unlock(void)
++{
++    barrier();
++    UPC_SHARED->flag[UPC_CORE_ID] = 0;
++}
++
++
++/****************************************************************
++ * Console: DTCM rings <-> generic/serial_irq.c
++ ****************************************************************/
++
++static uint8_t need_tx;
++
++void
++console_poll(void)
++{
++    struct ipc_header *h = UPC_IPC;
++    // Host -> MCU
++    uint32_t head = h->rx_head, tail = h->rx_tail;
++    if (head != tail) {
++        barrier();
++        while (tail != head)
++            serial_rx_byte(h->rx[tail++ & RING_MASK]);
++        barrier();
++        h->rx_tail = tail;
++    }
++    // MCU -> host
++    if (need_tx) {
++        head = h->tx_head;
++        tail = h->tx_tail;
++        while (head - tail < IPC_RING_SIZE) {
++            uint8_t b;
++            if (serial_get_tx_byte(&b) < 0) {
++                need_tx = 0;
++                break;
++            }
++            h->tx[head++ & RING_MASK] = b;
++        }
++        barrier();
++        h->tx_head = head;
++    }
++}
++
++void
++serial_enable_tx_irq(void)
++{
++    need_tx = 1;
++    console_poll();
++}
++
++
++/****************************************************************
++ * Interrupt / polling glue
++ ****************************************************************/
++
++void
++irq_disable(void)
++{
++}
++
++void
++irq_enable(void)
++{
++}
++
++irqstatus_t
++irq_save(void)
++{
++    return 0;
++}
++
++void
++irq_restore(irqstatus_t flag)
++{
++}
++
++void
++timer_dispatch_irq_poll(void)
++{
++}
++
++void
++timer_dispatch_task_poll(void)
++{
++    console_poll();
++}
++
++void
++irq_poll(void)
++{
++    if (timer_pending()) {
++        timer_clear_pending();
++        uint32_t next = timer_dispatch_many_polling();
++        timer_set(next);
++    }
++    console_poll();
++    UPC_IPC->heartbeat++;
++}
++
++void
++irq_wait(void)
++{
++    irq_poll();
++}
++
++
++/****************************************************************
++ * Faults, shutdown and reset
++ ****************************************************************/
++
++// Called from start.S on any exception. Never resumes in Klipper.
++int __visible
++upc_fault(uint32_t vector, uint32_t addr, uint32_t spsr, uint32_t *frame)
++{
++    gpio_all_off();
++    struct ipc_header *h = UPC_IPC;
++    h->fault_type = vector;
++    h->fault_lr = addr;
++    h->fault_spsr = spsr;
++    h->fault_count++;
++    h->state = IPC_STATE_FAULT;
++    for (;;)
++        ;
++    return 0;
++}
++
++void
++upc_shutdown(void)
++{
++    UPC_IPC->state = IPC_STATE_SHUTDOWN;
++}
++DECL_SHUTDOWN(upc_shutdown);
++
++void
++command_reset(uint32_t *args)
++{
++    // Restart from the reset vector: start.S re-copies .data and clears
++    // .bss (the ITCM image is untouched). Outputs keep their shutdown state.
++    gpio_all_off();
++    void (*reset)(void) = (void *)UPC_ITCM_BASE;
++    reset();
++}
++DECL_COMMAND_FLAGS(command_reset, HF_IN_SHUTDOWN, "reset");
++
++static void
++ipc_init(void)
++{
++    struct ipc_header *h = UPC_IPC;
++    h->magic = 0;
++    h->version = IPC_VERSION;
++    h->fw_id = 0x31504c4b;      // "KLP1"
++    h->state = IPC_STATE_BOOT;
++    // Discard stale data in both directions; each side owns one index
++    h->rx_tail = h->rx_head;
++    h->tx_head = h->tx_tail;
++    barrier();
++    h->state = IPC_STATE_RUNNING;
++    h->magic = IPC_MAGIC;
++}
++
++void __visible __noreturn
++upc_main(void)
++{
++    timer_boot();
++    ipc_init();
++    sched_main();
++    for (;;)
++        ;
++}
+diff --git a/src/upc/start.S b/src/upc/start.S
+new file mode 100644
+index 0000000..ef62a58
+--- /dev/null
++++ b/src/upc/start.S
+@@ -0,0 +1,125 @@
++// Reset/exception entry for the Marvell UPC cores (ARMv5TE, ARM mode).
++//
++// The core starts at address 0 (ITCM) with interrupts masked when Linux
++// releases CPUSoftReset. We never enable interrupts: Klipper runs fully
++// polled, like the AR100 port. Exceptions are reported through the IPC
++// header by upc_fault(), which also forces outputs off.
++
++    .syntax unified
++    .arm
++    .section .text.vectors, "ax"
++    .global _start
++_start:
++    b       reset
++    b       undef_entry
++    b       swi_entry
++    b       pabort_entry
++    b       dabort_entry
++    b       .
++    b       irq_entry
++    b       fiq_entry
++
++reset:
++    msr     cpsr_c, #0xd2           // IRQ mode, IRQ+FIQ masked
++    ldr     sp, =__stack_irq_top
++    msr     cpsr_c, #0xd1           // FIQ mode
++    ldr     sp, =__stack_irq_top
++    msr     cpsr_c, #0xd7           // ABT mode
++    ldr     sp, =__stack_abt_top
++    msr     cpsr_c, #0xdb           // UND mode
++    ldr     sp, =__stack_und_top
++    msr     cpsr_c, #0xd3           // SVC mode - we run here
++    ldr     sp, =__stack_top
++
++    // Copy .data from ITCM to DTCM, clear .bss
++    ldr     r0, =__data_load
++    ldr     r1, =__data_start
++    ldr     r2, =__data_end
++1:  cmp     r1, r2
++    ldrlo   r3, [r0], #4
++    strlo   r3, [r1], #4
++    blo     1b
++    ldr     r1, =__bss_start
++    ldr     r2, =__bss_end
++    mov     r3, #0
++2:  cmp     r1, r2
++    strlo   r3, [r1], #4
++    blo     2b
++
++    bl      upc_main
++3:  b       3b
++
++// Exception entries. Each pushes r0-r3,r12 and the resume address, sets
++// r0 = vector number and r1 = faulting instruction, then calls
++// int upc_fault(uint32_t vector, uint32_t addr, uint32_t spsr,
++//               uint32_t *frame)
++// frame[0..4] = saved r0-r3,r12, frame[5] = resume address. A nonzero
++// return resumes at frame[5] (the probe firmware uses this to survive
++// reads of unmapped addresses); Klipper never resumes.
++
++undef_entry:                        // lr = faulting + 4 = resume address
++    stmfd   sp!, {r0-r3, r12, lr}
++    mov     r0, #1
++    sub     r1, lr, #4
++    b       fault_common
++swi_entry:
++    stmfd   sp!, {r0-r3, r12, lr}
++    mov     r0, #2
++    sub     r1, lr, #4
++    b       fault_common
++pabort_entry:                       // lr = faulting + 4; never resumable
++    stmfd   sp!, {r0-r3, r12, lr}
++    mov     r0, #3
++    sub     r1, lr, #4
++    b       fault_common
++dabort_entry:                       // lr = faulting + 8
++    sub     lr, lr, #4              // resume at the next instruction
++    stmfd   sp!, {r0-r3, r12, lr}
++    mov     r0, #4
++    sub     r1, lr, #4
++    b       fault_common
++irq_entry:                          // should never happen (IRQs masked)
++    sub     lr, lr, #4
++    stmfd   sp!, {r0-r3, r12, lr}
++    mov     r0, #6
++    mov     r1, lr
++    b       fault_common
++fiq_entry:
++    sub     lr, lr, #4
++    stmfd   sp!, {r0-r3, r12, lr}
++    mov     r0, #7
++    mov     r1, lr
++    b       fault_common
++
++fault_common:
++    mrs     r2, spsr
++    mov     r3, sp
++    bl      upc_fault
++    cmp     r0, #0
++4:  beq     4b
++    ldmfd   sp!, {r0-r3, r12, pc}^
++
++    .ltorg
++
++// int setjmp(jmp_buf env) / void longjmp(jmp_buf env, int val)
++// Used by Klipper's sched.c for shutdown handling.
++    .section .text.setjmp, "ax"
++    .global setjmp
++    .type setjmp, %function
++setjmp:
++    mov     r2, sp
++    stmia   r0, {r4-r11}
++    str     r2, [r0, #32]
++    str     lr, [r0, #36]
++    mov     r0, #0
++    bx      lr
++
++    .global longjmp
++    .type longjmp, %function
++longjmp:
++    ldmia   r0, {r4-r11}
++    ldr     sp, [r0, #32]
++    ldr     lr, [r0, #36]
++    movs    r0, r1
++    moveq   r0, #1
++    bx      lr
+diff --git a/src/upc/timer.c b/src/upc/timer.c
+new file mode 100644
+index 0000000..783c5ef
+--- /dev/null
++++ b/src/upc/timer.c
+@@ -0,0 +1,116 @@
++// Polled timer for the UPC cores
++//
++// Copyright (C) 2026  This file may be distributed under the terms of the
++// GNU GPLv3 license.
++//
++// No interrupts are used: irq_poll() (main.c) checks timer_pending() and
++// runs timer_dispatch_many_polling(), exactly like the AR100 port.
++//
++// Timebase (measured on the printer with the probe firmware): the UPC has
++// no free-running counter. XENA Timer1 is a 32-bit one-shot down-counter
++// at ~395.8 MHz (2 x the dithered 198 MHz bus clock); loaded with
++// 0xffffffff it runs ~10.8 s and stops at 0. The FM core reloads it before
++// it runs out and adds the elapsed ticks to a shared accumulator in DTCM;
++// both cores compute time = acc + (RELOAD - Timer1) under a seqlock, so
++// the two Klipper MCUs share one continuous clock. The IO core never
++// writes the timer. The FM core must be running for the IO core's clock
++// to advance past one Timer1 period.
++
++#include "autoconf.h" // CONFIG_UPC_TIMER_ADDR
++#include "board/misc.h" // timer_read_time
++#include "internal.h" // reg_read
++#include "sched.h" // DECL_INIT
++
++#define TIMER_RELOAD 0xffffffffu
++#define TIMER_RELOAD_BELOW 0x40000000u  // ~8 s of headroom
++
++static uint32_t timer_compare, timer_boot_offset;
++static uint8_t timer_armed;
++
++// Shared Timer1-based count (same on both cores)
++static uint32_t
++shared_time(void)
++{
++    struct ipc_shared *sh = UPC_SHARED;
++#if CONFIG_UPC_CORE_FM
++    uint32_t raw = reg_read(CONFIG_UPC_TIMER_ADDR);
++    if (unlikely(raw < TIMER_RELOAD_BELOW)) {
++        sh->timer_seq++;
++        barrier();
++        sh->timer_acc += TIMER_RELOAD - raw;
++        reg_write(CONFIG_UPC_TIMER_ADDR, TIMER_RELOAD);
++        // The write may take a few cycles to land; a read in between would
++        // still see the old small value and reload (double count) again.
++        while (reg_read(CONFIG_UPC_TIMER_ADDR) < TIMER_RELOAD_BELOW)
++            ;
++        barrier();
++        sh->timer_seq++;
++        raw = TIMER_RELOAD;
++    }
++    return sh->timer_acc + (TIMER_RELOAD - raw);
++#else
++    for (;;) {
++        uint32_t seq = sh->timer_seq;
++        barrier();
++        if (seq & 1)
++            continue;
++        uint32_t acc = sh->timer_acc;
++        uint32_t raw = reg_read(CONFIG_UPC_TIMER_ADDR);
++        barrier();
++        if (sh->timer_seq == seq)
++            return acc + (TIMER_RELOAD - raw);
++    }
++#endif
++}
++
++// Return the current time (in absolute clock ticks). Klipper assumes the
++// clock starts near zero at boot (sched.c's periodic_timer starts at 0 and
++// advances 100 ms per run), so each core counts from its own boot.
++uint32_t
++timer_read_time(void)
++{
++    return shared_time() - timer_boot_offset;
++}
++
++// Called from upc_main() before any Klipper code runs (and again after a
++// "reset" command, which restarts at the reset vector).
++void
++timer_boot(void)
++{
++    timer_boot_offset = shared_time();
++}
++
++uint8_t
++timer_pending(void)
++{
++    return timer_armed && !timer_is_before(timer_read_time(), timer_compare);
++}
++
++void
++timer_clear_pending(void)
++{
++    timer_armed = 0;
++}
++
++// Set the next timer wake up time
++void
++timer_set(uint32_t next)
++{
++    timer_compare = next;
++    timer_armed = 1;
++}
++
++// Activate timer dispatch as soon as possible
++void
++timer_kick(void)
++{
++    timer_set(timer_read_time() + 50);
++}
++
++void
++timer_init(void)
++{
++    // On the FM core the first timer_read_time() starts a stopped Timer1
++    timer_kick();
++}
++DECL_INIT(timer_init);
+diff --git a/src/upc/upc.lds.S b/src/upc/upc.lds.S
+new file mode 100644
+index 0000000..29f876a
+--- /dev/null
++++ b/src/upc/upc.lds.S
+@@ -0,0 +1,57 @@
++/* Linker script for the UPC cores: code + constants in ITCM, data in the
++ * core's slice of the shared DTCM (see upc_ipc.h for the DTCM map). */
++
++#include "autoconf.h"
++
++#if CONFIG_UPC_CORE_FM
++#define UPC_DATA_BASE   0x04020000
++#define UPC_STACK_BASE  0x04038000
++#else
++#define UPC_DATA_BASE   0x04028000
++#define UPC_STACK_BASE  0x04030000
++#endif
++
++OUTPUT_FORMAT("elf32-littlearm")
++ENTRY(_start)
++
++MEMORY
++{
++  itcm  (rx) : ORIGIN = 0x00000000,     LENGTH = CONFIG_UPC_ITCM_SIZE
++  dram  (rw) : ORIGIN = UPC_DATA_BASE,  LENGTH = 0x8000
++  stack (rw) : ORIGIN = UPC_STACK_BASE, LENGTH = 0x8000
++}
++
++SECTIONS
++{
++  .text : {
++    KEEP(*(.text.vectors))
++    *(.text .text.*)
++    *(.rodata .rodata.*)
++    . = ALIGN(4);
++  } > itcm
++
++  .data : {
++    __data_start = .;
++    *(.data .data.*)
++    . = ALIGN(4);
++    __data_end = .;
++  } > dram AT > itcm
++  __data_load = LOADADDR(.data);
++
++  .bss (NOLOAD) : {
++    __bss_start = .;
++    *(.bss .bss.* COMMON)
++    . = ALIGN(4);
++    __bss_end = .;
++  } > dram
++
++  __stack_irq_top = ORIGIN(stack) + 0x400;
++  __stack_abt_top = ORIGIN(stack) + 0x800;
++  __stack_und_top = ORIGIN(stack) + 0xc00;
++  __stack_top     = ORIGIN(stack) + LENGTH(stack);
++
++  /DISCARD/ : {
++    *(.ARM.exidx*) *(.ARM.extab*) *(.comment) *(.note*)
++    *(.compile_time_request)
++  }
++}
+diff --git a/src/upc/upc_hw.h b/src/upc/upc_hw.h
+new file mode 100644
+index 0000000..0812c45
+--- /dev/null
++++ b/src/upc/upc_hw.h
+@@ -0,0 +1,134 @@
++// Sindoh DP200 / Marvell 88PA6170 "Gemstone" UPC hardware definitions.
++//
++// Everything here was recovered from the stock firmware (upc.ko, the
++// fm/io UPC microcode and the main printer program). See
++// docs/hardware_notes.md for the evidence behind each value. Items
++// marked UNVERIFIED have not been observed on real hardware yet.
++//
++// Addresses are as seen by the UPC cores. SoC peripherals (UART, stepper
++// engines, dec_*) are at their physical addresses, which is also what
++// Linux sees through /dev/mem.
++
++#ifndef __UPC_HW_H
++#define __UPC_HW_H
++
++// ---------------------------------------------------------------------
++// Memory map (UPC view)
++// ---------------------------------------------------------------------
++#define UPC_ITCM_BASE       0x00000000u
++#define UPC_ITCM_SIZE       0x00004000u   // 16 KiB, limit enforced by upc.ko
++#define UPC_DTCM_BASE       0x04000000u
++#define UPC_DTCM_SIZE       0x00040000u   // 256 KiB, shared by both cores
++#define XENA_BASE           0x08000000u   // UPC-local register block
++
++// ---------------------------------------------------------------------
++// XENA registers (offsets from upc.ko DWARF: struct XENA_REGS_s)
++// ---------------------------------------------------------------------
++#define XENA_PHASE(n)       (XENA_BASE + 0x094 + 4 * (n))
++#define XENA_MAILBOX0       (XENA_BASE + 0x128)
++#define XENA_MAILBOX1       (XENA_BASE + 0x12c)
++#define XENA_GPSTATUS       (XENA_BASE + 0x150) // bit0/bit1 raise Linux IRQs
++#define XENA_CPUSOFTRESET   (XENA_BASE + 0x154)
++#define XENA_PHASEREF       (XENA_BASE + 0x158)
++#define XENA_PERFMON0_TIMER (XENA_BASE + 0x204)
++#define XENA_PERFMON1_TIMER (XENA_BASE + 0x264)
++#define XENA_ENCPOS         (XENA_BASE + 0x1084)
++#define XENA_STATUS         (XENA_BASE + 0x1124)
++#define XENA_PSEUDOENCODER  (XENA_BASE + 0x1128)
++#define XENA_MAILBOX(n)     (XENA_BASE + 0x1130 + 4 * ((n) - 2)) // n = 2..5
++#define XENA_TIMER(n)       (XENA_BASE + 0x1140 + 4 * (n))      // n = 0..3
++#define XENA_XIIC(n)        (XENA_BASE + 0x1268 + 4 * (n))      // input cfg
++#define XENA_XIRW           (XENA_BASE + 0x1650)
++#define XENA_XIRD           (XENA_BASE + 0x1658) // input pins 0..31
++#define XENA_XIRD1          (XENA_BASE + 0x165c) // input pins 32..63
++#define XENA_IRQEN_FM       (XENA_BASE + 0x1800)
++#define XENA_FIQEN_FM       (XENA_BASE + 0x1820)
++#define XENA_INTPOST_FM     (XENA_BASE + 0x1840)
++#define XENA_INTCLR_FM      (XENA_BASE + 0x1860)
++#define XENA_IRQEN_IO       (XENA_BASE + 0x1880)
++#define XENA_FIQEN_IO       (XENA_BASE + 0x18a0)
++#define XENA_INTPOST_IO     (XENA_BASE + 0x18c0)
++#define XENA_INTCLR_IO      (XENA_BASE + 0x18e0)
++
++// Stock interrupt bits (we run with interrupts disabled, listed for reference)
++#define XENA_INT_TIMER0     (1u << 0)   // IO core periodic tick
++#define XENA_INT_IO_CMD     (1u << 5)   // IO core command from Linux
++#define XENA_INT_FM_ESTOP   (1u << 4)   // FM FIQ: emergency stop
++#define XENA_INT_FM_AUX     (1u << 6)
++#define XENA_INT_FM_CMD     (1u << 9)   // FM command (Linux wrote mailbox 5)
++
++// ---------------------------------------------------------------------
++// Debug UART (16550-style, shared with the Linux console ttyS0!)
++// ---------------------------------------------------------------------
++#define UART_THR            0xf8060000u
++#define UART_LSR            0xf8060014u
++#define UART_LSR_THRE       0x20u
++#define UART_LSR_TEMT       0x40u
++
++// ---------------------------------------------------------------------
++// "Gogin" hardware stepper pulse engines, 200 MHz timebase
++// engine 0 = X, 1 = Y, 2 = Z, 3 = E, 4 = C (cartridge, unused on DP200?)
++// ---------------------------------------------------------------------
++#define SMOT_COUNT          5
++#define SMOT_BASE(n)        (0xf8150000u + 0x1000u * (n))
++#define SMOT_ABORT          0x04  // write 0x100 to stop a running move
++#define SMOT_CFG            0x0c  // bit0 = 1: A4982 driver disabled
++#define SMOT_CTRL           0x44  // stock value 0x33224, bit4 = direction
++#define SMOT_ENABLE         0x50  // stock writes 1 before each move
++#define SMOT_RAMP_LEN       0x54
++#define SMOT_PERIOD         0x58  // ticks per output edge (half step period)
++#define SMOT_CMD            0x5c  // (edges << 16) | mode; edges = 2 * steps
++#define SMOT_START          0x60  // write 1
++#define SMOT_STATUS         0x64
++#define SMOT_DONE           0x88  // bit8 = move finished
++#define SMOT_CLEAR          0x8c  // write 0x100 to clear done
++#define SMOT_CTRL_STOCK     0x33224u
++#define SMOT_CTRL_DIR       0x10u
++#define SMOT_MODE_CONST     0x1u
++#define SMOT_MODE_RAMP      0x2u
++#define SMOT_DONE_BIT       0x100u
++#define SMOT_CLOCK_HZ       200000000u
++
++// ---------------------------------------------------------------------
++// dec_pwm: register block N at PWM_BASE + 0x100*N (N = 1..32),
++// global enable bit (N-1) in PWM_GLOBAL_EN.
++// Stock users: 1-4 fans (period 100), 5 nozzle heater (period 1000),
++// 6 clutch, 8 solenoid, 0x18 bed heater (period 1000),
++// 0x1b/0x1d/0x1e/0x1f motor current REF X/Y/Z/E (period 200).
++// ---------------------------------------------------------------------
++#define PWM_BASE            0xf9304000u
++#define PWM_GLOBAL_EN       PWM_BASE
++#define PWM_BLOCK(n)        (PWM_BASE + 0x100u * (n))
++#define PWM_CTRL            0x00  // bit0 run, bit2 static level when not running
++#define PWM_HIGH            0x08  // ticks high
++#define PWM_LOW             0x0c  // ticks low
++#define PWM_STATUS          0x20  // bit31 + [15:0] current position
++#define PWM_CTRL_RUN        0x1u
++#define PWM_CTRL_LEVEL      0x4u
++#define PWM_FIRST_BLOCK     1
++#define PWM_NUM_BLOCKS      32
++
++// ---------------------------------------------------------------------
++// dec_adc: 10-entry sample FIFO, mux select in the 0x200.. words.
++// Stock: select 0 = nozzle thermistor, 1 = bed thermistor.
++// Samples are 10 bit; stock code scales to 11 bit (x 2048/1023), drops
++// min and max and averages the remaining 8.
++// ---------------------------------------------------------------------
++#define ADC_BASE            0xf930a000u
++#define ADC_CTRL            (ADC_BASE + 0x000)
++#define ADC_CFG1            (ADC_BASE + 0x004)
++#define ADC_CFG2            (ADC_BASE + 0x008)
++#define ADC_FIFO(n)         (ADC_BASE + 0x180 + 4 * (n)) // n = 0..9
++#define ADC_MUX(n)          (ADC_BASE + 0x200 + 4 * (n)) // n = 0..8
++#define ADC_MUX_LAST        (ADC_BASE + 0x224)
++#define ADC_SEQ             (ADC_BASE + 0x2bc)
++#define ADC_FIFO_LEN        10
++#define ADC_RAW_MAX         1023
++#define ADC_CTRL_RUN        0x7770c006u   // io_2870(7,7,7,0,3,0,0,1,1)
++#define ADC_CFG1_VAL        0x00244d01u   // io_28fc(0,0x24,0x4d,1)
++#define ADC_MUX_WORD(sel)   (0x00010100u | (sel))
++
++#define DEC_SENSOR_BASE     0xf9301000u   // 2 encoder channels
++#define DEC_CONFIG_BASE     0xf9300000u
++
++#endif // upc_hw.h
+diff --git a/src/upc/upc_ipc.h b/src/upc/upc_ipc.h
+new file mode 100644
+index 0000000..1805502
+--- /dev/null
++++ b/src/upc/upc_ipc.h
+@@ -0,0 +1,113 @@
++// Shared-memory layout between Linux (upctool) and our UPC firmware.
++//
++// Everything lives in the 256 KiB DTCM, which both UPC cores and Linux
++// (via /dev/mem) can access while the cores run. Offsets are relative to
++// the DTCM base; the UPC sees DTCM at 0x04000000.
++//
++// DTCM use:
++//   0x00000-0x0ffff  free (stock firmware tables lived here; unused by us)
++//   0x10000-0x13fff  IPC block for the FM core (upc1)
++//   0x14000-0x17fff  IPC block for the IO core (upc0)
++//   0x18000-0x18fff  cross-core shared state (locks)
++//   0x20000-0x27fff  FM core .data/.bss/heap
++//   0x28000-0x2ffff  IO core .data/.bss/heap
++//   0x30000-0x37fff  IO core stacks
++//   0x38000-0x3ffff  FM core stacks
++//
++// Rings are single-producer/single-consumer with free-running 32-bit
++// indices; the producer writes data, then a barrier, then its index.
++
++#ifndef __UPC_IPC_H
++#define __UPC_IPC_H
++
++#include <stdint.h>
++
++#define IPC_MAGIC           0x50554c4bu   // "KLUP"
++#define IPC_VERSION         1u
++#define IPC_FM_OFFSET       0x10000u
++#define IPC_IO_OFFSET       0x14000u
++#define IPC_BLOCK_SIZE      0x4000u
++#define IPC_SHARED_OFFSET   0x18000u
++#define IPC_RING_SIZE       0x1000u       // power of two
++#define IPC_PROBE_OFFSET    0x2100u       // probe report inside an IPC block
++
++enum {
++    IPC_STATE_BOOT = 0, IPC_STATE_RUNNING = 1, IPC_STATE_SHUTDOWN = 2,
++    IPC_STATE_PARKED = 3, IPC_STATE_FAULT = 0xdeadu,
++};
++
++struct ipc_header {
++    uint32_t magic;          // written last by firmware once initialized
++    uint32_t version;
++    uint32_t state;          // IPC_STATE_*
++    uint32_t heartbeat;      // incremented by firmware main loop
++    uint32_t fault_type;     // exception vector number when state == FAULT
++    uint32_t fault_lr;
++    uint32_t fault_spsr;
++    uint32_t fault_count;
++    uint32_t fw_id;          // firmware identification ('PRB1', 'KLP1', ...)
++    uint32_t reserved[7];
++    // host -> UPC ring
++    volatile uint32_t rx_head;   // written by host
++    volatile uint32_t rx_tail;   // written by UPC
++    uint32_t pad0[2];
++    // UPC -> host ring
++    volatile uint32_t tx_head;   // written by UPC
++    volatile uint32_t tx_tail;   // written by host
++    uint32_t pad1[2];
++    uint32_t pad2[(0x100 - 0x60) / 4];
++    uint8_t rx[IPC_RING_SIZE];   // at +0x100
++    uint8_t tx[IPC_RING_SIZE];   // at +0x1100
++};
++
++// Two-core Peterson lock (no atomic instructions needed) protecting
++// read-modify-write of shared peripheral registers such as PWM_GLOBAL_EN.
++struct ipc_shared {
++    volatile uint32_t flag[2];   // [0] = IO core, [1] = FM core
++    volatile uint32_t turn;
++    // Shared timebase (see klipper/src/upc/timer.c): XENA Timer1 is a
++    // one-shot down-counter; the FM core reloads it and accumulates the
++    // elapsed ticks here. Odd timer_seq = update in progress.
++    volatile uint32_t timer_seq;
++    volatile uint32_t timer_acc;
++    uint32_t reserved[11];
++};
++
++// ---------------------------------------------------------------------
++// Probe firmware report (fw_id 'PRB1'), at IPC block + IPC_PROBE_OFFSET
++// ---------------------------------------------------------------------
++#define PROBE_NUM_COUNTERS  16
++#define PROBE_NUM_TCM_TESTS 8
++
++struct probe_counter {
++    uint32_t addr;
++    uint32_t first;          // value at start
++    uint32_t last;           // latest value
++    uint32_t changes;        // number of loop iterations where it changed
++    uint32_t increases;      // ... and the new value was larger
++    uint32_t decreases;      // ... and the new value was smaller
++};
++
++struct probe_report {
++    uint32_t magic;          // IPC_MAGIC once filled
++    uint32_t loops;          // main loop iterations
++    uint32_t core;           // 0 = IO core, 1 = FM core
++    uint32_t cpsr;
++    uint32_t cp15_id;        // CP15 c0 main ID register
++    uint32_t cp15_ctrl;      // CP15 c1 control register
++    uint32_t cp15_tcm;       // CP15 c0 TCM status (ARM946/966 style)
++    uint32_t thumb_ok;       // 0x7b = Thumb call returned correctly
++    uint32_t dtcm_exec_ok;   // 0xe1 = code copied to DTCM executed
++    uint32_t aborts;         // data/prefetch aborts taken during probing
++    uint32_t xird, xird1;    // live input pins
++    uint32_t xird_or, xird1_or;      // OR of all samples since start
++    uint32_t xird_and, xird1_and;    // AND of all samples since start
++    uint32_t adc_enabled;    // 1 if ADC sampling ran (IO core only)
++    uint32_t adc_fifo[2][10];// raw FIFO for mux select 0 / 1
++    uint32_t adc_code[2];    // stock-style averaged 11-bit code
++    uint32_t tcm_probe_addr[PROBE_NUM_TCM_TESTS];
++    uint32_t tcm_probe_result[PROBE_NUM_TCM_TESTS]; // 1 ok, 2 abort, 3 mismatch
++    struct probe_counter ctr[PROBE_NUM_COUNTERS];
++};
++
++#endif // upc_ipc.h
+-- 
+2.47.3
+

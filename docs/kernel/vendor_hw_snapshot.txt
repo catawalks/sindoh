@@ -1,0 +1,1333 @@
+00000000-1fffffff : System RAM
+  00008000-0056efff : Kernel text
+  00980000-00a61fc3 : Kernel data
+f8000000-fa3fffff : regs
+  f8000000-fa3fffff : regs
+    f8000000-f80006ff : apb_config
+      f8000000-f80002ff : Gogin APB Config Regs
+    f8010000-f8010007 : tsen.0
+    f8040000-f8040053 : gpio.0
+    f8041000-f8041053 : gpio.1
+    f8042000-f8042053 : gpio.2
+    f8043000-f8043053 : gpio.3
+    f8044000-f8044053 : gpio.4
+    f8045000-f8045053 : gpio.5
+    f8046000-f8046053 : gpio.6
+    f8047000-f8047053 : gpio.7
+    f8060000-f806001f : serial
+    f8061000-f806101f : serial
+    f8062000-f806201f : serial
+    f8063000-f806301f : serial
+    f8070000-f8070100 : spi base 0
+      f8070000-f8070100 : dw_spi_mmio
+    f8071000-f8071100 : spi base 1
+      f8071000-f8071100 : dw_spi_mmio
+    f8072000-f8072100 : spi base 2
+      f8072000-f8072100 : dw_spi_mmio
+    f80a2000-f80a20ff : i2c_designware.2
+      f80a2000-f80a20ff : i2c_designware
+    f80a3000-f80a30ff : i2c_designware.3
+      f80a3000-f80a30ff : i2c_designware
+    f80d0000-f80d007f : efuse
+    f80f0000-f80f001c : tsen.0
+    f8100000-f810002f : Gogin Real Time Clock Regs
+      f8100000-f810002f : gogin-rtc
+    f8140000-f8140fff : dcmotor_6pin_block0
+    f8141000-f8141fff : dcmotor_6pin_block1
+    f8142000-f8142fff : dcmotor_6pin_block2
+    f8150000-f8154fff : Gogin Stepper Motor
+    f8180000-f8183fff : Marvell SCCP
+    f8184000-f8187fff : Marvell SCCP
+    f9010000-f9010033 : bootspi.0
+      f9010000-f9010033 : marvell Boot SPI
+        f9010000-f9010033 : bootspi
+    f9020000-f9020fff : jbig_codec
+    f9021000-f9021fff : jbig_codec_idma
+    f9022000-f9022fff : jbig_codec_odma
+    f9030000-f9033fff : jpeg-regs
+    f9040000-f9040fff : ci13xxx_mmio.0
+      f9040000-f9040fff : ci13xxx_mmio
+    f9041000-f9041fff : ehci.0
+      f9041000-f9041fff : ehci_hcd
+    f9048000-f9048fff : ehci.1
+      f9048000-f9048fff : ehci_hcd
+    f904f040-f904f06f : ci13xxx_mmio.0
+    f904f080-f904f0af : ehci.0
+      f904f080-f904f0af : ehci_hcd
+    f904f0c0-f904f0ef : ehci.1
+      f904f0c0-f904f0ef : ehci_hcd
+    f9050000-f90510ff : synopGMAC.0
+      f9050000-f90510ff : synopGMAC
+    f9060000-f9060fff : mv61x0-cdma.0
+      f9060000-f9060fff : mv61x0-cdma
+    f9061000-f9061fff : mv61x0-cdma.0
+      f9061000-f9061fff : mv61x0-cdma
+    f9062000-f9062fff : mv61x0-cdma.0
+      f9062000-f9062fff : mv61x0-cdma
+    f9063000-f9063fff : mv61x0-cdma.0
+      f9063000-f9063fff : mv61x0-cdma
+    f9064000-f9064fff : mv61x0-cdma.0
+      f9064000-f9064fff : mv61x0-cdma
+    f9065000-f9065fff : mv61x0-cdma.0
+      f9065000-f9065fff : mv61x0-cdma
+    f9066000-f9066fff : mv61x0-cdma.0
+      f9066000-f9066fff : mv61x0-cdma
+    f9067000-f9067fff : mv61x0-cdma.0
+      f9067000-f9067fff : mv61x0-cdma
+    f9068000-f9068fff : mv61x0-cdma.0
+      f9068000-f9068fff : mv61x0-cdma
+    f9069000-f9069fff : mv61x0-cdma.0
+      f9069000-f9069fff : mv61x0-cdma
+    f906a000-f906afff : mv61x0-cdma.0
+      f906a000-f906afff : mv61x0-cdma
+    f906b000-f906bfff : mv61x0-cdma.0
+      f906b000-f906bfff : mv61x0-cdma
+    f906c000-f906cfff : mv61x0-cdma.0
+      f906c000-f906cfff : mv61x0-cdma
+    f9070000-f9070207 : mv61-fb
+    f9080000-f90800ff : sdhci-gogin.0
+      f9080000-f90800ff : mmc0
+    f9080200-f90802ff : sdhci-gogin.1
+      f9080200-f90802ff : mmc1
+    f9082000-f9082200 : mv61x0_nand.0
+      f9082000-f9082200 : mv61x0_nand
+    f9090000-f909afff : video
+      f9090000-f9090fff : hips_pll
+        f9090000-f909003f : tsen.0
+    f90a0000-f90a0003 : regs-zx
+      f90a0000-f90a0003 : regs-zx
+    f90c0000-f90c0fff : regs
+    f90c1000-f90c1fff : regs
+    f90d0000-f90d002b : antic-regs
+    f90d1000-f90d1033 : antic-idma
+    f90d2000-f90d2037 : antic-odma
+    f9100000-f9100003 : regs-pip-top
+      f9100000-f9100003 : regs-pip-top
+        f9100000-f9100003 : regs-pip-top
+    f9101000-f9101003 : regs-pip-fhs
+      f9101000-f9101003 : regs-pip-fhs
+    f9102000-f9103003 : regs-pip-cp
+      f9102000-f9102003 : regs-pip-cp
+      f9103000-f9103003 : regs-pip-tp
+        f9103000-f9103003 : regs-pip-tp
+    f9104000-f9104003 : regs-pip-csc
+      f9104000-f9104003 : regs-pip-csc
+    f9108000-f9108003 : regs-pip-cr
+      f9108000-f9108003 : regs-pip-cr
+    f9109000-f9109003 : regs-pip-mip
+      f9109000-f9109003 : regs-pip-mip
+    f910a000-f910a003 : regs-pip-nga
+      f910a000-f910a003 : regs-pip-nga
+    f910b000-f910b003 : regs-pip-pa-cdma
+      f910b000-f910b003 : regs-pip-pa-cdma
+    f910c000-f910c003 : regs-pip-pa
+      f910c000-f910c003 : regs-pip-pa
+    f910e000-f910e003 : regs-pip-pa-odma
+      f910e000-f910e003 : regs-pip-pa-odma
+    f910f000-f910f003 : regs-pip-pa-idma
+      f910f000-f910f003 : regs-pip-pa-idma
+    f9110000-f9110003 : regs-pip-sccsc
+      f9110000-f9110003 : regs-pip-sccsc
+    f9111000-f9111003 : regs-pip-serp
+      f9111000-f9111003 : regs-pip-serp
+    f9112000-f9112003 : regs-pip-serp-db
+      f9112000-f9112003 : regs-pip-serp-db
+    f9118000-f9118003 : regs-pip-th0
+      f9118000-f9118003 : regs-pip-th0
+    f9120000-f9120003 : regs-pip-th1
+      f9120000-f9120003 : regs-pip-th1
+    f9128000-f9128003 : regs-pip-th2
+      f9128000-f9128003 : regs-pip-th2
+    f9130000-f9130003 : regs-pip-th3
+      f9130000-f9130003 : regs-pip-th3
+    f9138000-f9138003 : regs-pip-ht-db
+      f9138000-f9138003 : regs-pip-ht-db
+    f9139000-f9139003 : regs-pip-yipi
+      f9139000-f9139003 : regs-pip-yipi
+    f913a000-f913a003 : regs-pip-autoht
+      f913a000-f913a003 : regs-pip-autoht
+    f913c000-f913c003 : regs-pip-kmod
+      f913c000-f913c003 : regs-pip-kmod
+    f913d000-f913d003 : regs-pip-kmod-db
+      f913d000-f913d003 : regs-pip-kmod-db
+    f913e000-f913e003 : regs-pip-bloom
+      f913e000-f913e003 : regs-pip-bloom
+    f9140000-f9140003 : regs-pip-ued
+      f9140000-f9140003 : regs-pip-ued
+    f9152000-f9152003 : regs-pip-stats
+      f9152000-f9152003 : regs-pip-stats
+    f9153000-f9153003 : regs-pip-stat-cdma0
+      f9153000-f9153003 : regs-pip-stat-cdma0
+    f9154000-f9154003 : regs-pip-stat-cdma1
+      f9154000-f9154003 : regs-pip-stat-cdma1
+    f9155000-f9155003 : regs-pip-stat-cdma2
+      f9155000-f9155003 : regs-pip-stat-cdma2
+    f9156000-f9156003 : regs-pip-cre
+      f9156000-f9156003 : regs-pip-cre
+    f9157000-f9157fff : regs-lpc0
+    f9158000-f9158fff : regs-lpc1
+    f9159000-f9159fff : regs-lpc2
+    f915a000-f915afff : regs-lpc3
+    f915b000-f915bfff : regs-idma0
+    f915c000-f915cfff : regs-idma1
+    f915d000-f915dfff : regs-idma2
+    f915e000-f915efff : regs-idma3
+    f915f000-f915ffff : regs-odma0
+      f915f000-f915f003 : regs-pip-odma0
+        f915f000-f915f003 : regs-pip-odma0
+    f9160000-f9160fff : regs-odma1
+      f9160000-f9160003 : regs-pip-odma1
+        f9160000-f9160003 : regs-pip-odma1
+    f9161000-f9161fff : regs-odma2
+      f9161000-f9161003 : regs-pip-odma2
+        f9161000-f9161003 : regs-pip-odma2
+    f9162000-f9162003 : regs-pip-odma3
+      f9162000-f9162003 : regs-pip-odma3
+    f9163000-f9163fff : regs-odma3
+      f9163000-f9163003 : regs-pip-odma4
+        f9163000-f9163003 : regs-pip-odma4
+    f9164000-f9164003 : regs-pip-odma5
+      f9164000-f9164003 : regs-pip-odma5
+    f9165000-f9165003 : regs-pip-odma6
+      f9165000-f9165003 : regs-pip-odma6
+    f9166000-f9166003 : regs-pip-odma7
+      f9166000-f9166003 : regs-pip-odma7
+    f9167000-f9167003 : regs-pip-planar
+      f9167000-f9167003 : regs-pip-planar
+    f9200000-f920ffff : Marvell UPC
+      f9200000-f920ffff : marvell-upc
+    f9210000-f92bffff : Marvell UPC
+      f9210000-f92bffff : marvell-upc
+    f9300000-f93000ff : dec_config
+    f9300300-f93003ff : dec_fuser
+    f9301000-f9301fff : dec_sensor
+    f9304000-f9307fff : dec_pwm
+    f9309000-f93090ff : dec_wavegen0
+    f9309100-f93091ff : dec_wavegen1
+    f9309200-f93092ff : dec_wavegen2
+    f9309300-f93093ff : dec_wavegen3
+    f930a000-f930afff : dec_adc
+    f930b000-f930b0ff : dec_lscan_hsync
+    f930b100-f930b1ff : dec_lscan_mirror0
+    f930b200-f930b2ff : dec_lscan_mirror1
+    f930b300-f930b3ff : dec_lscan_wfg0
+    f930b400-f930b4ff : dec_lscan_wfg1
+    f930b500-f930b5ff : dec_lscan_wfg2
+    f930b600-f930b6ff : dec_lscan_wfg3
+    f930b800-f930bbff : dec_lscan_wfs
+    f9420000-f942007f : sizar-regs
+    f9440300-f9440303 : LvdsAfeAselaMuxSel
+    f9500000-f950ffff : register_block
+    f9510000-f9511fff : SRAM
+    f9600000-f9600003 : AgateTopAselaMuxSel
+    f9601080-f9601083 : SAP0AselaMuxSel
+    f9601100-f9601103 : SAP1AselaMuxSel
+    f9602000-f9602003 : EIAselaMuxSel
+==INTERRUPTS
+           CPU0       CPU1       
+ 32:      44715          0       GIC  serial
+ 52:          0          0       GIC  Timer 0
+ 53:   23662741          0       GIC  Timer 1
+ 54:         55          0       GIC  Timer 2
+ 55:          0          0       GIC  Timer 3
+ 64:          0          0       GIC  gogin-rtc
+ 65:     824182          0       GIC  mv61x0_nand
+ 66:   11850240          0       GIC  mmc0, mmc1
+ 72:       4395          0       GIC  i2c_designware
+ 73:          0          0       GIC  i2c_designware
+ 75:          0          0       GIC  mv61x0
+ 81:          0          0       GIC  zx_idma
+ 82:          0          0       GIC  jbig_codec
+ 83:          0          0       GIC  jbig_codec_idma
+ 84:          0          0       GIC  jbig_codec_odma
+ 91:          0          0       GIC  dw_spi0
+ 92:          0          0       GIC  dw_spi1
+ 93:          0          0       GIC  dw_spi2
+ 96:          5          0       GIC  eth0
+ 97:          0          0       GIC  ci13xxx_mmio
+ 98:          0          0       GIC  ehci_hcd:usb1
+ 99:   22779821          0       GIC  ehci_hcd:usb2
+102:          0          0       GIC  dcmotor_6pin_block0
+103:          0          0       GIC  dcmotor_6pin_block1
+104:          0          0       GIC  dcmotor_6pin_block2
+109:          0          0       GIC  mv61x0-cdma
+126:         85          0       GIC  marvell-upc
+127:         16          0       GIC  marvell-upc
+128:          0          0       GIC  pip_irq
+145:          0          0      SIC0  DEC0 Timer 0
+146:          0          0      SIC0  DEC0 Timer 1
+147:          0          0      SIC0  DEC0 Timer 2
+148:          0          0      SIC0  DEC0 Timer 3
+149:          0          0      SIC0  DEC1 Timer 0
+150:          0          0      SIC0  DEC1 Timer 1
+151:          0          0      SIC0  DEC1 Timer 2
+152:          0          0      SIC0  DEC1 Timer 3
+169:          1          0      SIC0  dec_sensor
+275:         19          0  GPIO Irq  rohm-i2c
+IPI0:          0   23662717  Timer broadcast interrupts
+IPI1:    7437597    8274274  Rescheduling interrupts
+IPI2:          0          0  Function call interrupts
+IPI3:      42706      27598  Single function call interrupts
+IPI4:          0          0  CPU stop interrupts
+Err:          0
+==DMESG
+Booting Linux on physical CPU 0
+Initializing cgroup subsys cpu
+Linux version 3.2.0-g67a8e16 (vinod@vinod-ThinkPad-T520) (gcc version 4.6.4 20120630 (prerelease) (Linaro GCC branch-4.6.4. Marvell GCC 201208-1593.24ba3e13) ) #6 SMP PREEMPT Wed Nov 23 17:29:14 KST 2016
+CPU: PJ4B-MP ARMv7 [562f5841] revision 1 (ARMv7), cr=10c5387d
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+Machine: mv61x0
+Memory policy: ECC disabled, Data cache writealloc
+On node 0 totalpages: 131072
+free_area_init_node: node 0, pgdat c09f3f20, node_mem_map c0a62000
+  Normal zone: 1024 pages used for memmap
+  Normal zone: 0 pages reserved
+  Normal zone: 130048 pages, LIFO batch:31
+setup_arch: RESERVED_MEM_SIZE = (16777216)!
+mach_RsvdMemInit: RsvdMemSize = 16777216!
+mach_RsvdMemInit: reserveSize=16777216, reservePaddr=00e66000
+PERCPU: Embedded 8 pages/cpu @c1e69000 s9696 r8192 d14880 u32768
+pcpu-alloc: s9696 r8192 d14880 u32768 alloc=8*4096
+pcpu-alloc: [0] 0 [0] 1 
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 130048
+Kernel command line: console=ttyS0,115200n8 mtdparts=mv61x0_nand:0x800000(kernel),0x20000(u-boot-env),0x80000(bbt)ro,0x100000(boot-logo),0x800000(backup),0xC800000(recovery),-(filesystem) ubi.mtd=filesystem root=ubi0:filesystem rootfstype=ubifs BUSFREQ=200000000 ASICREV=C0 lxkearlycon=uart8250,mmio32,0xf8060000 synopGMAC_Mem.ethaddr=xx:xx:xx:xx:xx:xx mv61tft.boot_time=17 mv61tft.bar_color=0
+PID hash table entries: 2048 (order: 1, 8192 bytes)
+Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
+Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
+allocated 2097152 bytes of page_cgroup
+please try 'cgroup_disable=memory' option if you don't want memory cgroups
+Memory: 512MB = 512MB total
+Memory: 490608k/490608k available, 33680k reserved, 0K highmem
+Virtual kernel memory layout:
+    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+    vmalloc : 0xe0800000 - 0xf8000000   ( 376 MB)
+    lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
+    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+    modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+      .text : 0xc0008000 - 0xc056f000   (5532 kB)
+      .init : 0xc056f000 - 0xc097f5e0   (4162 kB)
+      .data : 0xc0980000 - 0xc09f5b50   ( 471 kB)
+       .bss : 0xc09f5b74 - 0xc0a61fc4   ( 434 kB)
+Preemptible hierarchical RCU implementation.
+NR_IRQS:604
+busfreq 200000000
+busfreq dithered 198000000
+Console: colour dummy device 80x30
+Calibrating delay loop... 789.70 BogoMIPS (lpj=3948544)
+pid_max: default: 32768 minimum: 301
+Mount-cache hash table entries: 512
+Initializing cgroup subsys memory
+CPU: Testing write buffer coherency: ok
+ftrace: allocating 16157 entries in 48 pages
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+hw perfevents: enabled with ARMv7 PJ4B-MP PMU driver, 7 counters available
+L2x0 series cache controller enabled
+l2x0: 8 ways, CACHE_ID 0x00000001, AUX_CTRL 0x300000f0, Cache size: 65536 B
+CPU1: Booted secondary processor
+CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+Brought up 2 CPUs
+SMP: Total of 2 processors activated (1579.41 BogoMIPS).
+NET: Registered protocol family 16
+ASSP revision identified as C1
+set_pin_config 64 1 slew=0 raw 
+set_pin_config 65 1 slew=0 raw 
+set_pin_config 66 0 GPIO out drv=0 slew=0 sync 
+set_pin_config 67 0 GPIO out drv=1 slew=0 sync 
+set_pin_config 68 1 slew=0 raw 
+set_pin_config 69 1 slew=0 raw 
+set_pin_config 48 1 slew=0 raw 
+set_pin_config 49 1 slew=0 raw 
+set_pin_config 50 1 slew=0 raw 
+set_pin_config 51 1 slew=0 raw 
+set_pin_config 52 1 slew=0 raw 
+set_pin_config 53 1 slew=0 raw 
+set_pin_config 54 1 slew=0 raw 
+set_pin_config 55 1 slew=0 raw 
+set_pin_config 56 1 slew=0 raw 
+set_pin_config 57 1 slew=0 raw 
+set_pin_config 58 1 slew=0 raw 
+set_pin_config 59 1 slew=0 raw 
+set_pin_config 60 1 slew=0 raw 
+set_pin_config 61 1 slew=0 raw 
+set_pin_config 63 1 slew=0 raw 
+set_pin_config 7 1 slew=0 raw 
+set_pin_config 8 1 slew=0 raw 
+set_pin_config 9 1 slew=0 raw 
+set_pin_config 10 1 slew=0 raw 
+set_pin_config 11 1 slew=0 raw 
+set_pin_config 138 0 GPIO in slew=0 sync 
+set_pin_config 139 0 GPIO in slew=0 sync 
+set_pin_config 140 0 GPIO in slew=0 sync 
+set_pin_config 141 0 GPIO in slew=0 sync 
+set_pin_config 142 0 GPIO in slew=0 sync 
+set_pin_config 143 0 GPIO in slew=0 sync 
+set_pin_config 144 0 GPIO in slew=0 sync 
+set_pin_config 145 0 GPIO in slew=0 sync 
+set_pin_config 146 0 GPIO in slew=0 sync 
+set_pin_config 147 0 GPIO in slew=0 sync 
+set_pin_config 166 1 slew=0 raw 
+set_pin_config 167 1 slew=0 raw 
+set_pin_config 168 1 slew=0 raw 
+set_pin_config 169 1 slew=0 raw 
+set_pin_config 170 1 slew=0 raw 
+set_pin_config 171 1 slew=0 raw 
+set_pin_config 172 1 slew=0 raw 
+set_pin_config 173 1 slew=0 raw 
+set_pin_config 174 1 slew=0 raw 
+set_pin_config 176 2 slew=0 raw 
+set_pin_config 177 2 slew=0 raw 
+set_pin_config 178 2 slew=0 raw 
+set_pin_config 179 2 slew=0 raw 
+set_pin_config 180 3 slew=0 raw 
+set_pin_config 181 3 slew=0 raw 
+set_pin_config 182 3 slew=0 raw 
+set_pin_config 183 3 slew=0 raw 
+set_pin_config 184 3 slew=0 raw 
+set_pin_config 185 2 slew=0 raw 
+set_pin_config 186 2 slew=0 raw 
+set_pin_config 187 2 slew=0 raw 
+set_pin_config 188 2 slew=0 raw 
+set_pin_config 189 1 slew=0 raw 
+set_pin_config 190 1 slew=0 raw 
+set_pin_config 191 1 slew=0 raw 
+set_pin_config 192 1 slew=0 raw 
+set_pin_config 194 1 slew=0 raw 
+set_pin_config 195 1 slew=0 raw 
+set_pin_config 196 1 slew=0 raw 
+set_pin_config 99 2 slew=0 raw 
+set_pin_config 100 2 slew=0 raw 
+set_pin_config 129 0 GPIO in slew=0 sync 
+set_pin_config 130 0 GPIO in slew=0 sync 
+set_pin_config 131 0 GPIO in slew=0 sync 
+set_pin_config 152 3 slew=0 raw 
+set_pin_config 154 3 slew=0 raw 
+set_pin_config 96 2 slew=0 raw 
+set_pin_config 97 2 slew=0 raw 
+set_pin_config 98 2 slew=0 raw 
+set_pin_config 102 2 slew=0 raw 
+set_pin_config 103 2 slew=0 raw 
+set_pin_config 104 2 slew=0 raw 
+set_pin_config 105 2 slew=0 raw 
+set_pin_config 106 2 slew=0 raw 
+set_pin_config 107 2 slew=0 raw 
+set_pin_config 108 2 slew=0 raw 
+set_pin_config 109 2 slew=0 raw 
+set_pin_config 110 2 slew=0 raw 
+set_pin_config 111 2 slew=0 raw 
+set_pin_config 112 2 slew=0 raw 
+set_pin_config 113 2 slew=0 raw 
+set_pin_config 114 2 slew=0 raw 
+set_pin_config 115 2 slew=0 raw 
+set_pin_config 116 2 slew=0 raw 
+set_pin_config 117 2 slew=0 raw 
+set_pin_config 118 2 slew=0 raw 
+set_pin_config 120 2 slew=0 raw 
+set_pin_config 121 2 slew=0 raw 
+set_pin_config 122 2 slew=0 raw 
+set_pin_config 123 2 slew=0 raw 
+set_pin_config 124 2 slew=0 raw 
+set_pin_config 160 3 slew=0 raw 
+set_pin_config 161 3 slew=0 raw 
+set_pin_config 162 3 slew=0 raw 
+set_pin_config 163 3 slew=0 raw 
+set_pin_config 34 1 slew=0 raw 
+set_pin_config 35 1 slew=0 raw 
+set_pin_config 36 1 slew=0 raw 
+set_pin_config 37 1 slew=0 raw 
+set_pin_config 38 1 slew=0 raw 
+set_pin_config 39 1 slew=0 raw 
+set_pin_config 40 1 slew=0 raw 
+set_pin_config 41 1 slew=0 raw 
+set_pin_config 42 1 slew=0 raw 
+set_pin_config 43 1 slew=0 raw 
+set_pin_config 44 1 slew=0 raw 
+set_pin_config 45 1 slew=0 raw 
+set_pin_config 46 1 slew=0 raw 
+set_pin_config 47 1 slew=0 raw 
+set_pin_config 32 2 slew=0 raw 
+set_pin_config 33 2 slew=0 raw 
+set_pin_config 3 2 slew=0 raw 
+set_pin_config 4 2 slew=0 raw 
+set_pin_config 5 2 slew=0 raw 
+set_pin_config 6 2 slew=0 raw 
+board_specific_register_devices
+hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 watchpoint registers.
+hw-breakpoint: maximum watchpoint size is 8 bytes.
+bio: create slab <bio-0> at 0
+SCSI subsystem initialized
+usbcore: registered new interface driver usbfs
+usbcore: registered new interface driver hub
+usbcore: registered new device driver usb
+cfg80211: Calling CRDA to update world regulatory domain
+NET: Registered protocol family 2
+IP route cache hash table entries: 4096 (order: 2, 16384 bytes)
+TCP established hash table entries: 16384 (order: 5, 131072 bytes)
+TCP bind hash table entries: 16384 (order: 6, 393216 bytes)
+TCP: Hash tables configured (established 16384 bind 16384)
+TCP reno registered
+UDP hash table entries: 256 (order: 2, 16384 bytes)
+UDP-Lite hash table entries: 256 (order: 2, 16384 bytes)
+NET: Registered protocol family 1
+RPC: Registered named UNIX socket transport module.
+RPC: Registered udp transport module.
+RPC: Registered tcp transport module.
+RPC: Registered tcp NFSv4.1 backchannel transport module.
+bootspi_probe:348 ID 00:00:00:00
+mmc0: SDHCI controller on sdhci-gogin.0 [sdhci-gogin.0] using DMA
+mmc1: SDHCI controller on sdhci-gogin.1 [sdhci-gogin.1] using DMA
+dma_alloc driver init 
+hips_init
+hips_platform_probe: driver registration begun id 0
+hips0: device probe complete
+hips_platform_probe: driver registration begun id 1
+hips1: device probe complete
+hips_platform_probe: driver registration begun id 2
+hips2: device probe complete
+hips_platform_probe: driver registration begun id 3
+hips3: device probe complete
+hips_platform_probe: driver registration begun id 4
+hips4: device probe complete
+hips_platform_probe: driver registration begun id 5
+hips5: device probe complete
+hips_platform_probe: driver registration begun id 6
+hips6: device probe complete
+hips_platform_probe: driver registration begun id 7
+hips7: device probe complete
+stepper_platform_init: driver platform init begun
+
+
+
+stepper_platform_probe: driver registration begun
+
+
+stepper:  platform registration complete
+msgmni has been set to 958
+io scheduler noop registered (default)
+Console: switching to colour frame buffer device 100x30
+Central DMA module init
+mv61x0-vdma mv61x0-vdma.0: Virtual DMA Controller type 0:owned, 6 virt channels, 6 phys channels
+mv61x0-vdma mv61x0-vdma.1: Virtual DMA Controller type 1:shared, 64 virt channels, 5 phys channels
+mv61x0-vdma mv61x0-vdma.2: Virtual DMA Controller type 2:cyclic, 1 virt channels, 1 phys channels
+Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+mmc0: new high speed SDHC card at address 59b4
+serial8250.0: ttyS0 at MMIO 0xf8060000 (irq = 32) is a 16550A
+console [ttyS0] enabled
+serial8250.1: ttyS1 at MMIO 0xf8061000 (irq = 33) is a 16550A
+serial8250.2: ttyS2 at MMIO 0xf8062000 (irq = 34) is a 16550A
+serial8250.3: ttyS3 at MMIO 0xf8063000 (irq = 35) is a 16550A
+NAND device: Manufacturer ID: 0xc2, Chip ID: 0xdc (Unknown NAND 512MiB 3,3V 8-bit)
+Bad block table found at page 262080, version 0x01
+Bad block table found at page 262016, version 0x01
+nand_read_bbt: bad block at 0x00001a980000
+7 cmdlinepart partitions found on MTD device mv61x0_nand
+Creating 7 MTD partitions on "mv61x0_nand":
+0x000000000000-0x000000800000 : "kernel"
+0x000000800000-0x000000820000 : "u-boot-env"
+0x000000820000-0x0000008a0000 : "bbt"
+0x0000008a0000-0x0000009a0000 : "boot-logo"
+0x0000009a0000-0x0000011a0000 : "backup"
+0x0000011a0000-0x00000d9a0000 : "recovery"
+0x00000d9a0000-0x000020000000 : "filesystem"
+UBI: attaching mtd6 to ubi0
+UBI: physical eraseblock size:   131072 bytes (128 KiB)
+UBI: logical eraseblock size:    126976 bytes
+UBI: smallest flash I/O unit:    2048
+UBI: VID header offset:          2048 (aligned 2048)
+UBI: data offset:                4096
+UBI: max. sequence number:       24214
+UBI: attached mtd6 to ubi0
+UBI: MTD device name:            "filesystem"
+UBI: MTD device size:            294 MiB
+UBI: number of good PEBs:        2350
+UBI: number of bad PEBs:         5
+UBI: number of corrupted PEBs:   0
+UBI: max. allowed volumes:       128
+UBI: wear-leveling threshold:    4096
+UBI: number of internal volumes: 1
+UBI: number of user volumes:     1
+UBI: available PEBs:             0
+UBI: total number of reserved PEBs: 2350
+UBI: number of PEBs reserved for bad PEB handling: 23
+UBI: max/mean erase counter: 112/9
+UBI: image sequence number:  1423714672
+UBI: background thread "ubi_bgt0d" started, PID 563
+dw_spi_mmio dw_spi_mmio.0: registered master spi0
+spi spi0.0: setup mode 3, 8 bits/w, 500000 Hz max --> 0
+dw_spi_mmio dw_spi_mmio.0: registered child spi0.0
+dw_spi_mmio dw_spi_mmio.1: registered master spi1
+dw_spi_mmio dw_spi_mmio.2: registered master spi2
+spi spi2.0: setup mode 3, 8 bits/w, 12000000 Hz max --> 0
+dw_spi_mmio dw_spi_mmio.2: registered child spi2.0
+SynopGMAC: synopGMAC_init called 
+Initial MAC addr: xx:xx:xx:xx:xx:xx
+Detected PHY 0141:0DD1 @ 0
+phy detected at address 0
+uio_pdrv_genirq uio_pdrv_genirq.28: device has more than 5 I/O memory resources.
+ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+ehci ehci.0: Marvell mv61xx EHCI
+ehci ehci.0: new USB bus registered, assigned bus number 1
+ehci ehci.0: irq 98, io mem 0xf9041000
+ehci ehci.0: USB 2.0 started, EHCI 1.00
+usb usb1: New USB device found, idVendor=1d6b, idProduct=0002
+usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+usb usb1: Product: Marvell mv61xx EHCI
+usb usb1: Manufacturer: Linux 3.2.0-g67a8e16 ehci_hcd
+usb usb1: SerialNumber: ehci.0
+hub 1-0:1.0: USB hub found
+hub 1-0:1.0: 1 port detected
+ehci ehci.1: Marvell mv61xx EHCI
+ehci ehci.1: new USB bus registered, assigned bus number 2
+ehci ehci.1: irq 99, io mem 0xf9048000
+ehci ehci.1: USB 2.0 started, EHCI 1.00
+usb usb2: New USB device found, idVendor=1d6b, idProduct=0002
+usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+usb usb2: Product: Marvell mv61xx EHCI
+usb usb2: Manufacturer: Linux 3.2.0-g67a8e16 ehci_hcd
+usb usb2: SerialNumber: ehci.1
+hub 2-0:1.0: USB hub found
+hub 2-0:1.0: 1 port detected
+usbcore: registered new interface driver usblp
+Initializing USB Mass Storage driver...
+usbcore: registered new interface driver usb-storage
+USB Mass Storage support registered.
+usbcore: registered new interface driver usbserial
+USB Serial support registered for generic
+usbcore: registered new interface driver usbserial_generic
+usbserial: USB Serial Driver core
+USB Serial support registered for FTDI USB Serial Device
+usbcore: registered new interface driver ftdi_sio
+ftdi_sio: v1.6.0:USB FTDI Serial Converters Driver
+USB Serial support registered for Keyspan - (without firmware)
+USB Serial support registered for Keyspan 1 port adapter
+USB Serial support registered for Keyspan 2 port adapter
+USB Serial support registered for Keyspan 4 port adapter
+usbcore: registered new interface driver keyspan
+keyspan: v1.1.5:Keyspan USB to Serial Converter Driver
+USB Serial support registered for Keyspan PDA
+USB Serial support registered for Keyspan PDA - (prerenumeration)
+usbcore: registered new interface driver keyspan_pda
+keyspan_pda: v1.1:USB Keyspan PDA Converter driver
+USB Serial support registered for MCT U232
+usbcore: registered new interface driver mct_u232
+mct_u232: z2.1:Magic Control Technology USB-RS232 converter driver
+ci13xxx controller reset event received
+ci13xxx mmio platform registration complete
+Trying to free nonexistent resource <00000000f8000000-00000000f80002ff>
+usb 2-1: new high-speed USB device number 2 using ehci
+usb 2-1: New USB device found, idVendor=1a40, idProduct=0101
+usb 2-1: New USB device strings: Mfr=0, Product=1, SerialNumber=0
+usb 2-1: Product: USB 2.0 Hub
+hub 2-1:1.0: USB hub found
+hub 2-1:1.0: 4 ports detected
+gogin-rtc: dev (254:0)
+gogin-rtc gogin-rtc.0: rtc core: registered gogin-rtc as rtc0
+i2c /dev entries driver
+input: Rohm-RTP-BU21029GUL as /devices/virtual/input/input0
+mmcblk0: mmc0:59b4 SD    3.67 GiB 
+ mmcblk0: p1
+sdhci: Secure Digital Host Controller Interface driver
+sdhci: Copyright(c) Pierre Ossman
+sdhci-pltfm: SDHCI platform and OF driver helper
+usbcore: registered new interface driver usbhid
+usbhid: USB HID core driver
+usb 2-1.1: new high-speed USB device number 3 using ehci
+TCP cubic registered
+Initializing XFRM netlink socket
+NET: Registered protocol family 10
+IPv6 over IPv4 tunneling driver
+NET: Registered protocol family 17
+lib80211: common routines for IEEE802.11 drivers
+lib80211_crypt: registered algorithm 'NULL'
+Registering the dns_resolver key type
+VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 6
+Registering SWP/SWPB emulation handler
+gogin-rtc gogin-rtc.0: setting system clock to 1970-05-03 15:32:00 UTC (10596720)
+Freeing init memory: 4160K
+usb 2-1.1: New USB device found, idVendor=1286, idProduct=2040
+usb 2-1.1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+usb 2-1.1: Product: Marvell Wireless Device
+usb 2-1.1: Manufacturer: Marvell
+usb 2-1.1: SerialNumber: 0000000000000000
+usb 2-1.3: new high-speed USB device number 4 using ehci
+usb 2-1.3: New USB device found, idVendor=0c45, idProduct=6341
+usb 2-1.3: New USB device strings: Mfr=2, Product=1, SerialNumber=3
+usb 2-1.3: Product: HD 720P Webcam
+usb 2-1.3: Manufacturer: HD 720P Webcam
+usb 2-1.3: SerialNumber: 20130901
+UBIFS: recovery needed
+UBIFS: recovery completed
+UBIFS: mounted UBI device 0, volume 0, name "filesystem"
+UBIFS: file system size:   293568512 bytes (286688 KiB, 279 MiB, 2312 LEBs)
+UBIFS: journal size:       9023488 bytes (8812 KiB, 8 MiB, 72 LEBs)
+UBIFS: media format:       w4/r0 (latest is w4/r0)
+UBIFS: default compressor: lzo
+UBIFS: reserved for root:  0 bytes (0 KiB)
+ci13xxx_mmio ci13xxx_mmio.0: [ci13xxx_start] hw_ep_max = 20
+Scan Function: Sindoh MFP, Setting Gadget Controller Number:
+Scan Function: Sindoh MFP, version: Marvell 61x0 Printer Driver 2012 
+Scan Function: Sindoh MFP, Setting up Config and Functions:
+Printer Function: Printer Function, version: 2012 July 30
+Printer Function: using ci13xxx_mmio, OUT ep1out IN ep1in
+Scan Function: g_Printer: Scan Checked 0
+MFP Printer gadget: MFP Printer ready
+Disabling lock debugging due to kernel taint
+wlan: Loading MWLAN driver
+VID/PID = 1286/2040, Boot2 version = 3119
+rx_work=1 cpu_num=2
+SynopGMAC: synopGMAC_linux_open called 
+P111xR/P1318/P1510/P1518 Phy LEDs
+usbcore: registered new interface driver usb8xxx
+wlan: Driver loaded successfully
+dros_init
+SynopGMAC: synopGMAC_giveup_rx_desc_queue called 
+SynopGMAC: synopGMAC_giveup_tx_desc_queue called 
+SynopGMAC: synopGMAC_linux_open called 
+P111xR/P1318/P1510/P1518 Phy LEDs
+ADDRCONF(NETDEV_UP): eth0: link is not ready
+UBI: attaching mtd4 to ubi1
+UBI: physical eraseblock size:   131072 bytes (128 KiB)
+UBI: logical eraseblock size:    126976 bytes
+UBI: smallest flash I/O unit:    2048
+UBI: VID header offset:          2048 (aligned 2048)
+UBI: data offset:                4096
+UBI: max. sequence number:       724
+UBI: attached mtd4 to ubi1
+UBI: MTD device name:            "backup"
+UBI: MTD device size:            8 MiB
+UBI: number of good PEBs:        64
+UBI: number of bad PEBs:         0
+UBI: number of corrupted PEBs:   0
+UBI: max. allowed volumes:       128
+UBI: wear-leveling threshold:    4096
+UBI: number of internal volumes: 1
+UBI: number of user volumes:     1
+UBI: available PEBs:             0
+UBI: total number of reserved PEBs: 64
+UBI: number of PEBs reserved for bad PEB handling: 2
+UBI: max/mean erase counter: 16/11
+UBI: image sequence number:  1546042085
+UBI: background thread "ubi_bgt1d" started, PID 858
+UBIFS: recovery needed
+UBIFS: recovery completed
+UBIFS: mounted UBI device 1, volume 0, name "backup"
+UBIFS: file system size:   6221824 bytes (6076 KiB, 5 MiB, 49 LEBs)
+UBIFS: journal size:       1015809 bytes (992 KiB, 0 MiB, 6 LEBs)
+UBIFS: media format:       w4/r0 (latest is w4/r0)
+UBIFS: default compressor: lzo
+UBIFS: reserved for root:  293871 bytes (286 KiB)
+UPC0: device registration complete
+UPC1: device registration complete
+UPC:  platform registration complete
+Linux video capture interface: v2.00
+uvcvideo: Found UVC 1.00 device HD 720P Webcam (0c45:6341)
+input: HD 720P Webcam as /devices/platform/ehci.1/usb2/2-1/2-1.3/2-1.3:1.0/input/input1
+usbcore: registered new interface driver uvcvideo
+USB Video Class driver (1.1.1)
+EXT3-fs (mmcblk0p1): error: couldn't mount because of unsupported optional features (240)
+EXT2-fs (mmcblk0p1): error: couldn't mount because of unsupported optional features (244)
+EXT4-fs (mmcblk0p1): recovery complete
+EXT4-fs (mmcblk0p1): mounted filesystem with ordered data mode. Opts: (null)
+ADDRCONF(NETDEV_UP): mlan0: link is not ready
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+wlan: SCAN COMPLETED: scanned AP count=0
+mv61fb_blank:1366: Requested blanking level = 0x00000000
+ADDRCONF(NETDEV_UP): mlan0: link is not ready
+wlan: SCAN COMPLETED: scanned AP count=10
+ADDRCONF(NETDEV_CHANGE): mlan0: link becomes ready
+CMD_RESP: cmd 0x5b error, result=0x1
+wlan: EVENT: Deauthenticated (reason 0xf)
+mlan0: no IPv6 routers present
+wlan: SCAN COMPLETED: scanned AP count=10
+ADDRCONF(NETDEV_UP): mlan0: link is not ready
+wlan: SCAN COMPLETED: scanned AP count=10
+ADDRCONF(NETDEV_CHANGE): mlan0: link becomes ready
+ADDBA RSP: Failed(86:XX:XX:XX:f9:44 tid=6)
+mlan0: no IPv6 routers present
+ttyS0: 1 input overrun(s)
+sh invoked oom-killer: gfp_mask=0xd0, order=2, oom_adj=0, oom_score_adj=0
+Backtrace: 
+[<c00127fc>] (dump_backtrace+0x0/0x120) from [<c041df74>] (dump_stack+0x20/0x28)
+ r6:000000d0 r5:00000000 r4:de49a000 r3:00000000
+[<c041df54>] (dump_stack+0x0/0x28) from [<c00b18a4>] (dump_header.isra.6+0x84/0x188)
+[<c00b1820>] (dump_header.isra.6+0x0/0x188) from [<c00b1b70>] (oom_kill_process+0x50/0x21c)
+[<c00b1b20>] (oom_kill_process+0x0/0x21c) from [<c00b2214>] (out_of_memory+0x138/0x1d8)
+[<c00b20dc>] (out_of_memory+0x0/0x1d8) from [<c00b5050>] (__alloc_pages_nodemask+0x4fc/0x668)
+ r8:c09f4940 r7:00000002 r6:00000000 r5:de49a000 r4:000000d0
+[<c00b4b54>] (__alloc_pages_nodemask+0x0/0x668) from [<c00b51dc>] (__get_free_pages+0x20/0x3c)
+[<c00b51bc>] (__get_free_pages+0x0/0x3c) from [<c001afd8>] (pgd_alloc+0x24/0xec)
+[<c001afb4>] (pgd_alloc+0x0/0xec) from [<c003239c>] (mm_init+0xbc/0xfc)
+ r7:df6568c0 r6:c09f65c8 r5:00000000 r4:ddb2e580
+[<c00322e0>] (mm_init+0x0/0xfc) from [<c0032660>] (mm_alloc+0x50/0x5c)
+ r7:de49a000 r6:df57d1e0 r5:000f77a4 r4:ddb2e580
+[<c0032610>] (mm_alloc+0x0/0x5c) from [<c00edc8c>] (bprm_mm_init+0x20/0x1b8)
+ r4:ddb23000 r3:00000001
+[<c00edc6c>] (bprm_mm_init+0x0/0x1b8) from [<c00ee14c>] (do_execve+0xf8/0x2c4)
+[<c00ee054>] (do_execve+0x0/0x2c4) from [<c0012470>] (sys_execve+0x44/0x68)
+[<c001242c>] (sys_execve+0x0/0x68) from [<c000e000>] (ret_fast_syscall+0x0/0x30)
+ r7:0000000b r6:000d5e48 r5:000f77e4 r4:000f7794
+Mem-info:
+Normal per-cpu:
+CPU    0: hi:  186, btch:  31 usd:  26
+CPU    1: hi:  186, btch:  31 usd:  62
+active_anon:110637 inactive_anon:560 isolated_anon:0
+ active_file:13 inactive_file:18 isolated_file:0
+ unevictable:0 dirty:0 writeback:0 unstable:0
+ free:6342 slab_reclaimable:898 slab_unreclaimable:1565
+ mapped:613 shmem:651 pagetables:776 bounce:0
+Normal free:25368kB min:2884kB low:3604kB high:4324kB active_anon:442548kB inactive_anon:2240kB active_file:52kB inactive_file:72kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:520192kB mlocked:0kB dirty:0kB writeback:0kB mapped:2452kB shmem:2604kB slab_reclaimable:3592kB slab_unreclaimable:6260kB kernel_stack:2080kB pagetables:3104kB unstable:0kB bounce:0kB writeback_tmp:0kB pages_scanned:193 all_unreclaimable? yes
+lowmem_reserve[]: 0 0 0
+Normal: 4210*4kB 978*8kB 38*16kB 3*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB 0*8192kB = 25368kB
+726 total pagecache pages
+131072 pages of RAM
+6803 free pages
+7380 reserved pages
+2463 slab pages
+686 pages shared
+0 pages swap cached
+[ pid ]   uid  tgid total_vm      rss cpu oom_adj oom_score_adj name
+[  739]     0   739     1924       16   0       0             0 syslogd
+[  741]     0   741     1924       20   0       0             0 klogd
+[  824]     0   824     1924       18   0       0             0 ifplugd
+[  832]     0   832     1926       25   0       0             0 sh
+[  888]     0   888     2958      390   0       0             0 snmpd
+[  933]     0   933     1924       21   0       0             0 crond
+[  942]     0   942     2205       52   0       0             0 wpa_supplicant
+[  949]     0   949     2057       24   1       0             0 stdin2log
+[  953]     0   953    60931    24450   0       0             0 appBrowser
+[ 5017]     0  5017   334960     1152   0       0             0 mjpg_streamer
+[ 9858]     0  9858     2046       32   0       0             0 config_periodic
+[10285]     0 10285     2046       32   0       0             0 config_periodic
+[10365]     0 10365     2045       31   1       0             0 config_periodic
+[10871]     0 10871     2046       32   1       0             0 config_periodic
+[11967]     0 11967     2046       32   0       0             0 config_periodic
+[13023]     0 13023     2046       32   0       0             0 config_periodic
+[29537]     0 29537     1926       26   0       0             0 sh
+[28415]     0 28415      138        5   1       0             0 upctool
+[22574]     0 22574     2452       80   0       0             0 lighttpd
+[21135]     0 21135     1924       15   0       0             0 sh
+[21136]     0 21136     1924       19   1       0             0 sh
+[21159]     0 21159      991       49   0       0             0 bash
+[ 1334]     0  1334     2054       79   0       0             0 su
+[ 1348]  1000  1348    21800    17651   1       0             0 pip
+[ 7315]  1000  7315     8134     4116   1       0             0 python3
+[ 7541]  1000  7541    39502    30942   1       0             0 python3
+[13925]  1000 13925     1052       31   0       0             0 arm-linux-gnuea
+[13926]  1000 13926    30200    20013   1       0             0 cc1
+[17344]  1000 17344     1052       31   1       0             0 arm-linux-gnuea
+[17347]  1000 17347    21232    11666   0       0             0 cc1
+[21828]     0 21828     1924       16   0       0             0 sh
+[21829]     0 21829     1924       16   0       0             0 sh
+[21830]     0 21830     1924       16   1       0             0 sh
+[21831]     0 21831     1891       19   0       0             0 pidof
+[21832]     0 21832     1891       19   0       0             0 pidof
+[21833]     0 21833      282        6   0       0             0 pidof
+[21834]     0 21834     1926       30   1       0             0 sh
+Out of memory: Kill process 7541 (python3) score 251 or sacrifice child
+Killed process 13925 (arm-linux-gnuea) total-vm:4208kB, anon-rss:124kB, file-rss:0kB
+sh invoked oom-killer: gfp_mask=0xd0, order=2, oom_adj=0, oom_score_adj=0
+Backtrace: 
+[<c00127fc>] (dump_backtrace+0x0/0x120) from [<c041df74>] (dump_stack+0x20/0x28)
+ r6:000000d0 r5:00000000 r4:de49a000 r3:00000000
+[<c041df54>] (dump_stack+0x0/0x28) from [<c00b18a4>] (dump_header.isra.6+0x84/0x188)
+[<c00b1820>] (dump_header.isra.6+0x0/0x188) from [<c00b1b70>] (oom_kill_process+0x50/0x21c)
+[<c00b1b20>] (oom_kill_process+0x0/0x21c) from [<c00b2214>] (out_of_memory+0x138/0x1d8)
+[<c00b20dc>] (out_of_memory+0x0/0x1d8) from [<c00b5050>] (__alloc_pages_nodemask+0x4fc/0x668)
+ r8:c09f4940 r7:00000002 r6:00000000 r5:de49a000 r4:000000d0
+[<c00b4b54>] (__alloc_pages_nodemask+0x0/0x668) from [<c00b51dc>] (__get_free_pages+0x20/0x3c)
+[<c00b51bc>] (__get_free_pages+0x0/0x3c) from [<c001afd8>] (pgd_alloc+0x24/0xec)
+[<c001afb4>] (pgd_alloc+0x0/0xec) from [<c003239c>] (mm_init+0xbc/0xfc)
+ r7:df6568c0 r6:c09f65c8 r5:00000000 r4:ddb2e580
+[<c00322e0>] (mm_init+0x0/0xfc) from [<c0032660>] (mm_alloc+0x50/0x5c)
+ r7:de49a000 r6:df57d1e0 r5:000f77a4 r4:ddb2e580
+[<c0032610>] (mm_alloc+0x0/0x5c) from [<c00edc8c>] (bprm_mm_init+0x20/0x1b8)
+ r4:ddb23000 r3:00000001
+[<c00edc6c>] (bprm_mm_init+0x0/0x1b8) from [<c00ee14c>] (do_execve+0xf8/0x2c4)
+[<c00ee054>] (do_execve+0x0/0x2c4) from [<c0012470>] (sys_execve+0x44/0x68)
+[<c001242c>] (sys_execve+0x0/0x68) from [<c000e000>] (ret_fast_syscall+0x0/0x30)
+ r7:0000000b r6:000d5e48 r5:000f77e4 r4:000f7794
+Mem-info:
+Normal per-cpu:
+CPU    0: hi:  186, btch:  31 usd:  24
+CPU    1: hi:  186, btch:  31 usd:  24
+active_anon:110611 inactive_anon:560 isolated_anon:0
+ active_file:12 inactive_file:64 isolated_file:0
+ unevictable:0 dirty:0 writeback:0 unstable:0
+ free:6378 slab_reclaimable:898 slab_unreclaimable:1565
+ mapped:613 shmem:651 pagetables:776 bounce:0
+Normal free:25512kB min:2884kB low:3604kB high:4324kB active_anon:442444kB inactive_anon:2240kB active_file:48kB inactive_file:256kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:520192kB mlocked:0kB dirty:0kB writeback:0kB mapped:2452kB shmem:2604kB slab_reclaimable:3592kB slab_unreclaimable:6260kB kernel_stack:2080kB pagetables:3104kB unstable:0kB bounce:0kB writeback_tmp:0kB pages_scanned:190 all_unreclaimable? yes
+lowmem_reserve[]: 0 0 0
+Normal: 4228*4kB 985*8kB 39*16kB 3*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB 0*8192kB = 25512kB
+764 total pagecache pages
+131072 pages of RAM
+6774 free pages
+7380 reserved pages
+2464 slab pages
+703 pages shared
+0 pages swap cached
+[ pid ]   uid  tgid total_vm      rss cpu oom_adj oom_score_adj name
+[  739]     0   739     1924       16   0       0             0 syslogd
+[  741]     0   741     1924       20   0       0             0 klogd
+[  824]     0   824     1924       18   0       0             0 ifplugd
+[  832]     0   832     1926       25   0       0             0 sh
+[  888]     0   888     2958      389   0       0             0 snmpd
+[  933]     0   933     1924       21   0       0             0 crond
+[  942]     0   942     2205       52   0       0             0 wpa_supplicant
+[  949]     0   949     2057       24   1       0             0 stdin2log
+[  953]     0   953    60931    24447   0       0             0 appBrowser
+[ 5017]     0  5017   334960     1152   0       0             0 mjpg_streamer
+[ 9858]     0  9858     2046       32   0       0             0 config_periodic
+[10285]     0 10285     2046       32   0       0             0 config_periodic
+[10365]     0 10365     2045       31   1       0             0 config_periodic
+[10871]     0 10871     2046       32   1       0             0 config_periodic
+[11967]     0 11967     2046       32   0       0             0 config_periodic
+[13023]     0 13023     2046       32   0       0             0 config_periodic
+[29537]     0 29537     1926       26   0       0             0 sh
+[28415]     0 28415      138       10   0       0             0 upctool
+[22574]     0 22574     2452       80   0       0             0 lighttpd
+[21135]     0 21135     1924       15   0       0             0 sh
+[21136]     0 21136     1924       19   1       0             0 sh
+[21159]     0 21159      991       49   0       0             0 bash
+[ 1334]     0  1334     2054       79   0       0             0 su
+[ 1348]  1000  1348    21800    17651   1       0             0 pip
+[ 7315]  1000  7315     8134     4116   1       0             0 python3
+[ 7541]  1000  7541    39502    30945   1       0             0 python3
+[13926]  1000 13926    30200    20012   1       0             0 cc1
+[17344]  1000 17344     1052       31   1       0             0 arm-linux-gnuea
+[17347]  1000 17347    21232    11654   0       0             0 cc1
+[21828]     0 21828     1924       16   0       0             0 sh
+[21829]     0 21829     1924       16   0       0             0 sh
+[21830]     0 21830     1924       16   1       0             0 sh
+[21831]     0 21831     1891       28   0       0             0 pidof
+[21832]     0 21832     1891       26   0       0             0 pidof
+[21833]     0 21833      282        7   0       0             0 pidof
+[21834]     0 21834     1926       30   1       0             0 sh
+Out of memory: Kill process 7541 (python3) score 251 or sacrifice child
+Killed process 17344 (arm-linux-gnuea) total-vm:4208kB, anon-rss:124kB, file-rss:0kB
+sh invoked oom-killer: gfp_mask=0xd0, order=2, oom_adj=0, oom_score_adj=0
+Backtrace: 
+[<c00127fc>] (dump_backtrace+0x0/0x120) from [<c041df74>] (dump_stack+0x20/0x28)
+ r6:000000d0 r5:00000000 r4:dde96000 r3:00000000
+[<c041df54>] (dump_stack+0x0/0x28) from [<c00b18a4>] (dump_header.isra.6+0x84/0x188)
+[<c00b1820>] (dump_header.isra.6+0x0/0x188) from [<c00b1b70>] (oom_kill_process+0x50/0x21c)
+[<c00b1b20>] (oom_kill_process+0x0/0x21c) from [<c00b2214>] (out_of_memory+0x138/0x1d8)
+[<c00b20dc>] (out_of_memory+0x0/0x1d8) from [<c00b5050>] (__alloc_pages_nodemask+0x4fc/0x668)
+ r8:c09f4940 r7:00000002 r6:00000000 r5:dde96000 r4:000000d0
+[<c00b4b54>] (__alloc_pages_nodemask+0x0/0x668) from [<c00b51dc>] (__get_free_pages+0x20/0x3c)
+[<c00b51bc>] (__get_free_pages+0x0/0x3c) from [<c001afd8>] (pgd_alloc+0x24/0xec)
+[<c001afb4>] (pgd_alloc+0x0/0xec) from [<c003239c>] (mm_init+0xbc/0xfc)
+ r7:df6f7500 r6:c09f65c8 r5:00000000 r4:de5d0900
+[<c00322e0>] (mm_init+0x0/0xfc) from [<c0032660>] (mm_alloc+0x50/0x5c)
+ r7:dde96000 r6:de0aebc0 r5:000f77a4 r4:de5d0900
+[<c0032610>] (mm_alloc+0x0/0x5c) from [<c00edc8c>] (bprm_mm_init+0x20/0x1b8)
+ r4:de4a0000 r3:00000001
+[<c00edc6c>] (bprm_mm_init+0x0/0x1b8) from [<c00ee14c>] (do_execve+0xf8/0x2c4)
+[<c00ee054>] (do_execve+0x0/0x2c4) from [<c0012470>] (sys_execve+0x44/0x68)
+[<c001242c>] (sys_execve+0x0/0x68) from [<c000e000>] (ret_fast_syscall+0x0/0x30)
+ r7:0000000b r6:000d5e48 r5:000f77e4 r4:000f7794
+Mem-info:
+Normal per-cpu:
+CPU    0: hi:  186, btch:  31 usd:  48
+CPU    1: hi:  186, btch:  31 usd:  32
+active_anon:110891 inactive_anon:561 isolated_anon:0
+ active_file:9 inactive_file:749 isolated_file:0
+ unevictable:0 dirty:0 writeback:0 unstable:0
+ free:5431 slab_reclaimable:892 slab_unreclaimable:1526
+ mapped:861 shmem:651 pagetables:775 bounce:0
+Normal free:21724kB min:2884kB low:3604kB high:4324kB active_anon:443564kB inactive_anon:2244kB active_file:36kB inactive_file:2996kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:520192kB mlocked:0kB dirty:0kB writeback:0kB mapped:3444kB shmem:2604kB slab_reclaimable:3568kB slab_unreclaimable:6104kB kernel_stack:2048kB pagetables:3100kB unstable:0kB bounce:0kB writeback_tmp:0kB pages_scanned:251 all_unreclaimable? yes
+lowmem_reserve[]: 0 0 0
+Normal: 3317*4kB 971*8kB 37*16kB 3*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB 0*8192kB = 21724kB
+1445 total pagecache pages
+131072 pages of RAM
+5864 free pages
+7380 reserved pages
+2419 slab pages
+1028 pages shared
+0 pages swap cached
+[ pid ]   uid  tgid total_vm      rss cpu oom_adj oom_score_adj name
+[  739]     0   739     1924       16   0       0             0 syslogd
+[  741]     0   741     1924       30   0       0             0 klogd
+[  824]     0   824     1924       18   0       0             0 ifplugd
+[  832]     0   832     1926       25   0       0             0 sh
+[  888]     0   888     2959      436   0       0             0 snmpd
+[  933]     0   933     1924       21   0       0             0 crond
+[  942]     0   942     2205       52   0       0             0 wpa_supplicant
+[  949]     0   949     2057       24   1       0             0 stdin2log
+[  953]     0   953    60931    24471   0       0             0 appBrowser
+[ 5017]     0  5017   334960     1152   0       0             0 mjpg_streamer
+[ 9858]     0  9858     2046       32   0       0             0 config_periodic
+[10285]     0 10285     2046       32   0       0             0 config_periodic
+[10365]     0 10365     2045       31   1       0             0 config_periodic
+[10871]     0 10871     2046       32   1       0             0 config_periodic
+[11967]     0 11967     2046       32   0       0             0 config_periodic
+[13023]     0 13023     2046       32   0       0             0 config_periodic
+[29537]     0 29537     1926       26   0       0             0 sh
+[28415]     0 28415      138       10   1       0             0 upctool
+[22574]     0 22574     2452       80   0       0             0 lighttpd
+[21135]     0 21135     1924       15   0       0             0 sh
+[21136]     0 21136     1924       19   1       0             0 sh
+[21159]     0 21159      991       49   0       0             0 bash
+[ 1334]     0  1334     2054       79   0       0             0 su
+[ 1348]  1000  1348    21800    17651   1       0             0 pip
+[ 7315]  1000  7315     8134     4116   1       0             0 python3
+[ 7541]  1000  7541    39502    30942   1       0             0 python3
+[13926]  1000 13926    30200    20100   0       0             0 cc1
+[17347]  1000 17347    21232    11753   0       0             0 cc1
+[21836]  1000 21836     1052       31   1       0             0 arm-linux-gnuea
+[21837]  1000 21837     1052       31   1       0             0 arm-linux-gnuea
+[21843]  1000 21843     8903      198   1       0             0 cc1
+[21844]  1000 21844     8903      198   1       0             0 cc1
+[21856]     0 21856     1926       74   1       0             0 sh
+Out of memory: Kill process 7541 (python3) score 251 or sacrifice child
+Killed process 21836 (arm-linux-gnuea) total-vm:4208kB, anon-rss:124kB, file-rss:0kB
+sh invoked oom-killer: gfp_mask=0xd0, order=2, oom_adj=0, oom_score_adj=0
+Backtrace: 
+[<c00127fc>] (dump_backtrace+0x0/0x120) from [<c041df74>] (dump_stack+0x20/0x28)
+ r6:000000d0 r5:00000000 r4:dde96000 r3:00000000
+[<c041df54>] (dump_stack+0x0/0x28) from [<c00b18a4>] (dump_header.isra.6+0x84/0x188)
+[<c00b1820>] (dump_header.isra.6+0x0/0x188) from [<c00b1b70>] (oom_kill_process+0x50/0x21c)
+[<c00b1b20>] (oom_kill_process+0x0/0x21c) from [<c00b2214>] (out_of_memory+0x138/0x1d8)
+[<c00b20dc>] (out_of_memory+0x0/0x1d8) from [<c00b5050>] (__alloc_pages_nodemask+0x4fc/0x668)
+ r8:c09f4940 r7:00000002 r6:00000000 r5:dde96000 r4:000000d0
+[<c00b4b54>] (__alloc_pages_nodemask+0x0/0x668) from [<c00b51dc>] (__get_free_pages+0x20/0x3c)
+[<c00b51bc>] (__get_free_pages+0x0/0x3c) from [<c001afd8>] (pgd_alloc+0x24/0xec)
+[<c001afb4>] (pgd_alloc+0x0/0xec) from [<c003239c>] (mm_init+0xbc/0xfc)
+ r7:df6f7500 r6:c09f65c8 r5:00000000 r4:de5d0040
+[<c00322e0>] (mm_init+0x0/0xfc) from [<c0032660>] (mm_alloc+0x50/0x5c)
+ r7:dde96000 r6:df3ba360 r5:000f777c r4:de5d0040
+[<c0032610>] (mm_alloc+0x0/0x5c) from [<c00edc8c>] (bprm_mm_init+0x20/0x1b8)
+ r4:de4a0000 r3:00000001
+[<c00edc6c>] (bprm_mm_init+0x0/0x1b8) from [<c00ee14c>] (do_execve+0xf8/0x2c4)
+[<c00ee054>] (do_execve+0x0/0x2c4) from [<c0012470>] (sys_execve+0x44/0x68)
+[<c001242c>] (sys_execve+0x0/0x68) from [<c000e000>] (ret_fast_syscall+0x0/0x30)
+ r7:0000000b r6:000d5e48 r5:000f77bc r4:000f776c
+Mem-info:
+Normal per-cpu:
+CPU    0: hi:  186, btch:  31 usd:  23
+CPU    1: hi:  186, btch:  31 usd: 163
+active_anon:110860 inactive_anon:562 isolated_anon:0
+ active_file:24 inactive_file:50 isolated_file:0
+ unevictable:0 dirty:0 writeback:0 unstable:0
+ free:6042 slab_reclaimable:892 slab_unreclaimable:1522
+ mapped:636 shmem:651 pagetables:771 bounce:0
+Normal free:24168kB min:2884kB low:3604kB high:4324kB active_anon:443440kB inactive_anon:2248kB active_file:96kB inactive_file:200kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:520192kB mlocked:0kB dirty:0kB writeback:0kB mapped:2544kB shmem:2604kB slab_reclaimable:3568kB slab_unreclaimable:6088kB kernel_stack:2040kB pagetables:3084kB unstable:0kB bounce:0kB writeback_tmp:0kB pages_scanned:288 all_unreclaimable? yes
+lowmem_reserve[]: 0 0 0
+Normal: 3922*4kB 974*8kB 37*16kB 3*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB 0*8192kB = 24168kB
+764 total pagecache pages
+131072 pages of RAM
+6568 free pages
+7380 reserved pages
+2415 slab pages
+692 pages shared
+0 pages swap cached
+[ pid ]   uid  tgid total_vm      rss cpu oom_adj oom_score_adj name
+[  739]     0   739     1924       16   0       0             0 syslogd
+[  741]     0   741     1924       21   0       0             0 klogd
+[  824]     0   824     1924       18   0       0             0 ifplugd
+[  832]     0   832     1926       25   0       0             0 sh
+[  888]     0   888     2959      396   0       0             0 snmpd
+[  933]     0   933     1924       21   0       0             0 crond
+[  942]     0   942     2205       52   0       0             0 wpa_supplicant
+[  949]     0   949     2057       24   1       0             0 stdin2log
+[  953]     0   953    60931    24460   0       0             0 appBrowser
+[ 5017]     0  5017   334960     1152   0       0             0 mjpg_streamer
+[ 9858]     0  9858     2046       32   0       0             0 config_periodic
+[10285]     0 10285     2046       32   0       0             0 config_periodic
+[10365]     0 10365     2045       31   1       0             0 config_periodic
+[10871]     0 10871     2046       32   1       0             0 config_periodic
+[11967]     0 11967     2046       32   0       0             0 config_periodic
+[13023]     0 13023     2046       32   0       0             0 config_periodic
+[29537]     0 29537     1926       26   0       0             0 sh
+[28415]     0 28415      138       10   1       0             0 upctool
+[22574]     0 22574     2452       80   1       0             0 lighttpd
+[21135]     0 21135     1924       15   0       0             0 sh
+[21136]     0 21136     1924       19   1       0             0 sh
+[21159]     0 21159      991       49   0       0             0 bash
+[ 1334]     0  1334     2054       79   0       0             0 su
+[ 1348]  1000  1348    21800    17651   1       0             0 pip
+[ 7315]  1000  7315     8134     4116   1       0             0 python3
+[ 7541]  1000  7541    39502    30947   1       0             0 python3
+[13926]  1000 13926    30200    20016   0       0             0 cc1
+[17347]  1000 17347    21232    11682   0       0             0 cc1
+[21837]  1000 21837     1052       31   1       0             0 arm-linux-gnuea
+[21843]  1000 21843     8903      158   0       0             0 cc1
+[21844]  1000 21844     8903      158   0       0             0 cc1
+[21857]     0 21857     1926       26   1       0             0 sh
+Out of memory: Kill process 7541 (python3) score 251 or sacrifice child
+Killed process 21837 (arm-linux-gnuea) total-vm:4208kB, anon-rss:124kB, file-rss:0kB
+sh invoked oom-killer: gfp_mask=0xd0, order=2, oom_adj=0, oom_score_adj=0
+Backtrace: 
+[<c00127fc>] (dump_backtrace+0x0/0x120) from [<c041df74>] (dump_stack+0x20/0x28)
+ r6:000000d0 r5:00000000 r4:ddff6000 r3:00000000
+[<c041df54>] (dump_stack+0x0/0x28) from [<c00b18a4>] (dump_header.isra.6+0x84/0x188)
+[<c00b1820>] (dump_header.isra.6+0x0/0x188) from [<c00b1b70>] (oom_kill_process+0x50/0x21c)
+[<c00b1b20>] (oom_kill_process+0x0/0x21c) from [<c00b2214>] (out_of_memory+0x138/0x1d8)
+[<c00b20dc>] (out_of_memory+0x0/0x1d8) from [<c00b5050>] (__alloc_pages_nodemask+0x4fc/0x668)
+ r8:c09f4940 r7:00000002 r6:00000000 r5:ddff6000 r4:000000d0
+[<c00b4b54>] (__alloc_pages_nodemask+0x0/0x668) from [<c00b51dc>] (__get_free_pages+0x20/0x3c)
+[<c00b51bc>] (__get_free_pages+0x0/0x3c) from [<c001afd8>] (pgd_alloc+0x24/0xec)
+[<c001afb4>] (pgd_alloc+0x0/0xec) from [<c003239c>] (mm_init+0xbc/0xfc)
+ r7:df6f7500 r6:c09f65c8 r5:00000000 r4:de5d0900
+[<c00322e0>] (mm_init+0x0/0xfc) from [<c0032660>] (mm_alloc+0x50/0x5c)
+ r7:ddff6000 r6:df444ba0 r5:000f77a4 r4:de5d0900
+[<c0032610>] (mm_alloc+0x0/0x5c) from [<c00edc8c>] (bprm_mm_init+0x20/0x1b8)
+ r4:df139000 r3:00038000
+[<c00edc6c>] (bprm_mm_init+0x0/0x1b8) from [<c00ee14c>] (do_execve+0xf8/0x2c4)
+[<c00ee054>] (do_execve+0x0/0x2c4) from [<c0012470>] (sys_execve+0x44/0x68)
+[<c001242c>] (sys_execve+0x0/0x68) from [<c000e000>] (ret_fast_syscall+0x0/0x30)
+ r7:0000000b r6:000d5e48 r5:000f77e4 r4:000f7794
+Mem-info:
+Normal per-cpu:
+CPU    0: hi:  186, btch:  31 usd:  57
+CPU    1: hi:  186, btch:  31 usd:  26
+active_anon:111613 inactive_anon:560 isolated_anon:0
+ active_file:14 inactive_file:450 isolated_file:0
+ unevictable:0 dirty:0 writeback:0 unstable:0
+ free:5028 slab_reclaimable:894 slab_unreclaimable:1523
+ mapped:861 shmem:651 pagetables:775 bounce:0
+Normal free:20112kB min:2884kB low:3604kB high:4324kB active_anon:446452kB inactive_anon:2240kB active_file:56kB inactive_file:1800kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:520192kB mlocked:0kB dirty:0kB writeback:0kB mapped:3444kB shmem:2604kB slab_reclaimable:3576kB slab_unreclaimable:6092kB kernel_stack:2032kB pagetables:3100kB unstable:0kB bounce:0kB writeback_tmp:0kB pages_scanned:115 all_unreclaimable? yes
+lowmem_reserve[]: 0 0 0
+Normal: 2902*4kB 973*8kB 39*16kB 3*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB 0*8192kB = 20112kB
+1129 total pagecache pages
+131072 pages of RAM
+5448 free pages
+7380 reserved pages
+2418 slab pages
+1023 pages shared
+0 pages swap cached
+[ pid ]   uid  tgid total_vm      rss cpu oom_adj oom_score_adj name
+[  739]     0   739     1924       16   0       0             0 syslogd
+[  741]     0   741     1924       19   0       0             0 klogd
+[  824]     0   824     1924       18   0       0             0 ifplugd
+[  832]     0   832     1926       25   0       0             0 sh
+[  888]     0   888     2958      387   0       0             0 snmpd
+[  933]     0   933     1924       21   0       0             0 crond
+[  942]     0   942     2205       52   0       0             0 wpa_supplicant
+[  949]     0   949     2057       24   1       0             0 stdin2log
+[  953]     0   953    60931    24493   0       0             0 appBrowser
+[ 5017]     0  5017   334960     1152   0       0             0 mjpg_streamer
+[ 9858]     0  9858     2046       32   0       0             0 config_periodic
+[10285]     0 10285     2046       32   0       0             0 config_periodic
+[10365]     0 10365     2045       31   1       0             0 config_periodic
+[10871]     0 10871     2046       32   1       0             0 config_periodic
+[11967]     0 11967     2046       32   0       0             0 config_periodic
+[13023]     0 13023     2046       32   0       0             0 config_periodic
+[29537]     0 29537     1926       26   0       0             0 sh
+[28415]     0 28415      138       10   1       0             0 upctool
+[22574]     0 22574     2452       80   0       0             0 lighttpd
+[21135]     0 21135     1924       15   0       0             0 sh
+[21136]     0 21136     1924       19   1       0             0 sh
+[21159]     0 21159      991       49   0       0             0 bash
+[ 1334]     0  1334     2054       79   0       0             0 su
+[ 1348]  1000  1348    21800    17651   1       0             0 pip
+[ 7315]  1000  7315     8134     4116   1       0             0 python3
+[ 7541]  1000  7541    39502    30999   1       0             0 python3
+[13926]  1000 13926    30200    20083   1       0             0 cc1
+[17347]  1000 17347    21232    11726   1       0             0 cc1
+[21843]  1000 21843     9035      506   1       0             0 cc1
+[21844]  1000 21844     9231      702   1       0             0 cc1
+[21865]     0 21865     1926       74   0       0             0 sh
+Out of memory: Kill process 7541 (python3) score 251 or sacrifice child
+Killed process 7541 (python3) total-vm:158008kB, anon-rss:123768kB, file-rss:228kB
+mv61fb_blank:1366: Requested blanking level = 0x00000001
+set_dma_control0:649: disabling lcd graphics dma
+mv61fb_blank:1366: Requested blanking level = 0x00000000
+set_dma_control0:655: enabling lcd graphics dma
+mv61fb_blank:1366: Requested blanking level = 0x00000004
+set_dma_control0:649: disabling lcd graphics dma
+mv61fb_blank:1366: Requested blanking level = 0x00000000
+set_dma_control0:655: enabling lcd graphics dma
+mv61fb_blank:1366: Requested blanking level = 0x00000001
+set_dma_control0:649: disabling lcd graphics dma
+mv61fb_blank:1366: Requested blanking level = 0x00000000
+set_dma_control0:655: enabling lcd graphics dma
+mv61fb_blank:1366: Requested blanking level = 0x00000004
+set_dma_control0:649: disabling lcd graphics dma
+mv61fb_blank:1366: Requested blanking level = 0x00000000
+set_dma_control0:655: enabling lcd graphics dma
+==DEVICES
+Character devices:
+  1 mem
+  4 /dev/vc/0
+  4 tty
+  4 ttyS
+  5 /dev/tty
+  5 /dev/console
+  5 /dev/ptmx
+  7 vcs
+ 10 misc
+ 13 input
+ 29 fb
+ 81 video4linux
+ 89 i2c
+ 90 mtd
+128 ptm
+136 pts
+180 usb
+188 ttyUSB
+189 usb_device
+246 upc_processor
+247 ubi1
+248 USB printer gadget
+249 hidraw
+250 uio
+251 ubi0
+252 hips_pll
+253 dma_alloc devices
+254 rtc
+
+Block devices:
+259 blkext
+  8 sd
+ 31 mtdblock
+ 65 sd
+ 66 sd
+ 67 sd
+ 68 sd
+ 69 sd
+ 70 sd
+ 71 sd
+128 sd
+129 sd
+130 sd
+131 sd
+132 sd
+133 sd
+134 sd
+135 sd
+179 mmc
+==PLATFORM
+/sys/bus/platform/devices:
+alarmtimer
+antic.0
+arm-pmu.0
+asela_platform.0
+bootspi.0
+ci13xxx_mmio.0
+dw_spi_mmio.0
+dw_spi_mmio.1
+dw_spi_mmio.2
+ehci.0
+ehci.1
+gogin-rtc.0
+gogin-stepper.0
+gpio.0
+gpio.1
+gpio.2
+gpio.3
+gpio.4
+gpio.5
+gpio.6
+gpio.7
+hips_pll.0
+hips_pll.1
+hips_pll.2
+hips_pll.3
+hips_pll.4
+hips_pll.5
+hips_pll.6
+hips_pll.7
+i2c_designware.2
+i2c_designware.3
+imgpipe.0
+jpegHw.0
+laser_video_chardev.0
+lpc.0
+marvell-sccp.0
+marvell-sccp.1
+marvell-upc.0
+marvell-upc.1
+marvell_bspi.0
+msigen.0
+mv61-fb
+mv61x0-cdma.0
+mv61x0-vdma.0
+mv61x0-vdma.1
+mv61x0-vdma.2
+mv61x0-vdma.3
+mv61x0_nand.0
+mvm2m.0
+mvm2m.1
+pip.0
+regulatory.0
+sdhci-gogin.0
+sdhci-gogin.1
+serial8250
+serial8250.0
+serial8250.1
+serial8250.2
+serial8250.3
+sizar.0
+synopGMAC.0
+tsen.0
+uio_pdrv.0
+uio_pdrv.1
+uio_pdrv.12
+uio_pdrv.13
+uio_pdrv.14
+uio_pdrv.15
+uio_pdrv.16
+uio_pdrv.17
+uio_pdrv.2
+uio_pdrv.3
+uio_pdrv.36
+uio_pdrv_genirq.11
+uio_pdrv_genirq.27
+uio_pdrv_genirq.28
+uio_pdrv_genirq.30
+uio_pdrv_genirq.31
+uio_pdrv_genirq.32
+uio_pdrv_genirq.4
+uio_pdrv_genirq.6
+uio_pdrv_genirq.7
+uio_pdrv_genirq.8
+
+/sys/bus/platform/drivers:
+alarmtimer
+arm-pmu
+bootspi
+ci13xxx_mmio
+dma_alloc
+dw_spi_mmio
+ehci
+gogin-rtc
+gogin-stepper
+gpio
+hips_pll
+i2c_designware
+marvell-upc
+mv61-fb
+mv61x0-cdma
+mv61x0-vdma
+mv61x0_nand
+sdhci-gogin
+serial8250
+synopGMAC
+uio_pdrv
+uio_pdrv_genirq
+==I2C
+2-0040
+3-0030
+i2c-2
+i2c-3
+/sys/bus/i2c/devices/2-0040 rohm-i2c
+/sys/bus/i2c/devices/3-0030 Smart-IC
+/sys/bus/i2c/devices/i2c-2 Synopsys DesignWare I2C adapter
+/sys/bus/i2c/devices/i2c-3 Synopsys DesignWare I2C adapter
+==MEM
+MemTotal:         494768 kB
+MemFree:           18064 kB
+Buffers:           40976 kB
+Cached:           341012 kB
+SwapCached:            0 kB

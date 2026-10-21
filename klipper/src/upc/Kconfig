@@ -1,0 +1,68 @@
+# Kconfig settings for the Marvell 88PA6170 UPC cores (Sindoh DP200)
+
+if MACH_UPC
+
+config UPC_SELECT
+    bool
+    default y
+    select HAVE_GPIO
+    select HAVE_GPIO_ADC if UPC_CORE_IO
+    select HAVE_GPIO_HARD_PWM
+    select HAVE_LIMITED_CODE_SIZE
+    select SERIAL
+
+config BOARD_DIRECTORY
+    string
+    default "upc"
+
+choice
+    prompt "UPC core"
+    config UPC_CORE_FM
+        bool "FM core (/dev/upc1) - steppers, endstops, motor current"
+    config UPC_CORE_IO
+        bool "IO core (/dev/upc0) - heaters, fans, thermistors"
+endchoice
+
+config MCU
+    string
+    default "upc_fm" if UPC_CORE_FM
+    default "upc_io"
+
+config CLOCK_FREQ
+    int "Timer frequency in Hz"
+    default 396000000
+    help
+      XENA Timer1 measured on the printer at 395.76-395.85 MHz
+      (2 x the 198 MHz dithered bus clock). Klipper's clock sync
+      corrects the small remaining offset.
+
+config UPC_TIMER_ADDR
+    hex "One-shot down-counter used as timebase (XENA Timer1)"
+    default 0x08001144
+
+config UPC_THUMB
+    bool "Compile in Thumb mode (needed to fit 16 KiB; verified on hardware)"
+    default y
+
+config UPC_ITCM_SIZE
+    hex "ITCM size in bytes (upc.ko only accepts 0x4000)"
+    default 0x4000
+
+config UPC_DYNMEM_SIZE
+    int "Bytes of DTCM for move queues and other dynamic objects"
+    default 16384
+
+config UPC_STEP_HALF_TICKS
+    int "Step pulse half period in stepper-engine ticks (200 MHz)"
+    default 400
+    help
+      Each step is issued as a one-pulse hardware move: the STEP line is
+      high for this many 5 ns ticks, then low for the same time. 400 =
+      2 us high, comfortably above the A4982's 1 us minimum.
+
+config UPC_ADC_SETTLE_US
+    int "Wait after selecting an ADC input before reading (microseconds)"
+    depends on UPC_CORE_IO
+    default 10000
+
+endif
