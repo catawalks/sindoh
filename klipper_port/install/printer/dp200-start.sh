@@ -82,4 +82,26 @@ killall mjpg_streamer 2>/dev/null
 # upc.ko is loaded by the stock /app/module_load.sh
 grep -q '^upc ' /proc/modules || insmod /app/upc.ko
 
+# The kernel's text console blanks the panel after 600 s without keyboard
+# input (consoleblank, read-only here) and touches don't count. The stock app
+# kept it awake; now turn the console screensaver off (setterm -blank 0).
+for t in /dev/tty0 /dev/tty1; do printf '\033[9;0]\033[14;0]' > $t 2>/dev/null; done
+echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null
+
+# WiFi: joining the owner's network was the stock app's job (see dp200-wifi.sh)
+sh $ROOT/dp200/dp200-wifi.sh $ROOT
+# network settings from the touch screen (DHCP/static per port, Ethernet hotplug)
+mkdir -p $ROOT/run/dp200
+if ! { [ -f /var/run/dp200-netd.pid ] && kill -0 $(cat /var/run/dp200-netd.pid) 2>/dev/null; }; then
+    sh $ROOT/dp200/dp200-netd.sh $ROOT </dev/null >> $ROOT/var/log/dp200-netd.log 2>&1 &
+    echo $! > /var/run/dp200-netd.pid
+fi
+# the touch screen (in the chroot) talks to wpa_supplicant's control socket
+mkdir -p $ROOT/run/wpa_supplicant
+grep -q " $ROOT/run/wpa_supplicant " /proc/mounts || \
+    mount --bind /var/run/wpa_supplicant $ROOT/run/wpa_supplicant
+# Marvell's mlanutl (stock firmware) for scans that keep the association;
+# runs fine in the chroot. Copied at boot, not shipped in our payload.
+cp /lib/modules/8782/mlanutl $ROOT/run/mlanutl 2>/dev/null
+
 in_root /etc/dp200/rc.dp200 start

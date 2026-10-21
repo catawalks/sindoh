@@ -28,6 +28,13 @@ dp200_mount_root() {
         for d in upc0 upc1 mem console fb0 event0; do
             [ -e /dev/$d ] && cp -a /dev/$d $ROOT/dev/
         done
+        # cartridge chip bridge (DS2465 on i2c-3): group klipper, for the
+        # read-only [dp200_cartridge] Klipper module
+        if [ -e /dev/i2c-3 ]; then
+            cp -a /dev/i2c-3 $ROOT/dev/
+            chown 0:$(grep '^klipper:' $ROOT/etc/group | cut -d: -f3) $ROOT/dev/i2c-3
+            chmod 660 $ROOT/dev/i2c-3
+        fi
         # webcam (uvcvideo): group "video" (gid 44 in the Debian root) so
         # ustreamer runs as the klipper user
         for d in /dev/video*; do
@@ -42,7 +49,7 @@ dp200_mount_root() {
 }
 
 dp200_umount_root() {
-    for m in tmp run dev/shm dev/pts dev sys proc; do
+    for m in tmp run/wpa_supplicant run dev/shm dev/pts dev sys proc; do
         grep -q " $ROOT/$m " /proc/mounts && umount $ROOT/$m
     done
     return 0

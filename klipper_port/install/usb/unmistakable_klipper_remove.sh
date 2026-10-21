@@ -41,7 +41,7 @@ fi
 
 for r in /klipper /mnt/sd; do
     [ -x $r/dp200/dp200-start.sh ] && $r/dp200/dp200-start.sh stop
-    for m in home/klipper/printer_data/logs var/log tmp run dev/shm dev/pts dev sys proc; do
+    for m in home/klipper/printer_data/logs var/log tmp run/wpa_supplicant run dev/shm dev/pts dev sys proc; do
         grep -q " $r/$m " /proc/mounts && umount $r/$m
     done
 done
@@ -50,7 +50,7 @@ if [ -f /etc/profile.stock ]; then
 else
     sed -i '/# dp200-klipper hook/d' /etc/profile
 fi
-rm -f /DEBUG_MACHINE /etc/dp200-boot.sh
+rm -f /DEBUG_MACHINE /etc/dp200-boot.sh /etc/dp200-nand
 sync
 
 if [ $RESTORE = 1 ]; then

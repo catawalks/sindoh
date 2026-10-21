@@ -35,6 +35,7 @@ class FakeTouch(S.Touch):
         os.write(self.w, S.EVENT.pack(0, 0, S.EV_SYN, S.SYN_REPORT, 0))
 
 ui = S.UI()
+ui.settings = {}                      # default timeout, whatever the printer has saved
 ui.st = S.query()
 touch = FakeTouch()
 fails = 0
@@ -88,12 +89,21 @@ tap('MOVE'); tap('HOME ALL')
 check('HOME ALL asks to confirm', ui.confirm is not None and sent[-1][1] == 'LAMP_TOGGLE')
 tap('YES');               check('YES sends G28', sent[-1] == ('/printer/gcode/script', 'G28'))
 tap('BACK')
+tap('FILAMENT'); tap('UNLOCK');       check('UNLOCK asks to confirm', ui.confirm is not None)
+tap('YES');                           check('YES sends CARTRIDGE_RELEASE', sent[-1] == ('/printer/gcode/script', 'CARTRIDGE_RELEASE'))
+tap('BACK')
 # STOP: a short tap must NOT stop, a 1 s hold must
 tap('STOP');              check('short STOP tap ignored', all(p != '/printer/emergency_stop' for p, _ in sent))
 box = find('STOP'); u, v = (box[0] + box[2]) // 2, (box[1] + box[3]) // 2
 t0 = time.time()
 while time.time() - t0 < 1.3:
-    touch.frame(u, v); step(); time.sleep(0.1)
+    # like the real panel: frames every 50 ms (a gap > 0.3 s counts as lifted),
+    # input handled each frame, a full redraw only now and then
+    touch.frame(u, v)
+    for ev in touch.poll():
+        ui.on_touch(ev)
+    ui.check_hold()
+    time.sleep(0.05)
 touch.lift(); step()
 check('STOP held 1 s -> emergency_stop', ('/printer/emergency_stop', None) in sent)
 # dim + wake: first tap only wakes

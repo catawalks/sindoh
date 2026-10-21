@@ -111,7 +111,7 @@ keywait
 if [ $DRY_RUN = 0 ]; then
     for r in /klipper /mnt/sd; do
         [ -x $r/dp200/dp200-start.sh ] && $r/dp200/dp200-start.sh stop
-        for m in home/klipper/printer_data/logs var/log tmp run dev/shm dev/pts dev sys proc; do
+        for m in home/klipper/printer_data/logs var/log tmp run/wpa_supplicant run dev/shm dev/pts dev sys proc; do
             grep -q " $r/$m " /proc/mounts && umount $r/$m
         done
     done
@@ -176,6 +176,8 @@ fi
 
 show "Installing boot hook" "" "DO NOT POWER OFF"
 sh $ROOT/dp200/hook_install.sh || fail "hook failed" "see install log"
+# tells /etc/dp200-boot.sh to attach mtd5 (only NAND installs)
+if [ $TARGET = nand ]; then touch /etc/dp200-nand; else rm -f /etc/dp200-nand; fi
 sync
 
 /app/tinydebug led green 2>/dev/null

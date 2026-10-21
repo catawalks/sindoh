@@ -84,14 +84,15 @@ else
 fi
 install -d /etc/dp200 /dp200 $KHOME/printer_data/config $KHOME/printer_data/gcodes $KHOME/printer_data/logs
 install -m 755 $PORT/install/rootfs/etc/dp200/rc.dp200 /etc/dp200/rc.dp200
-install -m 755 $PORT/install/display/dp200_screen.py /usr/local/bin/dp200_screen.py
+install -m 755 $PORT/install/display/dp200_screen.py $PORT/install/display/dp200_wifi.py $PORT/install/display/dp200_net.py /usr/local/bin/
 install -m 755 $PORT/install/printer/*.sh /dp200/
 cp -n $PORT/install/rootfs/home/klipper/printer_data/config/moonraker.conf $KHOME/printer_data/config/ || true
 # dp200_*.cfg belong to this port (replaced on every build/update);
 # printer.cfg is the user's file (only created if missing)
 cp $PORT/klipper/config/dp200_printer.cfg $PORT/klipper/config/dp200_macros.cfg $KHOME/printer_data/config/
 cp -n $PORT/klipper/config/printer.cfg $KHOME/printer_data/config/printer.cfg || true
-cp $PORT/klipper/extras/upc_stats.py $PORT/klipper/extras/upc_clockcheck.py $KHOME/klipper/klippy/extras/
+cp $PORT/klipper/extras/upc_stats.py $PORT/klipper/extras/upc_clockcheck.py \
+   $PORT/klipper/extras/dp200_cartridge.py $KHOME/klipper/klippy/extras/
 chown -R $KUSER:$KUSER $KHOME
 echo "dp200-klipper" > /etc/hostname
 echo "== inside: done ($(du -sh /usr /home /opt 2>/dev/null | tr '\n' ' '))"

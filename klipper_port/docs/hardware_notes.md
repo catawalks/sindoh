@@ -37,7 +37,7 @@ designed to settle the open items.
 | ITCM writes are limited to 0x4000 bytes per core. DTCM read/write through the driver is limited to 0x20000; the cores see 0x40000. | upc_read / upc_write bounds |
 | **The mailbox-write ioctl `0xc0087530` blocks**: for box 0 or 5 it waits (interruptibly) for the GPStatus-bit-0 IRQ, and for box 1 the bit-1 IRQ. It holds the driver's global mutex while waiting. | upc_ioctl → wait_for_completion_interruptible; upc_platform_irq clears the bit and calls complete() |
 | DTCM = `upc_data_array[1].base + 0x70000`; XENA registers = `upc_data_array[0].base + 0x8000`. Physical bases come from the board file, so upctool finds DTCM by writing a nonce through the driver and searching for it via `/dev/mem`. | upc_read_dtcm, upc_get_regbase_addr |
-| `CONFIG_STRICT_DEVMEM` is not set, so `/dev/mem` can map DTCM and peripherals. | IKCONFIG (docs/kernel-3.2.0-g67a8e16.config) |
+| `CONFIG_STRICT_DEVMEM` is not set, so `/dev/mem` can map DTCM and peripherals. | IKCONFIG (docs/kernel/vendor_3.2.0-g67a8e16.config) |
 | **HZ=100 and no `CONFIG_HIGH_RES_TIMERS`**: every sleep or poll lasts at least 10 ms. The bridge spins with sched_yield for 5 ms after traffic to cut latency. | IKCONFIG |
 | The CPU is ARMv7 with **VFPv3-D16**. Host binaries must not use d16–d31 or NEON (gcc: `-mfpu=vfpv3-d16`). A Cortex-A9 target produced 510 illegal register uses. | main ELF attributes; tools/vfpscan.py |
 

@@ -51,6 +51,19 @@ ustreamer MJPEG 640x480@15 passthrough as an rc.dp200 service (klipper user, v4l
 --device-timeout 5), Mainsail rotation 270, ~8 % of one core (stock YUYV way: 92 %). Load numbers in
 hardware_notes. Tunables: /etc/dp200/webcam.conf + rc.dp200 restart-webcam. A cardboard box with the
 thermocouple sits on the bed (visible on the camera) - remove before any homing/mesh!
+10-22 (user present): printer booted from U-Boot (run bootcmd; there is no "boot" command). WiFi was NOT
+connected after killing the stock app early: the stock app is what joins the network. Now our own WiFi:
+docs/wifi.md (dp200-wifi.sh import from karas.db, dp200_wifi.py over the control socket, screen pages
+System->WIFI with scan/keyboard/hidden/forget). DON'T restart wpa_supplicant (driver then scans 0 BSS;
+driver reload fixes it). Deployed live + tested by simulated taps (25/25) - real taps by the user pending.
+Full boot path (dp200-start -> dp200-wifi.sh -> bind mount -> rc apply) not yet tested by a reboot.
+10-21 NIGHT (unattended, PC only - printer parked at U-Boot):
+- Cartridge format decoded from the stock app (tools/elfdis.py): raw pages -> fields, TotalFilament p0+28 (m),
+  Used ePulse p2+4 (x 500/458.83 mm), six params p3, fuses = cleared bits in pages 6-7. docs/cartridge_chip.md.
+- klipper/extras/dp200_cartridge.py drafted (read-only, threaded, CARTRIDGE_READ) + i2c-3 group klipper in
+  dp200-mounts.sh + build scripts. NOT deployed/tested and NOT in the configs yet -> test with the user.
+- TODO on the printer: deploy dp200-start.sh (gemstone kill fix) + dp200-mounts.sh, rebuild the USB payload
+  (release_check.sh), then publish (tools/publish_to_sindoh.ps1) once the user agrees.
 10-21 (user present, then unattended overnight):
 - BED: sensor rescaled to surface (TC: 19/32/49/65 C at stock 24/40/60/80; surface = 0.824*stock - 0.77,
   verified 60=60); bed max_power 0.6 -> 1.0 (0.6 tripped verify_heater going to 80); bed PID 74.532/1.252/1109.592;

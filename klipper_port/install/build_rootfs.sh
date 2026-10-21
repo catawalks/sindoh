@@ -119,12 +119,13 @@ echo "== 8. DP200 configuration and boot scripts"
 install -d "$OUT/etc/dp200" "$OUT/dp200" "$KHOME/printer_data/config" \
     "$KHOME/printer_data/gcodes" "$KHOME/printer_data/logs"
 install -m 755 "$HERE/rootfs/etc/dp200/rc.dp200" "$OUT/etc/dp200/rc.dp200"
-install -m 755 "$HERE/display/dp200_screen.py" "$OUT/usr/local/bin/dp200_screen.py"
+install -m 755 "$HERE/display/dp200_screen.py" "$HERE/display/dp200_wifi.py" "$HERE/display/dp200_net.py" "$OUT/usr/local/bin/"
 install -m 755 "$HERE/printer/"*.sh "$OUT/dp200/"
 cp -n "$HERE/rootfs/home/klipper/printer_data/config/moonraker.conf" "$KHOME/printer_data/config/" || true
 cp "$PORT/klipper/config/dp200_printer.cfg" "$PORT/klipper/config/dp200_macros.cfg" "$KHOME/printer_data/config/"
 cp -n "$PORT/klipper/config/printer.cfg" "$KHOME/printer_data/config/printer.cfg" || true
-cp "$PORT/klipper/extras/upc_stats.py" "$PORT/klipper/extras/upc_clockcheck.py" "$KHOME/klipper/klippy/extras/"
+cp "$PORT/klipper/extras/upc_stats.py" "$PORT/klipper/extras/upc_clockcheck.py" \
+   "$PORT/klipper/extras/dp200_cartridge.py" "$KHOME/klipper/klippy/extras/"
 in_root chown -R $KUSER:$KUSER /home/$KUSER
 echo "dp200-klipper" > "$OUT/etc/hostname"
 

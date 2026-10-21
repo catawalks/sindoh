@@ -97,6 +97,8 @@ start)
     start_klipper
     start_moonraker
     start_webcam
+    # load the saved WiFi networks into the stock wpa_supplicant (see dp200_wifi.py)
+    [ -e /run/wpa_supplicant/mlan0 ] && /usr/bin/python3 /usr/local/bin/dp200_wifi.py apply &
     start_screen
     /usr/sbin/nginx
     echo "started: web UI on port 80, moonraker on 7125, webcam on /webcam/"
