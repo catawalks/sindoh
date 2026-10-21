@@ -19,7 +19,8 @@ NETS = [{'ssid': b'HomeNet', 'level': -40, 'freq': 2412, 'secured': True, 'wep':
         {'ssid': b'CoffeeShop', 'level': -70, 'freq': 2437, 'secured': False, 'wep': False}] + \
        [{'ssid': ('Net%d' % i).encode(), 'level': -80, 'freq': 2462, 'secured': True, 'wep': False}
         for i in range(6)]
-fake.scan = lambda w: calls.append(('scan',)) or list(NETS)
+fake.scan = lambda w, fresh=True: (calls.append(('scan',)) if fresh else None) or list(NETS)
+fake.watchdog = lambda w, state: None
 fake.connect = lambda w, ssid, psk: calls.append(('connect', ssid, psk)) or (True, 'Connected')
 fake.forget = lambda w, ssid: calls.append(('forget', ssid))
 S.wifi = fake
@@ -84,8 +85,11 @@ tap('WIFI');                          check('system -> wifi', ui.screen == 'wifi
 check('status shows HomeNet', ui.wf['status'].get('ssid') == b'HomeNet'); shot('status')
 tap('SCAN');                          check('scan -> list with 8 networks', ui.screen == 'wifi_list' and len(ui.wf['list']) == 8)
 shot('list')
-tap('MORE');                          check('MORE -> page 2', ui.wf['page'] == 1)
+tap('▼');                             check('down arrow -> page 2', ui.wf['page'] == 1)
+tap('▲');                             check('up arrow -> page 1', ui.wf['page'] == 0)
+tap('▼')
 tap('RESCAN');                        check('RESCAN back to page 1', ui.wf['page'] == 0)
+render();                             check('up arrow inactive on page 1', not any(a == ('wifi_up',) for b, a in ui.buttons))
 tap_action(lambda a: a[0] == 'wifi_pick' and a[1]['ssid'] == b'HomeNet')
 check('secured network -> keyboard', ui.screen == 'wifi_kb' and ui.wf['target'] == b'HomeNet')
 for k in 'pas':
@@ -111,7 +115,10 @@ tap('NO');                            check('NO -> no connect', ('connect', b'Co
 tap_action(lambda a: a[0] == 'wifi_pick' and a[1]['ssid'] == b'CoffeeShop')
 tap('YES');                           check('YES -> connect(CoffeeShop, None)', ('connect', b'CoffeeShop', None) in calls)
 # hidden network
-tap('HIDDEN');                        check('hidden -> name keyboard', ui.screen == 'wifi_kb' and ui.wf['kb_for'] == 'ssid')
+tap('SCAN'); tap('▼')
+check('hidden row on the last list page', any(a == ('wifi_hidden',) for b, a in ui.buttons))
+tap_action(lambda a: a == ('wifi_hidden',))
+check('hidden -> name keyboard', ui.screen == 'wifi_kb' and ui.wf['kb_for'] == 'ssid')
 for k in 'lab':
     key(k)
 tap('NEXT');                          check('name -> password keyboard', ui.wf['kb_for'] == 'psk' and ui.wf['target'] == b'lab')

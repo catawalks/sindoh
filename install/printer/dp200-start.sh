@@ -88,5 +88,8 @@ sh $ROOT/dp200/dp200-wifi.sh $ROOT
 mkdir -p $ROOT/run/wpa_supplicant
 grep -q " $ROOT/run/wpa_supplicant " /proc/mounts || \
     mount --bind /var/run/wpa_supplicant $ROOT/run/wpa_supplicant
+# Marvell's mlanutl (stock firmware) for scans that keep the association;
+# runs fine in the chroot. Copied at boot, not shipped in our payload.
+cp /lib/modules/8782/mlanutl $ROOT/run/mlanutl 2>/dev/null
 
 in_root /etc/dp200/rc.dp200 start

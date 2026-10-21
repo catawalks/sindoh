@@ -176,7 +176,10 @@ def apply(w, nets):
     connected = cur.get('wpa_state') == 'COMPLETED' and cur.get('ssid') in wanted
     have = list_networks(w)
     for nid, ssid, flags in have:
-        if ssid not in wanted or not (connected and ssid == cur.get('ssid')):
+        if connected and ssid == cur.get('ssid'):
+            # keep the live connection, but give it its saved priority
+            w.ok('SET_NETWORK %d priority %d' % (nid, wanted[ssid]['priority']))
+        else:
             w.ok('REMOVE_NETWORK %d' % nid)
     present = {ssid for nid, ssid, flags in list_networks(w)}
     for n in nets:
@@ -189,10 +192,39 @@ def apply(w, nets):
 # ---------------------------------------------------------------------------
 # touch-screen operations (blocking; call from a worker thread)
 # ---------------------------------------------------------------------------
-def scan(w, wait=8.0):
-    w.cmd('SCAN')
-    time.sleep(wait)
+MLANUTL = '/run/mlanutl'      # Marvell's tool, copied from the stock firmware by dp200-start.sh
+
+def scan(w, wait=8.0, fresh=True):
+    """fresh=False: just the daemon's latest scan results.
+    A standard wpa_supplicant SCAN while connected makes this Marvell driver
+    leave the network for ~10 s (about 7 s off-channel, 200 ms per channel).
+    The driver's own user scan with a 30 ms dwell takes ~2 s, keeps the
+    association, and wpa_supplicant picks up its results (tested 2026-10-22)."""
+    if fresh:
+        if os.access(MLANUTL, os.X_OK):
+            import subprocess
+            subprocess.run([MLANUTL, 'mlan0', 'setuserscan', 'keep=1', 'dur=30'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+            time.sleep(1)
+        else:
+            w.cmd('SCAN')
+            time.sleep(wait)
     return scan_results(w)
+
+def watchdog(w, state):
+    """Call every few seconds. If the radio stays associated without an IP
+    address for 60 s, force a re-association (seen after scans: the driver's
+    data path stalls until then). `state` is a dict kept by the caller."""
+    st = status(w)
+    if st.get('wpa_state') == 'COMPLETED' and not st.get('ip_address'):
+        since = state.setdefault('no_ip_since', time.time())
+        if time.time() - since > 60:
+            w.ok('REASSOCIATE')
+            state['no_ip_since'] = time.time()
+            return 'reassociated'
+    else:
+        state.pop('no_ip_since', None)
+    return None
 
 def connect(w, ssid, psk, timeout=30.0, path=CONF):
     """Join ssid (psk None = open network). On success the network is saved

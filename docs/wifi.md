@@ -53,3 +53,25 @@ fake backend (25 checks).
   `uap0`; stock `/etc/init.d/uap_start.sh` shows how).
 - A `wifi.txt` on the USB install stick.
 - WEP and WPA-Enterprise are not supported (WPA/WPA2-PSK and open only).
+
+## Changes after the first real test (2026-10-22)
+
+- **Scanning without dropping the network:** a standard `wpa_supplicant`
+  SCAN made the Marvell driver leave the network for ~10 s. The screen now
+  runs the driver's own user scan
+  (`mlanutl mlan0 setuserscan keep=1 dur=30`, ~2 s, association kept;
+  `wpa_supplicant` picks up the results). `mlanutl` is copied from the stock
+  firmware into the chroot at boot (`/run/mlanutl`); it isn't shipped.
+- **DHCP:** the action script renews (SIGUSR1) instead of restarting
+  `udhcpc`, so a re-association doesn't drop the IP address. The screen app
+  runs a watchdog that forces a re-association after 60 s associated
+  without an address.
+- **apply()** gives a kept (connected) network its saved priority.
+- **UI:**
+  - pressed buttons light up and their label shifts down 2 px;
+  - a padlock icon on the signal bars replaces the "lock"/"open" words;
+  - "Hidden network…" is the last row of the network list (no HIDDEN
+    button on the WiFi page);
+  - ?/? buttons with a page counter replace MORE.
+- **Real test by the user:** scan, keyboard and connect to Niholedotcom
+  worked; saved with priority 21.

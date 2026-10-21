@@ -301,21 +301,43 @@ class UI:
         self.wifi_bg(None, fn)
 
     def wifi_tick(self):
-        """Keep the WiFi page's status current while it is shown."""
+        """Keep the WiFi page's status current while it is shown, and run the
+        no-IP watchdog every 10 s on any page."""
         if self.screen == 'wifi' and not self.wf['busy'] and time.time() - self.wf['checked'] > 4:
             self.wifi_refresh()
+        if wifi is not None and time.time() - self.wf.get('wd_at', 0) > 10 and not self.wf.get('wd_run'):
+            self.wf['wd_at'] = time.time()
+            self.wf['wd_run'] = True
+
+            def work():
+                w = None
+                try:
+                    w = wifi.WpaCtrl()
+                    if wifi.watchdog(w, self.wf.setdefault('wd', {})):
+                        self.flash('WiFi: no address - reconnecting')
+                except Exception:
+                    pass
+                finally:
+                    if w is not None:
+                        w.close()
+                    self.wf['wd_run'] = False
+            threading.Thread(target=work, daemon=True).start()
 
     def wifi_action(self, action):
         wf, kind = self.wf, action[0]
-        if kind == 'wifi_scan':
+        if kind in ('wifi_scan', 'wifi_rescan'):
             self.screen = 'wifi_list'
             wf['page'] = 0
 
             def fn(w):
-                wf['list'] = wifi.scan(w)
+                wf['list'] = wifi.scan(w, fresh=False)        # known results at once...
+                wf['rev'] += 1
+                wf['list'] = wifi.scan(w, fresh=True)         # ...then a scan that keeps the link
             self.wifi_bg('Scanning...', fn)
-        elif kind == 'wifi_more':
+        elif kind == 'wifi_down':
             wf['page'] += 1
+        elif kind == 'wifi_up':
+            wf['page'] = max(0, wf['page'] - 1)
         elif kind == 'wifi_pick':
             n = action[1]
             if n['secured']:
@@ -359,7 +381,7 @@ class UI:
             wf['show'] = not wf['show']
         elif kind == 'kb_cancel':
             wf['text'] = ''
-            self.screen = 'wifi_list' if wf['kb_for'] == 'psk' and wf['list'] else 'wifi'
+            self.screen = 'wifi_list' if wf['list'] else 'wifi'
         elif kind == 'kb_ok':
             text = wf['text']
             if wf['kb_for'] == 'ssid':
@@ -400,8 +422,7 @@ class UI:
             d.text((150, 204 + i * 32), v[:24], font=font(20), fill=C_TXT)
         if wf['busy']:
             d.text((20, 340), wf['busy'], font=font(22), fill=C_WARN)
-        items = [('SCAN', ('wifi_scan',), C_BTN, 30, 'choose network'),
-                 ('HIDDEN', ('wifi_hidden',), C_BTN, 26, 'type a name')]
+        items = [('SCAN', ('wifi_scan',), C_BTN, 30, 'choose network')]
         if name:
             items.append(('FORGET', ('confirm', 'Forget %s? The printer will leave this network.' % name,
                                      ('wifi_forget', s['ssid'])), C_RED, 28, name[:14]))
@@ -410,34 +431,51 @@ class UI:
 
     def page_wifi_list(self, d, st):
         wf = self.wf
-        d.text((20, 160), 'Choose a network', font=font(26), fill=C_TXT)
         nets, per = wf['list'], 5
+        pages = (len(nets) + 1 + per - 1) // per       # +1: the hidden-network row
+        title = 'Choose a network' + (' (%d/%d)' % (min(wf['page'], pages - 1) + 1, pages) if pages > 1 else '')
+        d.text((20, 160), title, font=font(26), fill=C_TXT)
         if wf['busy']:
             d.text((20, 200), wf['busy'], font=font(20), fill=C_WARN)
         elif not nets:
             d.text((20, 200), 'No networks found', font=font(20), fill=C_DIM)
-        page = wf['page'] if wf['page'] * per < len(nets) else 0
-        for i, n in enumerate(nets[page * per:(page + 1) * per]):
+        rows = nets + [None]                           # last row: hidden network
+        page = wf['page'] if wf['page'] * per < len(rows) else 0
+        for i, n in enumerate(rows[page * per:(page + 1) * per]):
             y = 232 + i * 70
             box = (20, y, PW - 20, y + 62)
-            d.rounded_rectangle(box, radius=12, fill=C_BTN)
+            d.rounded_rectangle(box, radius=12,
+                                fill=tuple(c + 45 for c in C_BTN) if self.pressed(box) else C_BTN)
+            if n is None:
+                d.text((36, y + 16), 'Hidden network…', font=font(24), fill=C_DIM)
+                self.buttons.append((box, ('wifi_hidden',)))
+                continue
             label = n['ssid'].decode('utf-8', 'replace')
             f = font(24)
-            while d.textlength(label, font=f) > PW - 170 and len(label) > 4:
+            while d.textlength(label, font=f) > PW - 130 and len(label) > 4:
                 label = label[:-2] + '…'
             d.text((36, y + 16), label, font=f, fill=C_TXT)
             b = wifi.bars(n['level']) if wifi else 0
-            for k in range(4):                         # signal bars
-                x = PW - 120 + k * 12
+            bx = PW - 86                               # signal bars, right edge
+            for k in range(4):
+                x = bx + k * 12
                 h = 8 + k * 8
-                d.rectangle((x, y + 46 - h, x + 8, y + 46), fill=C_TXT if k < b else (80, 80, 92))
-            d.text((PW - 64, y + 18), 'lock' if n['secured'] else 'open', font=font(16),
-                   fill=C_DIM if n['secured'] else C_WARN)
+                d.rectangle((x, y + 50 - h, x + 8, y + 50), fill=C_TXT if k < b else (80, 80, 92))
+            if n['secured']:                           # small padlock in the bars' top-left corner
+                lx, ly = bx - 2, y + 10
+                d.arc((lx + 2, ly, lx + 12, ly + 12), 180, 360, fill=C_DIM, width=2)
+                d.rectangle((lx, ly + 6, lx + 14, ly + 17), fill=C_DIM)
             self.buttons.append((box, ('wifi_pick', n)))
-        more = len(nets) > (page + 1) * per
-        self.grid(d, [('MORE' if more else None, ('wifi_more',)) if more else None,
-                      ('RESCAN', ('wifi_scan',)),
-                      ('BACK', ('screen', 'wifi'))], top=590, rows_h=74, cols=3)
+        wf['page'] = page
+        down = len(rows) > (page + 1) * per
+        up = page > 0
+        off, off_fg = (32, 32, 40), (75, 75, 88)       # greyed out: no action
+        self.grid(d, [('▲', ('wifi_up',) if up else None, C_BTN if up else off, 34, None,
+                       C_TXT if up else off_fg),
+                      ('▼', ('wifi_down',) if down else None, C_BTN if down else off, 34, None,
+                       C_TXT if down else off_fg),
+                      ('RESCAN', ('wifi_rescan',), C_BTN, 22),
+                      ('BACK', ('screen', 'wifi'), C_BTN, 24)], top=590, rows_h=74, cols=4)
 
     KB_ROWS = {
         'abc': ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm.-_'],
@@ -516,15 +554,28 @@ class UI:
                 self.emergency_stop()
 
     # ---- drawing ---------------------------------------------------------
-    def button(self, d, box, label, action, colour=C_BTN, size=30, sub=None):
-        d.rounded_rectangle(box, radius=14, fill=colour)
+    def pressed(self, box):
+        """Is the finger currently down on this box (visual feedback)?"""
+        if not self.press:
+            return False
+        u, v = self.press[0], self.press[1]
+        return box[0] <= u < box[2] and box[1] <= v < box[3]
+
+    def button(self, d, box, label, action, colour=C_BTN, size=30, sub=None, fg=C_TXT):
         x0, y0, x1, y1 = box
+        down = action is not None and self.pressed(box)
+        if down:
+            # pressed: lighter face, label pushed down 2 px
+            colour = tuple(min(255, c + 45) for c in colour)
+        d.rounded_rectangle(box, radius=14, fill=colour)
+        if down:
+            y0, y1 = y0 + 2, y1 + 2
         while size > 16 and d.textlength(label, font=font(size)) > x1 - x0 - 20:
             size -= 2                                  # shrink long labels to fit
         f = font(size)
         tw = d.textlength(label, font=f)
         ty = (y0 + y1) // 2 - size // 2 - (10 if sub else 0)
-        d.text(((x0 + x1 - tw) // 2, ty), label, font=f, fill=C_TXT)
+        d.text(((x0 + x1 - tw) // 2, ty), label, font=f, fill=fg)
         if sub:
             fs = font(18)
             sw = d.textlength(sub, font=fs)
