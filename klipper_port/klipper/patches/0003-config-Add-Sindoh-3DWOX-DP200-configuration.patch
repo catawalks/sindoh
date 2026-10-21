@@ -1,0 +1,1051 @@
+From 06a36dcef629b2a5a66b36a9d7fa23d0ef34d0c3 Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 23:43:00 -0400
+Subject: [PATCH 3/3] config: Add Sindoh 3DWOX DP200 configuration
+
+Signed-off-by: catawalks <59056948+catawalks@users.noreply.github.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config/sindoh-dp200/README.md         |  12 +
+ config/sindoh-dp200/dp200_macros.cfg  | 535 ++++++++++++++++++++++++++
+ config/sindoh-dp200/dp200_printer.cfg | 417 ++++++++++++++++++++
+ config/sindoh-dp200/printer.cfg       |  42 ++
+ 4 files changed, 1006 insertions(+)
+ create mode 100644 config/sindoh-dp200/README.md
+ create mode 100644 config/sindoh-dp200/dp200_macros.cfg
+ create mode 100644 config/sindoh-dp200/dp200_printer.cfg
+ create mode 100644 config/sindoh-dp200/printer.cfg
+
+diff --git a/config/sindoh-dp200/README.md b/config/sindoh-dp200/README.md
+new file mode 100644
+index 00000000..633023bc
+--- /dev/null
++++ b/config/sindoh-dp200/README.md
+@@ -0,0 +1,12 @@
++# Sindoh 3DWOX DP200
++
++Copy all three files to `printer_data/config/`:
++
++- `printer.cfg` - the per-printer file: Z endstop, probe offsets, PID values
++  and the SAVE_CONFIG block live here.
++- `dp200_printer.cfg` - the hardware (UPC MCUs, steppers, heaters, sensors).
++- `dp200_macros.cfg` - filament load/unload, nozzle cleaning, the levelling
++  probe, bed mesh, lamp.
++
++The MCU firmware and the host-side bridge (upctool) come from the DP200
++port project; see https://github.com/catawalks/sindoh
+diff --git a/config/sindoh-dp200/dp200_macros.cfg b/config/sindoh-dp200/dp200_macros.cfg
+new file mode 100644
+index 00000000..b7f6ace7
+--- /dev/null
++++ b/config/sindoh-dp200/dp200_macros.cfg
+@@ -0,0 +1,535 @@
++# =====================================================================
++# Sindoh DP200 macros reconstructed from the stock firmware
++# =====================================================================
++# Source: stock main program (engine_filaUnload, engine_filaLoad,
++# engine_cleaningXYMove, engine_changelvsensor) + FM microcode commands
++# 0x0f/0x10/0x11 (insert), 0x13 (eject) + karas.db CONF_ENGINE_* row NO=4.
++# Unit conversion: positions in engine pulses / steps-per-mm; speeds are
++# engine half-periods: mm/s = 198010000 / (2 * SPD * steps_per_mm).
++# See docs/stock_routines.md for the raw values.
++#
++# Included by printer.cfg (next to dp200_printer.cfg). Replaced on updates.
++
++# ---------------------------------------------------------------------
++# Build-area lamp ([output_pin lamp] in dp200_printer.cfg, dec_pwm block 7)
++# ---------------------------------------------------------------------
++[gcode_macro LAMP_ON]
++description: Switch the build-area lamp on. BRIGHTNESS=0.0..1.0 (default 1)
++gcode:
++    {% set b = params.BRIGHTNESS|default(1)|float %}
++    SET_PIN PIN=lamp VALUE={[[b, 0.0]|max, 1.0]|min}
++
++[gcode_macro LAMP_OFF]
++description: Switch the build-area lamp off
++gcode:
++    SET_PIN PIN=lamp VALUE=0
++
++[gcode_macro LAMP_TOGGLE]
++description: Toggle the build-area lamp
++gcode:
++    {% if printer["output_pin lamp"].value > 0 %}
++        LAMP_OFF
++    {% else %}
++        LAMP_ON
++    {% endif %}
++
++# Marlin's case-light command, as some slicers/start scripts emit it:
++# M355 S1 (on) / S0 (off), optional P0..255 brightness
++[gcode_macro M355]
++description: Case light (Marlin): S1 on / S0 off, P0-255 brightness
++gcode:
++    {% set s = params.S|default(1)|int %}
++    {% set p = params.P|default(255)|float %}
++    {% if s == 0 %}
++        LAMP_OFF
++    {% else %}
++        LAMP_ON BRIGHTNESS={p / 255.0}
++    {% endif %}
++# =====================================================================
++
++[save_variables]
++filename: ~/printer_data/config/dp200_variables.cfg
++
++# Filament drive clutch (dec_pwm block 6). The stock firmware engages it
++# for every filament feed/retract from the cartridge.
++[output_pin clutch]
++pin: pwm6
++value: 0
++shutdown_value: 0
++
++# Solenoid (dec_pwm block 8) - not used by the stock load/unload; exposed
++# for experiments only.
++[output_pin solenoid]
++pin: pwm8
++value: 0
++shutdown_value: 0
++
++# Cartridge-detect lever: xena46, 0 = lever up (cartridge or filament holding
++# it), 1 = down. Sindoh's open-filament mode tapes it up. Filament alone
++# CAN hold it up, but it read "empty" after cold feeds with filament loaded
++# (2026-10-18), so it only reports - it does not pause prints.
++[filament_switch_sensor cartridge_lever]
++switch_pin: !xena46
++pause_on_runout: False
++runout_gcode:
++    M118 Cartridge lever reports no filament (informational)
++
++# Filament encoder: dec_sensor +0x210 bit 7 (dsens7). One short low pulse
++# per ~16.5 mm of filament (measured 2026-10-18), wheel ~60 mm past the
++# inlet. This is the runout/jam sensor. detection_length covers ~3 pulses.
++[filament_motion_sensor filament_encoder]
++switch_pin: dsens7
++detection_length: 50
++extruder: extruder
++pause_on_runout: True
++runout_gcode:
++    M118 Filament encoder stopped moving - runout or jam
++
++[gcode_macro _DP200]
++description: Stock-derived constants (karas.db row 4)
++# load / unload park position (INSERT 001_3, EJECT 101_02)
++variable_park_x: 229.0
++variable_park_y: 0.0
++variable_park_z: 23.1
++# nozzle cleaning / purge bin (CONF_ENGINE_CLEANING)
++variable_clean_x1: 231.2
++variable_clean_x2: 209.0
++variable_clean_y: 5.5
++variable_clean_z: 10.0
++variable_clean_purge: 20.0          # AutoFilaDisatance 9176
++variable_clean_purge_speed: 10.0    # AutoFilaSpeed 21579
++variable_clean_retract: 15.0        # AutoFilaRetraction -6882
++variable_clean_retract_speed: 40.0  # AutoFilaRetSpeed 5394
++variable_clean_delay: 3             # AutoCleaningTimeDelay
++variable_clean_wipes: 2             # AutoCleaningMoveCnt
++variable_clean_wipe_speed: 80.0     # AutoCleaningSpeed 15469
++variable_bin_threshold: 15          # TRASHCAN_CLEANING_REQUIRED_THRESHOLD
++# temperatures (INSERT/EJECT 001_2 / 101_01: target, wait threshold)
++variable_temp_pla: 230
++variable_temp_abs: 250
++variable_thresh_pla: 210
++variable_thresh_abs: 230
++# unload (FM cmd 0x13 with EJECT block)
++variable_unload_slow: 50.0          # 103_04_PRE_PULSE 22941
++variable_unload_slow_speed: 10.0    # 103_04_PRE_SPD 21579
++variable_unload_fast_speed: 25.0    # 103_04_SPD 8631
++# load (FM cmds 0x0f / 0x10 / 0x11 with INSERT block)
++variable_load_feed_speed: 40.0      # 001_4_SPD 5394
++variable_load_purge: 42.5           # 003_2_PULSE 19500 (after plastic reaches the nozzle)
++variable_load_purge_speed: 3.0      # 003_1_SPD 71951
++variable_load_dwell: 1.0            # 003_3_DELAY 1000 ms
++variable_load_retract: 15.0         # 003_4_PULSE 6882
++variable_load_retract_speed: 40.0   # 003_3_SPD 5394
++variable_load_settle: 3             # 003_5_DELAY
++# Open-filament path, measured 2026-10-18 (tools/ktest_feed.py, ktest_load.py):
++# inlet (feeder gears) -> gear-train exit ~100 mm, bowden tube 330-340 mm,
++# inlet -> nozzle (first plastic) ~515-520 mm.
++variable_inlet_to_nozzle: 518.0
++variable_load_fast: 440.0           # fast feed, stops ~78 mm before the nozzle
++variable_unload_extra: 30.0         # retract past the inlet so the gears let go
++variable_e_chunk: 40.0              # stay under max_extrude_only_distance
++gcode:
++    M118 DP200 constants macro (no action)
++
++[gcode_macro _SINDOH_ENSURE_HOMED]
++gcode:
++    {% if printer.toolhead.homed_axes != "xyz" %}
++        G28
++    {% endif %}
++
++[gcode_macro _SINDOH_TEMP]
++description: Resolve TEMP/MATERIAL params into target and wait-threshold
++gcode:
++    {% set c = printer["gcode_macro _DP200"] %}
++    {% set mat = params.MATERIAL|default("PLA")|upper %}
++    {% set t = params.TEMP|default(c.temp_abs if mat == "ABS" else c.temp_pla)|float %}
++    {% set th = c.thresh_abs if mat == "ABS" else c.thresh_pla %}
++    {% if params.TEMP is defined %}{% set th = t - 20 %}{% endif %}
++    M104 S{t}
++    TEMPERATURE_WAIT SENSOR=extruder MINIMUM={th}
++
++# ---------------------------------------------------------------------
++# Nozzle cleaning over the purge ("poop") bin - engine_cleaningXYMove
++# ---------------------------------------------------------------------
++[gcode_macro CLEAN_NOZZLE]
++description: Purge over the bin and wipe the nozzle (stock routine)
++gcode:
++    {% set c = printer["gcode_macro _DP200"] %}
++    _SINDOH_ENSURE_HOMED
++    SAVE_GCODE_STATE NAME=clean_nozzle
++    G90
++    G1 Z{c.clean_z} F600
++    G1 Y{c.clean_y} F6000
++    G1 X{c.clean_x1} F6000
++    _SINDOH_TEMP {rawparams}
++    {% if params.PURGE|default(1)|int %}
++        M83
++        G1 E{c.clean_purge} F{c.clean_purge_speed * 60}
++        G1 E-{c.clean_retract} F{c.clean_retract_speed * 60}
++        G4 P{c.clean_delay * 1000}
++        _SINDOH_BIN_COUNT
++    {% endif %}
++    {% for i in range(c.clean_wipes) %}
++        G1 X{c.clean_x2} F{c.clean_wipe_speed * 60}
++        G1 X{c.clean_x1} F{c.clean_wipe_speed * 60}
++    {% endfor %}
++    RESTORE_GCODE_STATE NAME=clean_nozzle
++
++[gcode_macro _SINDOH_BIN_COUNT]
++gcode:
++    {% set c = printer["gcode_macro _DP200"] %}
++    {% set n = printer.save_variables.variables.bin_count|default(0)|int + 1 %}
++    SAVE_VARIABLE VARIABLE=bin_count VALUE={n}
++    {% if n >= c.bin_threshold %}
++        M118 Purge bin has {n} purges - please empty it, then run BIN_EMPTIED
++    {% endif %}
++
++[gcode_macro BIN_EMPTIED]
++description: Reset the purge bin counter
++gcode:
++    SAVE_VARIABLE VARIABLE=bin_count VALUE=0
++    M118 Purge bin counter reset
++
++# ---------------------------------------------------------------------
++# UNLOAD - stock engine_filaUnload + FM cmd 0x13
++#   Open filament: no reliable presence sensor, so it retracts the measured
++#   path length (inlet_to_nozzle + unload_extra). Park, heat, clutch on,
++#   first 50 mm at 10 mm/s, the rest at 25 mm/s, clutch off. The encoder
++#   is disabled meanwhile (the filament leaves its wheel before the end).
++# ---------------------------------------------------------------------
++[gcode_macro UNLOAD_FILAMENT]
++description: Unload filament out of the feeder (stock speeds, measured length). MATERIAL=PLA|ABS or TEMP=
++gcode:
++    {% set c = printer["gcode_macro _DP200"] %}
++    {% set rest = c.inlet_to_nozzle + c.unload_extra - c.unload_slow %}
++    {% set n = (rest / c.e_chunk)|round(0, 'ceil')|int %}
++    _SINDOH_ENSURE_HOMED
++    {% if params.CLEAN|default(0)|int %}
++        CLEAN_NOZZLE PURGE=0 {rawparams}
++    {% endif %}
++    G90
++    G1 Z{c.park_z} F600
++    G1 X{c.park_x} Y{c.park_y} F6000
++    _SINDOH_TEMP {rawparams}
++    SET_FILAMENT_SENSOR SENSOR=filament_encoder ENABLE=0
++    SET_PIN PIN=clutch VALUE=1
++    M83
++    G1 E-{c.unload_slow} F{c.unload_slow_speed * 60}
++    {% for i in range(n) %}
++        G1 E-{rest / n} F{c.unload_fast_speed * 60}
++    {% endfor %}
++    M400
++    SET_PIN PIN=clutch VALUE=0
++    SET_FILAMENT_SENSOR SENSOR=filament_encoder ENABLE=1
++    M118 Unload complete ({c.unload_slow + rest} mm) - pull the filament out of the inlet
++
++# ---------------------------------------------------------------------
++# LOAD - stock engine_filaLoad + FM cmds 0x0f, 0x10, 0x11, open filament
++#   Push the filament into the inlet until the feeder gears grab it, then
++#   run LOAD_FILAMENT. Over the purge bin: heat (Klipper refuses cold
++#   extrusion), clutch on, fast feed load_fast at 40 mm/s (stops ~78 mm
++#   short), then the rest of the path + the stock 42.5 mm purge at 3 mm/s,
++#   wait 1 s, retract 15 mm at 40 mm/s, clutch off, wait 3 s, wipe.
++# ---------------------------------------------------------------------
++[gcode_macro LOAD_FILAMENT]
++description: Load open filament from the inlet, purge over the bin and wipe. MATERIAL=PLA|ABS or TEMP=
++gcode:
++    {% set c = printer["gcode_macro _DP200"] %}
++    {% set n = (c.load_fast / c.e_chunk)|round(0, 'ceil')|int %}
++    {% set slow = c.inlet_to_nozzle - c.load_fast + c.load_purge %}
++    {% set m = (slow / c.e_chunk)|round(0, 'ceil')|int %}
++    _SINDOH_ENSURE_HOMED
++    G90
++    G1 Z{c.clean_z} F600
++    G1 Y{c.clean_y} F6000
++    G1 X{c.clean_x1} F6000
++    _SINDOH_TEMP {rawparams}
++    SET_FILAMENT_SENSOR SENSOR=filament_encoder ENABLE=0
++    SET_PIN PIN=clutch VALUE=1
++    M83
++    {% for i in range(n) %}
++        G1 E{c.load_fast / n} F{c.load_feed_speed * 60}
++    {% endfor %}
++    {% for i in range(m) %}
++        G1 E{slow / m} F{c.load_purge_speed * 60}
++    {% endfor %}
++    G4 P{(c.load_dwell * 1000)|int}
++    G1 E-{c.load_retract} F{c.load_retract_speed * 60}
++    M400
++    SET_PIN PIN=clutch VALUE=0
++    G4 P{c.load_settle * 1000}
++    _SINDOH_BIN_COUNT
++    CLEAN_NOZZLE PURGE=0 {rawparams}
++    SET_FILAMENT_SENSOR SENSOR=filament_encoder ENABLE=1
++    M118 Load complete
++
++
++# ---------------------------------------------------------------------
++# LV bed-levelling probe, used like a BL-touch (PROBE, BED_MESH_CALIBRATE)
++#   State: dec_sensor +0x210 bit 8 (pin dsens8): 0 = pin extended
++#   (deployed), 1 = pushed in (stowed, or pushed by the bed while probing).
++#   It is a push-push latch toggled by driving the X carriage into a lever at
++#   the left wall (stock engine_changelvsensor: X -> -10, push to -20 at
++#   10 mm/s, back to -5.6; up to 3 tries). Verified on hardware 2026-10-18:
++#   triggers ~1.28 mm before the Z-switch height, the bed push does NOT
++#   latch it (stays deployed for a whole session), repeat 0.0006 mm.
++#
++#   Klipper runs [probe] activate_gcode after the move to each point and
++#   forbids toolhead moves in it, so the wall toggle cannot go there.
++#   Instead (like docked probes) the probing commands are wrapped:
++#   deploy -> base command -> stow. A stowed pin reads "triggered", so
++#   Klipper itself refuses to probe with it ("Probe triggered prior to
++#   movement") - the nozzle can never be driven into the bed that way.
++# ---------------------------------------------------------------------
++[gcode_macro LV_TOGGLE]
++description: Toggle the latching levelling probe via the X-carriage lever
++gcode:
++    {% if 'x' not in printer.toolhead.homed_axes %}
++        {action_raise_error("LV_TOGGLE: home X first (G28 X)")}
++    {% endif %}
++    SAVE_GCODE_STATE NAME=lv_toggle
++    G90
++    {% if 'z' in printer.toolhead.homed_axes and printer.toolhead.position.z < 10 %}
++        G1 Z10 F600
++    {% endif %}
++    G1 X-10 F6000
++    G1 X-20 F600
++    G1 X-5.6 F6000
++    M400
++    RESTORE_GCODE_STATE NAME=lv_toggle
++
++[probe]
++pin: dsens8
++# x_offset / y_offset / z_offset: per printer -> printer.cfg
++# (z_offset is saved by LV_PROBE_CALIBRATE_SAVE + SAVE_CONFIG)
++speed: 2
++lift_speed: 5
++samples: 2
++samples_result: median
++sample_retract_dist: 2.0
++samples_tolerance: 0.1
++samples_tolerance_retries: 2
++
++[bed_mesh]
++speed: 80
++horizontal_move_z: 10      # the pin hangs below the nozzle: keep travel high
++# Probe coordinates. The pin reaches X -6..248 and Y -32..171 (nozzle travel
++# + offsets). The front edge of the bed has a full-width grip handle: keep
++# mesh_min Y well behind it (30 until the handle depth is known).
++mesh_min: 20, 30
++mesh_max: 190, 170
++probe_count: 5, 5
++algorithm: bicubic
++fade_start: 1
++fade_end: 10
++
++# Z homing uses the top switch, which the bed reaches ~1.3 mm after it
++# would hit a deployed pin: always stow the pin before homing Z.
++[force_move]
++enable_force_move: True
++
++[homing_override]
++axes: xyz
++gcode:
++    {% set all = 'X' not in params and 'Y' not in params and 'Z' not in params %}
++    {% if all or 'X' in params %}
++        G28 X
++    {% endif %}
++    {% if all or 'Y' in params %}
++        G28 Y
++    {% endif %}
++    {% if all or 'Z' in params %}
++        QUERY_PROBE
++        _SINDOH_HOME_Z
++    {% endif %}
++
++[gcode_macro _SINDOH_HOME_Z]
++gcode:
++    {% if not printer.probe.last_query %}
++        M118 Probe pin is deployed - stowing it before Z homing
++        {% if 'x' not in printer.toolhead.homed_axes %}
++            G28 X
++        {% endif %}
++        {% if 'z' not in printer.toolhead.homed_axes %}
++            # bed height unknown: move it 10 mm down blind (at the bottom it just stalls)
++            FORCE_MOVE STEPPER=stepper_z DISTANCE=10 VELOCITY=5
++        {% endif %}
++        LV_STOW
++    {% endif %}
++    G28 Z
++
++[gcode_macro LV_DEPLOY]
++description: Make sure the levelling probe pin is extended (push-push latch)
++gcode:
++    QUERY_PROBE
++    _LV_TRY1 WANT=0
++
++[gcode_macro LV_STOW]
++description: Make sure the levelling probe pin is retracted
++gcode:
++    QUERY_PROBE
++    _LV_TRY1 WANT=1
++
++# Klipper forbids recursive macros, so the stock "up to 3 tries" is unrolled.
++# Each step is rendered only when it runs, i.e. after the previous QUERY_PROBE.
++[gcode_macro _LV_TRY1]
++gcode:
++    {% if (1 if printer.probe.last_query else 0) != params.WANT|int %}
++        LV_TOGGLE
++        QUERY_PROBE
++        _LV_TRY2 WANT={params.WANT}
++    {% endif %}
++
++[gcode_macro _LV_TRY2]
++gcode:
++    {% if (1 if printer.probe.last_query else 0) != params.WANT|int %}
++        LV_TOGGLE
++        QUERY_PROBE
++        _LV_TRY3 WANT={params.WANT}
++    {% endif %}
++
++[gcode_macro _LV_TRY3]
++gcode:
++    {% if (1 if printer.probe.last_query else 0) != params.WANT|int %}
++        LV_TOGGLE
++        QUERY_PROBE
++        _LV_FINAL WANT={params.WANT}
++    {% endif %}
++
++[gcode_macro _LV_FINAL]
++gcode:
++    {% if (1 if printer.probe.last_query else 0) != params.WANT|int %}
++        {action_raise_error("Levelling probe did not toggle after 3 tries (stock error 0x137)")}
++    {% endif %}
++
++# ---- probing commands wrapped with deploy/stow
++# Guard: on 2026-10-18 some runs read ~1.1-1.5 mm higher than others at the
++# same spot, once switching in the middle of a mesh (cause not found; not
++# reproduced since - see hardware_notes). The wrapper probes a reference
++# point before and after the mesh with the same deploy and discards the mesh
++# if they disagree by more than variable_ref_tol.
++[gcode_macro BED_MESH_CALIBRATE]
++rename_existing: _BED_MESH_CALIBRATE_BASE
++description: Deploy the LV probe, build a bed mesh (with a stability check), stow the probe
++variable_ref_x: 95
++variable_ref_y: 100
++variable_ref_tol: 0.1
++variable_ref_before: 0.0
++gcode:
++    _SINDOH_ENSURE_HOMED
++    G90
++    G1 Z10 F300
++    LV_DEPLOY
++    _SINDOH_MESH_REF
++    _SINDOH_MESH_REF_SAVE
++    _BED_MESH_CALIBRATE_BASE {rawparams}
++    _SINDOH_MESH_REF
++    _SINDOH_MESH_CHECK
++    LV_STOW
++
++[gcode_macro _SINDOH_MESH_REF]
++gcode:
++    {% set m = printer["gcode_macro BED_MESH_CALIBRATE"] %}
++    {% set off = printer.configfile.settings.probe %}
++    G1 Z10 F300
++    G1 X{m.ref_x - off.x_offset} Y{m.ref_y - off.y_offset} F6000
++    _PROBE_BASE SAMPLES=1
++    G1 Z10 F300
++
++# (templates render before they run: values read after a probe and errors
++# raised after cleanup need their own macros)
++[gcode_macro _SINDOH_MESH_REF_SAVE]
++gcode:
++    SET_GCODE_VARIABLE MACRO=BED_MESH_CALIBRATE VARIABLE=ref_before VALUE={printer.probe.last_z_result}
++
++[gcode_macro _SINDOH_MESH_CHECK]
++gcode:
++    {% set m = printer["gcode_macro BED_MESH_CALIBRATE"] %}
++    {% set after = printer.probe.last_z_result|float %}
++    {% set d = after - m.ref_before|float %}
++    {% if d|abs > m.ref_tol %}
++        BED_MESH_CLEAR
++        LV_STOW
++        _SINDOH_MESH_FAIL D={"%.3f" % d} A={"%.3f" % m.ref_before|float} B={"%.3f" % after}
++    {% else %}
++        M118 Mesh reference check OK ({"%.3f" % d} mm)
++    {% endif %}
++
++[gcode_macro _SINDOH_MESH_FAIL]
++gcode:
++    {action_raise_error("Mesh discarded: reference probe moved %s mm during the mesh (%s -> %s). Probe pin unstable - run it again." % (params.D, params.A, params.B))}
++
++[gcode_macro PROBE]
++rename_existing: _PROBE_BASE
++description: Deploy the LV probe, probe at the current XY, stow it
++gcode:
++    _SINDOH_ENSURE_HOMED
++    _SINDOH_PROBE_AT CMD=_PROBE_BASE {rawparams}
++
++[gcode_macro PROBE_ACCURACY]
++rename_existing: _PROBE_ACCURACY_BASE
++description: Deploy the LV probe, run PROBE_ACCURACY at the current XY, stow it
++gcode:
++    _SINDOH_ENSURE_HOMED
++    _SINDOH_PROBE_AT CMD=_PROBE_ACCURACY_BASE {rawparams}
++
++# Deploy at the wall, come back to the starting XY at Z >= 10 (never lower
++# with the pin out), run the base command there, stow.
++[gcode_macro _SINDOH_PROBE_AT]
++gcode:
++    {% set x = printer.toolhead.position.x %}
++    {% set y = printer.toolhead.position.y %}
++    {% set z = [printer.toolhead.position.z, 10]|max %}
++    {% set pass = rawparams.split(' ')[1:]|join(' ') %}
++    SAVE_GCODE_STATE NAME=dp200_probe_at
++    G90
++    G1 Z{z} F600
++    LV_DEPLOY
++    G1 X{x} Y{y} F6000
++    {params.CMD} {pass}
++    G1 Z{z} F600
++    LV_STOW
++    RESTORE_GCODE_STATE NAME=dp200_probe_at
++
++# ---- z_offset calibration. Klipper's PROBE_CALIBRATE would lower the nozzle
++# for the paper test with the pin still deployed below it, so:
++#   1. LV_PROBE_CALIBRATE [X=110 Y=100]: probes the point with the pin,
++#      stows it, puts the NOZZLE over the same point and starts a manual probe
++#   2. paper test with TESTZ Z=-0.1 ... then ACCEPT
++#   3. LV_PROBE_CALIBRATE_SAVE, then SAVE_CONFIG
++[gcode_macro LV_PROBE_CALIBRATE]
++description: Probe a point with the LV pin, then paper-test the nozzle there (step 1 of 3)
++gcode:
++    {% set x = params.X|default(110)|float %}
++    {% set y = params.Y|default(100)|float %}
++    {% set off = printer.configfile.settings.probe %}
++    _SINDOH_ENSURE_HOMED
++    G90
++    G1 Z10 F600
++    LV_DEPLOY
++    G1 X{x - off.x_offset} Y{y - off.y_offset} F6000
++    _PROBE_BASE
++    G1 Z10 F600
++    LV_STOW
++    G1 X{x} Y{y} F6000
++    G1 Z5 F600
++    M118 Paper test: TESTZ Z=-0.1 (repeat) until the paper drags, then ACCEPT, then LV_PROBE_CALIBRATE_SAVE
++    MANUAL_PROBE
++
++[gcode_macro LV_PROBE_CALIBRATE_SAVE]
++description: Compute probe z_offset from the last PROBE and the paper test (step 3 of 3). Z=<the "Z position is ..." value printed by ACCEPT>
++gcode:
++    # Klipper clears manual_probe.z_position after ACCEPT, so the accepted
++    # value is passed in: LV_PROBE_CALIBRATE_SAVE Z=0.825
++    {% set trig = printer.probe.last_z_result|float %}
++    {% if params.Z is not defined %}
++        {action_raise_error("Pass the accepted paper-test height: LV_PROBE_CALIBRATE_SAVE Z=<value from 'Z position is ...'>")}
++    {% endif %}
++    {% set zero = params.Z|float %}
++    {% set old = printer.configfile.settings.probe.z_offset|float %}
++    {% set new = trig - zero|float %}
++    M118 probe trigger z={trig} nozzle zero z={zero} -> z_offset={new}
++    SET_GCODE_OFFSET Z={old - new}
++    Z_OFFSET_APPLY_PROBE
++    SET_GCODE_OFFSET Z=0
++    M118 Run SAVE_CONFIG to store z_offset={new}
+diff --git a/config/sindoh-dp200/dp200_printer.cfg b/config/sindoh-dp200/dp200_printer.cfg
+new file mode 100644
+index 00000000..f8e0486f
+--- /dev/null
++++ b/config/sindoh-dp200/dp200_printer.cfg
+@@ -0,0 +1,417 @@
++# Sindoh DP200 hardware definition - included by printer.cfg.
++# This file is replaced on updates: put your own changes in printer.cfg.
++# Options that calibration commands save (Z position_endstop, probe
++# z_offset, PID gains) are NOT in here: SAVE_CONFIG refuses to override
++# options that come from an included file, so they live in printer.cfg.
++
++# M118 / RESPOND messages (used by the macros)
++[respond]
++
++# Step-engine diagnostics (klipper/extras/upc_stats.py -> klippy/extras/):
++# UPC_STEP_STATS reports pulses and pulses requested while the engine was busy.
++[upc_stats]
++
++# Re-checks the MCU clock 30 s after start-up and withdraws Klipper's spurious
++# "configured for 396Mhz but running at 38xMhz" warning when the settled
++# estimate is fine (klipper/extras/upc_clockcheck.py -> klippy/extras/).
++[upc_clockcheck]
++
++# =====================================================================
++# Sindoh DP200 (Rodin CTL board, Marvell 88PA6170) - Klipper config
++# =====================================================================
++# Two Klipper MCUs run on the SoC's UPC cores (see klipper_port/README.md):
++#   [mcu]     FM core: stepper engines, endstops, motor current
++#   [mcu io]  IO core: heaters, fans, thermistors
++# 'upctool bridge' exposes them as /tmp/klipper_upc_fm and _io.
++#
++# STATUS: first bring-up config. Values come from the stock firmware;
++# items marked TBC must be checked on the machine. Before the first heat
++# test, read the safety section in klipper_port/README.md.
++#
++# Pin names (UPC port):
++#   smot_stepN / smot_dirN / smot_enN  stepper engine N (0=X 1=Y 2=Z 3=E)
++#   xenaN                               XENA input pin N
++#   pwmN                                dec_pwm block N
++#   adcN                                dec_adc input N (0 nozzle, 1 bed)
++# =====================================================================
++
++[mcu]
++serial: /tmp/klipper_upc_fm
++restart_method: command
++
++[mcu io]
++serial: /tmp/klipper_upc_io
++restart_method: command
++
++[printer]
++kinematics: cartesian
++max_velocity: 150             # stock tables top out ~197 mm/s
++max_accel: 1500
++# The UPC step engines take one move per step and lose steps above ~20k
++# steps/s (measured 2026-10-18: Z fine to 19.2k, 1.8 mm lost at 25.6k, 75 % at
++# 32k). Z at 3200 steps/mm -> cap at 5 mm/s (16k). X/Y at 80 steps/mm are fine
++# to 240 mm/s; the extruder (458.83 steps/mm) is capped at 40 mm/s below.
++max_z_velocity: 5
++max_z_accel: 100
++square_corner_velocity: 5.0
++
++# ---------------------------------------------------------------------
++# Steppers: Allegro A4982. Stock scaling X/Y 80, Z 3200, E 458.83 steps/mm.
++# Only full_steps*microsteps/rotation_distance matters (MS1/MS2 unknown).
++# Keep the default step_pulse_duration (2 us): each step is one hardware
++# pulse from the stepper engine, so "step on both edges" must stay off.
++# Direction: the stock engine treats DIR bit = 1 as positive travel.
++# ---------------------------------------------------------------------
++[stepper_x]
++step_pin: smot_step0
++dir_pin: smot_dir0
++enable_pin: !smot_en0          # engine CFG bit0 = 1 disables the driver
++microsteps: 16
++rotation_distance: 40
++endstop_pin: xena42            # X home (XIRD1 bit 10): 1 = triggered (stock homing code; carriage was parked on the switch)
++position_endstop: 216.0        # stock homes X to its MAX end
++position_min: -21.0
++position_max: 233.6            # stock soft limit; purge bin / park positions are 209-231.2 mm
++homing_speed: 10               # stock fine approach ~10.4 mm/s
++second_homing_speed: 5
++homing_positive_dir: true
++
++[stepper_y]
++step_pin: smot_step1
++dir_pin: smot_dir1
++enable_pin: !smot_en1
++microsteps: 16
++rotation_distance: 40
++endstop_pin: xena43            # Y home (XIRD1 bit 11): active-high, measured (0 = free, 1 = triggered)
++position_endstop: 5.5
++position_min: -1.75
++position_max: 201.5
++homing_speed: 10
++second_homing_speed: 5
++
++[stepper_z]
++step_pin: smot_step2
++dir_pin: smot_dir2
++enable_pin: !smot_en2
++microsteps: 16
++rotation_distance: 1
++endstop_pin: xena44            # Z home (XIRD1 bit 12): active-high, at the top (bed up); homing tested
++# position_endstop: per printer -> printer.cfg (paper test / Z_ENDSTOP_CALIBRATE).
++# The switch is at the top of travel, ~2.3 mm above the bed on the first unit.
++position_min: -2.0
++position_max: 194              # ~195 mm bottom-to-switch measured (old coords)
++homing_speed: 5
++second_homing_speed: 2
++
++# ---------------------------------------------------------------------
++# Motor current: A4982 REF from filtered hardware PWM (stock period 200,
++# high = 100 + offset). karas.db offsets X -15, Y +15, Z +30, E +50.
++# ---------------------------------------------------------------------
++[output_pin motor_current_x]
++pin: pwm27
++pwm: True
++hardware_pwm: True
++cycle_time: 0.0001             # ignored by the UPC port (stock period used)
++value: 0.425
++shutdown_value: 0.425
++
++[output_pin motor_current_y]
++pin: pwm29
++pwm: True
++hardware_pwm: True
++cycle_time: 0.0001
++value: 0.60
++shutdown_value: 0.60
++
++[output_pin motor_current_z]
++pin: pwm30
++pwm: True
++hardware_pwm: True
++cycle_time: 0.0001
++value: 0.65
++shutdown_value: 0.65
++
++[output_pin motor_current_e]
++pin: pwm31
++pwm: True
++hardware_pwm: True
++cycle_time: 0.0001
++value: 0.75
++shutdown_value: 0.75
++
++# ---------------------------------------------------------------------
++# Thermistors from the stock lookup tables. The port reports raw 10-bit
++# ADC counts (ADC_MAX 1023), so voltage = raw/1023 with adc_voltage 1.
++# Matches the stock firmware conversion; a reference thermometer check is still advised.
++# ---------------------------------------------------------------------
++# Generated from the stock firmware lookup tables (tools/gen_thermistors.py).
++# Checked on the printer: raw 891 -> 64.1 C (stock 64.6 C), raw 692 bed -> 44.0 C (stock 44.2 C).
++[adc_temperature dp200_nozzle]
++# generated by tools/gen_thermistors.py from adc_temp_mC_lookup_table (stock firmware table)
++temperature1: 0.6
++voltage1: 0.98584
++temperature2: 10.5
++voltage2: 0.97852
++temperature3: 20.1
++voltage3: 0.96875
++temperature4: 30.0
++voltage4: 0.95508
++temperature5: 40.0
++voltage5: 0.93701
++temperature6: 50.1
++voltage6: 0.91357
++temperature7: 60.0
++voltage7: 0.88525
++temperature8: 70.0
++voltage8: 0.85059
++temperature9: 80.1
++voltage9: 0.81006
++temperature10: 90.1
++voltage10: 0.76416
++temperature11: 100.1
++voltage11: 0.71387
++temperature12: 110.1
++voltage12: 0.65967
++temperature13: 120.1
++voltage13: 0.60205
++temperature14: 130.1
++voltage14: 0.54297
++temperature15: 140.1
++voltage15: 0.48438
++temperature16: 150.1
++voltage16: 0.42871
++temperature17: 160.0
++voltage17: 0.37695
++temperature18: 170.0
++voltage18: 0.32910
++temperature19: 180.0
++voltage19: 0.28613
++temperature20: 190.0
++voltage20: 0.24805
++temperature21: 200.1
++voltage21: 0.21436
++temperature22: 210.2
++voltage22: 0.18506
++temperature23: 220.1
++voltage23: 0.16016
++temperature24: 230.1
++voltage24: 0.13867
++temperature25: 240.1
++voltage25: 0.12012
++temperature26: 250.4
++voltage26: 0.10400
++temperature27: 260.1
++voltage27: 0.09082
++temperature28: 270.2
++voltage28: 0.07910
++temperature29: 280.0
++voltage29: 0.06934
++temperature30: 290.4
++voltage30: 0.06055
++
++[adc_temperature dp200_bed]
++# generated by tools/gen_thermistors.py from adc_bed_mC_lookup_table (stock firmware table)
++temperature1: 0.0
++voltage1: 0.92139
++temperature2: 10.1
++voltage2: 0.88330
++temperature3: 20.1
++voltage3: 0.83447
++temperature4: 30.1
++voltage4: 0.77490
++temperature5: 40.0
++voltage5: 0.70654
++temperature6: 50.0
++voltage6: 0.63184
++temperature7: 60.1
++voltage7: 0.55469
++temperature8: 70.0
++voltage8: 0.47949
++temperature9: 80.0
++voltage9: 0.40918
++temperature10: 90.1
++voltage10: 0.34570
++temperature11: 100.0
++voltage11: 0.29053
++temperature12: 110.1
++voltage12: 0.24268
++temperature13: 120.1
++voltage13: 0.20264
++
++[extruder]
++step_pin: smot_step3
++dir_pin: !smot_dir3            # stock: DIR 1 = retract (eject), DIR 0 = feed (insert)
++enable_pin: !smot_en3
++microsteps: 16
++rotation_distance: 6.975       # 200*16/458.83
++nozzle_diameter: 0.400
++filament_diameter: 1.750
++heater_pin: io:pwm5            # dec_pwm block 5, soft PWM (static level)
++max_power: 0.6                 # bring-up limit; raise after PID tuning
++sensor_type: dp200_nozzle
++sensor_pin: io:adc0
++adc_voltage: 1.0
++min_temp: 5                    # stock Err301 below 8 C
++max_temp: 260                  # stock Err304 at 280 C
++min_extrude_temp: 170
++max_extrude_only_distance: 150
++max_extrude_only_velocity: 40  # 18.4k steps/s, under the step-engine limit (~20k)
++# control / pid_Kp / pid_Ki / pid_Kd: per printer -> printer.cfg (PID_CALIBRATE)
++
++[verify_heater extruder]
++max_error: 120
++check_gain_time: 20
++hysteresis: 5
++heating_gain: 2
++
++[heater_bed]
++heater_pin: io:pwm24           # dec_pwm block 0x18
++max_power: 0.6
++sensor_type: dp200_bed
++sensor_pin: io:adc1
++adc_voltage: 1.0
++min_temp: 5
++max_temp: 100                  # stock table ends ~125 C
++# control / pid_Kp / pid_Ki / pid_Kd: per printer -> printer.cfg (PID_CALIBRATE)
++
++[verify_heater heater_bed]
++max_error: 120
++check_gain_time: 90
++hysteresis: 5
++heating_gain: 2
++
++# ---------------------------------------------------------------------
++# Fans (dec_pwm, stock period 100), identified on the printer:
++# block 1 extruder/hotend heatsink fan, 2 part-cooling fan,
++# 4 rear case exhaust fan (mesh filter), 3 nothing connected.
++# ---------------------------------------------------------------------
++[fan]
++pin: io:pwm2
++
++[heater_fan nozzle_fan]
++pin: io:pwm1
++heater: extruder
++heater_temp: 50.0
++
++[fan_generic exhaust_fan]
++pin: io:pwm4                    # rear case fan with filter; SET_FAN_SPEED FAN=exhaust_fan SPEED=1
++
++# Build-area lamp: the stock "pwm_led_extruder" (LED on the print head).
++# Stock main program: pwm_config_construct(6, ...) addresses dec_pwm base
++# (UIO "dec_pwm" = 0xf9304000) + (6+1)*0x100 = block 7 (stock ctrl 0x18,
++# period 100). SetLamp() switches it; the touchscreen "lamp" menu and
++# karas.db Lamp_Setting default it to on. (Block 10 is the beeper.)
++[output_pin lamp]
++pin: io:pwm7
++pwm: True
++cycle_time: 0.0001             # ignored by the UPC port (stock period used)
++value: 1
++shutdown_value: 0
++
++# ---------------------------------------------------------------------
++# Not configured yet (verify wiring first):
++#   clutch: pwm6 (configured in dp200_macros.cfg; NOT the lamp - see [output_pin lamp])
++#   solenoid: pwm8 (stock ctrl 0x2e on / 0x2a off)
++#   filament/level sensor: xena46 (TBC)
++#   front LED: power-management MCU on Linux /dev/ttyS2 (not a UPC pin)
++# ---------------------------------------------------------------------
++
++[virtual_sdcard]
++path: ~/printer_data/gcodes
++
++[display_status]
++
++[pause_resume]
++
++# PAUSE / RESUME / CANCEL_PRINT (needed by Mainsail and by the filament
++# runout sensor). [pause_resume] saves and restores the G-code state,
++# including the move back, so these only add retract, lift and park.
++[gcode_macro PAUSE]
++description: Pause the print - retract, lift and park
++rename_existing: BASE_PAUSE
++variable_retract: 1.0
++variable_lift: 10.0
++gcode:
++    {% if printer.pause_resume.is_paused %}
++        M118 Already paused
++    {% else %}
++        {% set c = printer["gcode_macro _DP200"] %}
++        {% set th = printer.toolhead %}
++        {% set homed = 'x' in th.homed_axes and 'y' in th.homed_axes and 'z' in th.homed_axes %}
++        BASE_PAUSE
++        {% if printer.extruder.can_extrude %}
++            M83
++            G1 E-{retract} F2100
++        {% endif %}
++        {% if homed %}
++            G90
++            G1 Z{[th.position.z + lift, th.axis_maximum.z]|min} F300
++            G1 X{c.park_x} Y{c.park_y} F6000
++        {% endif %}
++    {% endif %}
++
++[gcode_macro RESUME]
++description: Resume the print - un-retract, move back, continue
++rename_existing: BASE_RESUME
++gcode:
++    {% if not printer.pause_resume.is_paused %}
++        M118 Not paused
++    {% else %}
++        {% if printer.extruder.can_extrude %}
++            M83
++            G1 E{printer["gcode_macro PAUSE"].retract} F2100
++        {% endif %}
++        BASE_RESUME {rawparams}
++    {% endif %}
++
++[gcode_macro CANCEL_PRINT]
++description: Cancel the print - heaters and fan off, lift and park
++rename_existing: BASE_CANCEL_PRINT
++gcode:
++    {% set c = printer["gcode_macro _DP200"] %}
++    {% set th = printer.toolhead %}
++    TURN_OFF_HEATERS
++    M106 S0
++    {% if 'x' in th.homed_axes and 'y' in th.homed_axes and 'z' in th.homed_axes %}
++        G90
++        G1 Z{[th.position.z + 10, th.axis_maximum.z]|min} F300
++        G1 X{c.park_x} Y{c.park_y} F6000
++    {% endif %}
++    CLEAR_PAUSE
++    BASE_CANCEL_PRINT
++
++# Slicer start G-code:  PRINT_START BED=[first_layer_bed_temperature] EXTRUDER=[first_layer_temperature]
++# (Cura: BED={material_bed_temperature_layer_0} EXTRUDER={material_print_temperature_layer_0})
++# Fresh 4x4 mesh before every print (user's routine), then purge + wipe
++# over the bin. NOTE: the bed heater is not verified under Klipper yet -
++# test it before the first print.
++[gcode_macro PRINT_START]
++description: Heat, home, 4x4 bed mesh, purge and wipe. BED= EXTRUDER= MESH=4
++gcode:
++    {% set bed = params.BED|default(60)|float %}
++    {% set ext = params.EXTRUDER|default(210)|float %}
++    {% set n = params.MESH|default(4)|int %}
++    CLEAR_PAUSE
++    M140 S{bed}
++    M104 S150                  # warm the nozzle without oozing while probing
++    G28
++    M190 S{bed}
++    BED_MESH_CALIBRATE PROBE_COUNT={n},{n} PROFILE=print
++    CLEAN_NOZZLE TEMP={ext}    # heats, purges into the bin, wipes
++    M109 S{ext}
++    G90
++    M83
++    G92 E0
++
++[gcode_macro PRINT_END]
++description: End of print - retract, heaters/fan off, lift, present the bed
++gcode:
++    {% set th = printer.toolhead %}
++    M83
++    G1 E-2 F2100
++    TURN_OFF_HEATERS
++    M106 S0
++    G90
++    G1 Z{[th.position.z + 10, th.axis_maximum.z]|min} F300
++    G1 X{th.axis_maximum.x - 10} Y{th.axis_maximum.y - 5} F6000
++    M84
+diff --git a/config/sindoh-dp200/printer.cfg b/config/sindoh-dp200/printer.cfg
+new file mode 100644
+index 00000000..99f0a6e0
+--- /dev/null
++++ b/config/sindoh-dp200/printer.cfg
+@@ -0,0 +1,42 @@
++# =====================================================================
++# Sindoh DP200 - YOUR printer.cfg
++# =====================================================================
++# The hardware definition and the macros come from the two included files,
++# which updates replace. This file is yours and is never overwritten:
++# - put your own changes and overrides here (a section repeated here adds
++#   to / overrides the included one);
++# - the per-printer values below are written by calibration commands, then
++#   SAVE_CONFIG (which only works for options that are NOT in an include).
++# =====================================================================
++
++[include dp200_printer.cfg]
++[include dp200_macros.cfg]
++
++# --- per-printer calibration -----------------------------------------
++[stepper_z]
++# Z switch height above the bed: paper test (LV_PROBE_CALIBRATE) or
++# Z_ENDSTOP_CALIBRATE. First unit (2026-10-19): 2.275.
++position_endstop: 2.275
++
++[probe]
++# Pin position relative to the nozzle (measure with a ruler): the pin sits
++# front-right of the nozzle on the DP200 (front = lower Y).
++x_offset: 15
++y_offset: -30
++# Pin tip below the nozzle: LV_PROBE_CALIBRATE -> paper test -> ACCEPT ->
++# LV_PROBE_CALIBRATE_SAVE Z=<accepted> -> SAVE_CONFIG. First unit: 2.530.
++z_offset: 2.530
++
++[extruder]
++# Placeholder gains - run PID_CALIBRATE HEATER=extruder TARGET=210, then SAVE_CONFIG
++control: pid
++pid_Kp: 22.2
++pid_Ki: 1.08
++pid_Kd: 114
++
++[heater_bed]
++# Placeholder gains - run PID_CALIBRATE HEATER=heater_bed TARGET=60, then SAVE_CONFIG
++control: pid
++pid_Kp: 54.0
++pid_Ki: 0.77
++pid_Kd: 948.0
+-- 
+2.55.0.windows.5
+

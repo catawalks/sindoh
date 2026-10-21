@@ -1,0 +1,146 @@
+#!/bin/sh
+# Service control inside the Debian chroot (no systemd: the vendor kernel
+# is 3.2). Called by /dp200/dp200-start.sh on the stock side.
+#
+#   rc.dp200 start | stop | restart | status
+#   rc.dp200 restart-klipper           (after editing printer.cfg firmware)
+#   rc.dp200 restart-screen            (touch UI; SCREEN_ENABLED=0 in /etc/dp200/screen.conf disables it)
+#   rc.dp200 restart-webcam            (after editing /etc/dp200/webcam.conf:
+#                                       WEBCAM_RES=640x480 WEBCAM_FPS=15 WEBCAM_ENABLED=1
+#                                       WEBCAM_CTRLS="power_line_frequency=2 sharpness=3")
+
+USER=klipper
+HOME_DIR=/home/$USER
+DATA=$HOME_DIR/printer_data
+FW=/opt/dp200
+RUN=/run/dp200
+SSD=/sbin/start-stop-daemon
+
+mkdir -p $RUN $DATA/logs $DATA/comms
+chown $USER:$USER $DATA/logs $DATA/comms
+
+start_upc() {
+    if [ ! -f $FW/fm.bin ] || [ ! -f $FW/io.bin ]; then
+        echo "missing $FW/fm.bin or io.bin - build the UPC firmware first"
+        return 1
+    fi
+    /usr/local/bin/upctool load $FW/io.bin $FW/fm.bin || return 1
+    $SSD --start --background --make-pidfile --pidfile $RUN/bridge.pid \
+        --exec /usr/local/bin/upctool -- bridge \
+        -f /tmp/klipper_upc_fm -i /tmp/klipper_upc_io
+    sleep 1
+}
+
+start_klipper() {
+    $SSD --start --background --make-pidfile --pidfile $RUN/klipper.pid \
+        --chuid $USER --chdir $HOME_DIR \
+        --exec $HOME_DIR/klippy-env/bin/python -- \
+        $HOME_DIR/klipper/klippy/klippy.py $DATA/config/printer.cfg \
+        -l $DATA/logs/klippy.log -a $DATA/comms/klippy.sock
+}
+
+start_moonraker() {
+    $SSD --start --background --make-pidfile --pidfile $RUN/moonraker.pid \
+        --chuid $USER --chdir $HOME_DIR \
+        --exec $HOME_DIR/moonraker-env/bin/python -- \
+        $HOME_DIR/moonraker/moonraker/moonraker.py -d $DATA
+}
+
+# Webcam: ustreamer passes the camera's own MJPEG through (no re-encoding).
+# Measured 2026-10-20: 640x480@15 costs ~8 % of one core; software JPEG
+# from YUYV (what the stock mjpg_streamer -y does) costs ~92 %.
+# v4l2_time32_shim.so: Debian trixie is time64, kernel 3.2 only knows the
+# time32 v4l2_buffer layout. --device-timeout 5: the camera needs > 1 s to
+# deliver its first frame. Settings: /etc/dp200/webcam.conf.
+# The shim also repairs the camera's MJPEG frames (junk instead of the JPEG
+# end marker -> grey/black frames in browsers; see install/camera/).
+# WEBCAM_CTRLS: v4l2 controls applied at start (v4l2-ctl --list-ctrls);
+# power_line_frequency 1 = 50 Hz, 2 = 60 Hz (avoids light banding).
+WEBCAM_RES=640x480
+WEBCAM_FPS=15
+WEBCAM_ENABLED=1
+WEBCAM_CTRLS="power_line_frequency=2"
+[ -f /etc/dp200/webcam.conf ] && . /etc/dp200/webcam.conf
+start_webcam() {
+    [ "$WEBCAM_ENABLED" = 1 ] && [ -e /dev/video0 ] || return 0
+    for c in $WEBCAM_CTRLS; do
+        /usr/bin/v4l2-ctl -d /dev/video0 -c "$c" || echo "webcam: control $c failed"
+    done
+    $SSD --start --background --make-pidfile --pidfile $RUN/webcam.pid \
+        --chuid $USER --exec /usr/bin/ustreamer --startas /usr/bin/env -- \
+        LD_PRELOAD=/usr/local/lib/v4l2_time32_shim.so /usr/bin/ustreamer \
+        --device=/dev/video0 --format=MJPEG --encoder=HW \
+        --resolution=$WEBCAM_RES --desired-fps=$WEBCAM_FPS \
+        --device-timeout=5 --persistent \
+        --host=127.0.0.1 --port=8080
+}
+
+# Touch screen UI on the built-in panel (install/display/dp200_screen.py).
+# Runs as root: /dev/fb0 and /dev/event0 are root-only. Uses Debian's
+# python3-pil (the moonraker-env Pillow has no FreeType).
+SCREEN_ENABLED=1
+[ -f /etc/dp200/screen.conf ] && . /etc/dp200/screen.conf
+start_screen() {
+    [ "$SCREEN_ENABLED" = 1 ] && [ -e /dev/fb0 ] && [ -e /dev/event0 ] || return 0
+    $SSD --start --background --make-pidfile --pidfile $RUN/screen.pid \
+        --exec /usr/bin/python3 -- /usr/local/bin/dp200_screen.py
+}
+
+stop_pid() {
+    [ -f $RUN/$1.pid ] && $SSD --stop --retry TERM/10/KILL/5 --pidfile $RUN/$1.pid
+    rm -f $RUN/$1.pid
+}
+
+case "$1" in
+start)
+    start_upc || exit 1
+    start_klipper
+    start_moonraker
+    start_webcam
+    start_screen
+    /usr/sbin/nginx
+    echo "started: web UI on port 80, moonraker on 7125, webcam on /webcam/"
+    ;;
+stop)
+    /usr/sbin/nginx -s quit 2>/dev/null
+    stop_pid screen
+    stop_pid webcam
+    stop_pid moonraker
+    stop_pid klipper
+    stop_pid bridge
+    # Hold both UPC cores in reset and force heaters/fans/motors off
+    /usr/local/bin/upctool --force stop
+    ;;
+restart)
+    "$0" stop
+    sleep 1
+    "$0" start
+    ;;
+restart-webcam)
+    stop_pid webcam
+    start_webcam
+    ;;
+restart-screen)
+    stop_pid screen
+    start_screen
+    ;;
+restart-klipper)
+    stop_pid klipper
+    stop_pid bridge
+    start_upc && start_klipper
+    ;;
+status)
+    for s in bridge klipper moonraker webcam screen; do
+        if [ -f $RUN/$s.pid ] && kill -0 "$(cat $RUN/$s.pid)" 2>/dev/null; then
+            echo "$s: running"
+        else
+            echo "$s: stopped"
+        fi
+    done
+    /usr/local/bin/upctool info
+    ;;
+*)
+    echo "usage: $0 start|stop|restart|restart-klipper|restart-webcam|restart-screen|status"
+    exit 2
+    ;;
+esac

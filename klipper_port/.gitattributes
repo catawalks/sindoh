@@ -1,0 +1,12 @@
+# Everything in this repo runs on the printer (Linux): keep LF line endings
+# on every platform, whatever core.autocrlf says.
+* text=auto eol=lf
+
+# Windows-only helper scripts
+*.ps1 text eol=crlf
+
+# Binaries
+*.bin binary
+*.png binary
+*.pdf binary
+prebuilt/upctool binary

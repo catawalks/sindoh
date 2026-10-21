@@ -1,0 +1,11 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local Claude Code settings for this folder
+.claude/
+
+# Never commit vendor secrets or dumps (they live outside this folder)
+crypto_key.dat
+*.she
+*nand*.bin
