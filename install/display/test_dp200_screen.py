@@ -88,6 +88,9 @@ tap('MOVE'); tap('HOME ALL')
 check('HOME ALL asks to confirm', ui.confirm is not None and sent[-1][1] == 'LAMP_TOGGLE')
 tap('YES');               check('YES sends G28', sent[-1] == ('/printer/gcode/script', 'G28'))
 tap('BACK')
+tap('FILAMENT'); tap('UNLOCK');       check('UNLOCK asks to confirm', ui.confirm is not None)
+tap('YES');                           check('YES sends CARTRIDGE_RELEASE', sent[-1] == ('/printer/gcode/script', 'CARTRIDGE_RELEASE'))
+tap('BACK')
 # STOP: a short tap must NOT stop, a 1 s hold must
 tap('STOP');              check('short STOP tap ignored', all(p != '/printer/emergency_stop' for p, _ in sent))
 box = find('STOP'); u, v = (box[0] + box[2]) // 2, (box[1] + box[3]) // 2

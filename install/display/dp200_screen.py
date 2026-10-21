@@ -733,6 +733,8 @@ class UI:
         for mat in ('PLA', 'ABS'):
             items.append(('UNLOAD ' + mat, ('confirm', 'Heat and UNLOAD %s?' % mat,
                                             ('gcode', 'UNLOAD_FILAMENT MATERIAL=' + mat, 'Unload ' + mat))))
+        items.append(('UNLOCK', ('confirm', 'Release the cartridge latch for 4 s? Unload the filament first.',
+                                 ('gcode', 'CARTRIDGE_RELEASE', 'Cartridge release')), C_BTN, 28, 'cartridge'))
         items.append(('BACK', ('screen', 'home')))
         self.grid(d, items, top=270, rows_h=96)
 
