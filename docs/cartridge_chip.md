@@ -94,6 +94,31 @@ How the stock app (`marvell_lspsdk_3dp_gemstone-debug_stripped.elf`, symbols in 
 - **Writing back:** `write_smart_ic` / `inc_smart_ic` ("[SEC] %s-MemW
   Fail") do authenticated writes.
 
+## Second chip (2026-10-22): black flex
+
+User: chip 1 = **blue PLA**, chip 2 = **black flex**. ROM `48 df 6b 01 02 00 00 77`
+(serial 000002016bdf); same personality, same protection (AUTH; block 3 EPROM).
+
+```
+page 0: 52 45 46 33 44 50 46 42 4b 2d 52 00 5a c0 77 7d 06 00 00 00 03 00 00 00 01 00 00 00 a9 00 00 00  |REF3DPFBK-R.Z.w}................|
+page 2: 00 00 00 00 b4 34 02 00 00 ...
+page 3: 0c 00 00 00 09 00 00 00 09 00 00 00 08 00 00 00 00 ...
+page 6: 00 00 fc ff ...      (18 fuses burnt)
+pages 1, 4, 5 all 00; page 7 all ff
+```
+
+| Field | Blue PLA | Black flex | Conclusion |
+|---|---|---|---|
+| p0 0–11 | `3DP200PBL-RQ` | `REF3DPFBK-R` | product code: **P = PLA, F = Flex; BL = blue, BK = black** |
+| p0 12–15 | BE 0x6299776b = 2022-06-03 | BE 0x5ac0777d = 2018-04-01 | likely production date (big-endian Unix time) |
+| p0 16–19 | 1 | 6 | **material code: 1 = PLA, 6 = Flex** (stock: 2 = ABS) |
+| p0 20–23 | 05 ff 6d 15 | 3 | ? (colour/variant) |
+| p0 24–27 | 1 | 1 | ? |
+| p0 28–31 | 232 m | 169 m | **total length (m)** |
+| p2 4–7 | 90 591 → 98.7 m | 144 564 → 157.5 m (93 %) | **used, in ePulse units (1.0897 mm)** |
+| p3 | 10,10,7,6,36,25 | 12,9,9,8,0,0 | material parameters, meaning unknown |
+| p6–7 fuses | 8 | 18 | not proportional to use: a different counter |
+
 ## Field hypotheses (before the disassembly)
 
 Clues come from the stock app's (`marvell_lspsdk_3dp_gemstone-debug_stripped.elf`)

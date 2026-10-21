@@ -117,7 +117,9 @@ def read_cartridge(device, address):
     used_mm = struct.unpack_from('<I', p2, 4)[0] * MM_PER_EPULSE
     remaining_m = max(0., total_m - used_mm / 1000.)
     product = p0[:12].decode('ascii', 'replace').rstrip('\0')
-    material = {1: 'PLA', 2: 'ABS'}.get(struct.unpack_from('<I', p0, 16)[0], 'unknown')
+    # 1 = PLA, 2 = ABS (stock app), 6 = Flex (black flex cartridge, 2026-10-22)
+    code = struct.unpack_from('<I', p0, 16)[0]
+    material = {1: 'PLA', 2: 'ABS', 6: 'FLEX'}.get(code, 'code %d' % code)
     fuses = sum(8 - bin(b).count('1') for b in p6 + p7)   # cleared EPROM bits
     return {
         'present': True,
