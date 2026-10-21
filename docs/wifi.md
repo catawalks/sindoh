@@ -70,8 +70,8 @@ fake backend (25 checks).
 - **UI:**
   - pressed buttons light up and their label shifts down 2 px;
   - a padlock icon on the signal bars replaces the "lock"/"open" words;
-  - "Hidden network�" is the last row of the network list (no HIDDEN
+  - "Hidden network…" is the last row of the network list (no HIDDEN
     button on the WiFi page);
-  - ?/? buttons with a page counter replace MORE.
+  - ▲/▼ buttons with a page counter replace MORE.
 - **Real test by the user:** scan, keyboard and connect to Niholedotcom
   worked; saved with priority 21.
