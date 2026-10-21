@@ -176,6 +176,8 @@ fi
 
 show "Installing boot hook" "" "DO NOT POWER OFF"
 sh $ROOT/dp200/hook_install.sh || fail "hook failed" "see install log"
+# tells /etc/dp200-boot.sh to attach mtd5 (only NAND installs)
+if [ $TARGET = nand ]; then touch /etc/dp200-nand; else rm -f /etc/dp200-nand; fi
 sync
 
 /app/tinydebug led green 2>/dev/null

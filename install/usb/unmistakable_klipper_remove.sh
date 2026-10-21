@@ -50,7 +50,7 @@ if [ -f /etc/profile.stock ]; then
 else
     sed -i '/# dp200-klipper hook/d' /etc/profile
 fi
-rm -f /DEBUG_MACHINE /etc/dp200-boot.sh
+rm -f /DEBUG_MACHINE /etc/dp200-boot.sh /etc/dp200-nand
 sync
 
 if [ $RESTORE = 1 ]; then
