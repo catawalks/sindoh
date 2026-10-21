@@ -140,6 +140,19 @@ tap('TIMEOUT'); tap('NEVER');         check('never saved', S.load_settings().get
 ui.last_touch = time.time() - 100000; check('never dims with NEVER', not ui.dimmed())
 ui.last_touch = time.time()
 tap('BACK'); tap('BACK')
+# the fixed BACK button
+ui.st = ST; ui.screen = 'home'; ui.confirm = None
+render();                             check('home: no BACK', 'BACK' not in labels)
+tap('SYSTEM'); tap('WIFI'); tap('SCAN')
+render();                             check('list: BACK in the bottom bar', labels.get('BACK', (0, 0, 0, 0))[1] > 700)
+tap('BACK');                          check('list BACK -> wifi', ui.screen == 'wifi')
+tap('SCAN')
+tap_action(lambda a: a[0] == 'wifi_pick' and a[1]['ssid'] == b'HomeNet'); key('x')
+tap('BACK');                          check('keyboard BACK = cancel', ui.screen == 'wifi_list' and ui.wf['text'] == '')
+tap_action(lambda a: a[0] == 'wifi_pick' and a[1]['ssid'] == b'CoffeeShop')
+n = len(calls)
+tap('BACK');                          check('dialog BACK = NO', ui.confirm is None and len(calls) == n)
+tap('BACK'); tap('BACK'); tap('BACK');check('BACK x3 -> home', ui.screen == 'home')
 # without Klipper
 ui.st = None; ui.screen = 'home'
 render();                             check('waiting page has a WIFI button', 'WIFI' in labels)

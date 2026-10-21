@@ -435,7 +435,6 @@ class UI:
         if name:
             items.append(('FORGET', ('confirm', 'Forget %s? The printer will leave this network.' % name,
                                      ('wifi_forget', s['ssid'])), C_RED, 28, name[:14]))
-        items.append(('BACK', ('screen', 'system' if self.st else 'home')))
         self.grid(d, items, top=380, rows_h=100)
 
     def page_wifi_list(self, d, st):
@@ -483,8 +482,7 @@ class UI:
                        C_TXT if up else off_fg),
                       ('▼', ('wifi_down',) if down else None, C_BTN if down else off, 34, None,
                        C_TXT if down else off_fg),
-                      ('RESCAN', ('wifi_rescan',), C_BTN, 22),
-                      ('BACK', ('screen', 'wifi'), C_BTN, 24)], top=590, rows_h=74, cols=4)
+                      ('RESCAN', ('wifi_rescan',), C_BTN, 24)], top=590, rows_h=74, cols=3)
 
     KB_ROWS = {
         'abc': ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm.-_'],
@@ -531,9 +529,9 @@ class UI:
         # actions
         y += 66
         ok = 'NEXT' if wf['kb_for'] == 'ssid' else 'CONNECT'
-        self.button(d, (6, y, 156, y + 58), 'CANCEL', ('kb_cancel',), C_BAR, 24)
-        self.button(d, (164, y, 316, y + 58), 'HIDE' if wf['show'] else 'SHOW', ('kb_show',), C_BAR, 24)
-        self.button(d, (324, y, PW - 6, y + 58), ok, ('kb_ok',), C_ON, 24)
+        # (cancel = the BACK button in the bottom bar)
+        self.button(d, (6, y, 186, y + 58), 'HIDE' if wf['show'] else 'SHOW', ('kb_show',), C_BAR, 24)
+        self.button(d, (194, y, PW - 6, y + 58), ok, ('kb_ok',), C_ON, 26)
 
     # ---- touch -----------------------------------------------------------
     def hit(self, u, v):
@@ -664,6 +662,26 @@ class UI:
         d.text((250, 78), 'Bed', font=font(18), fill=C_DIM)
         d.text((250, 100), '%.0f/%.0f°' % (b['temperature'], b['target']), font=font(36), fill=C_BED)
 
+    # page -> page that BACK returns to (None: top level, no BACK)
+    PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'system': 'home',
+              'wifi': 'system', 'wifi_list': 'wifi', 'display': 'system', 'timeout': 'display'}
+
+    def back_action(self):
+        if self.confirm:
+            return ('cancel',)                         # BACK = NO in a dialog
+        if self.screen == 'wifi_kb':
+            return ('kb_cancel',)
+        ready = self.st is not None and self.st['webhooks']['state'] == 'ready'
+        if not ready:
+            # only the WiFi pages work without Klipper; their top goes back to
+            # the waiting/error page (screen "home")
+            if self.screen == 'wifi':
+                return ('screen', 'home')
+            if not self.screen.startswith('wifi'):
+                return None
+        parent = self.PARENT.get(self.screen)
+        return ('screen', parent) if parent else None
+
     def footer(self, d):
         y = PH - 86
         if self.busy:
@@ -671,8 +689,16 @@ class UI:
         elif self.msg and time.time() < self.msg[1]:
             d.text((20, y - 34), self.msg[0][:40], font=font(20), fill=C_WARN)
         d.rectangle((0, y, PW, PH), fill=C_BAR)
-        d.text((20, y + 16), 'http://%s/' % self.ip, font=font(18), fill=C_DIM)
-        d.text((20, y + 46), time.strftime('%H:%M'), font=font(18), fill=C_DIM)
+        # BACK: one fixed spot on every page (bottom left); none on top-level pages
+        back = self.back_action()
+        bbox = (14, y + 10, 150, PH - 10)
+        if back is not None:
+            self.button(d, bbox, 'BACK', back, C_BTN, 24)
+            down = 2 if self.pressed(bbox) else 0      # arrow follows the pressed label
+            cy = (bbox[1] + bbox[3]) // 2 + down
+            d.polygon([(22, cy), (32, cy - 8), (32, cy + 8)], fill=C_TXT)
+        d.text((162, y + 16), self.ip, font=font(18), fill=C_DIM)
+        d.text((162, y + 46), time.strftime('%H:%M'), font=font(18), fill=C_DIM)
         box = (PW - 170, y + 10, PW - 14, PH - 10)
         held = 0.0
         if self.press and self.hit(self.press[0], self.press[1]) == ('estop',):
@@ -750,7 +776,6 @@ class UI:
                                             ('gcode', 'UNLOAD_FILAMENT MATERIAL=' + mat, 'Unload ' + mat))))
         items.append(('UNLOCK', ('confirm', 'Release the cartridge latch for 4 s? Unload the filament first.',
                                  ('gcode', 'CARTRIDGE_RELEASE', 'Cartridge release')), C_BTN, 28, 'cartridge'))
-        items.append(('BACK', ('screen', 'home')))
         self.grid(d, items, top=270, rows_h=96)
 
     def page_preheat(self, d, st):
@@ -761,7 +786,6 @@ class UI:
                                  ('gcode', 'M104 S%d\nM140 S%d' % (noz, bed), 'Preheat ' + name)),
                           C_BTN, 30, '%d / %d' % (noz, bed)))
         items.append(('COOL DOWN', ('gcode', 'TURN_OFF_HEATERS', 'Cool down')))
-        items.append(('BACK', ('screen', 'home')))
         self.grid(d, items, top=210)
 
     def page_move(self, d, st):
@@ -776,7 +800,6 @@ class UI:
                        ('gcode', 'CLEAN_NOZZLE', 'Clean nozzle')), C_BTN, 30, 'nozzle'),
             ('MOTORS OFF', ('gcode', 'M84', 'Motors off')),
             ('BIN EMPTIED', ('gcode', 'BIN_EMPTIED', 'Bin emptied'), C_BTN, 24),
-            ('BACK', ('screen', 'home')),
         ], top=240)
 
     def page_system(self, d, st):
@@ -790,7 +813,6 @@ class UI:
              C_BTN, 28, 'restart'),
             ('WIFI', ('screen', 'wifi'), C_BTN, 30, 'network'),
             ('DISPLAY', ('screen', 'display'), C_BTN, 28, 'screen'),
-            ('BACK', ('screen', 'home')),
         ], top=270)
 
     def page_display(self, d, st):
@@ -800,7 +822,6 @@ class UI:
         d.text((20, 230), 'and wakes on the first tap.', font=font(18), fill=C_DIM)
         self.grid(d, [
             ('TIMEOUT', ('screen', 'timeout'), C_BTN, 28, fmt_timeout(t)),
-            ('BACK', ('screen', 'system')),
         ], top=280)
 
     def page_timeout(self, d, st):
@@ -808,7 +829,6 @@ class UI:
         d.text((20, 160), 'Screen timeout', font=font(28), fill=C_TXT)
         items = [(fmt_timeout(t).upper(), ('set_timeout', t), C_ON if t == cur else C_BTN, 28)
                  for t in TIMEOUTS]
-        items.append(('BACK', ('screen', 'display')))
         self.grid(d, items, top=210, rows_h=100)
 
     def page_error(self, d, st):
