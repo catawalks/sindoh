@@ -1,6 +1,6 @@
-From 714d0a34704855c83da62cee81d162c75938b803 Mon Sep 17 00:00:00 2001
-From: catawalks <catawalks@gmail.com>
-Date: Tue, 20 Oct 2026 21:18:25 +0000
+From b3e0e5569ded8710f78d70d553957affe5843298 Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 23:43:00 -0400
 Subject: [PATCH 2/3] upc: Add upc_stats and upc_clockcheck host modules
 
 upc_stats: UPC_STEP_STATS reports the step pulse and step-engine busy
@@ -11,7 +11,7 @@ withdraws the start-up warning when the settled clock estimate agrees
 (the first clock samples of the UPC cores arrive through a busy
 shared-memory bridge and read 1-2 % low).
 
-Signed-off-by: catawalks <catawalks@gmail.com>
+Signed-off-by: catawalks <59056948+catawalks@users.noreply.github.com>
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  klippy/extras/upc_clockcheck.py | 58 +++++++++++++++++++++++++++++++++
@@ -22,7 +22,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 diff --git a/klippy/extras/upc_clockcheck.py b/klippy/extras/upc_clockcheck.py
 new file mode 100644
-index 0000000..29c6b8c
+index 00000000..29c6b8c2
 --- /dev/null
 +++ b/klippy/extras/upc_clockcheck.py
 @@ -0,0 +1,58 @@
@@ -86,7 +86,7 @@ index 0000000..29c6b8c
 +    return UPCClockCheck(config)
 diff --git a/klippy/extras/upc_stats.py b/klippy/extras/upc_stats.py
 new file mode 100644
-index 0000000..f9349e5
+index 00000000..f9349e51
 --- /dev/null
 +++ b/klippy/extras/upc_stats.py
 @@ -0,0 +1,37 @@
@@ -128,5 +128,5 @@ index 0000000..f9349e5
 +def load_config(config):
 +    return UpcStats(config)
 -- 
-2.47.3
+2.55.0.windows.5
 

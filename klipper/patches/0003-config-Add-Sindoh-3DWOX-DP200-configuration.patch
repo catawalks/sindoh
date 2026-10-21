@@ -1,9 +1,9 @@
-From 38d33895d58498d8d4a5619dcd5e7815c11bae82 Mon Sep 17 00:00:00 2001
-From: catawalks <catawalks@gmail.com>
-Date: Tue, 20 Oct 2026 21:18:26 +0000
+From 06a36dcef629b2a5a66b36a9d7fa23d0ef34d0c3 Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 23:43:00 -0400
 Subject: [PATCH 3/3] config: Add Sindoh 3DWOX DP200 configuration
 
-Signed-off-by: catawalks <catawalks@gmail.com>
+Signed-off-by: catawalks <59056948+catawalks@users.noreply.github.com>
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  config/sindoh-dp200/README.md         |  12 +
@@ -18,7 +18,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 diff --git a/config/sindoh-dp200/README.md b/config/sindoh-dp200/README.md
 new file mode 100644
-index 0000000..633023b
+index 00000000..633023bc
 --- /dev/null
 +++ b/config/sindoh-dp200/README.md
 @@ -0,0 +1,12 @@
@@ -36,7 +36,7 @@ index 0000000..633023b
 +port project; see https://github.com/catawalks/sindoh
 diff --git a/config/sindoh-dp200/dp200_macros.cfg b/config/sindoh-dp200/dp200_macros.cfg
 new file mode 100644
-index 0000000..b7f6ace
+index 00000000..b7f6ace7
 --- /dev/null
 +++ b/config/sindoh-dp200/dp200_macros.cfg
 @@ -0,0 +1,535 @@
@@ -577,7 +577,7 @@ index 0000000..b7f6ace
 +    M118 Run SAVE_CONFIG to store z_offset={new}
 diff --git a/config/sindoh-dp200/dp200_printer.cfg b/config/sindoh-dp200/dp200_printer.cfg
 new file mode 100644
-index 0000000..f8e0486
+index 00000000..f8e0486f
 --- /dev/null
 +++ b/config/sindoh-dp200/dp200_printer.cfg
 @@ -0,0 +1,417 @@
@@ -1000,7 +1000,7 @@ index 0000000..f8e0486
 +    M84
 diff --git a/config/sindoh-dp200/printer.cfg b/config/sindoh-dp200/printer.cfg
 new file mode 100644
-index 0000000..99f0a6e
+index 00000000..99f0a6e0
 --- /dev/null
 +++ b/config/sindoh-dp200/printer.cfg
 @@ -0,0 +1,42 @@
@@ -1047,5 +1047,5 @@ index 0000000..99f0a6e
 +pid_Ki: 0.77
 +pid_Kd: 948.0
 -- 
-2.47.3
+2.55.0.windows.5
 

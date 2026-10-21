@@ -16,8 +16,8 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 SRC=${1:-/home/klipper/klipper}
 F=${2:-/usr/src/dp200/klipper-fork}
 OUT=${3:-$HERE/patches}
-G="git -c user.name=catawalks -c user.email=catawalks@gmail.com"
-TRAILER="Signed-off-by: catawalks <catawalks@gmail.com>
+G="git -c user.name=catawalks -c user.email=59056948+catawalks@users.noreply.github.com"
+TRAILER="Signed-off-by: catawalks <59056948+catawalks@users.noreply.github.com>
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 rm -rf "$F"
