@@ -43,7 +43,8 @@ LOWER_BED_Z = 120                     # Z grows downwards on this machine (bed m
 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
-           'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder')
+           'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
+           'dp200_cartridge')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -722,8 +723,13 @@ class UI:
         lever = st.get('filament_switch_sensor cartridge_lever', {})
         enc = st.get('filament_motion_sensor filament_encoder', {})
         d.text((20, 160), 'Filament', font=font(28), fill=C_TXT)
-        d.text((20, 200), 'Cartridge lever: %s' % ('triggered' if lever.get('filament_detected') else 'clear'),
-               font=font(20), fill=C_DIM)
+        cart = st.get('dp200_cartridge') or {}
+        if cart.get('present'):
+            d.text((20, 200), 'Cartridge: %s, %.0f of %d m left (%.0f%%)'
+                   % (cart.get('material', '?'), cart.get('remaining_m', 0), cart.get('total_m', 0),
+                      cart.get('remaining_percent', 0)), font=font(20), fill=C_TXT)
+        else:
+            d.text((20, 200), 'Cartridge: none (open filament)', font=font(20), fill=C_DIM)
         d.text((20, 228), 'Runout encoder: %s' % ('on' if enc.get('enabled') else 'off'),
                font=font(20), fill=C_DIM)
         items = []
@@ -813,7 +819,9 @@ def view_key(ui):
             st.get('output_pin lamp', {}).get('value'), st['toolhead'].get('homed_axes'),
             st['gcode_move']['homing_origin'][2],
             st.get('filament_switch_sensor cartridge_lever', {}).get('filament_detected'),
-            st.get('filament_motion_sensor filament_encoder', {}).get('enabled'), ui.ip)
+            st.get('filament_motion_sensor filament_encoder', {}).get('enabled'), ui.ip,
+            tuple(sorted((st.get('dp200_cartridge') or {}).items(), key=lambda kv: kv[0]))
+            if st.get('dp200_cartridge') else None)
 
 # ---------------------------------------------------------------------------
 def main():
