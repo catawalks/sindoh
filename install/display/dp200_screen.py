@@ -805,6 +805,16 @@ class UI:
         self.button(d, (40, 440, 220, 530), 'YES', action, C_ON)
         self.button(d, (260, 440, PW - 40, 530), 'NO', ('cancel',))
 
+def unblank():
+    """Switch the panel's display DMA back on. The kernel's text console
+    blanks it after 10 min without keyboard input (dp200-start.sh turns that
+    off; this is the safety net)."""
+    try:
+        with open('/sys/class/graphics/fb0/blank', 'w') as f:
+            f.write('0')
+    except OSError:
+        pass
+
 def view_key(ui):
     """The status values as displayed (rounded), so a poll that changes
     nothing visible does not cost a redraw."""
@@ -834,6 +844,8 @@ def main():
         ui.render().save(out)
         return
     panel, touch = Panel(), Touch()
+    unblank()
+    unblanked = time.time()
     next_poll = 0.0
     last_key = None
     while True:
@@ -851,6 +863,9 @@ def main():
                                5.0 if ui.dimmed() else REFRESH_IDLE)
         events = touch.poll()
         woke = ui.dimmed() and any(e[0] == 'down' for e in events)
+        if any(e[0] == 'down' for e in events) and time.time() - unblanked > 60:
+            unblank()                   # in case the kernel console blanked the panel
+            unblanked = time.time()
         for ev in events:
             if woke:                    # first touch only wakes the screen
                 ui.last_touch = time.time()

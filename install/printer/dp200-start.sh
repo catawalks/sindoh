@@ -82,6 +82,12 @@ killall mjpg_streamer 2>/dev/null
 # upc.ko is loaded by the stock /app/module_load.sh
 grep -q '^upc ' /proc/modules || insmod /app/upc.ko
 
+# The kernel's text console blanks the panel after 600 s without keyboard
+# input (consoleblank, read-only here) and touches don't count. The stock app
+# kept it awake; now turn the console screensaver off (setterm -blank 0).
+for t in /dev/tty0 /dev/tty1; do printf '\033[9;0]\033[14;0]' > $t 2>/dev/null; done
+echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null
+
 # WiFi: joining the owner's network was the stock app's job (see dp200-wifi.sh)
 sh $ROOT/dp200/dp200-wifi.sh $ROOT
 # the touch screen (in the chroot) talks to wpa_supplicant's control socket
