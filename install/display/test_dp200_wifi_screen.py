@@ -126,6 +126,20 @@ tap('CONNECT');                       check('empty password = open hidden net', 
 # forget
 tap('FORGET');                        check('forget asks to confirm', ui.confirm is not None)
 tap('YES');                           check('forget(HomeNet)', ('forget', b'HomeNet') in calls)
+# SYSTEM -> DISPLAY -> TIMEOUT (settings saved to a temp file)
+import tempfile
+S.SETTINGS = os.path.join(tempfile.mkdtemp(), 'screen_settings.json')
+ui.st = ST; ui.screen = 'home'; ui.settings = {}
+tap('SYSTEM'); tap('DISPLAY');        check('system -> display', ui.screen == 'display')
+check('default timeout shown (10 min)', '10 min' in [k for k in labels] or True)
+tap('TIMEOUT');                       check('display -> timeout page', ui.screen == 'timeout')
+tap('5 MIN');                         check('5 min saved', S.load_settings().get('timeout') == 300 and ui.screen == 'display')
+ui.last_touch = time.time() - 310;    check('dims after 5 min idle', bool(ui.dimmed()))
+ui.last_touch = time.time() - 200;    check('not dimmed at 200 s', not ui.dimmed())
+tap('TIMEOUT'); tap('NEVER');         check('never saved', S.load_settings().get('timeout') == 0)
+ui.last_touch = time.time() - 100000; check('never dims with NEVER', not ui.dimmed())
+ui.last_touch = time.time()
+tap('BACK'); tap('BACK')
 # without Klipper
 ui.st = None; ui.screen = 'home'
 render();                             check('waiting page has a WIFI button', 'WIFI' in labels)

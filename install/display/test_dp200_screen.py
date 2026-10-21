@@ -35,6 +35,7 @@ class FakeTouch(S.Touch):
         os.write(self.w, S.EVENT.pack(0, 0, S.EV_SYN, S.SYN_REPORT, 0))
 
 ui = S.UI()
+ui.settings = {}                      # default timeout, whatever the printer has saved
 ui.st = S.query()
 touch = FakeTouch()
 fails = 0

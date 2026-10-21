@@ -33,8 +33,10 @@ CAL_V = (-0.22272, 856.2)             # v = a * raw_x + b
 
 REFRESH_BUSY = 1.0                    # s between status polls while printing/heating
 REFRESH_IDLE = 2.0
-DIM_AFTER = 600                       # s without touch while idle -> dark screen (backlight
-                                      # control is not known yet, so this only blanks the image)
+DIM_AFTER = 600                       # default s without touch while idle -> black image (the
+                                      # backlight is not controllable); SYSTEM -> DISPLAY -> TIMEOUT
+TIMEOUTS = (60, 300, 600, 1800, 0)    # choices on the TIMEOUT page; 0 = never
+SETTINGS = '/etc/dp200/screen_settings.json'   # saved touch-screen settings
 HOLD_STOP = 1.0                       # s to hold STOP
 
 # Preheat presets (nozzle, bed); bed max_temp is 100, nozzle 260
@@ -219,6 +221,7 @@ class UI:
         self.press = None              # (u, v, t0)
         self.last_touch = time.time()
         self.ip = my_ip()
+        self.settings = load_settings()          # e.g. {'timeout': 600}
         # WiFi setup state (pages wifi, wifi_list, wifi_kb)
         self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'list': [], 'page': 0,
                    'busy': None, 'checked': 0.0, 'target': b'', 'kb_for': 'psk',
@@ -233,6 +236,11 @@ class UI:
                 self.wifi_refresh()
         elif kind.startswith('wifi') or kind.startswith('kb'):
             self.wifi_action(action)
+        elif kind == 'set_timeout':
+            self.settings['timeout'] = action[1]
+            ok = save_settings(self.settings)
+            self.flash('Screen timeout: %s%s' % (fmt_timeout(action[1]), '' if ok else ' (not saved!)'))
+            self.screen = 'display'
         elif kind == 'confirm':
             self.confirm = (action[1], action[2])
         elif kind == 'cancel':
@@ -640,7 +648,8 @@ class UI:
         idle = self.st and self.st['print_stats']['state'] not in ('printing', 'paused') \
             and not self.busy and self.st['extruder']['target'] == 0 \
             and self.st['heater_bed']['target'] == 0
-        return idle and DIM_AFTER and time.time() - self.last_touch > DIM_AFTER
+        t = self.settings.get('timeout', DIM_AFTER)
+        return idle and t and time.time() - self.last_touch > t
 
     def header(self, d, st):
         d.rectangle((0, 0, PW, 64), fill=C_BAR)
@@ -780,8 +789,27 @@ class UI:
             ('KLIPPER', ('confirm', 'Restart Klipper host?', ('post', '/printer/restart', 'Restart')),
              C_BTN, 28, 'restart'),
             ('WIFI', ('screen', 'wifi'), C_BTN, 30, 'network'),
+            ('DISPLAY', ('screen', 'display'), C_BTN, 28, 'screen'),
             ('BACK', ('screen', 'home')),
         ], top=270)
+
+    def page_display(self, d, st):
+        t = self.settings.get('timeout', DIM_AFTER)
+        d.text((20, 160), 'Display', font=font(28), fill=C_TXT)
+        d.text((20, 204), 'Turns black when idle (no print, heaters off)', font=font(18), fill=C_DIM)
+        d.text((20, 230), 'and wakes on the first tap.', font=font(18), fill=C_DIM)
+        self.grid(d, [
+            ('TIMEOUT', ('screen', 'timeout'), C_BTN, 28, fmt_timeout(t)),
+            ('BACK', ('screen', 'system')),
+        ], top=280)
+
+    def page_timeout(self, d, st):
+        cur = self.settings.get('timeout', DIM_AFTER)
+        d.text((20, 160), 'Screen timeout', font=font(28), fill=C_TXT)
+        items = [(fmt_timeout(t).upper(), ('set_timeout', t), C_ON if t == cur else C_BTN, 28)
+                 for t in TIMEOUTS]
+        items.append(('BACK', ('screen', 'display')))
+        self.grid(d, items, top=210, rows_h=100)
 
     def page_error(self, d, st):
         wh = st['webhooks']
@@ -804,6 +832,28 @@ class UI:
             d.text((40, 250 + i * 38), l, font=font(28), fill=C_TXT)
         self.button(d, (40, 440, 220, 530), 'YES', action, C_ON)
         self.button(d, (260, 440, PW - 40, 530), 'NO', ('cancel',))
+
+def load_settings():
+    try:
+        with open(SETTINGS) as f:
+            s = json.load(f)
+        return s if isinstance(s, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+def save_settings(s):
+    tmp = SETTINGS + '.tmp'
+    try:
+        os.makedirs(os.path.dirname(SETTINGS), exist_ok=True)
+        with open(tmp, 'w') as f:
+            json.dump(s, f)
+        os.replace(tmp, SETTINGS)
+        return True
+    except OSError:
+        return False
+
+def fmt_timeout(s):
+    return 'never' if not s else '%d min' % (s // 60) if s >= 60 else '%d s' % s
 
 def unblank():
     """Switch the panel's display DMA back on. The kernel's text console
