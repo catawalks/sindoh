@@ -82,3 +82,14 @@ stored in `/app/crypto_key.dat` for the newer `3DWOX 1` models or decrypted from
 Decrypting crypto_key.dat for the `3DWOX 1` gives `sindoh024601779U` and for the `DP200` is `sindoh024601779`. Due to the older build and encryption used on the `DP200` based systems, current versions of OPENSSL cannot decrypt or encrypt the files for this machine. An older version such as 1.0.1c (version used on the embedded linux install itself) must be used for cryptography of these files. Finally, the `.she` file is
 expected to be a bzip2’ed tar archive that gets extracted to `/tmp`. See
 [`pack_firmware.sh`](pack_firmware.sh) for an example.
+
+## Klipper port (DP200)
+
+[`klipper_port/`](klipper_port/) runs [Klipper](https://www.klipper3d.org/) with Moonraker and
+Mainsail on a DP200's own hardware. The two UPC coprocessors of the 88PA6170 become the Klipper
+MCUs, and klippy, Moonraker and Mainsail run on the printer's Linux. It also includes a touch
+screen UI, the webcam, bed mesh with the built-in probe, filament load/unload, and a USB-stick
+installer for the internal NAND. Start with
+[`klipper_port/docs/INSTALL.md`](klipper_port/docs/INSTALL.md) (preview) and
+[`klipper_port/README.md`](klipper_port/README.md). The Klipper changes themselves are on the
+`sindoh-dp200` branch of [catawalks/klipper](https://github.com/catawalks/klipper/tree/sindoh-dp200).
