@@ -1,7 +1,7 @@
 From 06a36dcef629b2a5a66b36a9d7fa23d0ef34d0c3 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 20 Oct 2026 23:43:00 -0400
-Subject: [PATCH 3/3] config: Add Sindoh 3DWOX DP200 configuration
+Subject: [PATCH 3/4] config: Add Sindoh 3DWOX DP200 configuration
 
 Signed-off-by: catawalks <59056948+catawalks@users.noreply.github.com>
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
