@@ -90,6 +90,12 @@ echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null
 
 # WiFi: joining the owner's network was the stock app's job (see dp200-wifi.sh)
 sh $ROOT/dp200/dp200-wifi.sh $ROOT
+# network settings from the touch screen (DHCP/static per port, Ethernet hotplug)
+mkdir -p $ROOT/run/dp200
+if ! { [ -f /var/run/dp200-netd.pid ] && kill -0 $(cat /var/run/dp200-netd.pid) 2>/dev/null; }; then
+    sh $ROOT/dp200/dp200-netd.sh $ROOT </dev/null >> $ROOT/var/log/dp200-netd.log 2>&1 &
+    echo $! > /var/run/dp200-netd.pid
+fi
 # the touch screen (in the chroot) talks to wpa_supplicant's control socket
 mkdir -p $ROOT/run/wpa_supplicant
 grep -q " $ROOT/run/wpa_supplicant " /proc/mounts || \

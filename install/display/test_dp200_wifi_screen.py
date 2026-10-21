@@ -81,7 +81,8 @@ def shot(name):
         ui.render().save(os.path.join(png, 'wifi_%s.png' % name))
 
 tap('SYSTEM');                        check('home -> system', ui.screen == 'system')
-tap('WIFI');                          check('system -> wifi', ui.screen == 'wifi')
+tap('NETWORK');                       check('system -> network', ui.screen == 'network')
+tap('WIFI');                          check('network -> wifi', ui.screen == 'wifi')
 check('status shows HomeNet', ui.wf['status'].get('ssid') == b'HomeNet'); shot('status')
 tap('SCAN');                          check('scan -> list with 8 networks', ui.screen == 'wifi_list' and len(ui.wf['list']) == 8)
 shot('list')
@@ -140,10 +141,47 @@ tap('TIMEOUT'); tap('NEVER');         check('never saved', S.load_settings().get
 ui.last_touch = time.time() - 100000; check('never dims with NEVER', not ui.dimmed())
 ui.last_touch = time.time()
 tap('BACK'); tap('BACK')
+# SYSTEM -> NETWORK: port info, static IP via the keypad (real dp200_net, temp files)
+import dp200_net
+tmpd = tempfile.mkdtemp()
+dp200_net.CONF = os.path.join(tmpd, 'network.json')
+dp200_net.TRIGGER = os.path.join(tmpd, 'net-apply')
+dp200_net.info = lambda i: {'mac': 'aa:bb:cc:dd:ee:%02x' % len(i), 'link': i == 'mlan0', 'up': True,
+                            'ip': '10.0.0.5' if i == 'mlan0' else '', 'mask': '255.255.255.0',
+                            'gw': '10.0.0.1', 'mode': dp200_net.load().get(i, {}).get('mode', 'dhcp'),
+                            'present': True}
+dp200_net.dns = lambda: ['10.0.0.1']
+S.net = dp200_net
+ui.st = ST; ui.screen = 'home'; ui.confirm = None
+tap('SYSTEM'); tap('NETWORK')
+ui.net_tick(); time.sleep(0.3); render()
+check('network page shows both ports', set(ui.net['info']) == {'mlan0', 'eth0'}); shot('network')
+tap('ETHERNET IP');                   check('-> ethernet IP settings', ui.screen == 'ipcfg' and ui.net['iface'] == 'eth0')
+tap('STATIC');                        check('static mode selected', ui.net['draft']['mode'] == 'static')
+tap_action(lambda a: a == ('net_edit', 'ip'))
+check('IP field -> keypad', ui.screen == 'numpad')
+tap('CLEAR')
+for k in '10.0.0.300':
+    tap(k)
+tap('OK');                            check('invalid IP refused', ui.screen == 'numpad')
+tap('DEL'); tap('DEL'); tap('DEL'); tap('5'); tap('0')
+tap('OK');                            check('10.0.0.50 accepted', ui.net['draft']['ip'] == '10.0.0.50' and ui.screen == 'ipcfg')
+shot('ipcfg')
+tap_action(lambda a: a == ('net_edit', 'gw'))
+tap('BACK');                          check('keypad BACK = cancel', ui.screen == 'ipcfg')
+tap('SAVE & APPLY');                  check('apply asks to confirm', ui.confirm is not None)
+tap('YES')
+saved = open(dp200_net.CONF).read()
+check('saved compact static eth0', '"eth0":{"mode":"static","ip":"10.0.0.50"' in saved)
+check('apply trigger written', os.path.exists(dp200_net.TRIGGER))
+os.remove(dp200_net.TRIGGER)
+tap('ETHERNET IP'); tap('DHCP'); tap('SAVE & APPLY'); tap('YES')
+check('back to DHCP', '"eth0":{"mode":"dhcp"}' in open(dp200_net.CONF).read())
+tap('BACK'); tap('BACK');             check('BACK -> system -> home', ui.screen == 'home')
 # the fixed BACK button
 ui.st = ST; ui.screen = 'home'; ui.confirm = None
 render();                             check('home: no BACK', 'BACK' not in labels)
-tap('SYSTEM'); tap('WIFI'); tap('SCAN')
+tap('SYSTEM'); tap('NETWORK'); tap('WIFI'); tap('SCAN')
 render();                             check('list: BACK in the bottom bar', labels.get('BACK', (0, 0, 0, 0))[1] > 700)
 tap('BACK');                          check('list BACK -> wifi', ui.screen == 'wifi')
 tap('SCAN')
@@ -152,11 +190,12 @@ tap('BACK');                          check('keyboard BACK = cancel', ui.screen 
 tap_action(lambda a: a[0] == 'wifi_pick' and a[1]['ssid'] == b'CoffeeShop')
 n = len(calls)
 tap('BACK');                          check('dialog BACK = NO', ui.confirm is None and len(calls) == n)
-tap('BACK'); tap('BACK'); tap('BACK');check('BACK x3 -> home', ui.screen == 'home')
+tap('BACK'); tap('BACK'); tap('BACK'); tap('BACK')
+check('BACK x4 -> home', ui.screen == 'home')
 # without Klipper
 ui.st = None; ui.screen = 'home'
-render();                             check('waiting page has a WIFI button', 'WIFI' in labels)
-tap('WIFI');                          check('wifi page without Klipper', ui.screen == 'wifi'); shot('no_klipper')
+render();                             check('waiting page has a NETWORK button', 'NETWORK' in labels)
+tap('NETWORK');                       check('network page without Klipper', ui.screen == 'network'); shot('no_klipper')
 tap('BACK');                          check('BACK -> home (waiting page)', ui.screen == 'home')
 print('calls:', calls)
 print('FAILURES: %d' % fails)

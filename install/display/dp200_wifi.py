@@ -214,7 +214,29 @@ def scan(w, wait=8.0, fresh=True):
 def watchdog(w, state):
     """Call every few seconds. If the radio stays associated without an IP
     address for 60 s, force a re-association (seen after scans: the driver's
-    data path stalls until then). `state` is a dict kept by the caller."""
+    data path stalls until then). Every 10 min, if a saved network with a
+    higher priority than the current one is in range with a good signal,
+    switch to it (wpa_supplicant never leaves a working lower-priority
+    network by itself). `state` is a dict kept by the caller."""
+    st = status(w)
+    now = time.time()
+    if st.get('wpa_state') == 'COMPLETED' and now - state.get('pref_at', 0) > 600:
+        state['pref_at'] = now
+        saved = {n['ssid']: n['priority'] for n in load_saved()}
+        cur = saved.get(st.get('ssid'), -1)
+        visible = {n['ssid']: n['level'] for n in scan_results(w)}
+        better = [s for s, p in saved.items() if p > cur and visible.get(s, -999) > -70]
+        if better:
+            target = max(better, key=lambda s: saved[s])
+            for nid, s, flags in list_networks(w):
+                if s == target:
+                    w.ok('SELECT_NETWORK %d' % nid)
+                    for _ in range(20):
+                        time.sleep(1)
+                        if status(w).get('wpa_state') == 'COMPLETED':
+                            break
+                    w.ok('ENABLE_NETWORK all')     # back-up networks stay usable
+                    return 'switched to preferred network'
     st = status(w)
     if st.get('wpa_state') == 'COMPLETED' and not st.get('ip_address'):
         since = state.setdefault('no_ip_since', time.time())

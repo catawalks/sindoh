@@ -20,6 +20,10 @@ try:
     import dp200_wifi as wifi              # WiFi setup (install/display/dp200_wifi.py)
 except ImportError:
     wifi = None
+try:
+    import dp200_net as net                # port info / IP settings (install/display/dp200_net.py)
+except ImportError:
+    net = None
 
 PW, PH = 480, 800                     # portrait, as mounted
 FB_W, FB_H = 800, 480                 # fb0 geometry (two pages: 800x960 virtual)
@@ -222,6 +226,9 @@ class UI:
         self.last_touch = time.time()
         self.ip = my_ip()
         self.settings = load_settings()          # e.g. {'timeout': 600}
+        # network pages: port info (refreshed in the background), IP settings draft
+        self.net = {'rev': 0, 'info': {}, 'dns': [], 'checked': 0.0, 'busy': False,
+                    'iface': 'eth0', 'draft': {}, 'field': 'ip', 'text': ''}
         # WiFi setup state (pages wifi, wifi_list, wifi_kb)
         self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'list': [], 'page': 0,
                    'busy': None, 'checked': 0.0, 'target': b'', 'kb_for': 'psk',
@@ -232,10 +239,14 @@ class UI:
         kind = action[0]
         if kind == 'screen':
             self.screen = action[1]
-            if self.screen == 'wifi':
+            if self.screen in ('wifi', 'network'):
                 self.wifi_refresh()
+            if self.screen == 'network':
+                self.net['checked'] = 0
         elif kind.startswith('wifi') or kind.startswith('kb'):
             self.wifi_action(action)
+        elif kind.startswith('net') or kind.startswith('np'):
+            self.net_action(action)
         elif kind == 'set_timeout':
             self.settings['timeout'] = action[1]
             ok = save_settings(self.settings)
@@ -408,6 +419,165 @@ class UI:
                 wf['text'] = ''
                 self.run(('wifi_join', wf['target'], text))
         wf['rev'] += 1
+
+    # ---- network (both ports) ---------------------------------------------
+    FIELDS = (('ip', 'IP address'), ('mask', 'Netmask'), ('gw', 'Gateway'), ('dns', 'DNS server'))
+    PORT_NAME = {'mlan0': 'WiFi', 'eth0': 'Ethernet'}
+
+    def net_tick(self):
+        """Refresh the port info every 3 s while a network page is shown."""
+        n = self.net
+        if net is None or self.screen not in ('network', 'ipcfg') or n['busy'] \
+                or time.time() - n['checked'] < 3:
+            return
+        n['busy'], n['checked'] = True, time.time()
+
+        def work():
+            try:
+                n['info'] = {i: net.info(i) for i, _ in net.PORTS}
+                n['dns'] = net.dns()
+                self.ip = my_ip()
+            except Exception as e:
+                self.flash('Network: %s' % e)
+            finally:
+                n['busy'] = False
+                n['rev'] += 1
+        threading.Thread(target=work, daemon=True).start()
+
+    def net_action(self, action):
+        n, kind = self.net, action[0]
+        if kind == 'net_cfg':                          # open the IP settings of a port
+            iface = action[1]
+            saved = net.load().get(iface, {}) if net else {}
+            cur = n['info'].get(iface, {})
+            n['iface'] = iface
+            # draft: saved static values, else the current (DHCP) ones as a starting point
+            n['draft'] = {'mode': saved.get('mode', 'dhcp'),
+                          'ip': saved.get('ip', cur.get('ip', '')),
+                          'mask': saved.get('mask', cur.get('mask', '') or '255.255.255.0'),
+                          'gw': saved.get('gw', cur.get('gw', '')),
+                          'dns': saved.get('dns', (n['dns'] or [''])[0])}
+            self.screen = 'ipcfg'
+        elif kind == 'net_mode':
+            n['draft']['mode'] = action[1]
+        elif kind == 'net_edit':
+            n['field'] = action[1]
+            n['text'] = n['draft'].get(action[1], '')
+            self.screen = 'numpad'
+        elif kind == 'np':
+            if len(n['text']) < 15:
+                n['text'] += action[1]
+        elif kind == 'np_bs':
+            n['text'] = n['text'][:-1]
+        elif kind == 'np_clear':
+            n['text'] = ''
+        elif kind == 'np_ok':
+            t = n['text']
+            ok = net.valid_mask(t) if n['field'] == 'mask' else net.valid_ip(t)
+            if t and not ok:
+                self.flash('Not a valid %s' % dict(self.FIELDS)[n['field']].lower())
+                return
+            n['draft'][n['field']] = t
+            self.screen = 'ipcfg'
+        elif kind == 'np_cancel':
+            self.screen = 'ipcfg'
+        elif kind == 'net_save':
+            d = n['draft']
+            if d['mode'] == 'static':
+                err = net.check_static(d)
+                if err:
+                    self.flash(err)
+                    return
+            name = self.PORT_NAME[n['iface']]
+            what = 'DHCP' if d['mode'] == 'dhcp' else 'static %s' % d['ip']
+            self.confirm = ('Apply %s for %s? The connection can drop for a moment.' % (what, name),
+                            ('net_apply',))
+        elif kind == 'net_apply':
+            d = dict(n['draft'])
+            conf = net.load()
+            conf[n['iface']] = d if d['mode'] == 'static' else {'mode': 'dhcp'}
+            try:
+                net.save(conf)
+                self.flash('%s: settings applied' % self.PORT_NAME[n['iface']])
+            except OSError as e:
+                self.flash('Not saved: %s' % e)
+            n['checked'] = 0                           # refresh soon
+            self.screen = 'network'
+        n['rev'] += 1
+
+    def page_network(self, d, st):
+        n = self.net
+        d.text((20, 160), 'Network', font=font(28), fill=C_TXT)
+        if not n['info']:
+            self.net_tick()
+            d.text((20, 204), 'Reading...', font=font(20), fill=C_DIM)
+        y = 200
+        for iface, name in (net.PORTS if net else ()):
+            i = n['info'].get(iface)
+            if not i:
+                continue
+            if iface == 'mlan0':
+                ssid = self.wf['status'].get('ssid', b'').decode('utf-8', 'replace') \
+                    if self.wf['status'].get('wpa_state') == 'COMPLETED' else ''
+                state = ('on %s' % ssid) if ssid else 'not connected'
+            else:
+                state = 'cable connected' if i['link'] else 'no cable'
+            d.text((20, y), '%s: %s' % (name, state), font=font(22), fill=C_TXT)
+            rows = [('IP', ('%s / %s' % (i['ip'], i['mask'])) if i['ip'] else '-'),
+                    ('Gateway', i['gw'] or '-'),
+                    ('MAC', i['mac'].upper() or '-'),
+                    ('Mode', 'static' if i['mode'] == 'static' else 'DHCP (automatic)')]
+            for k, (lbl, val) in enumerate(rows):
+                d.text((36, y + 30 + k * 24), lbl, font=font(17), fill=C_DIM)
+                d.text((140, y + 30 + k * 24), val, font=font(17), fill=C_TXT)
+            y += 30 + len(rows) * 24 + 14
+        if n['dns']:
+            d.text((20, y), 'DNS: %s' % ', '.join(n['dns'][:2]), font=font(17), fill=C_DIM)
+        self.grid(d, [('WIFI', ('screen', 'wifi'), C_BTN, 28, 'networks'),
+                      ('WIFI IP', ('net_cfg', 'mlan0'), C_BTN, 24, 'DHCP / static'),
+                      ('ETHERNET IP', ('net_cfg', 'eth0'), C_BTN, 22, 'DHCP / static')],
+                  top=508, rows_h=80)
+
+    def page_ipcfg(self, d, st):
+        n = self.net
+        dr = n['draft']
+        d.text((20, 160), '%s IP settings' % self.PORT_NAME[n['iface']], font=font(26), fill=C_TXT)
+        static = dr.get('mode') == 'static'
+        self.grid(d, [('DHCP', ('net_mode', 'dhcp'), C_ON if not static else C_BTN, 26, 'automatic'),
+                      ('STATIC', ('net_mode', 'static'), C_ON if static else C_BTN, 26, 'fixed address')],
+                  top=200, rows_h=80)
+        y = 300
+        if static:
+            for key, label in self.FIELDS:
+                box = (20, y, PW - 20, y + 54)
+                d.rounded_rectangle(box, radius=10,
+                                    fill=tuple(c + 45 for c in C_BTN) if self.pressed(box) else C_BTN)
+                d.text((34, y + 6), label, font=font(15), fill=C_DIM)
+                d.text((34, y + 24), dr.get(key) or ('(optional)' if key in ('gw', 'dns') else '(tap to set)'),
+                       font=font(22), fill=C_TXT if dr.get(key) else C_DIM)
+                self.buttons.append((box, ('net_edit', key)))
+                y += 62
+        else:
+            d.text((20, y), 'The router assigns the address.', font=font(20), fill=C_DIM)
+            y += 40
+        self.button(d, (20, 552, PW - 20, 620), 'SAVE & APPLY', ('net_save',), C_ON, 26)
+
+    def page_numpad(self, d, st):
+        n = self.net
+        d.text((20, 158), '%s - %s' % (self.PORT_NAME[n['iface']], dict(self.FIELDS)[n['field']]),
+               font=font(22), fill=C_TXT)
+        d.rounded_rectangle((20, 192, PW - 20, 248), radius=10, fill=(12, 12, 16), outline=(90, 90, 100), width=2)
+        d.text((34, 202), n['text'] + '|', font=font(30), fill=C_TXT)
+        keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'DEL']
+        w, h, gap = (PW - 40 - 2 * 10) // 3, 66, 8
+        for i, k in enumerate(keys):
+            x = 20 + (i % 3) * (w + 10)
+            y = 258 + (i // 3) * (h + gap)
+            act = ('np_bs',) if k == 'DEL' else ('np', k)
+            self.button(d, (x, y, x + w, y + h), k, act, C_BAR if k == 'DEL' else C_BTN, 30)
+        y = 258 + 4 * (h + gap)
+        self.button(d, (20, y, 170, y + 60), 'CLEAR', ('np_clear',), C_BAR, 22)
+        self.button(d, (180, y, PW - 20, y + 60), 'OK', ('np_ok',), C_ON, 28)
 
     def kb_start(self, ssid, kb_for, hidden=False):
         self.wf.update(target=ssid, kb_for=kb_for, text='', mode='abc', shift=False,
@@ -606,8 +776,8 @@ class UI:
         st = self.st
         if self.dimmed():
             return Image.new('RGB', (PW, PH), (0, 0, 0))
-        if self.screen.startswith('wifi'):
-            # WiFi setup works with or without Klipper/Moonraker
+        if self.screen in self.NO_KLIPPER:
+            # network/WiFi setup works with or without Klipper/Moonraker
             if st is not None:
                 self.header(d, st)
             else:
@@ -623,7 +793,7 @@ class UI:
             if self.err:
                 for i, l in enumerate(wrap(d, self.err, font(20), PW - 60)[:4]):
                     d.text((30, 390 + i * 28), l, font=font(20), fill=C_DIM)
-            self.button(d, (30, 520, 250, 610), 'WIFI', ('screen', 'wifi'), C_BTN, 30, 'setup')
+            self.button(d, (30, 520, 250, 610), 'NETWORK', ('screen', 'network'), C_BTN, 28, 'WiFi / IP')
             self.footer(d)
             return im
         self.header(d, st)
@@ -664,20 +834,25 @@ class UI:
 
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'system': 'home',
-              'wifi': 'system', 'wifi_list': 'wifi', 'display': 'system', 'timeout': 'display'}
+              'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
+              'display': 'system', 'timeout': 'display'}
+    # pages that also work without Klipper (to fix the network from the waiting/error page)
+    NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_kb')
 
     def back_action(self):
         if self.confirm:
             return ('cancel',)                         # BACK = NO in a dialog
         if self.screen == 'wifi_kb':
             return ('kb_cancel',)
+        if self.screen == 'numpad':
+            return ('np_cancel',)
         ready = self.st is not None and self.st['webhooks']['state'] == 'ready'
         if not ready:
-            # only the WiFi pages work without Klipper; their top goes back to
-            # the waiting/error page (screen "home")
-            if self.screen == 'wifi':
+            # only the network pages work without Klipper; their top goes back
+            # to the waiting/error page (screen "home")
+            if self.screen == 'network':
                 return ('screen', 'home')
-            if not self.screen.startswith('wifi'):
+            if self.screen not in self.NO_KLIPPER:
                 return None
         parent = self.PARENT.get(self.screen)
         return ('screen', parent) if parent else None
@@ -811,7 +986,7 @@ class UI:
                           ('post', '/printer/firmware_restart', 'Firmware restart')), C_BTN, 28, 'restart'),
             ('KLIPPER', ('confirm', 'Restart Klipper host?', ('post', '/printer/restart', 'Restart')),
              C_BTN, 28, 'restart'),
-            ('WIFI', ('screen', 'wifi'), C_BTN, 30, 'network'),
+            ('NETWORK', ('screen', 'network'), C_BTN, 28, 'WiFi / Ethernet'),
             ('DISPLAY', ('screen', 'display'), C_BTN, 28, 'screen'),
         ], top=270)
 
@@ -840,7 +1015,7 @@ class UI:
         self.grid(d, [
             ('FIRMWARE', ('post', '/printer/firmware_restart', 'Firmware restart'), C_BTN, 28, 'restart'),
             ('KLIPPER', ('post', '/printer/restart', 'Restart'), C_BTN, 28, 'restart'),
-            ('WIFI', ('screen', 'wifi'), C_BTN, 30, 'setup'),
+            ('NETWORK', ('screen', 'network'), C_BTN, 28, 'WiFi / IP'),
         ], top=500, rows_h=80)
 
     def overlay_confirm(self, d):
@@ -911,6 +1086,17 @@ def main():
         ui.st = query()
         if len(sys.argv) > sys.argv.index('--demo') + 2:
             ui.screen = sys.argv[sys.argv.index('--demo') + 2]
+        if net is not None:                            # network pages: read the ports first
+            ui.net['info'] = {i: net.info(i) for i, _ in net.PORTS}
+            ui.net['dns'] = net.dns()
+            ui.net['checked'] = time.time()
+        if wifi is not None:
+            try:
+                w = wifi.WpaCtrl()
+                ui.wf['status'] = wifi.status(w)
+                w.close()
+            except Exception:
+                pass
         ui.render().save(out)
         return
     panel, touch = Panel(), Touch()
@@ -944,12 +1130,13 @@ def main():
             ui.on_touch(ev)
         ui.check_hold()
         ui.wifi_tick()
+        ui.net_tick()
         # Redraw only when something can have changed: new status, touch,
         # STOP being held, the clock minute, a message or busy state, dimming,
         # WiFi state (scan results, connect progress).
         key = (time.strftime('%H:%M'), ui.busy, ui.msg and time.time() < ui.msg[1],
                bool(ui.dimmed()), ui.screen, ui.confirm is not None, view_key(ui), ui.err,
-               ui.wf['rev'])
+               ui.wf['rev'], ui.net['rev'])
         if events or ui.press or key != last_key:
             panel.show(ui.render())
             last_key = key
