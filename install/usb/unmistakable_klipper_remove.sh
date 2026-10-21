@@ -41,7 +41,7 @@ fi
 
 for r in /klipper /mnt/sd; do
     [ -x $r/dp200/dp200-start.sh ] && $r/dp200/dp200-start.sh stop
-    for m in home/klipper/printer_data/logs var/log tmp run dev/shm dev/pts dev sys proc; do
+    for m in home/klipper/printer_data/logs var/log tmp run/wpa_supplicant run dev/shm dev/pts dev sys proc; do
         grep -q " $r/$m " /proc/mounts && umount $r/$m
     done
 done

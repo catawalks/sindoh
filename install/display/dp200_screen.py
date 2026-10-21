@@ -15,6 +15,11 @@ right on every screen) is an emergency stop: hold it for 1 second.
 """
 import json, os, select, socket, struct, sys, threading, time, urllib.parse, urllib.request
 from PIL import Image, ImageChops, ImageDraw, ImageFont
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import dp200_wifi as wifi              # WiFi setup (install/display/dp200_wifi.py)
+except ImportError:
+    wifi = None
 
 PW, PH = 480, 800                     # portrait, as mounted
 FB_W, FB_H = 800, 480                 # fb0 geometry (two pages: 800x960 virtual)
@@ -213,12 +218,20 @@ class UI:
         self.press = None              # (u, v, t0)
         self.last_touch = time.time()
         self.ip = my_ip()
+        # WiFi setup state (pages wifi, wifi_list, wifi_kb)
+        self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'list': [], 'page': 0,
+                   'busy': None, 'checked': 0.0, 'target': b'', 'kb_for': 'psk',
+                   'text': '', 'mode': 'abc', 'shift': False, 'show': False, 'hidden': False}
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
         kind = action[0]
         if kind == 'screen':
             self.screen = action[1]
+            if self.screen == 'wifi':
+                self.wifi_refresh()
+        elif kind.startswith('wifi') or kind.startswith('kb'):
+            self.wifi_action(action)
         elif kind == 'confirm':
             self.confirm = (action[1], action[2])
         elif kind == 'cancel':
@@ -253,6 +266,227 @@ class UI:
             self.flash('EMERGENCY STOP sent')
         except Exception as e:
             self.flash('E-stop failed: %s' % e)
+
+    # ---- WiFi ------------------------------------------------------------
+    def wifi_bg(self, label, fn):
+        """Run a WiFi operation in a worker thread (wpa_supplicant calls block)."""
+        wf = self.wf
+        if wf['busy'] or wifi is None:
+            if wifi is None:
+                self.flash('WiFi support not installed')
+            return
+        wf['busy'] = label
+        wf['rev'] += 1
+
+        def work():
+            w = None
+            try:
+                w = wifi.WpaCtrl()
+                fn(w)
+            except Exception as e:
+                self.flash('WiFi: %s' % e)
+            finally:
+                if w is not None:
+                    w.close()
+                wf['busy'] = None
+                wf['rev'] += 1
+        threading.Thread(target=work, daemon=True).start()
+
+    def wifi_refresh(self):
+        def fn(w):
+            self.wf['status'] = wifi.status(w)
+            self.wf['saved'] = len(wifi.load_saved())
+            self.ip = my_ip()
+        self.wf['checked'] = time.time()
+        self.wifi_bg(None, fn)
+
+    def wifi_tick(self):
+        """Keep the WiFi page's status current while it is shown."""
+        if self.screen == 'wifi' and not self.wf['busy'] and time.time() - self.wf['checked'] > 4:
+            self.wifi_refresh()
+
+    def wifi_action(self, action):
+        wf, kind = self.wf, action[0]
+        if kind == 'wifi_scan':
+            self.screen = 'wifi_list'
+            wf['page'] = 0
+
+            def fn(w):
+                wf['list'] = wifi.scan(w)
+            self.wifi_bg('Scanning...', fn)
+        elif kind == 'wifi_more':
+            wf['page'] += 1
+        elif kind == 'wifi_pick':
+            n = action[1]
+            if n['secured']:
+                self.kb_start(n['ssid'], 'psk')
+            else:
+                self.confirm = ('Join the OPEN network %s? (no password, anyone can listen in)'
+                                % n['ssid'].decode('utf-8', 'replace'), ('wifi_join', n['ssid'], None))
+        elif kind == 'wifi_hidden':
+            self.kb_start(b'', 'ssid')
+        elif kind == 'wifi_join':
+            ssid, psk = action[1], action[2]
+            self.screen = 'wifi'
+            name = ssid.decode('utf-8', 'replace')
+
+            def fn(w):
+                ok, msg = wifi.connect(w, ssid, psk)
+                wf['status'] = wifi.status(w)
+                wf['saved'] = len(wifi.load_saved())
+                self.flash(('%s: %s' % (name, msg))[:40], 10)
+            self.wifi_bg('Connecting to %s...' % name, fn)
+        elif kind == 'wifi_forget':
+            ssid = action[1]
+
+            def fn(w):
+                wifi.forget(w, ssid)
+                wf['status'] = wifi.status(w)
+                wf['saved'] = len(wifi.load_saved())
+            self.wifi_bg('Forgetting...', fn)
+        elif kind == 'kb':
+            ch = action[1]
+            if len(wf['text']) < 63:
+                wf['text'] += ch.upper() if wf['shift'] and wf['mode'] == 'abc' else ch
+            wf['shift'] = False
+        elif kind == 'kb_bs':
+            wf['text'] = wf['text'][:-1]
+        elif kind == 'kb_shift':
+            wf['shift'] = not wf['shift']
+        elif kind == 'kb_mode':
+            wf['mode'] = 'sym' if wf['mode'] == 'abc' else 'abc'
+        elif kind == 'kb_show':
+            wf['show'] = not wf['show']
+        elif kind == 'kb_cancel':
+            wf['text'] = ''
+            self.screen = 'wifi_list' if wf['kb_for'] == 'psk' and wf['list'] else 'wifi'
+        elif kind == 'kb_ok':
+            text = wf['text']
+            if wf['kb_for'] == 'ssid':
+                if not text or len(text.encode()) > 32:
+                    self.flash('Network name: 1-32 characters')
+                    return
+                self.kb_start(text.encode(), 'psk', hidden=True)
+            else:
+                if not text and wf['hidden']:
+                    self.run(('wifi_join', wf['target'], None))    # open hidden network
+                    return
+                if not 8 <= len(text) <= 63:
+                    self.flash('Password must be 8-63 characters')
+                    return
+                wf['text'] = ''
+                self.run(('wifi_join', wf['target'], text))
+        wf['rev'] += 1
+
+    def kb_start(self, ssid, kb_for, hidden=False):
+        self.wf.update(target=ssid, kb_for=kb_for, text='', mode='abc', shift=False,
+                       show=(kb_for == 'ssid'), hidden=hidden)
+        self.screen = 'wifi_kb'
+
+    def page_wifi(self, d, st):
+        wf = self.wf
+        s = wf['status']
+        d.text((20, 160), 'WiFi', font=font(28), fill=C_TXT)
+        name = s.get('ssid', b'').decode('utf-8', 'replace') if s.get('wpa_state') == 'COMPLETED' else ''
+        state = {'COMPLETED': 'connected', 'SCANNING': 'searching', 'DISCONNECTED': 'not connected',
+                 'INACTIVE': 'idle', 'INTERFACE_DISABLED': 'radio off'}.get(
+                     s.get('wpa_state', ''), 'connecting' if s.get('wpa_state') else '...')
+        lines = [('Network', name or 'not connected'),
+                 ('Address', 'http://%s/' % self.ip if self.ip != '?' else '-'),
+                 ('State', state),
+                 ('Saved', '%d network%s' % (wf['saved'], '' if wf['saved'] == 1 else 's'))]
+        for i, (k, v) in enumerate(lines):
+            d.text((20, 204 + i * 32), k, font=font(20), fill=C_DIM)
+            d.text((150, 204 + i * 32), v[:24], font=font(20), fill=C_TXT)
+        if wf['busy']:
+            d.text((20, 340), wf['busy'], font=font(22), fill=C_WARN)
+        items = [('SCAN', ('wifi_scan',), C_BTN, 30, 'choose network'),
+                 ('HIDDEN', ('wifi_hidden',), C_BTN, 26, 'type a name')]
+        if name:
+            items.append(('FORGET', ('confirm', 'Forget %s? The printer will leave this network.' % name,
+                                     ('wifi_forget', s['ssid'])), C_RED, 28, name[:14]))
+        items.append(('BACK', ('screen', 'system' if self.st else 'home')))
+        self.grid(d, items, top=380, rows_h=100)
+
+    def page_wifi_list(self, d, st):
+        wf = self.wf
+        d.text((20, 160), 'Choose a network', font=font(26), fill=C_TXT)
+        nets, per = wf['list'], 5
+        if wf['busy']:
+            d.text((20, 200), wf['busy'], font=font(20), fill=C_WARN)
+        elif not nets:
+            d.text((20, 200), 'No networks found', font=font(20), fill=C_DIM)
+        page = wf['page'] if wf['page'] * per < len(nets) else 0
+        for i, n in enumerate(nets[page * per:(page + 1) * per]):
+            y = 232 + i * 70
+            box = (20, y, PW - 20, y + 62)
+            d.rounded_rectangle(box, radius=12, fill=C_BTN)
+            label = n['ssid'].decode('utf-8', 'replace')
+            f = font(24)
+            while d.textlength(label, font=f) > PW - 170 and len(label) > 4:
+                label = label[:-2] + '…'
+            d.text((36, y + 16), label, font=f, fill=C_TXT)
+            b = wifi.bars(n['level']) if wifi else 0
+            for k in range(4):                         # signal bars
+                x = PW - 120 + k * 12
+                h = 8 + k * 8
+                d.rectangle((x, y + 46 - h, x + 8, y + 46), fill=C_TXT if k < b else (80, 80, 92))
+            d.text((PW - 64, y + 18), 'lock' if n['secured'] else 'open', font=font(16),
+                   fill=C_DIM if n['secured'] else C_WARN)
+            self.buttons.append((box, ('wifi_pick', n)))
+        more = len(nets) > (page + 1) * per
+        self.grid(d, [('MORE' if more else None, ('wifi_more',)) if more else None,
+                      ('RESCAN', ('wifi_scan',)),
+                      ('BACK', ('screen', 'wifi'))], top=590, rows_h=74, cols=3)
+
+    KB_ROWS = {
+        'abc': ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm.-_'],
+        'sym': ['1234567890', '!@#$%^&*()', '-_=+[]{}\\|', ';:\'",.<>/?'],
+    }
+
+    def page_wifi_kb(self, d, st):
+        wf = self.wf
+        if wf['kb_for'] == 'ssid':
+            title = 'Network name (hidden network)'
+        else:
+            title = 'Password for %s' % wf['target'].decode('utf-8', 'replace')
+        d.text((12, 158), title[:34], font=font(22), fill=C_TXT)
+        # text field
+        d.rounded_rectangle((8, 190, PW - 8, 244), radius=10, fill=(12, 12, 16), outline=(90, 90, 100), width=2)
+        shown = wf['text'] if wf['show'] else '•' * len(wf['text'])
+        f = font(28)
+        while d.textlength(shown + '|', font=f) > PW - 40 and shown:
+            shown = shown[1:]                          # show the end of a long entry
+        d.text((20, 200), shown + '|', font=f, fill=C_TXT)
+        if not wf['text'] and wf['kb_for'] == 'psk' and wf['hidden']:
+            d.text((44, 208), 'empty = open network', font=font(18), fill=C_DIM)
+        # keys
+        kw, gap, top = 43, 4, 254
+        for r, row in enumerate(self.KB_ROWS[wf['mode']]):
+            x0 = 6 + (len(row) < 10) * (kw + gap) // 2
+            y = top + r * 62
+            for i, ch in enumerate(row):
+                label = ch.upper() if wf['shift'] and wf['mode'] == 'abc' else ch
+                x = x0 + i * (kw + gap)
+                self.button(d, (x, y, x + kw, y + 56), label, ('kb', ch), C_BTN, 26)
+        y = top + 4 * 62
+        u = kw + gap                                   # bottom row in key units
+        if wf['mode'] == 'abc':
+            self.button(d, (6, y, 6 + 2 * u - gap, y + 56), '?123', ('kb_mode',), C_BAR, 22)
+            self.button(d, (6 + 2 * u, y, 6 + 4 * u - gap, y + 56), 'SHIFT', ('kb_shift',),
+                        C_ON if wf['shift'] else C_BAR, 20)
+        else:
+            self.button(d, (6, y, 6 + 2 * u - gap, y + 56), 'ABC', ('kb_mode',), C_BAR, 22)
+            self.button(d, (6 + 2 * u, y, 6 + 3 * u - gap, y + 56), '`', ('kb', '`'), C_BTN, 26)
+            self.button(d, (6 + 3 * u, y, 6 + 4 * u - gap, y + 56), '~', ('kb', '~'), C_BTN, 26)
+        self.button(d, (6 + 4 * u, y, 6 + 8 * u - gap, y + 56), 'space', ('kb', ' '), C_BTN, 20)
+        self.button(d, (6 + 8 * u, y, PW - 6, y + 56), 'DEL', ('kb_bs',), C_BAR, 20)
+        # actions
+        y += 66
+        ok = 'NEXT' if wf['kb_for'] == 'ssid' else 'CONNECT'
+        self.button(d, (6, y, 156, y + 58), 'CANCEL', ('kb_cancel',), C_BAR, 24)
+        self.button(d, (164, y, 316, y + 58), 'HIDE' if wf['show'] else 'SHOW', ('kb_show',), C_BAR, 24)
+        self.button(d, (324, y, PW - 6, y + 58), ok, ('kb_ok',), C_ON, 24)
 
     # ---- touch -----------------------------------------------------------
     def hit(self, u, v):
@@ -312,15 +546,28 @@ class UI:
         d = ImageDraw.Draw(im)
         self.buttons = []
         st = self.st
+        if self.dimmed():
+            return Image.new('RGB', (PW, PH), (0, 0, 0))
+        if self.screen.startswith('wifi'):
+            # WiFi setup works with or without Klipper/Moonraker
+            if st is not None:
+                self.header(d, st)
+            else:
+                d.rectangle((0, 0, PW, 64), fill=C_BAR)
+                d.text((20, 14), 'Sindoh DP200', font=font(30), fill=C_TXT)
+            getattr(self, 'page_' + self.screen)(d, st)
+            if self.confirm:
+                self.overlay_confirm(d)
+            self.footer(d)
+            return im
         if st is None:
             d.text((30, 330), 'Waiting for Klipper...', font=font(32), fill=C_TXT)
             if self.err:
                 for i, l in enumerate(wrap(d, self.err, font(20), PW - 60)[:4]):
                     d.text((30, 390 + i * 28), l, font=font(20), fill=C_DIM)
+            self.button(d, (30, 520, 250, 610), 'WIFI', ('screen', 'wifi'), C_BTN, 30, 'setup')
             self.footer(d)
             return im
-        if self.dimmed():
-            return Image.new('RGB', (PW, PH), (0, 0, 0))
         self.header(d, st)
         state = st['webhooks']['state']
         if state != 'ready':
@@ -473,6 +720,7 @@ class UI:
                           ('post', '/printer/firmware_restart', 'Firmware restart')), C_BTN, 28, 'restart'),
             ('KLIPPER', ('confirm', 'Restart Klipper host?', ('post', '/printer/restart', 'Restart')),
              C_BTN, 28, 'restart'),
+            ('WIFI', ('screen', 'wifi'), C_BTN, 30, 'network'),
             ('BACK', ('screen', 'home')),
         ], top=270)
 
@@ -485,7 +733,8 @@ class UI:
         self.grid(d, [
             ('FIRMWARE', ('post', '/printer/firmware_restart', 'Firmware restart'), C_BTN, 28, 'restart'),
             ('KLIPPER', ('post', '/printer/restart', 'Restart'), C_BTN, 28, 'restart'),
-        ], top=500, rows_h=100)
+            ('WIFI', ('screen', 'wifi'), C_BTN, 30, 'setup'),
+        ], top=500, rows_h=80)
 
     def overlay_confirm(self, d):
         q, action = self.confirm
@@ -548,10 +797,13 @@ def main():
                 continue
             ui.on_touch(ev)
         ui.check_hold()
+        ui.wifi_tick()
         # Redraw only when something can have changed: new status, touch,
-        # STOP being held, the clock minute, a message or busy state, dimming.
+        # STOP being held, the clock minute, a message or busy state, dimming,
+        # WiFi state (scan results, connect progress).
         key = (time.strftime('%H:%M'), ui.busy, ui.msg and time.time() < ui.msg[1],
-               bool(ui.dimmed()), ui.screen, ui.confirm is not None, view_key(ui), ui.err)
+               bool(ui.dimmed()), ui.screen, ui.confirm is not None, view_key(ui), ui.err,
+               ui.wf['rev'])
         if events or ui.press or key != last_key:
             panel.show(ui.render())
             last_key = key

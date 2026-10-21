@@ -90,6 +90,20 @@ PRINT_START BED=[first_layer_bed_temperature] EXTRUDER=[first_layer_temperature]
 PRINT_END
 ```
 
+## WiFi
+
+If the printer was already on your WiFi with the Sindoh firmware, it stays
+connected: the installer takes over the saved (password-protected) networks.
+
+To join a different network, on the touch screen:
+1. Tap **SYSTEM → WIFI → SCAN**.
+2. Pick your network.
+3. Type the password on the on-screen keyboard and tap **CONNECT**.
+
+The screen shows the new address for Mainsail. For a network that doesn't
+broadcast its name, use **HIDDEN**. If the printer can't reach Klipper, the
+"Waiting for Klipper" screen also has a WIFI button.
+
 ## Everyday use
 
 - **Touch screen:** after 10 minutes idle the screen goes dark; tap once to

@@ -49,7 +49,7 @@ dp200_mount_root() {
 }
 
 dp200_umount_root() {
-    for m in tmp run dev/shm dev/pts dev sys proc; do
+    for m in tmp run/wpa_supplicant run dev/shm dev/pts dev sys proc; do
         grep -q " $ROOT/$m " /proc/mounts && umount $ROOT/$m
     done
     return 0

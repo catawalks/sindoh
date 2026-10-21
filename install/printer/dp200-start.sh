@@ -82,4 +82,11 @@ killall mjpg_streamer 2>/dev/null
 # upc.ko is loaded by the stock /app/module_load.sh
 grep -q '^upc ' /proc/modules || insmod /app/upc.ko
 
+# WiFi: joining the owner's network was the stock app's job (see dp200-wifi.sh)
+sh $ROOT/dp200/dp200-wifi.sh $ROOT
+# the touch screen (in the chroot) talks to wpa_supplicant's control socket
+mkdir -p $ROOT/run/wpa_supplicant
+grep -q " $ROOT/run/wpa_supplicant " /proc/mounts || \
+    mount --bind /var/run/wpa_supplicant $ROOT/run/wpa_supplicant
+
 in_root /etc/dp200/rc.dp200 start

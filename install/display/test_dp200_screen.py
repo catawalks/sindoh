@@ -93,7 +93,13 @@ tap('STOP');              check('short STOP tap ignored', all(p != '/printer/eme
 box = find('STOP'); u, v = (box[0] + box[2]) // 2, (box[1] + box[3]) // 2
 t0 = time.time()
 while time.time() - t0 < 1.3:
-    touch.frame(u, v); step(); time.sleep(0.1)
+    # like the real panel: frames every 50 ms (a gap > 0.3 s counts as lifted),
+    # input handled each frame, a full redraw only now and then
+    touch.frame(u, v)
+    for ev in touch.poll():
+        ui.on_touch(ev)
+    ui.check_hold()
+    time.sleep(0.05)
 touch.lift(); step()
 check('STOP held 1 s -> emergency_stop', ('/printer/emergency_stop', None) in sent)
 # dim + wake: first tap only wakes
