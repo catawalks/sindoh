@@ -44,9 +44,13 @@ SETTINGS = '/etc/dp200/screen_settings.json'   # saved touch-screen settings
 HOLD_STOP = 1.0                       # s to hold STOP
 
 # Front power button: GPIO bank 5 pin 27, 1 = pressed (found 2026-10-22).
-# A short press opens the POWER page; holding it LONG_POWER s makes the
-# stock-side dp200-powerkey.sh shut down (this app only shows a countdown).
+# A short press opens the POWER page. Holding it ~HW_CUT s makes the
+# power-management MCU cut the power (hardware, no clean shutdown); this app
+# only warns. dp200-powerkey.sh syncs the cards on every press and shuts down
+# cleanly after LONG_POWER s if the hardware didn't (other SW1-4 settings).
 KEY_REG, KEY_BIT = 0xF8045000, 1 << 27
+HW_CUT = 2.0                          # measured roughly: "2 s hold" switched it off
+HOLD_WARN = 0.4                       # s held before the warning appears
 LONG_POWER = 5.0
 POWER_REQ = '/run/dp200/power'        # "reboot" / "poweroff" for dp200-powerkey.sh
 
@@ -832,7 +836,7 @@ class UI:
         if self.screen.startswith('powering'):
             self.page_powering(d)
             return im
-        if self.key_down is not None and time.time() - self.key_down >= 1.0:
+        if self.key_down is not None and time.time() - self.key_down >= HOLD_WARN:
             self.page_key_held(d)
             return im
         if self.dimmed():
@@ -1075,7 +1079,9 @@ class UI:
         warn = ' The running print will be lost.' if printing else ''
         if printing:
             d.text((20, y), 'A print is running!', font=font(22), fill=C_WARN)
-        d.text((20, y + 30), 'Hold the button %d s to force power-off' % LONG_POWER,
+        d.text((20, y + 30), 'Holding the button ~%d s cuts the power at once.' % HW_CUT,
+               font=font(18), fill=C_DIM)
+        d.text((20, y + 54), 'SHUT DOWN here stops everything cleanly first.',
                font=font(18), fill=C_DIM)
         items = [
             ('SHUT DOWN', ('confirm', 'Shut down the printer?' + warn, ('power', 'poweroff')),
@@ -1087,17 +1093,18 @@ class UI:
             items.append(('KLIPPER', ('confirm', 'Restart Klipper host?' + warn,
                                       ('post', '/printer/restart', 'Restart')), C_BTN, 28, 'restart'))
         items.append(('SCREEN OFF', ('screen_off',), C_BTN, 26, 'tap to wake'))
-        self.grid(d, items, top=y + 80)
+        self.grid(d, items, top=y + 100)
 
     def page_key_held(self, d):
-        """Power button held: countdown to the forced shutdown."""
-        left = LONG_POWER - (time.time() - self.key_down)
+        """Power button held: the hardware is about to cut the power."""
+        held = time.time() - self.key_down
         d.rectangle((0, 0, PW, PH), fill=(60, 16, 16))
-        d.text((30, 260), 'Power button held', font=font(34), fill=C_TXT)
-        if left > 0:
-            d.text((30, 320), 'Shutting down in %d s' % (int(left) + 1), font=font(30), fill=C_WARN)
-            d.text((30, 370), 'Release to cancel', font=font(22), fill=C_DIM)
-            frac = 1 - left / LONG_POWER
+        d.text((30, 240), 'Power button held', font=font(34), fill=C_TXT)
+        if held < LONG_POWER:
+            d.text((30, 300), 'Keep holding: power OFF', font=font(30), fill=C_WARN)
+            d.text((30, 345), '(cut at once, no clean shutdown)', font=font(20), fill=C_DIM)
+            d.text((30, 380), 'Release now for the power menu', font=font(22), fill=C_TXT)
+            frac = min(held / HW_CUT, 1.0)
             d.rounded_rectangle((30, 430, PW - 30, 470), radius=8, outline=(200, 120, 120), width=2)
             d.rounded_rectangle((32, 432, 32 + int((PW - 64) * frac), 468), radius=7, fill=(240, 60, 60))
         else:

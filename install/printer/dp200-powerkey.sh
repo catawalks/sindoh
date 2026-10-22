@@ -4,9 +4,15 @@
 #
 # The button is GPIO bank 5 pin 27: 0xF8045000 bit 27, 1 = pressed (found
 # 2026-10-22; it also shows as dec_sensor +0x210 bit 9). Short presses are
-# the touch screen's job (it opens its POWER page). This loop handles:
-#   - holding the button LONG_S seconds: forced shutdown, works even when
-#     Klipper or the screen has hung;
+# the touch screen's job (it opens its POWER page).
+#
+# HARDWARE: holding the button ~2 s makes the power-management MCU cut the
+# power at once (seen 2026-10-22), whatever Linux does. So on every press
+# this loop syncs the filesystems straight away (a hold may follow). This
+# loop handles:
+#   - sync as soon as the button goes down;
+#   - holding the button LONG_S seconds: forced shutdown, for boards where
+#     the MCU does not cut the power (normally the hardware is faster);
 #   - <root>/run/dp200/power containing "reboot" or "poweroff", written by the
 #     screen's POWER page (the chroot can't shut the stock system down).
 #
@@ -55,8 +61,10 @@ while true; do
         esac
     fi
     if pressed; then
+        # the hardware may cut the power in ~2 s: flush the cards now
+        [ $held -eq 0 ] && sync
         held=$((held + 1))
-        if [ $held -ge $((LONG_S * 2)) ]; then
+        if [ $held -ge $((LONG_S * 5)) ]; then
             echo "dp200-powerkey: button held ${LONG_S} s"
             shutdown_now poweroff
             exit 0
@@ -64,5 +72,5 @@ while true; do
     else
         held=0
     fi
-    sleep 0.5 2>/dev/null || usleep 500000
+    sleep 0.2 2>/dev/null || usleep 200000
 done
