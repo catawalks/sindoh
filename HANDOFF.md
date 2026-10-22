@@ -51,6 +51,15 @@ ustreamer MJPEG 640x480@15 passthrough as an rc.dp200 service (klipper user, v4l
 --device-timeout 5), Mainsail rotation 270, ~8 % of one core (stock YUYV way: 92 %). Load numbers in
 hardware_notes. Tunables: /etc/dp200/webcam.conf + rc.dp200 restart-webcam. A cardboard box with the
 thermocouple sits on the bed (visible on the camera) - remove before any homing/mesh!
+10-22 NIGHT (unattended, no heat/motion) - TEST PRINT PREP: action list docs/test_print_plan.md (work it
+in order). Deployed dp200_printer.cfg: [exclude_object], [gcode_arcs], PRIME_LINE, PRINT_START re-primes
+the 15 mm CLEAN_NOZZLE retract and ends at X100 Y100 Z10 (not over the front handle). Test files on the
+printer: dp200_first_layer.gcode, dp200_box_20mm.gcode (tools/gen_test_prints.py). PrusaSlicer profile
+install/slicer/. tools/rescale_sensor.py for the nozzle TC fit. OPEN: clutch state during printing (E
+with clutch off never tested) = item 2. Nozzle read 26.3 C vs bed 19.0 C at room temp (nozzle ~7 C high?).
+SD cards: 4GB-SD = working card (in the printer), 2GB-SD = rescue card (boot block now ALSO at sector 1).
+DIP SD boot: mode 6 confirmed but the boot ROM hangs in SD init -> next session: user hooks a JTAGulator
+to CN3 (JTAG) to see where. Boot ROM dump: D:\DP200\backup\bootrom (not in git). docs/sd_boot_plan.md.
 10-22 RESCUE SD CARD (plan A WORKS, user present, spare 2 GB card; old contents backed up to
 D:\DP200\backup\spare_sd_backup\spare_sd_card.tar): p1 ext2 "RESCUE" from sector 32768 with the stock root
 (profile.stock, no hook, /etc/dp200-rescue marker, banner + PS1 "RESCUE# "), signed U-Boot block raw at
