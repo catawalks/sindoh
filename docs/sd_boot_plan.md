@@ -159,6 +159,25 @@ working read would at least print "Authentication success" or an error.
 The table checksum at 0x04 isn't a plain sum, XOR or CRC32 (not needed for
 a verbatim copy).
 
+**DIP test 3 (2026-10-22).** The board silkscreen (SW1, KSD42H) says
+NAND = 1 ON, 2 ON, 3 OFF and SD = 1 OFF, 2 OFF, 3 ON; switch 4 selects DC-DC
+vs power-management-MCU control. NAND reads as mode 1, so ON = 0 and switch
+3 = bit 5, which makes the SD setting **mode 6** (correct for this slot).
+
+With the USB-B port connected to a PC, nothing enumerated (no new USB
+device), and pulling and reinserting the card after 30 s gave no output.
+So the ROM hangs inside the SD attempt, before its download loop.
+
+A possible cause: in Linux the slot's power doesn't come from the SDHCI
+power bit (0xF9080029 = 0x0E, bit 0 clear); the board powers the card
+another way, which the ROM may not enable. Sindoh's own recovery
+(`recovery/nand_write.sh`) runs from Linux booted off NAND with update files
+on the SD card, not from an SD-booted system.
+
+**Verdict:** DIP-switch SD boot doesn't work on this board without further
+hardware work (e.g. JTAG on CN3 to see where the ROM stops). The recovery
+path is the rescue card started from NAND U-Boot (above).
+
 The first SD attempt (table at sector 0x80, outside sectors 0-19) reset
 itself once after ~30 s and then stayed silent.
 
