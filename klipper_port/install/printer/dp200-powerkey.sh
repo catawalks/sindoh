@@ -38,7 +38,20 @@ shutdown_now() {        # $1 = reboot | poweroff
     i=0
     while kill -0 $s 2>/dev/null && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done
     kill -0 $s 2>/dev/null && { echo "dp200-powerkey: stop timed out"; kill $s; }
+    # Leave the Klipper root clean: init's "umount -a -r" can't remount it
+    # read-only while the chroot mounts and our log files are open on it.
+    exec >/dev/console 2>&1
+    [ -f /var/run/dp200-netd.pid ] && kill $(cat /var/run/dp200-netd.pid) 2>/dev/null
+    for p in $(ps | grep '[w]pa_cli' | awk '{print $1}'); do kill $p; done
+    sleep 1
+    . $ROOT/dp200/dp200-mounts.sh
+    dp200_umount_root
+    for m in var/log home/klipper/printer_data/logs; do
+        grep -q " $ROOT/$m " /proc/mounts && umount $ROOT/$m
+    done
     sync
+    mount -o remount,ro $ROOT 2>/dev/null && echo "dp200-powerkey: $ROOT read-only" \
+        || echo "dp200-powerkey: $ROOT still busy (journal will recover it)"
     if [ "$1" = reboot ]; then
         reboot
     else
