@@ -1081,7 +1081,7 @@ class UI:
             d.text((20, y), 'A print is running!', font=font(22), fill=C_WARN)
         d.text((20, y + 30), 'Holding the button ~%d s cuts the power at once.' % HW_CUT,
                font=font(18), fill=C_DIM)
-        d.text((20, y + 54), 'SHUT DOWN here stops everything cleanly first.',
+        d.text((20, y + 54), 'Better: SHUT DOWN first, then hold the button.',
                font=font(18), fill=C_DIM)
         items = [
             ('SHUT DOWN', ('confirm', 'Shut down the printer?' + warn, ('power', 'poweroff')),
@@ -1118,8 +1118,8 @@ class UI:
         if what == 'reboot':
             lines = ['Rebooting...', '', 'Klipper stops, then the', 'printer restarts', '(about 1-2 min).']
         else:
-            lines = ['Shutting down...', '', 'Klipper stops and Linux', 'halts. After ~30 s it is',
-                     'safe to switch off', 'the printer.']
+            lines = ['Shutting down...', '', 'Klipper stops and Linux', 'halts (~30 s). Then hold',
+                     'the POWER BUTTON ~2 s', 'to switch the printer off.']
         for i, l in enumerate(lines):
             d.text((30, 240 + i * 44), l, font=font(30 if i == 0 else 24),
                    fill=C_TXT if i == 0 else C_DIM)
