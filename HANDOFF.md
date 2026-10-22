@@ -51,6 +51,19 @@ ustreamer MJPEG 640x480@15 passthrough as an rc.dp200 service (klipper user, v4l
 --device-timeout 5), Mainsail rotation 270, ~8 % of one core (stock YUYV way: 92 %). Load numbers in
 hardware_notes. Tunables: /etc/dp200/webcam.conf + rc.dp200 restart-webcam. A cardboard box with the
 thermocouple sits on the bed (visible on the camera) - remove before any homing/mesh!
+10-22 RESCUE SD CARD (plan A WORKS, user present, spare 2 GB card; old contents backed up to
+D:\DP200\backup\spare_sd_backup\spare_sd_card.tar): p1 ext2 "RESCUE" from sector 32768 with the stock root
+(profile.stock, no hook, /etc/dp200-rescue marker, banner + PS1 "RESCUE# "), signed U-Boot block raw at
+sector 0x80, kernel uImage raw at 0x800, /restore/{README.txt,mtd0.bin}. FINDING: U-Boot's SD driver sees
+nothing (mmcinfo: 0 bytes on mvsdh0 AND mvsdh1, mmc rescan no help), so U-Boot can't load from the card.
+Working start = NAND kernel + SD root: run load_nand; setenv bootargs console=ttyS0,115200n8 ${mtdparts}
+root=/dev/mmcblk0p1 rootfstype=ext2 rootwait ${bootargs_mv61X0_other} synopGMAC_Mem.ethaddr=${ethaddr_sdh};
+bootm ${downld_addr}. Booted: / = mmcblk0p1 ext2, NAND root mtd6 not attached (only stock /backup ubi1).
+Consequence for plan B: U-Boot can't test for the card, so an automatic "SD if present" bootcmd isn't
+possible from U-Boot; it has to be decided in Linux (initramfs / early /etc/profile) - open question.
+DIP-switch SD boot of U-Boot (sector 0x80) still untested; doubtful if the boot ROM can read the slot either.
+Full raw NAND dump with OOB: NAND_Dump/MX30LF4G18AC@TSOP48.BIN (T48 programmer) - source for restore images.
+U-Boot env is NAND-only (env_nand.c), so the DIP-switch SD boot alone still boots the NAND root.
 10-22 (user present): printer booted from U-Boot (run bootcmd; there is no "boot" command). WiFi was NOT
 connected after killing the stock app early: the stock app is what joins the network. Now our own WiFi:
 docs/wifi.md (dp200-wifi.sh import from karas.db, dp200_wifi.py over the control socket, screen pages

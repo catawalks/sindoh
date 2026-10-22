@@ -84,6 +84,31 @@ either:
   kernel when present and NAND otherwise. A corrupt env falls back to the
   built-in default, which is NAND boot, so this is safe.
 
+## Rescue card test (2026-10-22)
+
+U-Boot's SD driver can't see the card: `mmcinfo` reports 0 bytes on both
+controllers (`mmc list`: mvsdh0, mvsdh1), with or without `mmc rescan`. So
+U-Boot loads nothing from SD, and the stock `mv61X0_mmcboot` can't work on
+this board either. What works is the **NAND kernel with the root on the
+card**, started by hand from the U-Boot prompt:
+
+```
+run load_nand
+setenv bootargs console=ttyS0,115200n8 ${mtdparts} root=/dev/mmcblk0p1 rootfstype=ext2 rootwait ${bootargs_mv61X0_other} synopGMAC_Mem.ethaddr=${ethaddr_sdh}
+bootm ${downld_addr}
+```
+
+Result: `/` is `/dev/mmcblk0p1` (ext2), the NAND root (mtd6) is not attached,
+and the stock init runs from the card. Card layout and restore notes are in
+`install/rescue/README.txt`. This covers a broken NAND **root** (the only
+part the Klipper install writes). It needs mtd0 (U-Boot + kernel) to be
+intact.
+
+The consequence for way B: U-Boot can't test whether a card is present, so
+"boot SD if present, else NAND" can't be decided in U-Boot. It would have to
+happen in Linux, for example in the kernel's initramfs or very early in the
+NAND root's boot scripts.
+
 Layout conflict: the stock `mv61X0_mmcboot` reads the kernel from sector 0x202,
 which overlaps a U-Boot copy at sector 0x80 (it ends at ~0x21A). A rescue card
 therefore puts the kernel at its own offset (e.g. 1 MiB, sector 0x800) and uses
