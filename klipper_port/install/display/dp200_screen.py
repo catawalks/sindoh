@@ -43,6 +43,17 @@ TIMEOUTS = (60, 300, 600, 1800, 0)    # choices on the TIMEOUT page; 0 = never
 SETTINGS = '/etc/dp200/screen_settings.json'   # saved touch-screen settings
 HOLD_STOP = 1.0                       # s to hold STOP
 
+# Front power button: GPIO bank 5 pin 27, 1 = pressed (found 2026-10-22).
+# A short press opens the POWER page. Holding it ~HW_CUT s makes the
+# power-management MCU cut the power (hardware, no clean shutdown); this app
+# only warns. dp200-powerkey.sh syncs the cards on every press and shuts down
+# cleanly after LONG_POWER s if the hardware didn't (other SW1-4 settings).
+KEY_REG, KEY_BIT = 0xF8045000, 1 << 27
+HW_CUT = 2.0                          # measured roughly: "2 s hold" switched it off
+HOLD_WARN = 0.4                       # s held before the warning appears
+LONG_POWER = 5.0
+POWER_REQ = '/run/dp200/power'        # "reboot" / "poweroff" for dp200-powerkey.sh
+
 # Preheat presets (nozzle, bed); bed max_temp is 100, nozzle 260
 PRESETS = (('PLA', 200, 60), ('ABS', 240, 90))
 LOWER_BED_Z = 120                     # Z grows downwards on this machine (bed moves down)
@@ -167,6 +178,24 @@ class Touch:
         self.samples, self.down = [], False
         return out
 
+class PowerKey:
+    """Front power button, read from the GPIO data register (mmap of
+    /dev/mem, read only). pressed() is False if the register can't be read."""
+    def __init__(self):
+        import mmap
+        self.m = None
+        try:
+            fd = os.open('/dev/mem', os.O_RDONLY | os.O_SYNC)
+            self.m = mmap.mmap(fd, 4096, mmap.MAP_SHARED, mmap.PROT_READ, offset=KEY_REG & ~0xfff)
+            os.close(fd)
+        except (OSError, ValueError):
+            pass
+
+    def pressed(self):
+        if self.m is None:
+            return False
+        return bool(struct.unpack_from('<I', self.m, KEY_REG & 0xfff)[0] & KEY_BIT)
+
 # ---------------------------------------------------------------------------
 # Moonraker
 # ---------------------------------------------------------------------------
@@ -223,6 +252,8 @@ class UI:
         self.busy = None               # text of the running command
         self.msg = None                # (text, until)
         self.press = None              # (u, v, t0)
+        self.key_down = None           # time the power button went down
+        self.power_at = 0.0            # when a reboot/power-off was requested
         self.last_touch = time.time()
         self.ip = my_ip()
         self.settings = load_settings()          # e.g. {'timeout': 600}
@@ -261,6 +292,34 @@ class UI:
                      lambda: post('/printer/gcode/script', {'script': action[1]}))
         elif kind == 'post':
             self._bg(action[2], lambda: post(action[1]))
+        elif kind == 'power':
+            self.power_request(action[1])
+        elif kind == 'screen_off':
+            self.last_touch = 0.0              # black now (only while idle, see dimmed())
+            self.screen = 'home'
+
+    def power_request(self, what):
+        """Ask dp200-powerkey.sh (stock side) to reboot or power off. It stops
+        Klipper first, which also ends this app; the last frame stays up."""
+        try:
+            os.makedirs(os.path.dirname(POWER_REQ), exist_ok=True)
+            with open(POWER_REQ, 'w') as f:
+                f.write(what)
+            self.screen = 'powering_' + what
+            self.power_at = time.time()
+        except OSError as e:
+            self.flash('%s failed: %s' % (what, e))
+
+    def key_event(self, down, now):
+        """Power button edges from the main loop."""
+        if down:
+            self.key_down = now
+            self.last_touch = now              # wakes the screen
+        elif self.key_down is not None:
+            held, self.key_down = now - self.key_down, None
+            if held < LONG_POWER and not self.screen.startswith('powering'):
+                self.confirm = None
+                self.screen = 'power'
 
     def _bg(self, label, fn):
         if self.busy:
@@ -774,6 +833,12 @@ class UI:
         d = ImageDraw.Draw(im)
         self.buttons = []
         st = self.st
+        if self.screen.startswith('powering'):
+            self.page_powering(d)
+            return im
+        if self.key_down is not None and time.time() - self.key_down >= HOLD_WARN:
+            self.page_key_held(d)
+            return im
         if self.dimmed():
             return Image.new('RGB', (PW, PH), (0, 0, 0))
         if self.screen in self.NO_KLIPPER:
@@ -835,9 +900,9 @@ class UI:
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'system': 'home',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
-              'display': 'system', 'timeout': 'display'}
+              'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
-    NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_kb')
+    NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_kb', 'power')
 
     def back_action(self):
         if self.confirm:
@@ -850,7 +915,7 @@ class UI:
         if not ready:
             # only the network pages work without Klipper; their top goes back
             # to the waiting/error page (screen "home")
-            if self.screen == 'network':
+            if self.screen in ('network', 'power'):
                 return ('screen', 'home')
             if self.screen not in self.NO_KLIPPER:
                 return None
@@ -1006,6 +1071,59 @@ class UI:
                  for t in TIMEOUTS]
         self.grid(d, items, top=210, rows_h=100)
 
+    def page_power(self, d, st):
+        """Opened by a short press of the front power button."""
+        d.text((20, 160 if st else 90), 'Power', font=font(28), fill=C_TXT)
+        y = 200 if st else 130
+        printing = st and st['print_stats']['state'] in ('printing', 'paused')
+        warn = ' The running print will be lost.' if printing else ''
+        if printing:
+            d.text((20, y), 'A print is running!', font=font(22), fill=C_WARN)
+        d.text((20, y + 30), 'Holding the button ~%d s cuts the power at once.' % HW_CUT,
+               font=font(18), fill=C_DIM)
+        d.text((20, y + 54), 'SHUT DOWN here stops everything cleanly first.',
+               font=font(18), fill=C_DIM)
+        items = [
+            ('SHUT DOWN', ('confirm', 'Shut down the printer?' + warn, ('power', 'poweroff')),
+             C_RED, 28, 'power off'),
+            ('REBOOT', ('confirm', 'Reboot the printer?' + warn, ('power', 'reboot')),
+             C_BTN, 28, 'whole printer'),
+        ]
+        if st is not None:
+            items.append(('KLIPPER', ('confirm', 'Restart Klipper host?' + warn,
+                                      ('post', '/printer/restart', 'Restart')), C_BTN, 28, 'restart'))
+        items.append(('SCREEN OFF', ('screen_off',), C_BTN, 26, 'tap to wake'))
+        self.grid(d, items, top=y + 100)
+
+    def page_key_held(self, d):
+        """Power button held: the hardware is about to cut the power."""
+        held = time.time() - self.key_down
+        d.rectangle((0, 0, PW, PH), fill=(60, 16, 16))
+        d.text((30, 240), 'Power button held', font=font(34), fill=C_TXT)
+        if held < LONG_POWER:
+            d.text((30, 300), 'Keep holding: power OFF', font=font(30), fill=C_WARN)
+            d.text((30, 345), '(cut at once, no clean shutdown)', font=font(20), fill=C_DIM)
+            d.text((30, 380), 'Release now for the power menu', font=font(22), fill=C_TXT)
+            frac = min(held / HW_CUT, 1.0)
+            d.rounded_rectangle((30, 430, PW - 30, 470), radius=8, outline=(200, 120, 120), width=2)
+            d.rounded_rectangle((32, 432, 32 + int((PW - 64) * frac), 468), radius=7, fill=(240, 60, 60))
+        else:
+            self.screen = 'powering_poweroff'          # dp200-powerkey.sh acts on its own
+            self.power_at = time.time()
+            d.text((30, 320), 'Shutting down...', font=font(30), fill=C_WARN)
+
+    def page_powering(self, d):
+        what = self.screen.split('_', 1)[1]
+        d.rectangle((0, 0, PW, PH), fill=(0, 0, 0))
+        if what == 'reboot':
+            lines = ['Rebooting...', '', 'Klipper stops, then the', 'printer restarts', '(about 1-2 min).']
+        else:
+            lines = ['Shutting down...', '', 'Klipper stops and Linux', 'halts. After ~30 s it is',
+                     'safe to switch off', 'the printer.']
+        for i, l in enumerate(lines):
+            d.text((30, 240 + i * 44), l, font=font(30 if i == 0 else 24),
+                   fill=C_TXT if i == 0 else C_DIM)
+
     def page_error(self, d, st):
         wh = st['webhooks']
         d.rectangle((0, 160, PW, 480), fill=(90, 24, 24))
@@ -1099,13 +1217,24 @@ def main():
                 pass
         ui.render().save(out)
         return
-    panel, touch = Panel(), Touch()
+    panel, touch, pkey = Panel(), Touch(), PowerKey()
     unblank()
     unblanked = time.time()
     next_poll = 0.0
     last_key = None
+    key_was = False
     while True:
         now = time.time()
+        btn = pkey.pressed()
+        if btn != key_was:
+            key_was = btn
+            ui.key_event(btn, now)
+            if btn:
+                unblank()
+        if ui.screen.startswith('powering') and now - ui.power_at > 90:
+            # still running: dp200-powerkey.sh didn't act (not started?)
+            ui.screen = 'home'
+            ui.flash('Power-off/reboot did not happen (dp200-powerkey not running?)', 15)
         polled = now >= next_poll
         if polled:
             try:
@@ -1137,10 +1266,11 @@ def main():
         key = (time.strftime('%H:%M'), ui.busy, ui.msg and time.time() < ui.msg[1],
                bool(ui.dimmed()), ui.screen, ui.confirm is not None, view_key(ui), ui.err,
                ui.wf['rev'], ui.net['rev'])
-        if events or ui.press or key != last_key:
+        if events or ui.press or ui.key_down is not None or key != last_key:
             panel.show(ui.render())
             last_key = key
-        timeout = 0.05 if ui.press else max(0.0, min(next_poll - time.time(), 0.5))
+        timeout = 0.05 if ui.press or ui.key_down is not None else \
+            max(0.0, min(next_poll - time.time(), 0.1 if pkey.m is not None else 0.5))
         select.select([touch.fd], [], [], timeout)
 
 if __name__ == '__main__':

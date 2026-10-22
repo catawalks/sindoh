@@ -96,6 +96,12 @@ if ! { [ -f /var/run/dp200-netd.pid ] && kill -0 $(cat /var/run/dp200-netd.pid) 
     sh $ROOT/dp200/dp200-netd.sh $ROOT </dev/null >> $ROOT/var/log/dp200-netd.log 2>&1 &
     echo $! > /var/run/dp200-netd.pid
 fi
+# front power button (hold 5 s = forced shutdown) and the screen's
+# reboot/power-off requests
+if ! { [ -f /var/run/dp200-powerkey.pid ] && kill -0 $(cat /var/run/dp200-powerkey.pid) 2>/dev/null; }; then
+    sh $ROOT/dp200/dp200-powerkey.sh $ROOT </dev/null >> $ROOT/var/log/dp200-powerkey.log 2>&1 &
+    echo $! > /var/run/dp200-powerkey.pid
+fi
 # the touch screen (in the chroot) talks to wpa_supplicant's control socket
 mkdir -p $ROOT/run/wpa_supplicant
 grep -q " $ROOT/run/wpa_supplicant " /proc/mounts || \
