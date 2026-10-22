@@ -7,8 +7,10 @@ changed unless you do it. Login: the serial console (115200) or the USB/WiFi
 shell as usual; the prompt says RESCUE.
 
 Card layout
-  sector 0x80   signed U-Boot block (copy of NAND mtd0 0..0x33314) - for the
-                boot ROM when the DIP switches select SD
+  sector 1      boot table + signed U-Boot (copy of NAND mtd0 0..0x33800) -
+                for the boot ROM when the DIP switches select SD (it looks
+                at sectors 0-19). Not yet seen to boot.
+  sector 0x80   older copy of the same, partly overwritten - unused
   sector 0x800  stock kernel uImage (copy of NAND mtd0 0x40000, 0x69b990 bytes)
   partition 1   from sector 32768: this rescue root (copy of the stock root)
 
