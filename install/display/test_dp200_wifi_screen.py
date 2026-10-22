@@ -197,6 +197,35 @@ ui.st = None; ui.screen = 'home'
 render();                             check('waiting page has a NETWORK button', 'NETWORK' in labels)
 tap('NETWORK');                       check('network page without Klipper', ui.screen == 'network'); shot('no_klipper')
 tap('BACK');                          check('BACK -> home (waiting page)', ui.screen == 'home')
+# front power button
+S.POWER_REQ = os.path.join(tempfile.mkdtemp(), 'run', 'dp200', 'power')
+ui.st = ST; ui.screen = 'home'; ui.confirm = None
+t = time.time()
+ui.key_event(True, t); ui.key_event(False, t + 0.3)
+render();                             check('short press -> power page', ui.screen == 'power'); shot('power')
+check('power page has SHUT DOWN/REBOOT/KLIPPER', all(k in labels for k in ('SHUT DOWN', 'REBOOT', 'KLIPPER')))
+tap('REBOOT');                        check('reboot asks to confirm', ui.confirm is not None)
+tap('NO');                            check('NO -> no request', not os.path.exists(S.POWER_REQ))
+tap('SHUT DOWN'); tap('YES')
+check('poweroff request written', open(S.POWER_REQ).read() == 'poweroff')
+check('powering screen shown', ui.screen == 'powering_poweroff'); shot('powering')
+os.remove(S.POWER_REQ)
+ui.screen = 'home'
+ui.key_event(True, time.time() - 2.0)
+render();                             check('held 2 s -> countdown overlay', ui.key_down is not None and 'BACK' not in labels)
+shot('key_held')
+ui.key_event(False, time.time());     check('released before 5 s -> power page', ui.screen == 'power')
+ui.key_event(True, time.time() - 6.0); render()
+check('held 6 s -> powering (stock side acts)', ui.screen == 'powering_poweroff')
+ui.key_event(False, time.time());     check('release after long press: no power page', ui.screen == 'powering_poweroff')
+ui.screen = 'home'
+ui.st = None
+ui.key_event(True, time.time()); ui.key_event(False, time.time())
+render();                             check('power page without Klipper', ui.screen == 'power' and 'SHUT DOWN' in labels and 'KLIPPER' not in labels)
+tap('BACK');                          check('BACK -> waiting page', ui.screen == 'home')
+ui.st = dict(ST, print_stats={'state': 'printing', 'filename': 'x.gcode'})
+ui.screen = 'power'
+tap('SHUT DOWN');                     check('printing: warns about the print', 'print will be lost' in ui.confirm[0])
 print('calls:', calls)
 print('FAILURES: %d' % fails)
 sys.exit(1 if fails else 0)
