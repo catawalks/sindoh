@@ -109,6 +109,59 @@ The consequence for way B: U-Boot can't test whether a card is present, so
 happen in Linux, for example in the kernel's initramfs or very early in the
 NAND root's boot scripts.
 
+## Boot ROM (dumped 2026-10-22)
+
+The mask ROM is 64 KiB at 0xF9F00000 (aliased at 0xFFFF0000 for the vectors).
+It's readable from Linux with `tools/memdump.py` (mmap of /dev/mem; `dd`
+gets EFAULT). The dump stays outside the repo (vendor code):
+`D:\DP200\backup\bootrom\rom_f9f00000.bin`, md5
+2bdf7d7dd0939026e349646f36deb781. Build "Fri Sep 09 2011", ARM reset code,
+then Thumb-2.
+
+**Boot mode** = strap bits 5, 6 and 7 of 0xF8000004
+(`mode = b5 | b6<<1 | b7<<2`). With the stock DIP setting the register
+reads 0x21, which is mode 1.
+
+| Mode | Loader |
+|---|---|
+| 0 | SPI flash, table at 0, 0x10000 or 0x40000 |
+| 1 | NAND (if 0xFA000010 bit 17), table copies at erase-block steps, 10 tries |
+| 2, 4 | SD on controller 0 (0xF9080000), 4-bit, pins GPIO1 0-5 |
+| 5 | eMMC on controller 1 (0xF9080200), 8-bit |
+| 6 | SD on controller 0, 4-bit, pins GPIO1 0-1 + GPIO0 3-6 |
+| 3, 7 | no storage boot |
+
+After a failed storage boot, every mode ends in a download loop (Marvell
+"ACL" protocol: DOWNLOAD, BURN_FLASH, RESET...; probably over USB device)
+that also retries SD when card detect changes. It prints nothing while
+waiting, which matches the silence seen with the SD DIP setting.
+
+**This board's SD slot** is on controller 0 with pins GPIO1 0-1 and
+GPIO0 3-6 set to function 2 (read in Linux). That is exactly **mode 6**.
+Mode 6 = binary 110, the inverse of NAND's 001. So "SD = inverse of the
+NAND switches" would select it, if those switches are the strap bits.
+
+**SD image layout** the ROM looks for, in mode 2, 4 or 6:
+- the boot table (`c1deed1c`, 0x50 bytes) at the start of one of sectors
+  0-19 (512-byte steps);
+- image offsets in the table are relative to the table;
+- the image must start with the `xxxxc0de` code header, then checksum and
+  authentication.
+
+Both SDSC (byte addressing) and SDHC are handled. The NAND boot block
+(mtd0 bytes 0-0x33800) copied unchanged to **sector 1** keeps the MBR in
+sector 0. It was written to 2GB-SD that way and verified, but the boot ROM
+still printed nothing after its banner with the SD DIP setting.
+
+Still open: which mode the DIP setting really produces. Mode 2/4 (wrong
+pins) or 3/7 (no storage boot) would also be silent; mode 6 with a
+working read would at least print "Authentication success" or an error.
+The table checksum at 0x04 isn't a plain sum, XOR or CRC32 (not needed for
+a verbatim copy).
+
+The first SD attempt (table at sector 0x80, outside sectors 0-19) reset
+itself once after ~30 s and then stayed silent.
+
 Layout conflict: the stock `mv61X0_mmcboot` reads the kernel from sector 0x202,
 which overlaps a U-Boot copy at sector 0x80 (it ends at ~0x21A). A rescue card
 therefore puts the kernel at its own offset (e.g. 1 MiB, sector 0x800) and uses
