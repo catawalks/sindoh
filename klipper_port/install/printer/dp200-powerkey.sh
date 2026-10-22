@@ -17,9 +17,10 @@
 #     screen's POWER page (the chroot can't shut the stock system down).
 #
 # Power-off: the stack is stopped (UPC cores held = heaters and motors off),
-# then BusyBox poweroff. If the board's supply stays on (SW1-4 open: the
-# power-management MCU doesn't control the DC-DC), Linux is halted and the
-# printer is safe to switch off at the mains switch.
+# the root is remounted read-only, then BusyBox poweroff. That only HALTS
+# Linux: the supply stays on (tested 2026-10-22). No software power-off was
+# found - the stock firmware's power key only did sleep/wake - so the user
+# then holds the button ~2 s and the power-management MCU cuts the power.
 #
 #   dp200-powerkey.sh ROOT
 ROOT=${1:?usage: dp200-powerkey.sh ROOT}
