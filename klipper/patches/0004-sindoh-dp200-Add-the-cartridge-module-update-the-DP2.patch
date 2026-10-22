@@ -1,7 +1,7 @@
 From a1b365cd5f9077c7144fa046ff7a562630a94259 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Wed, 21 Oct 2026 19:55:37 -0400
-Subject: [PATCH 4/4] sindoh-dp200: Add the cartridge module, update the DP200
+Subject: [PATCH 4/5] sindoh-dp200: Add the cartridge module, update the DP200
  configuration
 
 - dp200_cartridge: read-only support for the DP200 filament cartridge chip
