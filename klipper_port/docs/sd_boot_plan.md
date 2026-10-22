@@ -59,6 +59,61 @@ So an SD-booted system means:
 - The U-Boot prompt is `# `; `version` reports U-Boot 2011.09-svn22695 and
   Marvell GCC 4.6.4.
 
+## Boot block and U-Boot (from the mtd0 dump, 2026-10-22)
+
+mtd0 starts with a boot table (big-endian):
+
+| Offset | Value | Meaning |
+|---|---|---|
+| 0x00 | `c1deed1c` | magic |
+| 0x04 | `6c30cca4` | checksum? |
+| 0x10 | type 0, offset 0x60, size 0x332b4 | signed U-Boot blob |
+| 0x30 | type 1, offset 0x40000, size 0x69b990 | kernel uImage (what `load_nand` reads) |
+| 0x60 | `8120c0de`, then 256 bytes | signature header + an RSA-2048-sized signature |
+| 0x170 | 0x33190 | U-Boot ELF length; the ELF starts at 0x180 |
+
+U-Boot strings show **only `env_nand.c`**: the environment always comes from
+NAND (mtd1), even when the boot ROM loaded U-Boot from SD. So a DIP-switch
+SD boot of U-Boot alone still boots the NAND kernel and root. It protects
+against a damaged **mtd0**, which the Klipper NAND install never writes. A
+damaged **NAND root** needs a rescue Linux on the SD card, started by U-Boot,
+either:
+- by hand (key at the prompt, then `mmc read` a kernel + `bootm` with
+  root=/dev/mmcblk0pN); or
+- automatically, by changing `bootcmd_select` in mtd1 to boot an SD rescue
+  kernel when present and NAND otherwise. A corrupt env falls back to the
+  built-in default, which is NAND boot, so this is safe.
+
+## Rescue card test (2026-10-22)
+
+U-Boot's SD driver can't see the card: `mmcinfo` reports 0 bytes on both
+controllers (`mmc list`: mvsdh0, mvsdh1), with or without `mmc rescan`. So
+U-Boot loads nothing from SD, and the stock `mv61X0_mmcboot` can't work on
+this board either. What works is the **NAND kernel with the root on the
+card**, started by hand from the U-Boot prompt:
+
+```
+run load_nand
+setenv bootargs console=ttyS0,115200n8 ${mtdparts} root=/dev/mmcblk0p1 rootfstype=ext2 rootwait ${bootargs_mv61X0_other} synopGMAC_Mem.ethaddr=${ethaddr_sdh}
+bootm ${downld_addr}
+```
+
+Result: `/` is `/dev/mmcblk0p1` (ext2), the NAND root (mtd6) is not attached,
+and the stock init runs from the card. Card layout and restore notes are in
+`install/rescue/README.txt`. This covers a broken NAND **root** (the only
+part the Klipper install writes). It needs mtd0 (U-Boot + kernel) to be
+intact.
+
+The consequence for way B: U-Boot can't test whether a card is present, so
+"boot SD if present, else NAND" can't be decided in U-Boot. It would have to
+happen in Linux, for example in the kernel's initramfs or very early in the
+NAND root's boot scripts.
+
+Layout conflict: the stock `mv61X0_mmcboot` reads the kernel from sector 0x202,
+which overlaps a U-Boot copy at sector 0x80 (it ends at ~0x21A). A rescue card
+therefore puts the kernel at its own offset (e.g. 1 MiB, sector 0x800) and uses
+its own command.
+
 ## Constraints found
 
 - **Partition layout:** this printer's card has partition 1 at sector
