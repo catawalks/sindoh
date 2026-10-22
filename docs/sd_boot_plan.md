@@ -59,6 +59,36 @@ So an SD-booted system means:
 - The U-Boot prompt is `# `; `version` reports U-Boot 2011.09-svn22695 and
   Marvell GCC 4.6.4.
 
+## Boot block and U-Boot (from the mtd0 dump, 2026-10-22)
+
+mtd0 starts with a boot table (big-endian):
+
+| Offset | Value | Meaning |
+|---|---|---|
+| 0x00 | `c1deed1c` | magic |
+| 0x04 | `6c30cca4` | checksum? |
+| 0x10 | type 0, offset 0x60, size 0x332b4 | signed U-Boot blob |
+| 0x30 | type 1, offset 0x40000, size 0x69b990 | kernel uImage (what `load_nand` reads) |
+| 0x60 | `8120c0de`, then 256 bytes | signature header + an RSA-2048-sized signature |
+| 0x170 | 0x33190 | U-Boot ELF length; the ELF starts at 0x180 |
+
+U-Boot strings show **only `env_nand.c`**: the environment always comes from
+NAND (mtd1), even when the boot ROM loaded U-Boot from SD. So a DIP-switch
+SD boot of U-Boot alone still boots the NAND kernel and root. It protects
+against a damaged **mtd0**, which the Klipper NAND install never writes. A
+damaged **NAND root** needs a rescue Linux on the SD card, started by U-Boot,
+either:
+- by hand (key at the prompt, then `mmc read` a kernel + `bootm` with
+  root=/dev/mmcblk0pN); or
+- automatically, by changing `bootcmd_select` in mtd1 to boot an SD rescue
+  kernel when present and NAND otherwise. A corrupt env falls back to the
+  built-in default, which is NAND boot, so this is safe.
+
+Layout conflict: the stock `mv61X0_mmcboot` reads the kernel from sector 0x202,
+which overlaps a U-Boot copy at sector 0x80 (it ends at ~0x21A). A rescue card
+therefore puts the kernel at its own offset (e.g. 1 MiB, sector 0x800) and uses
+its own command.
+
 ## Constraints found
 
 - **Partition layout:** this printer's card has partition 1 at sector
