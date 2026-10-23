@@ -46,6 +46,27 @@ layout:
    **CH0 → pin 3, CH1 → 5, CH2 → 7, CH3 → 9, CH4 → 11, CH5 → 13,
    CH6 → 15**. Leave pin 1 unconnected to the channels.
 
+## Results 2026-10-22
+
+- CN3 pin 1 (and CN4 pin 2) measure 3.30 V: target voltage 3.3.
+- Idle levels with the printer running, CH0–CH6 on pins 3–15: pin 3 = 1,
+  pin 5 = 0, pin 7 = 0, pin 9 = 1, pin 11 = 1, pin 13 = 1, pin 15 = 0.
+- **With pin 15 (nSRST) connected, the scans kept the printer from
+  booting.** The SoC stays in reset while the JTAGulator drives it. Leave
+  pins 15 and 3 unconnected.
+- IDCODE scan on CH0–CH6 (printer off at the time): only a false hit
+  (0xFFFFFFFB).
+- IDCODE and BYPASS scans on pins 5–13 (CH1–CH5) with the printer running:
+  **no device found.**
+- Likely causes:
+  - JTAG is disabled by the secure-boot fuses (the boot ROM authenticates
+    U-Boot, so the chip is in a secured life cycle);
+  - CN3 is not the standard ARM-20 layout;
+  - the TAP needs nTRST actively driven high, or RTCK (adaptive clocking).
+
+  Next checks: continuity-test CN3's even pins against GND, try the RTCK
+  scan (R), and a scan with pin 3 driven high.
+
 ## First session (no OpenOCD needed)
 
 1. Printer on (normal NAND boot is fine for the first scan).

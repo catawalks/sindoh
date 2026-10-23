@@ -31,10 +31,13 @@ def main():
     ap.add_argument('--port', default='COM4')
     ap.add_argument('--wait', type=float, default=1.5, help='s of silence that ends a reply')
     ap.add_argument('cmds', nargs='*')
+    ap.add_argument('--no-cr', action='store_true',
+                    help='do not send the initial CR (continue an open prompt)')
     a = ap.parse_args()
     s = serial.Serial(a.port, 115200, timeout=0.1)
-    s.write(b'\r')
-    sys.stdout.write(read_reply(s, a.wait))
+    if not a.no_cr:
+        s.write(b'\r')
+        sys.stdout.write(read_reply(s, a.wait))
     lines = a.cmds or iter(lambda: sys.stdin.readline().rstrip('\n'), 'quit')
     for c in lines:
         s.write(c.encode() + b'\r')
