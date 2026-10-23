@@ -16,6 +16,10 @@ Goal: find where the boot ROM stops when it tries to boot from SD in mode 6
   Its Windows build has **no Bus Pirate driver**, which the JTAGulator's
   OpenOCD mode needs, so OpenOCD has to run on Linux to drive it: WSL (not
   installed on this PC) or any Linux box with `apt install openocd`.
+- **WSL 1 Debian with OpenOCD 0.12** (installed 2026-10-22): it has the
+  `buspirate` driver, and COM4 appears as `/dev/ttyS4`. Run it as
+  `wsl -d Debian -u root -- openocd -f interface/buspirate.cfg -c "buspirate port /dev/ttyS4" ...`
+  after putting the JTAGulator in OpenOCD mode (J, O).
 - JTAGulator source, for reference: `D:\DP200\backup\tools_ext\jtagulator_src\`.
 
 ## Wiring (printer OFF while connecting)
