@@ -87,6 +87,9 @@ The BYPASS scan **reset the printer** (one of pins 2–8 is a reset line).
 its state after every reset (opening COM4 resets it), its unpowered level
 shifters pull the lines low and **hold the printer in reset**. Keep it at
 V 3.3 while it's connected, or unplug it from CN3.
+**Pin 8 (CH0) is the reset line** (user test 2026-10-23: with pin 8
+disconnected the printer boots while the JTAGulator is attached; with
+pin 2 disconnected it doesn't). Leave pin 8 off for future scans.
 Conclusion so far: no TAP answers. JTAG is most likely disabled by the
 secure-boot fuses.
 
