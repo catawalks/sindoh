@@ -83,6 +83,10 @@ pull-ups win over R80's 4.7 kΩ, so pin 2 also reads high.
 
 IDCODE and BYPASS scans on CH0–CH6, printer running: **no device found**.
 The BYPASS scan **reset the printer** (one of pins 2–8 is a reset line).
+**Careful:** with the JTAGulator's target voltage off (V 0), which is also
+its state after every reset (opening COM4 resets it), its unpowered level
+shifters pull the lines low and **hold the printer in reset**. Keep it at
+V 3.3 while it's connected, or unplug it from CN3.
 Conclusion so far: no TAP answers. JTAG is most likely disabled by the
 secure-boot fuses.
 
