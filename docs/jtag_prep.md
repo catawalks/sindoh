@@ -67,6 +67,25 @@ layout:
   Next checks: continuity-test CN3's even pins against GND, try the RTCK
   scan (R), and a scan with pin 3 driven high.
 
+### Real CN3 layout (user, close-up photos 2026-10-22)
+
+CN3 is **not** ARM-20:
+- pin 1 = 3.3 V, pin 20 = 3.3 V;
+- **pins 2–8 = the 7 signals**, each through RN3 (8 × 330 Ω series);
+- pin 9 = NC, pins 10–19 = GND.
+
+Pin 2 has R80 = 4.7 kΩ to GND (TCK or nTRST style). R79 (11 kΩ) and
+R75 (6 kΩ) are on the back near the header.
+
+Wired CH6…CH0 to pins 2…8. Idle levels: pins 7 and 6 (CH1, CH2) are driven
+low by the board, the rest read high. The JTAGulator's level-shifter
+pull-ups win over R80's 4.7 kΩ, so pin 2 also reads high.
+
+IDCODE and BYPASS scans on CH0–CH6, printer running: **no device found**.
+The BYPASS scan **reset the printer** (one of pins 2–8 is a reset line).
+Conclusion so far: no TAP answers. JTAG is most likely disabled by the
+secure-boot fuses.
+
 ## First session (no OpenOCD needed)
 
 1. Printer on (normal NAND boot is fine for the first scan).
