@@ -1,0 +1,56 @@
+From 7c9b2167a6011a5f124baa4bfe5f8d174a6b448f Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 15:54:34 -0400
+Subject: [PATCH 6/6] upc: set up the step engines like the stock app
+
+Without the stock app (a /DEBUG_MACHINE boot) the engines keep their
+power-on setup and produce no output. Write the stock values for +0x00,
++0x10, +0x14, +0x2c and CFG bit4 when an engine is claimed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/upc/gpio.c   | 9 +++++++++
+ src/upc/upc_hw.h | 6 +++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/src/upc/gpio.c b/src/upc/gpio.c
+index aea3f701..5b54953d 100644
+--- a/src/upc/gpio.c
++++ b/src/upc/gpio.c
+@@ -147,6 +147,15 @@ smot_claim(uint8_t n)
+         return;
+     smot_owned |= 1u << n;
+     uint32_t b = SMOT_BASE(n);
++    // Engine setup the stock app does at start-up (measured 2026-10-27).
++    // A UPC reset keeps these, so earlier tests worked only because the
++    // stock app had run first; after a /DEBUG_MACHINE boot they are at
++    // their power-on values and the engine counts pulses but drives nothing.
++    reg_write(b + SMOT_BLOCK_EN, 1);
++    reg_write(b + SMOT_SETUP10, 8);
++    reg_write(b + SMOT_SETUP14, 4);
++    reg_write(b + SMOT_PATTERN, 0xaaaaaaaau);
++    reg_write(b + SMOT_CFG, reg_read(b + SMOT_CFG) | 0x10);
+     reg_write(b + SMOT_ABORT, SMOT_DONE_BIT);
+     reg_write(b + SMOT_CLEAR, SMOT_DONE_BIT);
+     reg_write(b + SMOT_ENABLE, 1);
+diff --git a/src/upc/upc_hw.h b/src/upc/upc_hw.h
+index 0812c455..7338d6b8 100644
+--- a/src/upc/upc_hw.h
++++ b/src/upc/upc_hw.h
+@@ -71,8 +71,12 @@
+ // ---------------------------------------------------------------------
+ #define SMOT_COUNT          5
+ #define SMOT_BASE(n)        (0xf8150000u + 0x1000u * (n))
++#define SMOT_BLOCK_EN       0x00  // stock 1; power-on 0 = no output at all
+ #define SMOT_ABORT          0x04  // write 0x100 to stop a running move
+-#define SMOT_CFG            0x0c  // bit0 = 1: A4982 driver disabled
++#define SMOT_CFG            0x0c  // bit0 = 1: A4982 driver disabled; stock sets bit4
++#define SMOT_SETUP10        0x10  // stock 8 (power-on 1), meaning unknown
++#define SMOT_SETUP14        0x14  // stock 4 (power-on 0), meaning unknown
++#define SMOT_PATTERN        0x2c  // stock 0xaaaaaaaa (power-on 0), output pattern?
+ #define SMOT_CTRL           0x44  // stock value 0x33224, bit4 = direction
+ #define SMOT_ENABLE         0x50  // stock writes 1 before each move
+ #define SMOT_RAMP_LEN       0x54
+-- 
+2.55.0.windows.5
+

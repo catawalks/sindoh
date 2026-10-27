@@ -1,7 +1,7 @@
 From b3e0e5569ded8710f78d70d553957affe5843298 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 20 Oct 2026 23:43:00 -0400
-Subject: [PATCH 2/5] upc: Add upc_stats and upc_clockcheck host modules
+Subject: [PATCH 2/6] upc: Add upc_stats and upc_clockcheck host modules
 
 upc_stats: UPC_STEP_STATS reports the step pulse and step-engine busy
 counters of the DP200 FM core, used to diagnose step-rate limits.
