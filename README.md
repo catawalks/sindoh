@@ -93,3 +93,9 @@ installer for the internal NAND. Start with
 [`klipper_port/docs/INSTALL.md`](klipper_port/docs/INSTALL.md) (preview) and
 [`klipper_port/README.md`](klipper_port/README.md). The Klipper changes themselves are on the
 `sindoh-dp200` branch of [catawalks/klipper](https://github.com/catawalks/klipper/tree/sindoh-dp200).
+
+## Custom boot logo
+
+[`boot_logo/`](boot_logo/) turns your own picture into the boot logo (DP200: raw 800×480 RGB565
+in the `boot-logo` partition) and packs it into a `.she` USB update with your printer's
+`crypto_key.dat`. Newer 3DWOX 1 models are not verified yet; see its README.
