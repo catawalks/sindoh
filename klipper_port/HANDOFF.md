@@ -51,6 +51,13 @@ ustreamer MJPEG 640x480@15 passthrough as an rc.dp200 service (klipper user, v4l
 --device-timeout 5), Mainsail rotation 270, ~8 % of one core (stock YUYV way: 92 %). Load numbers in
 hardware_notes. Tunables: /etc/dp200/webcam.conf + rc.dp200 restart-webcam. A cardboard box with the
 thermocouple sits on the bed (visible on the camera) - remove before any homing/mesh!
+10-26 NIGHT (unattended): 4GB-SD was 100 % FULL - nginx access.log 600 MB (Mainsail polls the webcam
+snapshot ~1/s; no logrotate in the chroot) -> truncated snapshots, failed writes. Fixed: access_log off,
+proxy_buffering off for /webcam/ (sites-available/mainsail deployed, nginx reloaded, 574 MB free, snapshot
+OK). Check `df -h /mnt/sd` if anything odd happens. JTAG: CN3 = 3.3 V pins 1/20, signals pins 2-8 (via
+RN3 330R), pin 8 = RESET (leave off), GND 10-19; no TAP answers on any pin (likely fused off); details
+docs/jtag_prep.md. JTAGulator at V 0 (its state after every COM4 open) holds reset if pin 8 is connected.
+Power button: GPIO5 pin 27; hardware cuts power after ~2 s hold; POWER page + dp200-powerkey.sh.
 10-22 NIGHT (unattended, no heat/motion) - TEST PRINT PREP: action list docs/test_print_plan.md (work it
 in order). Deployed dp200_printer.cfg: [exclude_object], [gcode_arcs], PRIME_LINE, PRINT_START re-primes
 the 15 mm CLEAN_NOZZLE retract and ends at X100 Y100 Z10 (not over the front handle). Test files on the
