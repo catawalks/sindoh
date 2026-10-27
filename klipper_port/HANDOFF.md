@@ -58,6 +58,13 @@ OK). Check `df -h /mnt/sd` if anything odd happens. JTAG: CN3 = 3.3 V pins 1/20,
 RN3 330R), pin 8 = RESET (leave off), GND 10-19; no TAP answers on any pin (likely fused off); details
 docs/jtag_prep.md. JTAGulator at V 0 (its state after every COM4 open) holds reset if pin 8 is connected.
 Power button: GPIO5 pin 27; hardware cuts power after ~2 s hold; POWER page + dp200-powerkey.sh.
+10-27 NIGHT (unattended): repo copy on the card (/mnt/sd/usr/src/dp200/klipper_port) refreshed from git;
+all deployed files == repo (copied the missing dp200-wifi-from-stockdb.sh). USB payload rebuilt
+(/mnt/sd/payload). NAND restore images (ECC-corrected nanddump of mtd0-6) in D:\DP200\backup\nand_images,
+see docs/nand_restore.md - copy them to 2GB-SD /restore when that card is in. Clock: printer was in 2013;
+dp200-start.sh now runs one-shot ntpd + hwclock -w (tested: Klipper unaffected by the jump). Logs: Klipper
+and Moonraker rotate themselves (12 MB), stock /var/log 0.8 MB, NAND root 52 MB free - nothing else grows.
+Large transfers to the printer with nc can truncate: always compare md5.
 10-22 NIGHT (unattended, no heat/motion) - TEST PRINT PREP: action list docs/test_print_plan.md (work it
 in order). Deployed dp200_printer.cfg: [exclude_object], [gcode_arcs], PRIME_LINE, PRINT_START re-primes
 the 15 mm CLEAN_NOZZLE retract and ends at X100 Y100 Z10 (not over the front handle). Test files on the

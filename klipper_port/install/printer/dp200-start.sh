@@ -96,6 +96,10 @@ if ! { [ -f /var/run/dp200-netd.pid ] && kill -0 $(cat /var/run/dp200-netd.pid) 
     sh $ROOT/dp200/dp200-netd.sh $ROOT </dev/null >> $ROOT/var/log/dp200-netd.log 2>&1 &
     echo $! > /var/run/dp200-netd.pid
 fi
+# Clock: the stock app set it (hwclock); without it the printer thinks it's
+# 2013 (wrong log names, file dates, Moonraker history). One-shot NTP once
+# the network is up, then save it to the RTC (CR2032 on the board).
+( sleep 20; ntpd -n -q -p pool.ntp.org && hwclock -w -u ) </dev/null >/dev/null 2>&1 &
 # front power button (hold 5 s = forced shutdown) and the screen's
 # reboot/power-off requests
 if ! { [ -f /var/run/dp200-powerkey.pid ] && kill -0 $(cat /var/run/dp200-powerkey.pid) 2>/dev/null; }; then
