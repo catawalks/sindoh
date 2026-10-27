@@ -63,7 +63,8 @@ Power button: GPIO5 pin 27; hardware cuts power after ~2 s hold; POWER page + dp
 FM image rebuilt on the printer (tools/fm_rebuild.sh, old one kept as /opt/dp200/fm.bin.prev) and verified
 after a hook boot. The JTAGulator was unplugged from CN3 (not the cause). The stock app ran once for the
 comparison (heated nozzle to ~88 C / bed 50 C on its own); /DEBUG_MACHINE is back. Bed is ~20 mm lower than
-this morning. regsnap_klipper/stock.txt + regdiff.txt are on the card in /mnt/sd.
+this morning. regsnap_klipper/stock.txt + regdiff.txt are on the card in /mnt/sd. prebuilt/ rebuilt (zig) and
+the USB payload rebuilt with the fixed fm.bin (release_check PASSED 21:12 printer time).
 10-27 NIGHT (unattended): repo copy on the card (/mnt/sd/usr/src/dp200/klipper_port) refreshed from git;
 all deployed files == repo (copied the missing dp200-wifi-from-stockdb.sh). USB payload rebuilt
 (/mnt/sd/payload). NAND restore images (ECC-corrected nanddump of mtd0-6) in D:\DP200\backup\nand_images,
