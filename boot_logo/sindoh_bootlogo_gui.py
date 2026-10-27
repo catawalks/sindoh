@@ -46,7 +46,7 @@ class App:
         self.bar = tk.StringVar(value="auto")
         self.dry = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Open a picture to start.")
-        self.key_status = tk.StringVar(value="no key yet")
+        self.key_status = tk.StringVar(value="built-in key")
         self.bar_auto_text = tk.StringVar(value="Automatic")
 
         self._build_ui()
@@ -139,8 +139,8 @@ class App:
                         variable=self.bar).grid(row=2, column=2, sticky="w")
         ttk.Radiobutton(f, text="Leave as is", value="keep",
                         variable=self.bar).grid(row=2, column=3, sticky="w", padx=6)
-        ttk.Label(f, text="Encryption key").grid(row=3, column=0, sticky="w", pady=(6, 0))
-        ttk.Button(f, text="crypto_key.dat...", command=self.load_key).grid(row=3, column=1, sticky="w", padx=6, pady=(6, 0))
+        ttk.Label(f, text="Key (built in)").grid(row=3, column=0, sticky="w", pady=(6, 0))
+        ttk.Button(f, text="Key file...", command=self.load_key).grid(row=3, column=1, sticky="w", padx=6, pady=(6, 0))
         ttk.Button(f, text="Type key...", command=self.type_key).grid(row=3, column=2, sticky="w", pady=(6, 0))
         ttk.Label(f, textvariable=self.key_status, foreground="#555").grid(row=4, column=1, columnspan=3, sticky="w", padx=6)
 
@@ -308,7 +308,7 @@ class App:
                 "It saves the old logo (bootlogo_original.bin) on the stick first, so it can "
                 "be put back. Use the Dry run option first."))
         self.key = None
-        self.key_status.set("model changed: load the key again")
+        self.key_status.set("built-in key")
         self.redraw()
 
     def load_key(self):
@@ -325,7 +325,7 @@ class App:
             messagebox.showerror("Key", str(e))
 
     def type_key(self):
-        k = simpledialog.askstring("Encryption key", "Update password for this model:", show="*")
+        k = simpledialog.askstring("Encryption key", "Update password for this model:")
         if k:
             self.key = k.strip()
             self.key_status.set("key typed in")
@@ -345,12 +345,9 @@ class App:
         if self.src is None:
             messagebox.showinfo("No picture", "Open a picture first.")
             return
-        if not self.key:
-            messagebox.showinfo("No key", "Load crypto_key.dat from your printer first "
-                                          "(the /app folder), or type the key.")
-            return
         model = self.model_key()
         m = core.MODELS[model]
+        key = self.key or m["key"]
         if not m["verified"] and not messagebox.askyesno(
                 "Not verified", f"{m['name']} is not verified. Make the file anyway?"):
             return
@@ -374,7 +371,7 @@ class App:
             try:
                 raw = core.to_rgb565(core.upright_to_fb(upright), dither)
                 b = core.auto_bar_color(core.from_rgb565(raw, m["fb"])) if bar == "auto" else bar
-                path = core.build_usb(raw, model, self.key, b, out, dry)
+                path = core.build_usb(raw, model, key, b, out, dry)
                 msg = (f"Saved {path} (verified), progress bar {b}"
                        f"{', DRY RUN' if dry else ''}.\nlogo md5 {hashlib.md5(raw).hexdigest()}\n\n"
                        "Plug the stick into the printer and touch the screen when asked. "

@@ -19,15 +19,17 @@ from PIL import Image, ImageOps
 SCRIPT_NAME = "unmistakable_bootlogo.sh"
 LOGO_NAME = "bootlogo_new.bin"
 
-# Per printer family: logo geometry, USB folder and .she cipher.
-# Only the DP200 is verified. The 3DWOX 1 entry follows the cipher described
+# Per printer family: logo geometry, USB folder, .she cipher and the update
+# password (what /app/crypto_key.dat decrypts to; already public in this
+# repository's README). The DP200 key is checked on a Sindoh DP200 and on a
+# Stanley Model 1. Only the DP200 logo format is verified. The 3DWOX 1 entry follows the cipher described
 # in this repository's README; its logo partition and panel are unknown until
 # someone checks a 3DWOX 1 update or a dump of its boot-logo partition.
 MODELS = {
-    "dp200": dict(name="DP200 (3DWOX DP200, Model 1)", fb=(800, 480), upright=(480, 800),
-                  folder="_update_rodin", cipher="des3", verified=True),
+    "dp200": dict(name="DP200 / Model 1 (all brands)", fb=(800, 480), upright=(480, 800),
+                  folder="_update_rodin", cipher="des3", key="sindoh024601779", verified=True),
     "3dwox1": dict(name="3DWOX 1 (newer, not verified)", fb=(800, 480), upright=(480, 800),
-                   folder="_update_rodin_up", cipher="aes", verified=False),
+                   folder="_update_rodin_up", cipher="aes", key="sindoh024601779U", verified=False),
 }
 
 

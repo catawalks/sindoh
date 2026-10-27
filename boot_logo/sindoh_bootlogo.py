@@ -6,7 +6,7 @@ same with a window. Turns any picture (PNG, JPG, ...) into the printer's raw
 boot-logo format and packs it, with a small install script, into an encrypted
 .she file that the printer's own USB update (/app/auto_update.sh) runs:
 
-    python sindoh_bootlogo.py my_logo.png --key-file crypto_key.dat
+    python sindoh_bootlogo.py my_logo.png
 
 then copy the generated _update_rodin folder to the root of a FAT32 USB
 stick, plug it into the printer and touch the screen when asked.
@@ -21,11 +21,11 @@ bar_color (0 for dark logos, 1 for light ones, like Sindoh's own files).
 Other commands:
     python sindoh_bootlogo.py --decode bootlogo_original.bin original.png
         show a raw logo (e.g. the backup the stick saves) as an upright PNG
-    python sindoh_bootlogo.py bootlogo_original.bin --key-file crypto_key.dat
+    python sindoh_bootlogo.py bootlogo_original.bin
         a raw .bin logo is packed as it is (restore the original)
 
-The encryption key is not part of this tool: pass the crypto_key.dat from
-your own printer (/app/crypto_key.dat), or --key if you already know it.
+The update key of each model is built in. If your printer uses another one,
+pass its /app/crypto_key.dat with --key-file, or the key itself with --key.
 Needs Python 3.8+ and Pillow (pip install pillow).
 """
 import argparse
@@ -59,10 +59,10 @@ def fit_image(path, size, fit, bg):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter,
-                                 epilog="Example: python sindoh_bootlogo.py logo.png --key-file crypto_key.dat")
+                                 epilog="Example: python sindoh_bootlogo.py logo.png")
     ap.add_argument("image", nargs="?", help="your picture, or a raw logo .bin to pack as is")
-    ap.add_argument("--key-file", help="crypto_key.dat copied from your printer's /app")
-    ap.add_argument("--key", help="the update password itself, instead of --key-file")
+    ap.add_argument("--key-file", help="use the key in this crypto_key.dat (from the printer's /app) instead of the built-in one")
+    ap.add_argument("--key", help="use this update password instead of the built-in one")
     ap.add_argument("--model", choices=sorted(core.MODELS), default="dp200")
     ap.add_argument("--experimental", action="store_true",
                     help="allow a model whose logo format is not verified yet")
@@ -98,10 +98,8 @@ def main():
         sys.exit(f"The {a.model} boot-logo format is not verified yet (only the DP200 is).\n"
                  "Run with --experimental to try anyway: the stick saves the old logo\n"
                  "(bootlogo_original.bin) so it can be put back.")
-    if not (a.key or a.key_file):
-        ap.error("need --key-file crypto_key.dat (from your printer's /app) or --key")
     try:
-        key = a.key or core.key_from_file(a.key_file, m["cipher"])
+        key = a.key or (core.key_from_file(a.key_file, m["cipher"]) if a.key_file else m["key"])
     except ValueError as e:
         sys.exit(f"{e} - try --key")
 
