@@ -1,10 +1,17 @@
 # Custom boot logo
 
-`sindoh_bootlogo.py` turns any picture into the printer's boot logo and packs
-it into an encrypted `.she` update file. The printer's own USB update
-(`/app/auto_update.sh`) installs that file. You don't need a serial console, a
-root shell or Klipper. It works on stock firmware and on Klipper-ported
-printers.
+Turn any picture into the printer's boot logo. The tool packs it into an
+encrypted `.she` update file, which the printer's own USB update
+(`/app/auto_update.sh`) installs. You don't need a serial console, a root
+shell or Klipper. It works on stock firmware and on Klipper-ported printers.
+
+There are two versions, which share `bootlogo_core.py`:
+- **`SindohBootLogo.exe`** / `sindoh_bootlogo_gui.py`: a Windows program
+  with a live preview of the printer screen;
+- **`sindoh_bootlogo.py`**: a command-line version for Windows, Linux and
+  macOS.
+
+Both do the encryption themselves; no `openssl` is needed.
 
 ## What the boot logo is (DP200, verified)
 
@@ -24,24 +31,45 @@ printers.
   the brand's stock logo back, chosen by the printer's TLI. So does the
   factory `--set-tli` step. After an OEM update, run your logo stick again.
 
-## Use
+## The window version
 
-Needs Python 3.8+, Pillow (`pip install pillow`) and the `openssl` command
-(Linux/macOS have it; on Windows, Git for Windows includes one and the tool
-finds it).
+![The boot logo maker window](screenshot.png)
 
 1. Copy `/app/crypto_key.dat` from your printer, or from a backup of its
    `/app`. The update password is not included in this tool.
-2. Make the stick files:
-   ```
-   python sindoh_bootlogo.py my_logo.png --key-file crypto_key.dat
-   ```
-   This writes `bootlogo_usb/_update_rodin/unmistakable_bootlogo.she`. Check
-   `bootlogo_usb/bootlogo_preview.png`: it shows exactly what the screen will
-   show (16-bit colour).
-3. Copy the `_update_rodin` folder to the root of a FAT32 USB stick and plug
-   the stick into the printer. It shows "Touch to install the new boot
+2. Start `SindohBootLogo.exe`, or `python sindoh_bootlogo_gui.py` with
+   Python 3.8+ and `pip install pillow`. Then:
+   - **Open picture...** (PNG, JPG, BMP, GIF, WebP, TIFF);
+   - drag the picture to move it, use the mouse wheel to zoom, or use the
+     Size / Rotate sliders, *Rotate 90*, *Mirror*, *Fit whole picture*,
+     *Fill screen*, *Center*;
+   - pick a background colour, *Invert colours*, and *Dither* (on for
+     photos and gradients, off for flat-colour logos). The preview shows
+     the screen's real 16-bit colour;
+   - choose the printer model and the boot progress bar colour: Automatic,
+     0 (dark logos), 1 (light logos) or *Leave as is*;
+   - **crypto_key.dat...** loads the key.
+3. **Save to USB stick...**: choose the stick, or any folder whose
+   `_update_rodin` folder you'll copy onto a FAT32 stick later. The file is
+   checked by decrypting it again before it's saved.
+4. Plug the stick into the printer. It shows "Touch to install the new boot
    logo"; touch the screen. The new logo appears at the next power-on.
+
+**Open raw logo (.bin)...** loads a raw logo exactly, for example the
+`bootlogo_original.bin` the stick saved. Saving it unchanged puts the old
+logo back bit for bit.
+
+To build the `.exe` yourself: `pip install pillow pyinstaller`, then run
+`build_exe.bat` (it writes to `dist\`).
+
+## The command-line version
+
+```
+python sindoh_bootlogo.py my_logo.png --key-file crypto_key.dat
+```
+This writes `bootlogo_usb/_update_rodin/unmistakable_bootlogo.she` and
+`bootlogo_usb/bootlogo_preview.png` (what the screen will show). Copy the
+`_update_rodin` folder to the root of a FAT32 USB stick.
 
 The first time, the stick also gets **`bootlogo_original.bin`**, the logo
 that was on the printer. To put it back:
@@ -50,21 +78,23 @@ python sindoh_bootlogo.py bootlogo_original.bin --key-file crypto_key.dat
 ```
 (A `.bin` input is packed as it is.)
 
-Options:
-
 | Option | |
 |---|---|
 | `--fit contain` | whole picture, with `--bg` colour bars around it (default) |
 | `--fit cover` | fill the screen, crop the edges |
 | `--fit stretch` | distort to 480 × 800 |
 | `--bg COLOUR` | background for `contain` and transparent areas (default black) |
+| `--invert` | invert the picture's colours |
 | `--no-dither` | plain rounding to 16-bit colour, best for flat-colour logos. The default dithers, best for photos and gradients. |
 | `--bar-color auto/0/1/keep` | progress bar colour; `auto` uses 0 for dark pictures and 1 for light ones |
+| `--dry-run` | the stick only runs the checks and writes nothing |
 | `--decode logo.bin out.png` | view a raw logo (a backup, a stock logo) upright |
 | `--out DIR` | output folder (default `bootlogo_usb`) |
 
-**Rehearsal:** an empty file named `dry_run` in `_update_rodin` on the stick
-runs every check (partition, size, md5, current logo) and writes nothing.
+**Rehearsal (both versions):** with *Dry run* or `--dry-run`, the stick gets
+an empty `dry_run` file. The printer then runs every check (partition, size,
+md5, current logo) and writes nothing. Delete that file, or save again
+without the option, to install for real.
 
 ## What runs on the printer
 
@@ -84,8 +114,10 @@ picture). Run the stick again, or restore `bootlogo_original.bin`.
 
 Tested 2026-10-27 on a DP200:
 - the stock logos are reproduced exactly (PNG → `.bin` round trip, md5 equal);
+- the Python Triple DES / AES match `openssl` byte for byte;
 - the printer's OpenSSL 1.0 decrypts the `.she`, and the script passes every
-  check in `dry_run` mode.
+  check in `dry_run` mode;
+- a test logo was flashed and read back (`mtd3` md5 equals the image).
 
 ## Newer 3DWOX 1 models (not verified)
 
