@@ -13,29 +13,36 @@ There are two versions, which share `bootlogo_core.py`:
 
 Both do the encryption themselves; no `openssl` is needed.
 
-## What the boot logo is
+## Supported printers
 
-The DP200 family is the Sindoh 3DWOX DP200 and its rebrands (Stanley,
-Leon3D, Mimaki Model 1). They share the boot logo format and the update key;
-the key is built into the tool and was checked on a Sindoh DP200 and on a
-Stanley Model 1. The newer 3DWOX 1 uses the same logo format, with its own
-USB folder and key (see the last section).
+| Model | Screen (draw upright at) | Logo format | Where it lives | USB folder |
+|---|---|---|---|---|
+| DP200 / DP201 / Model 1 (Sindoh, Stanley, Leon3D, Mimaki) | 480 × 800 | 800 × 480 RGB565, turned 90° | NAND partition `boot-logo` (`mtd3`) | `_update_rodin` |
+| 3DWOX 1 | 480 × 800 | same as DP200 | NAND `boot-logo` | `_update_rodin_up` |
+| 3DWOX 2X | 480 × 800 | 800 × 480 24-bit BGR, turned 90° | older boards (Prime_r1): NAND `boot-logo`; newer (Prime_r2): `/boot/bootlogo.bin` | `_update_rodin_prime` |
+| 3DWOX 1X | 480 × 800 | 800 × 480 24-bit BGR, turned 90° | `/boot/bootlogo.bin` on the eMMC | `_update_rodin_1x` |
+| 3DWOX 7X | 1024 × 600 (landscape) | 1024 × 600 RGB565 | `/boot/bootlogo.bin` on the eMMC | `_update_rodin_h` |
+| 3DWOX 30X | not supported yet | | | `_update_rodin_stf` |
 
-- **Where:** the flash partition `boot-logo` (`mtd3`, 1 MiB). U-Boot reads it
-  at power-on.
-- **Format:** one raw frame-buffer image, **800 × 480 pixels, RGB565
-  little-endian, no header** (768000 bytes). The panel is mounted in
-  portrait, so the image is stored turned 90°. Draw your logo **upright at
-  480 × 800**; the tool turns it.
-- **Progress bar:** U-Boot draws a progress bar over the logo. Its colour is
-  the U-Boot variable `bar_color`: Sindoh uses 0 for dark logos (Sindoh,
+Pick the model in the window or with `--model` (`dp200`, `3dwox1`, `2x`,
+`1x`, `7x`). Each model's update key is built in. The 30X uses a key that
+isn't known yet; see the end of this page.
+
+- **The logo** is one raw frame-buffer image with no header. U-Boot shows it
+  at power-on: the DP200 and 3DWOX 1 read it from NAND, while the 1X, 7X and
+  newer 2X load the file `/boot/bootlogo.bin` from the eMMC. The 800 × 480
+  panels are mounted in portrait, so those logos are stored turned 90°.
+  Draw your logo upright; the tool turns it.
+- **Progress bar:** a progress bar is drawn over the logo. Its colour is the
+  U-Boot variable `bar_color`: Sindoh uses 0 for dark logos (Sindoh,
   Leon3D) and 1 for light ones (Stanley, Mimaki).
-- **The stock logos** are in `/app/boot-logo_{sindoh,stanley,leon3d,mimaki}.bin`.
-  The OEM update (`image.logo`) carries `boot-logo_rodin.bin`, which is the
-  same file as the Sindoh one.
+- **The stock logos:** DP200 and 3DWOX 1 have them in
+  `/app/boot-logo_{sindoh,stanley,leon3d,mimaki}.bin`, and the others in
+  `/boot/bootlogo_{sindoh,leon3d,rize}.bin`.
 - **When it gets replaced:** an OEM firmware update (`update.she`) writes
   the brand's stock logo back, chosen by the printer's TLI. So does the
-  factory `--set-tli` step. After an OEM update, run your logo stick again.
+  factory `--set-tli` step on the DP200. After an OEM update, run your logo
+  stick again.
 
 ## The window version
 
@@ -48,15 +55,17 @@ USB folder and key (see the last section).
      Size / Rotate sliders, *Rotate 90*, *Mirror*, *Fit whole picture*,
      *Fill screen*, *Center*;
    - pick a background colour, *Invert colours*, and *Dither* (on for
-     photos and gradients, off for flat-colour logos). The preview shows
-     the screen's real 16-bit colour;
-   - choose the printer model and the boot progress bar colour: Automatic,
+     photos and gradients, off for flat-colour logos; it only matters on
+     the 16-bit screens). The preview shows the screen's own colours;
+   - choose the printer model (the preview changes to its screen) and the
+     boot progress bar colour: Automatic,
      0 (dark logos), 1 (light logos) or *Leave as is*;
    - the update key is built in. If your printer uses another one,
      **Key file...** loads the `crypto_key.dat` from your printer's `/app`, or
      **Type key...** takes it as text.
-2. **Save to USB stick...**: choose the stick, or any folder whose
-   `_update_rodin` folder you'll copy onto a FAT32 stick later. The file is
+2. **Save to USB stick...**: choose the stick, or any folder whose model
+   folder (`_update_rodin`, `_update_rodin_up`, ...) you'll copy onto a
+   FAT32 stick later. The file is
    checked by decrypting it again before it's saved.
 3. Plug the stick into the printer. It shows "Touch to install the new boot
    logo"; touch the screen. The new logo appears at the next power-on.
@@ -71,16 +80,16 @@ To build the `.exe` yourself: `pip install pillow pyinstaller`, then run
 ## The command-line version
 
 ```
-python sindoh_bootlogo.py my_logo.png
+python sindoh_bootlogo.py my_logo.png --model dp200
 ```
 This writes `bootlogo_usb/_update_rodin/unmistakable_bootlogo.she` and
 `bootlogo_usb/bootlogo_preview.png` (what the screen will show). Copy the
-`_update_rodin` folder to the root of a FAT32 USB stick.
+model folder (here `_update_rodin`) to the root of a FAT32 USB stick.
 
 The first time, the stick also gets **`bootlogo_original.bin`**, the logo
 that was on the printer. To put it back:
 ```
-python sindoh_bootlogo.py bootlogo_original.bin
+python sindoh_bootlogo.py bootlogo_original.bin --model dp200
 ```
 (A `.bin` input is packed as it is.)
 
@@ -88,10 +97,11 @@ python sindoh_bootlogo.py bootlogo_original.bin
 |---|---|
 | `--fit contain` | whole picture, with `--bg` colour bars around it (default) |
 | `--fit cover` | fill the screen, crop the edges |
-| `--fit stretch` | distort to 480 × 800 |
+| `--model` | `dp200` (default), `3dwox1`, `2x`, `1x`, `7x` |
+| `--fit stretch` | distort to the screen size |
 | `--bg COLOUR` | background for `contain` and transparent areas (default black) |
 | `--invert` | invert the picture's colours |
-| `--no-dither` | plain rounding to 16-bit colour, best for flat-colour logos. The default dithers, best for photos and gradients. |
+| `--no-dither` | plain rounding to 16-bit colour, best for flat-colour logos. The default dithers, best for photos and gradients. (24-bit models need neither.) |
 | `--bar-color auto/0/1/keep` | progress bar colour; `auto` uses 0 for dark pictures and 1 for light ones |
 | `--dry-run` | the stick only runs the checks and writes nothing |
 | `--decode logo.bin out.png` | view a raw logo (a backup, a stock logo) upright |
@@ -106,45 +116,61 @@ without the option, to install for real.
 ## What runs on the printer
 
 `unmistakable_bootlogo.sh` is packed inside the `.she` next to the image. It:
-1. finds the partition by its name `boot-logo` in `/proc/mtd`, not by
-   number;
-2. refuses to write if the image is bigger than the partition, or if its
-   size or md5 doesn't match;
+1. finds the logo: the NAND partition named `boot-logo` in `/proc/mtd` (not
+   by number), or the file `/boot/bootlogo.bin`. On the 2X it picks by
+   `/sys/kernel/board_name`: the file on Prime_r2 boards, NAND otherwise;
+2. refuses to write if the image's size or md5 doesn't match, or if it's
+   bigger than the partition;
 3. returns without writing if the logo is already installed;
 4. saves the current logo to the stick once (`bootlogo_original.bin`);
-5. asks for a touch, then erases the partition, writes it (`nandwrite -p`)
-   and reads it back to compare;
+5. asks for a touch, then writes the logo and reads it back to compare.
+   NAND: erase, then `nandwrite -p`. File: writes `bootlogo.bin.new`, then
+   renames it over `bootlogo.bin`. Sindoh's updates leave `bootlogo.bin` as
+   a symlink to the stock logo; the rename replaces the link, not the stock
+   file;
 6. sets `bar_color`.
 
 A failed write leaves the printer booting normally (the logo is only a
 picture). Run the stick again, or restore `bootlogo_original.bin`.
 
-Tested 2026-10-27 on a DP200:
+## How each model was checked
+
+**DP200** (tested on a printer, 2026-10-27):
 - the stock logos are reproduced exactly (PNG → `.bin` round trip, md5 equal);
 - the Python Triple DES / AES match `openssl` byte for byte;
 - the printer's OpenSSL 1.0 decrypts the `.she`, and the script passes every
   check in `dry_run` mode;
-- a test logo was flashed and read back (`mtd3` md5 equals the image).
+- a test logo was flashed and read back (`mtd3` md5 equals the image);
+- the DP201's OEM update is byte for byte the DP200's.
 
-## Newer 3DWOX 1 models
+**3DWOX 1, 2X, 1X, 7X** were checked against Sindoh's own updates:
+`RODUP_220111_1`, `PRIME_210419_2`, `ROD1X_190917_1` and `RODNH_210602_1`.
+- **Keys:** each update decrypts with the model's built-in key, and the
+  printer's own `crypto_key.dat` gives the same key.
+- **The 3DWOX 1** runs the same firmware as the DP200, with `RODIN_SUB=U`;
+  its stock logos are byte for byte the DP200's.
+- **Logo formats** come from the stock logo files in each update. Every one
+  converts to a picture and back to the identical file.
+- **Install path:** each model's `update.sh` / `auto_update.sh` shows how the
+  logo is installed, and that `unmistakable*.she` files in the model's USB
+  folder are run the same way as on the DP200. The 1X and 7X U-Boot loads
+  `/boot/bootlogo.bin`.
+- **The sticks** this tool makes decrypt with `openssl` and unpack with
+  `tar -xj`, the way each printer does it.
+- **The file-mode script** ran on the DP200's busybox shell, in a `/tmp`
+  copy, over a symlinked stock logo:
+  - the dry run wrote nothing;
+  - the install replaced the link and left the stock file alone;
+  - the backup held the old logo;
+  - a second run said "already installed".
 
-Choose **3DWOX 1 (newer)** in the window, or `--model 3dwox1`. The stick
-then gets a `_update_rodin_up` folder, and the `.she` is encrypted with
-AES-256-CBC and the 3DWOX 1 key, which is also built in.
+None of these four has been run on its own hardware yet. Use *Dry run* the
+first time.
 
-The 3DWOX 1 runs the same firmware as the DP200, with `RODIN_SUB=U` in
-`/etc/export_rodin_sub.sh`. That setting only picks the USB folder and the
-cipher. Checked 2026-10-27 against Sindoh's 3DWOX 1 update `RODUP_220111_1`:
-- it decrypts with the built-in key, and its `crypto_key.dat` gives the same
-  key;
-- its `image.logo` and `/app/boot-logo_{sindoh,stanley,leon3d,mimaki}.bin`
-  are byte for byte the same files as the DP200's: 800 × 480 RGB565;
-- its `update.sh` writes the logo to `mtd3` and sets `bar_color` exactly
-  like the DP200's;
-- its `auto_update.sh` runs `unmistakable*.she` from `_update_rodin_up`
-  the same way;
-- a 3DWOX 1 stick from this tool decrypts with `openssl aes-256-cbc` and
-  unpacks with `tar -xj`, the way that printer does it.
+## 3DWOX 30X (not supported yet)
 
-It has not been run on a real 3DWOX 1 yet. Use *Dry run* the first time;
-the script also checks the partition's name and size before writing.
+Its update (`RDSTF_220422_1`, folder `_update_rodin_stf`) is AES-encrypted
+like the 1X and 7X, but not with any key tried so far. Those were the
+DP200 key plus every one- or two-character ending; the 1X and 7X keys
+follow that pattern. With the key, from a 30X's `/app/crypto_key.dat`, it
+can probably be added like the 7X: its system image is the same size.

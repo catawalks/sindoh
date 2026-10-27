@@ -18,7 +18,7 @@ from PIL import Image, ImageOps, ImageTk
 
 import bootlogo_core as core
 
-VIEW = 0.625                 # preview scale: 480 x 800 -> 300 x 500
+BOX = 500                    # preview: the longer screen side, in pixels
 PAD = 12
 
 
@@ -62,13 +62,11 @@ class App:
         r.columnconfigure(1, weight=1)
         r.rowconfigure(0, weight=1)
 
-        w, h = int(480 * VIEW), int(800 * VIEW)
-        self.canvas = tk.Canvas(left, width=w, height=h, bg="#202020",
-                                highlightthickness=1, highlightbackground="#888", cursor="fleur")
+        self.canvas = tk.Canvas(left, bg="#202020", highlightthickness=1,
+                                highlightbackground="#888", cursor="fleur")
         self.canvas.grid(row=0, column=0)
-        ttk.Label(left, text="Printer screen, upright (480 x 800).\n"
-                             "Drag to move, mouse wheel to zoom.",
-                  justify="center").grid(row=1, column=0, pady=(6, 0))
+        self.screen_lbl = ttk.Label(left, justify="center")
+        self.screen_lbl.grid(row=1, column=0, pady=(6, 0))
         self.canvas.bind("<ButtonPress-1>", self.on_press)
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", lambda e: setattr(self, "drag", None))
@@ -118,7 +116,7 @@ class App:
                         command=self.changed).grid(row=0, column=2, padx=(12, 0))
         ttk.Checkbutton(f, text="Dither (smoother photos and gradients)",
                         variable=self.dither).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
-        ttk.Checkbutton(f, text="Preview in the screen's 16-bit colour", variable=self.show565,
+        ttk.Checkbutton(f, text="Preview in the screen's own colours", variable=self.show565,
                         command=self.redraw).grid(row=2, column=0, columnspan=3, sticky="w")
 
         # 4. printer
@@ -126,10 +124,11 @@ class App:
         f.grid(row=3, column=0, sticky="ew", pady=(8, 0))
         ttk.Label(f, text="Model").grid(row=0, column=0, sticky="w")
         names = [m["name"] for m in core.MODELS.values()]
-        self.model_box = ttk.Combobox(f, values=names, state="readonly", width=32)
+        self.model_box = ttk.Combobox(f, values=names, state="readonly", width=36)
         self.model_box.current(0)
         self.model_box.grid(row=0, column=1, columnspan=3, sticky="w", padx=6)
         self.model_box.bind("<<ComboboxSelected>>", self.on_model)
+        self.fit_canvas()
         ttk.Label(f, text="Boot progress bar").grid(row=1, column=0, sticky="w", pady=(6, 0))
         ttk.Radiobutton(f, textvariable=self.bar_auto_text, value="auto",
                         variable=self.bar).grid(row=1, column=1, sticky="w", padx=6, pady=(6, 0))
@@ -164,10 +163,21 @@ class App:
     def size(self):
         return core.MODELS[self.model_key()]["upright"]
 
+    def view(self):
+        """Preview scale: the screen's longer side becomes BOX pixels."""
+        return BOX / max(self.size())
+
+    def fit_canvas(self):
+        W, H = self.size()
+        k = self.view()
+        self.canvas.config(width=round(W * k), height=round(H * k))
+        self.screen_lbl.config(text=f"Printer screen, upright ({W} x {H}).\n"
+                                    "Drag to move, mouse wheel to zoom.")
+
     def compose(self, view):
         """The upright screen image. view=True: small and fast for the canvas."""
         W, H = self.size()
-        k = VIEW if view else 1.0
+        k = self.view() if view else 1.0
         out = Image.new("RGB", (round(W * k), round(H * k)), self.bg)
         if self.src is None:
             return out
@@ -179,7 +189,7 @@ class App:
             im = Image.merge("RGBA", ImageOps.invert(Image.merge("RGB", (r, g, b))).split() + (a,))
         s = self.scale.get() / 100 * k
         w, h = max(1, round(im.width * s)), max(1, round(im.height * s))
-        if self.raw_exact and not view and self.is_identity():
+        if self.raw_exact and not view and self.is_identity() and im.size == (W, H):
             out.paste(im.convert("RGB"))
             return out
         im = im.resize((w, h), Image.Resampling.BILINEAR if view else Image.Resampling.LANCZOS)
@@ -200,7 +210,7 @@ class App:
     def redraw(self):
         im = self.compose(True)
         if self.show565.get():
-            im = core.preview_565(im)
+            im = core.preview(im, core.MODELS[self.model_key()])
         self.bar_auto_text.set(f"Automatic ({core.auto_bar_color(im)})")
         self.tkimg = ImageTk.PhotoImage(im)
         self.canvas.delete("all")
@@ -230,12 +240,15 @@ class App:
         if not path:
             return
         m = core.MODELS[self.model_key()]
-        n = m["fb"][0] * m["fb"][1] * 2
-        data = open(path, "rb").read()[:n]
+        n = m["bytes"]
+        data = open(path, "rb").read()
+        if m["target"] == "mtd":
+            data = data[:n]                  # a partition dump has padding
         if len(data) != n:
-            messagebox.showerror("Not a logo", f"A raw logo has {n} bytes.")
+            messagebox.showerror("Not a logo", f"A raw {m['name']} logo has {n} bytes, this file "
+                                 f"{len(data)}.\nCheck the printer model (4. Printer) first.")
             return
-        self.src = core.fb_to_upright(core.from_rgb565(data, m["fb"])).convert("RGBA")
+        self.src = core.from_raw(data, m).convert("RGBA")
         self.src_name, self.raw_exact = os.path.basename(path), True
         self.name_lbl.config(text=f"{self.src_name}  (raw logo, kept exact)")
         self.reset()
@@ -286,8 +299,8 @@ class App:
 
     def on_drag(self, e):
         if self.drag:
-            self.dx += (e.x - self.drag[0]) / VIEW
-            self.dy += (e.y - self.drag[1]) / VIEW
+            self.dx += (e.x - self.drag[0]) / self.view()
+            self.dy += (e.y - self.drag[1]) / self.view()
             self.drag = (e.x, e.y)
             self.redraw()
 
@@ -309,7 +322,13 @@ class App:
                 "be put back. Use the Dry run option first."))
         self.key = None
         self.key_status.set("built-in key")
-        self.redraw()
+        old = (int(self.canvas.cget("width")), int(self.canvas.cget("height")))
+        self.fit_canvas()
+        new = (int(self.canvas.cget("width")), int(self.canvas.cget("height")))
+        if self.src is not None and old != new and not self.raw_exact:
+            self.fit(False)                  # other screen shape: fit the picture again
+        else:
+            self.redraw()
 
     def load_key(self):
         path = filedialog.askopenfilename(title="crypto_key.dat from your printer's /app folder",
@@ -336,7 +355,7 @@ class App:
         path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG", "*.png")],
                                             initialfile="bootlogo_preview.png")
         if path:
-            core.preview_565(self.compose(False)).save(path)
+            core.preview(self.compose(False), core.MODELS[self.model_key()]).save(path)
             self.status.set(f"Saved {path}")
 
     def save_usb(self):
@@ -369,8 +388,8 @@ class App:
 
         def work():
             try:
-                raw = core.to_rgb565(core.upright_to_fb(upright), dither)
-                b = core.auto_bar_color(core.from_rgb565(raw, m["fb"])) if bar == "auto" else bar
+                raw = core.to_raw(upright, m, dither)
+                b = core.auto_bar_color(core.from_raw(raw, m)) if bar == "auto" else bar
                 path = core.build_usb(raw, model, key, b, out, dry)
                 msg = (f"Saved {path} (verified), progress bar {b}"
                        f"{', DRY RUN' if dry else ''}.\nlogo md5 {hashlib.md5(raw).hexdigest()}\n\n"

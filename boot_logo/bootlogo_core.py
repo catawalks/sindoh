@@ -19,18 +19,40 @@ from PIL import Image, ImageOps
 SCRIPT_NAME = "unmistakable_bootlogo.sh"
 LOGO_NAME = "bootlogo_new.bin"
 
-# Per printer family: logo geometry, USB folder, .she cipher and the update
-# password (what /app/crypto_key.dat decrypts to; already public in this
-# repository's README). The DP200 key is checked on a Sindoh DP200 and on a
-# Stanley Model 1. The 3DWOX 1 is the same firmware with RODIN_SUB=U: its OEM
-# update (RODUP_220111_1) decrypts with its key, carries the same four stock
-# logos byte for byte and writes them to mtd3 the same way.
+# Per printer family, from Sindoh's own updates (see README):
+#   fb       frame-buffer size (width, height) of the raw logo
+#   fmt      "rgb565" (2 bytes/pixel, little-endian) or "bgr888" (3 bytes)
+#   rotate   True: panel mounted in portrait, the logo is stored turned 90
+#   target   where the logo lives: "mtd" = the NAND partition "boot-logo";
+#            "file" = /boot/bootlogo.bin on the eMMC (U-Boot loads it);
+#            "auto" = the 2X: NAND on Prime_r1 boards, file on Prime_r2
+#   folder   USB folder the stock /app/auto_update.sh reads
+#   cipher, key  the .she encryption and update password (what
+#            /app/crypto_key.dat decrypts to; the keys are public)
+# DP200 key checked on a Sindoh DP200 and a Stanley Model 1. The 3DWOX 1 is
+# the DP200 firmware with RODIN_SUB=U and the same logos. 2X, 1X and 7X were
+# checked against their OEM updates (PRIME_210419_2, ROD1X_190917_1,
+# RODNH_210602_1): keys, stock logo files and how update.sh installs them.
 MODELS = {
-    "dp200": dict(name="DP200 / Model 1 (all brands)", fb=(800, 480), upright=(480, 800),
-                  folder="_update_rodin", cipher="des3", key="sindoh024601779", verified=True),
-    "3dwox1": dict(name="3DWOX 1 (newer)", fb=(800, 480), upright=(480, 800),
-                   folder="_update_rodin_up", cipher="aes", key="sindoh024601779U", verified=True),
+    "dp200": dict(name="DP200 / DP201 / Model 1 (all brands)", fb=(800, 480), fmt="rgb565",
+                  rotate=True, target="mtd", folder="_update_rodin", cipher="des3",
+                  key="sindoh024601779", verified=True),
+    "3dwox1": dict(name="3DWOX 1", fb=(800, 480), fmt="rgb565",
+                   rotate=True, target="mtd", folder="_update_rodin_up", cipher="aes",
+                   key="sindoh024601779U", verified=True),
+    "2x": dict(name="3DWOX 2X", fb=(800, 480), fmt="bgr888",
+               rotate=True, target="auto", folder="_update_rodin_prime", cipher="des3",
+               key="sindoh024601779", verified=True),
+    "1x": dict(name="3DWOX 1X", fb=(800, 480), fmt="bgr888",
+               rotate=True, target="file", folder="_update_rodin_1x", cipher="aes",
+               key="sindoh0246017791", verified=True),
+    "7x": dict(name="3DWOX 7X", fb=(1024, 600), fmt="rgb565",
+               rotate=False, target="file", folder="_update_rodin_h", cipher="aes",
+               key="sindoh024601779H", verified=True),
 }
+for _m in MODELS.values():
+    _m["upright"] = _m["fb"][::-1] if _m["rotate"] else _m["fb"]
+    _m["bytes"] = _m["fb"][0] * _m["fb"][1] * (2 if _m["fmt"] == "rgb565" else 3)
 
 
 def resource(name):
@@ -104,13 +126,35 @@ def preview_565(im):
     return im.convert("RGB").point(lut5 + lut6 + lut5)
 
 
-def fb_to_upright(im):
-    # panel mounted in portrait: fb (x, y) shows at upright (u = y, v = 799 - x)
-    return im.transpose(Image.Transpose.ROTATE_90)
+def fb_to_upright(im, m):
+    # portrait panels: fb (x, y) shows at upright (u = y, v = width-1 - x)
+    return im.transpose(Image.Transpose.ROTATE_90) if m["rotate"] else im
 
 
-def upright_to_fb(im):
-    return im.transpose(Image.Transpose.ROTATE_270)
+def upright_to_fb(im, m):
+    return im.transpose(Image.Transpose.ROTATE_270) if m["rotate"] else im
+
+
+def to_raw(upright, m, dither):
+    """Upright picture -> the model's raw logo bytes."""
+    fb = upright_to_fb(upright.convert("RGB"), m)
+    if m["fmt"] == "rgb565":
+        return to_rgb565(fb, dither)
+    return fb.tobytes("raw", "BGR")
+
+
+def from_raw(data, m):
+    """The model's raw logo bytes -> upright picture."""
+    if m["fmt"] == "rgb565":
+        fb = from_rgb565(data, m["fb"])
+    else:
+        fb = Image.frombytes("RGB", m["fb"], data, "raw", "BGR")
+    return fb_to_upright(fb, m)
+
+
+def preview(im, m):
+    """What the panel shows: 16-bit colour for rgb565 models."""
+    return preview_565(im) if m["fmt"] == "rgb565" else im.convert("RGB")
 
 
 def auto_bar_color(upright):
@@ -435,6 +479,14 @@ def aes_decrypt(password, data):
     return _unpad(_cbc(AES(key), iv, data, 16, False), 16)
 
 
+def aes_pw_decrypt(password, data):
+    """openssl aes-256-cbc -d -salt -k password (MD5 key derivation)."""
+    if data[:8] != b"Salted__":
+        raise ValueError("not a salted openssl file")
+    key, iv = _bytes_to_key(password.encode(), data[8:16], 32, 16)
+    return _unpad(_cbc(AES(key), iv, data[16:], 16, False), 16)
+
+
 def encrypt(cipher, key, data):
     return des3_encrypt(key, data) if cipher == "des3" else aes_encrypt(key, data)
 
@@ -455,7 +507,8 @@ def key_from_file(path, cipher):
     """The update password, stored encrypted in the printer's crypto_key.dat."""
     blob = open(path, "rb").read()
     attempts = ([lambda: des3_decrypt("", blob)] if cipher == "des3" else
-                [lambda: aes_decrypt("SINDOH", blob), lambda: des3_decrypt("SINDOH", blob)])
+                [lambda: aes_decrypt("SINDOH", blob), lambda: aes_pw_decrypt("", blob),
+                 lambda: des3_decrypt("SINDOH", blob)])
     for attempt in attempts:
         try:
             plain = attempt()
@@ -485,19 +538,20 @@ def make_tar_bz2(files):
     return bz2.compress(buf.getvalue(), 9)
 
 
-def install_script(size, md5, bar_color):
+def install_script(size, md5, bar_color, target="mtd"):
     text = open(resource(SCRIPT_NAME), "rb").read().replace(b"\r\n", b"\n")
     return (text.replace(b"@SIZE@", str(size).encode())
+                .replace(b"@TARGET@", target.encode())
                 .replace(b"@MD5@", md5.encode())
                 .replace(b"@BAR_COLOR@", str(bar_color).encode()))
 
 
 def build_usb(raw, model, key, bar_color, out_dir, dry_run=False):
     """Write <out_dir>/<folder>/unmistakable_bootlogo.she, verify it and
-    return its path. raw = the 768000-byte logo."""
+    return its path. raw = the raw logo (see MODELS for its format)."""
     m = MODELS[model]
     md5 = hashlib.md5(raw).hexdigest()
-    script = install_script(len(raw), md5, bar_color)
+    script = install_script(len(raw), md5, bar_color, m["target"])
     she = encrypt(m["cipher"], key, make_tar_bz2([(SCRIPT_NAME, script, 0o755),
                                                    (LOGO_NAME, raw, 0o644)]))
     # self-check: decrypt like the printer does and compare

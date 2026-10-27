@@ -96,6 +96,7 @@ installer for the internal NAND. Start with
 
 ## Custom boot logo
 
-[`boot_logo/`](boot_logo/) (Windows program + cross-platform script) turns your own picture into the boot logo (DP200: raw 800×480 RGB565
-in the `boot-logo` partition) and packs it into a `.she` USB update. The update key is
-built in. It works for the DP200 family and the newer 3DWOX 1, which use the same logo format.
+[`boot_logo/`](boot_logo/) (Windows program + cross-platform script) turns your own picture into the boot logo
+and packs it into a `.she` USB update, with each model's update key built in. It supports the DP200 / DP201 /
+Model 1 family, the 3DWOX 1, 2X, 1X and 7X (the 30X's key is not known yet). Its README lists each model's logo
+format, update key and USB folder, found in Sindoh's own updates.

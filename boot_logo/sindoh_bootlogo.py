@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
-"""Make a custom boot logo for a Sindoh DP200 / Model 1 or 3DWOX 1.
+"""Make a custom boot logo for a Sindoh DP200 / DP201 / Model 1, 3DWOX 1,
+3DWOX 2X, 3DWOX 1X or 3DWOX 7X.
 
 Command-line version (Windows, Linux, macOS); sindoh_bootlogo_gui.py is the
 same with a window. Turns any picture (PNG, JPG, ...) into the printer's raw
 boot-logo format and packs it, with a small install script, into an encrypted
 .she file that the printer's own USB update (/app/auto_update.sh) runs:
 
-    python sindoh_bootlogo.py my_logo.png
+    python sindoh_bootlogo.py my_logo.png --model dp200
 
-then copy the generated _update_rodin folder to the root of a FAT32 USB
-stick, plug it into the printer and touch the screen when asked.
+then copy the generated folder (_update_rodin, _update_rodin_up, ...) to the
+root of a FAT32 USB stick, plug it into the printer and touch the screen
+when asked.
 
-The boot logo (DP200): flash partition "boot-logo" (mtd3, 1 MiB), read by
-U-Boot at power-on. It holds one raw frame-buffer image: 800 x 480 pixels,
-RGB565 little-endian (768000 bytes). The panel is mounted in portrait, so the
-picture is stored turned 90 degrees: draw your logo upright at 480 x 800.
-U-Boot draws a progress bar over it; its colour is the U-Boot variable
-bar_color (0 for dark logos, 1 for light ones, like Sindoh's own files).
+The boot logo is one raw frame-buffer image that U-Boot shows at power-on:
+  dp200, 3dwox1  800 x 480 RGB565 in the NAND partition "boot-logo"
+  2x, 1x         800 x 480 24-bit (BGR) in "boot-logo" or /boot/bootlogo.bin
+  7x             1024 x 600 RGB565 in /boot/bootlogo.bin
+The 800 x 480 panels are mounted in portrait, so draw those logos upright at
+480 x 800; the tool turns them. U-Boot draws a progress bar over the logo;
+its colour is the U-Boot variable bar_color (0 for dark logos, 1 for light).
 
 Other commands:
     python sindoh_bootlogo.py --decode bootlogo_original.bin original.png
@@ -82,13 +85,13 @@ def main():
                     help="convert a raw logo to an upright PNG and exit")
     a = ap.parse_args()
     m = core.MODELS[a.model]
-    fb_bytes = m["fb"][0] * m["fb"][1] * 2
+    fb_bytes = m["bytes"]
 
     if a.decode:
         data = open(a.decode[0], "rb").read()[:fb_bytes]
         if len(data) != fb_bytes:
-            sys.exit(f"{a.decode[0]}: need {fb_bytes} bytes")
-        core.fb_to_upright(core.from_rgb565(data, m["fb"])).save(a.decode[1])
+            sys.exit(f"{a.decode[0]}: a {a.model} logo has {fb_bytes} bytes")
+        core.from_raw(data, m).save(a.decode[1])
         print(f"wrote {a.decode[1]}")
         return
 
@@ -103,10 +106,19 @@ def main():
     except ValueError as e:
         sys.exit(f"{e} - try --key")
 
+    upright = None
     if a.image.lower().endswith(".bin"):
-        raw = open(a.image, "rb").read()[:fb_bytes]        # a logo .bin / mtd3 dump
-        if len(raw) != fb_bytes:
-            sys.exit(f"{a.image}: a raw logo must be at least {fb_bytes} bytes")
+        raw = open(a.image, "rb").read()                    # a logo .bin / backup
+        if m["target"] == "mtd":
+            raw = raw[:fb_bytes]                            # an mtd dump has padding
+        if len(raw) == fb_bytes:
+            upright = core.from_raw(raw, m)
+        elif m["target"] == "mtd" or len(raw) < 100000:
+            sys.exit(f"{a.image}: a {a.model} logo has {fb_bytes} bytes")
+        else:
+            # /boot/bootlogo.bin of another size (e.g. an older 32-bit 7X
+            # logo): put back as it is
+            print(f"note: {len(raw)} bytes, not the usual {fb_bytes}; packed as it is")
     else:
         try:
             bg = ImageColor.getrgb(a.bg)[:3]
@@ -115,14 +127,18 @@ def main():
         upright = fit_image(a.image, m["upright"], a.fit, bg)
         if a.invert:
             upright = ImageOps.invert(upright)
-        raw = core.to_rgb565(core.upright_to_fb(upright), not a.no_dither)
-    upright = core.fb_to_upright(core.from_rgb565(raw, m["fb"]))
+        raw = core.to_raw(upright, m, not a.no_dither)
+        upright = core.from_raw(raw, m)
 
-    bar = core.auto_bar_color(upright) if a.bar_color == "auto" else a.bar_color
+    if a.bar_color == "auto":
+        bar = core.auto_bar_color(upright) if upright else "keep"
+    else:
+        bar = a.bar_color
     she = core.build_usb(raw, a.model, key, bar, a.out, a.dry_run)
     os.makedirs(a.out, exist_ok=True)
     open(os.path.join(a.out, "bootlogo_new.bin"), "wb").write(raw)
-    upright.save(os.path.join(a.out, "bootlogo_preview.png"))
+    if upright:
+        upright.save(os.path.join(a.out, "bootlogo_preview.png"))
 
     print(f"wrote {she}  (verified)" + ("  DRY RUN" if a.dry_run else ""))
     print(f"preview (as the screen shows it): {os.path.join(a.out, 'bootlogo_preview.png')}")
