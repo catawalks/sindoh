@@ -49,8 +49,7 @@ LAMP_ON [BRIGHTNESS=], LAMP_OFF, LAMP_TOGGLE, M355 S/P added and tested. webcam.
 WEBCAM + LAMP DONE 10-20 (unattended, no motion/heat): lamp = io:pwm7 ([output_pin lamp], on by default);
 ustreamer MJPEG 640x480@15 passthrough as an rc.dp200 service (klipper user, v4l2_time32_shim LD_PRELOAD,
 --device-timeout 5), Mainsail rotation 270, ~8 % of one core (stock YUYV way: 92 %). Load numbers in
-hardware_notes. Tunables: /etc/dp200/webcam.conf + rc.dp200 restart-webcam. A cardboard box with the
-thermocouple sits on the bed (visible on the camera) - remove before any homing/mesh!
+hardware_notes. Tunables: /etc/dp200/webcam.conf + rc.dp200 restart-webcam.
 10-26 NIGHT (unattended): 4GB-SD was 100 % FULL - nginx access.log 600 MB (Mainsail polls the webcam
 snapshot ~1/s; no logrotate in the chroot) -> truncated snapshots, failed writes. Fixed: access_log off,
 proxy_buffering off for /webcam/ (sites-available/mainsail deployed, nginx reloaded, 574 MB free, snapshot
