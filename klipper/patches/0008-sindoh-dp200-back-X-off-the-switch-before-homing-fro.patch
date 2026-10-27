@@ -1,0 +1,60 @@
+From 26fcc1013935eaead05861fa11e59cb56a9944bd Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 18:25:10 -0400
+Subject: [PATCH 8/8] sindoh-dp200: back X off the switch before homing from
+ the purge bin
+
+The bin (X 231.2) and park (X 229) are ~15 mm past the X switch, deeper
+than the 5 mm homing retract, so G28 after a load or clean failed with
+'still triggered after retract'.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config/sindoh-dp200/dp200_macros.cfg | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/config/sindoh-dp200/dp200_macros.cfg b/config/sindoh-dp200/dp200_macros.cfg
+index 4215437f..e4c6a7f8 100644
+--- a/config/sindoh-dp200/dp200_macros.cfg
++++ b/config/sindoh-dp200/dp200_macros.cfg
+@@ -347,7 +347,7 @@ axes: xyz
+ gcode:
+     {% set all = 'X' not in params and 'Y' not in params and 'Z' not in params %}
+     {% if all or 'X' in params %}
+-        G28 X
++        _SINDOH_HOME_X
+     {% endif %}
+     {% if all or 'Y' in params %}
+         G28 Y
+@@ -357,12 +357,27 @@ gcode:
+         _SINDOH_HOME_Z
+     {% endif %}
+ 
++# The purge bin (X 231.2) and load park (X 229) are past the X switch
++# (216): parked there the carriage is ~15 mm into the switch, too deep for
++# the 5 mm homing retract ("still triggered after retract"). Back off first.
++[gcode_macro _SINDOH_HOME_X]
++gcode:
++    QUERY_ENDSTOPS
++    _SINDOH_HOME_X_CHECKED
++
++[gcode_macro _SINDOH_HOME_X_CHECKED]
++gcode:
++    {% if printer.query_endstops.last_query.stepper_x %}
++        FORCE_MOVE STEPPER=stepper_x DISTANCE=-20 VELOCITY=10
++    {% endif %}
++    G28 X
++
+ [gcode_macro _SINDOH_HOME_Z]
+ gcode:
+     {% if not printer.probe.last_query %}
+         M118 Probe pin is deployed - stowing it before Z homing
+         {% if 'x' not in printer.toolhead.homed_axes %}
+-            G28 X
++            _SINDOH_HOME_X
+         {% endif %}
+         {% if 'z' not in printer.toolhead.homed_axes %}
+             # bed height unknown: move it 10 mm down blind (at the bottom it just stalls)
+-- 
+2.55.0.windows.5
+
