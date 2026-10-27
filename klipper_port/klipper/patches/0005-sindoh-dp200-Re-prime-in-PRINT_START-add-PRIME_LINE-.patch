@@ -1,7 +1,7 @@
 From 0eed04f807354f114f690bd091ea9bb90837ffb3 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Wed, 21 Oct 2026 23:05:14 -0400
-Subject: [PATCH 5/7] sindoh-dp200: Re-prime in PRINT_START, add PRIME_LINE,
+Subject: [PATCH 5/8] sindoh-dp200: Re-prime in PRINT_START, add PRIME_LINE,
  exclude_object and arcs
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
