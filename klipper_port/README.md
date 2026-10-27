@@ -38,7 +38,7 @@ Nothing is flashed: Debian lives on a microSD card, and one line in
 ## What has been verified (without hardware)
 
 * **upctool** cross-compiles as a static ARMv7 binary. A scan of the output found no d16–d31 or NEON use in ARM-mode code (PJ4 is VFPv3-D16).
-* **Klipper port** builds against current Klipper master for ARMv5TE in Thumb mode: FM image 14,160 B and IO image 15,492 B, both under the 16,384 B ITCM.
+* **Klipper port** builds against current Klipper master for ARMv5TE in Thumb mode: FM image 15,824 B and IO image 15,920 B, both under the 16,384 B ITCM.
   Both images were booted in a Unicorn ARM946 emulator and driven over the DTCM rings with klippy's own `msgproto`:
   * `identify` and the data dictionary work.
   * 25 queued steps produced exactly 25 hardware step-engine pulses with the direction bit set, and `stepper_get_position` returns 25.
