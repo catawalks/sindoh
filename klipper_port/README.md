@@ -31,6 +31,7 @@ Nothing is flashed: Debian lives on a microSD card, and one line in
 | `klipper/config/dp200_macros.cfg` | Stock-derived macros (load/unload, clean, probe deploy/stow, bed mesh wrapper); replaced on updates |
 | `install/` | Debian rootfs builder, SD writer, boot hook, service script |
 | `docs/hardware_notes.md` | Facts the port depends on, with evidence and open items |
+| `docs/other_models.md` | What Sindoh's updates show about the 3DWOX 1, 2X, 1X, 7X and 30X (SoC, keys, USB folders) |
 | `prebuilt/` | Verified test builds (see below) |
 | `tools/` | Development tools used for verification (zig build, Unicorn emulators) |
 
