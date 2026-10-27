@@ -13,12 +13,13 @@ There are two versions, which share `bootlogo_core.py`:
 
 Both do the encryption themselves; no `openssl` is needed.
 
-## What the boot logo is (DP200, verified)
+## What the boot logo is
 
 The DP200 family is the Sindoh 3DWOX DP200 and its rebrands (Stanley,
 Leon3D, Mimaki Model 1). They share the boot logo format and the update key;
 the key is built into the tool and was checked on a Sindoh DP200 and on a
-Stanley Model 1.
+Stanley Model 1. The newer 3DWOX 1 uses the same logo format, with its own
+USB folder and key (see the last section).
 
 - **Where:** the flash partition `boot-logo` (`mtd3`, 1 MiB). U-Boot reads it
   at power-on.
@@ -125,17 +126,25 @@ Tested 2026-10-27 on a DP200:
   check in `dry_run` mode;
 - a test logo was flashed and read back (`mtd3` md5 equals the image).
 
-## Newer 3DWOX 1 models (not verified)
+## Newer 3DWOX 1 models
 
-These printers use AES-256-CBC `.she` files and a `_update_rodin_up` folder
-(see the main README). `--model 3dwox1 --experimental` packs that way, but
-their logo partition and panel size are unknown. Until someone checks them,
-the tool refuses this model without `--experimental`. What would settle it:
-- a 3DWOX 1 OEM update (its `image.logo`, or `/app/boot-logo_*.bin`
-  from the printer);
-- or the output of `cat /proc/mtd` and `cat /sys/class/graphics/fb0/virtual_size`
-  from one.
+Choose **3DWOX 1 (newer)** in the window, or `--model 3dwox1`. The stick
+then gets a `_update_rodin_up` folder, and the `.she` is encrypted with
+AES-256-CBC and the 3DWOX 1 key, which is also built in.
 
-If its logo is the same 768000-byte format, only the cipher differs. Even
-then, the on-printer script checks the partition name and size before
-writing.
+The 3DWOX 1 runs the same firmware as the DP200, with `RODIN_SUB=U` in
+`/etc/export_rodin_sub.sh`. That setting only picks the USB folder and the
+cipher. Checked 2026-10-27 against Sindoh's 3DWOX 1 update `RODUP_220111_1`:
+- it decrypts with the built-in key, and its `crypto_key.dat` gives the same
+  key;
+- its `image.logo` and `/app/boot-logo_{sindoh,stanley,leon3d,mimaki}.bin`
+  are byte for byte the same files as the DP200's: 800 × 480 RGB565;
+- its `update.sh` writes the logo to `mtd3` and sets `bar_color` exactly
+  like the DP200's;
+- its `auto_update.sh` runs `unmistakable*.she` from `_update_rodin_up`
+  the same way;
+- a 3DWOX 1 stick from this tool decrypts with `openssl aes-256-cbc` and
+  unpacks with `tar -xj`, the way that printer does it.
+
+It has not been run on a real 3DWOX 1 yet. Use *Dry run* the first time;
+the script also checks the partition's name and size before writing.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make a custom boot logo for a Sindoh DP200 (3DWOX DP200 / Model 1 family).
+"""Make a custom boot logo for a Sindoh DP200 / Model 1 or 3DWOX 1.
 
 Command-line version (Windows, Linux, macOS); sindoh_bootlogo_gui.py is the
 same with a window. Turns any picture (PNG, JPG, ...) into the printer's raw
@@ -95,7 +95,7 @@ def main():
     if not a.image:
         ap.error("give a picture (or --decode)")
     if not m["verified"] and not a.experimental:
-        sys.exit(f"The {a.model} boot-logo format is not verified yet (only the DP200 is).\n"
+        sys.exit(f"The {a.model} boot-logo format is not verified yet.\n"
                  "Run with --experimental to try anyway: the stick saves the old logo\n"
                  "(bootlogo_original.bin) so it can be put back.")
     try:

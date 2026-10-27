@@ -98,4 +98,4 @@ installer for the internal NAND. Start with
 
 [`boot_logo/`](boot_logo/) (Windows program + cross-platform script) turns your own picture into the boot logo (DP200: raw 800×480 RGB565
 in the `boot-logo` partition) and packs it into a `.she` USB update. The update key is
-built in. Newer 3DWOX 1 models are not verified yet; see its README.
+built in. It works for the DP200 family and the newer 3DWOX 1, which use the same logo format.
