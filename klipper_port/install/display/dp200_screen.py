@@ -898,7 +898,7 @@ class UI:
         d.text((250, 100), '%.0f/%.0f°' % (b['temperature'], b['target']), font=font(36), fill=C_BED)
 
     # page -> page that BACK returns to (None: top level, no BACK)
-    PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'system': 'home',
+    PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1033,7 +1033,7 @@ class UI:
         d.text((20, 160), 'Move / maintenance', font=font(28), fill=C_TXT)
         d.text((20, 200), 'Homed: %s' % (homed.upper() or 'no'), font=font(20), fill=C_DIM)
         self.grid(d, [
-            ('HOME ALL', ('confirm', 'Home all axes?', ('gcode', 'G28', 'Home'))),
+            ('HOME', ('screen', 'homing'), C_BTN, 30, 'all / X / Y / Z'),
             ('LOWER BED', ('confirm', 'Lower the bed to Z%d?' % LOWER_BED_Z,
                            ('gcode', '_SINDOH_ENSURE_HOMED\nG90\nG1 Z%d F600' % LOWER_BED_Z, 'Lower bed'))),
             ('CLEAN', ('confirm', 'Heat, purge and wipe the nozzle?',
@@ -1041,6 +1041,18 @@ class UI:
             ('MOTORS OFF', ('gcode', 'M84', 'Motors off')),
             ('BIN EMPTIED', ('gcode', 'BIN_EMPTIED', 'Bin emptied'), C_BTN, 24),
         ], top=240)
+
+    def page_homing(self, d, st):
+        homed = st['toolhead'].get('homed_axes', '')
+        d.text((20, 160), 'Home', font=font(28), fill=C_TXT)
+        d.text((20, 200), 'Homed: %s' % (homed.upper() or 'no'), font=font(20), fill=C_DIM)
+        items = [('HOME ALL', ('confirm', 'Home all axes?', ('gcode', 'G28', 'Home all')))]
+        for axis, what in (('X', 'the print head'), ('Y', 'the bed (front/back)'),
+                           ('Z', 'the bed up to the top switch')):
+            items.append(('HOME ' + axis, ('confirm', 'Home %s? This moves %s.' % (axis, what),
+                                           ('gcode', 'G28 ' + axis, 'Home ' + axis)),
+                          C_ON if axis.lower() in homed else C_BTN))
+        self.grid(d, items, top=240)
 
     def page_system(self, d, st):
         d.text((20, 160), 'System', font=font(28), fill=C_TXT)

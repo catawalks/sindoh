@@ -1,0 +1,53 @@
+{
+    "version": 2,
+    "name": "Sindoh DP200 (Klipper)",
+    "inherits": "fdmprinter",
+    "metadata": {
+        "visible": true,
+        "author": "catawalks",
+        "manufacturer": "Sindoh",
+        "file_formats": "text/x-gcode",
+        "has_materials": true,
+        "preferred_material": "generic_pla_175",
+        "machine_extruder_trains": { "0": "sindoh_dp200_klipper_extruder_0" }
+    },
+    "overrides": {
+        "machine_name": { "default_value": "Sindoh DP200 (Klipper)" },
+        "machine_width": { "default_value": 210 },
+        "machine_depth": { "default_value": 201 },
+        "machine_height": { "default_value": 190 },
+        "machine_center_is_zero": { "default_value": false },
+        "machine_heated_bed": { "default_value": true },
+        "machine_gcode_flavor": { "default_value": "RepRap (Marlin/Sprinter)" },
+        "machine_disallowed_areas": {
+            "default_value": [
+                [[-105, -100.5], [-101, -100.5], [-101, -92.5], [-105, -92.5]],
+                [[101, -100.5], [105, -100.5], [105, -92.5], [101, -92.5]]
+            ]
+        },
+        "machine_start_gcode": {
+            "default_value": "PRINT_START BED={material_bed_temperature_layer_0} EXTRUDER={material_print_temperature_layer_0}\nPRIME_LINE\nG90\nM83\n"
+        },
+        "machine_end_gcode": { "default_value": "PRINT_END\n" },
+        "machine_max_feedrate_x": { "default_value": 150 },
+        "machine_max_feedrate_y": { "default_value": 150 },
+        "machine_max_feedrate_z": { "default_value": 5 },
+        "machine_max_acceleration_x": { "default_value": 1500 },
+        "machine_max_acceleration_y": { "default_value": 1500 },
+        "machine_max_acceleration_z": { "default_value": 100 },
+        "relative_extrusion": { "value": true },
+        "retraction_amount": { "default_value": 4 },
+        "retraction_speed": { "default_value": 35 },
+        "retraction_min_travel": { "value": 2 },
+        "layer_height_0": { "value": 0.25 },
+        "speed_print": { "value": 40 },
+        "speed_wall_0": { "value": 25 },
+        "speed_infill": { "value": 50 },
+        "speed_topbottom": { "value": 25 },
+        "speed_layer_0": { "value": 20 },
+        "speed_travel": { "value": 120 },
+        "adhesion_type": { "value": "'none'" },
+        "material_print_temp_prepend": { "value": false },
+        "material_bed_temp_prepend": { "value": false }
+    }
+}
