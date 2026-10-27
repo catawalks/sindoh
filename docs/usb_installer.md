@@ -54,7 +54,7 @@ the stock kernel/BusyBox side.
 |---|---|
 | `unmistakable_klipper_install.sh` | Runs from the stick. Takes over the touchscreen (`/app/display.sh`, `tinydebug keywait`), checks the payload md5, SD card (ext2/3/4, free space) and that `/app/upc.ko` exists. Asks for a touch to confirm. Stops a running stack (upgrade), unpacks the payload to `/mnt/sd`, keeps an existing `printer_data/config`, runs `hook_install.sh`, then asks for a touch to reboot. |
 | `unmistakable_klipper_remove.sh` | Restores the stock boot (`/etc/profile.stock`, removes `/DEBUG_MACHINE`). The SD card content stays. |
-| `pack_she.sh` | Packs a `.sh` into `.she` (`tar cjf` + `openssl des3 -salt -md md5`). Uses **the user's own `crypto_key.dat`**; the vendor key is not stored in this repository. Self-verifies. |
+| `pack_she.sh` | Packs a `.sh` into `.she` (`tar cjf` + `openssl des3 -salt -md md5`). The DP200 family's update key is built in; `-k crypto_key.dat` uses another key. Self-verifies. |
 | `make_payload.sh` | Builds `dp200_klipper_payload.tar.gz` (+ .md5) from a working printer's SD card with GNU tar from the Debian root, minus logs, database, caches and test files. |
 
 Stick layout:

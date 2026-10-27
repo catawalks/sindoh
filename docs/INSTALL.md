@@ -135,12 +135,13 @@ On a printer running the development setup (Debian root on the SD card):
 
 ```
 sh /mnt/sd/usr/src/dp200/klipper_port/install/usb/make_payload.sh /mnt/sda1/_update_rodin
-sh install/usb/pack_she.sh /app/crypto_key.dat install/usb/unmistakable_klipper_install.sh /mnt/sda1/_update_rodin
+sh install/usb/pack_she.sh install/usb/unmistakable_klipper_install.sh /mnt/sda1/_update_rodin
 ```
 
 `pack_she.sh` encrypts the installer the way Sindoh's update mechanism
-expects, using the printer's own `crypto_key.dat`. The key is not part of
-this repository. Whether to publish pre-packed `.she` files is an open
+expects. The DP200 family's update key is built in (checked on a Sindoh
+DP200 and a Stanley Model 1); `-k crypto_key.dat` uses another printer's key
+instead. Whether to publish pre-packed `.she` files is an open
 project decision.
 
 Rehearse an installer without touching the flash (no screen, no reboot; it
