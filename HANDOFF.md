@@ -223,6 +223,17 @@ filament sensor xena46 (0 = present); level probe dsens8 (0 = extended/deployed,
 motorised toggle via X into the left wall works; heated unload retracts (filament snapped - old).
 
 ## Next steps (in order)
+OPEN 10-27 (after the first-layer test print; z_offset saved 2.58):
+- Probe X offset: the user saw the probe ~1-2 mm from the plate's right edge at mesh X 204 and
+  ~15-20 mm from the left at X 8, i.e. ~6-8 mm further right than x_offset 15 predicts. Measure
+  the real X/Y offsets (nozzle on a mark, then probe pin on the same mark), fix x/y_offset, then
+  recheck mesh_min/mesh_max so the right column stays on the plate.
+- Screen app died once (frozen frame, pid gone) during the 10-27 session; cause unknown (it
+  survived a later Klipper restart). It now logs to /tmp/dp200_screen.log only when started by
+  hand: make rc.dp200 keep a log and restart it if it exits.
+- Spaghetti detection (Obico etc.) can't run on the printer; leave it to a main Klipper host
+  that drives this printer's Moonraker. Per-object cancel already works ([exclude_object] +
+  PrusaSlicer/Orca labels).
 1. DONE 10-18: load with fresh filament (inlet -> nozzle ~518 mm; macros updated).
 2. DONE 10-18: filament encoder = dsens7 (~16.5 mm/pulse). FM firmware with buttons is LOADED
    (klipper_fm.bin on the printer = buttons build; klipper_fm_nobtn.bin = previous). Verify encoder
