@@ -71,8 +71,12 @@
 // ---------------------------------------------------------------------
 #define SMOT_COUNT          5
 #define SMOT_BASE(n)        (0xf8150000u + 0x1000u * (n))
+#define SMOT_BLOCK_EN       0x00  // stock 1; power-on 0 = no output at all
 #define SMOT_ABORT          0x04  // write 0x100 to stop a running move
-#define SMOT_CFG            0x0c  // bit0 = 1: A4982 driver disabled
+#define SMOT_CFG            0x0c  // bit0 = 1: A4982 driver disabled; stock sets bit4
+#define SMOT_SETUP10        0x10  // stock 8 (power-on 1), meaning unknown
+#define SMOT_SETUP14        0x14  // stock 4 (power-on 0), meaning unknown
+#define SMOT_PATTERN        0x2c  // stock 0xaaaaaaaa (power-on 0), output pattern?
 #define SMOT_CTRL           0x44  // stock value 0x33224, bit4 = direction
 #define SMOT_ENABLE         0x50  // stock writes 1 before each move
 #define SMOT_RAMP_LEN       0x54
