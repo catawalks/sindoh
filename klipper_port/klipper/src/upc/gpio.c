@@ -147,6 +147,15 @@ smot_claim(uint8_t n)
         return;
     smot_owned |= 1u << n;
     uint32_t b = SMOT_BASE(n);
+    // Engine setup the stock app does at start-up (measured 2026-10-27).
+    // A UPC reset keeps these, so earlier tests worked only because the
+    // stock app had run first; after a /DEBUG_MACHINE boot they are at
+    // their power-on values and the engine counts pulses but drives nothing.
+    reg_write(b + SMOT_BLOCK_EN, 1);
+    reg_write(b + SMOT_SETUP10, 8);
+    reg_write(b + SMOT_SETUP14, 4);
+    reg_write(b + SMOT_PATTERN, 0xaaaaaaaau);
+    reg_write(b + SMOT_CFG, reg_read(b + SMOT_CFG) | 0x10);
     reg_write(b + SMOT_ABORT, SMOT_DONE_BIT);
     reg_write(b + SMOT_CLEAR, SMOT_DONE_BIT);
     reg_write(b + SMOT_ENABLE, 1);

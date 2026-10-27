@@ -58,6 +58,12 @@ OK). Check `df -h /mnt/sd` if anything odd happens. JTAG: CN3 = 3.3 V pins 1/20,
 RN3 330R), pin 8 = RESET (leave off), GND 10-19; no TAP answers on any pin (likely fused off); details
 docs/jtag_prep.md. JTAGulator at V 0 (its state after every COM4 open) holds reset if pin 8 is connected.
 Power button: GPIO5 pin 27; hardware cuts power after ~2 s hold; POWER page + dp200-powerkey.sh.
+10-27 DAY (user present): NO MOTION since the boot hook - fixed. The stock app sets up the step engines
+(+0x00/+0x10/+0x14/+0x2c, CFG bit4) and Klipper relied on that; smot_claim now does it (hardware_notes).
+FM image rebuilt on the printer (tools/fm_rebuild.sh, old one kept as /opt/dp200/fm.bin.prev) and verified
+after a hook boot. The JTAGulator was unplugged from CN3 (not the cause). The stock app ran once for the
+comparison (heated nozzle to ~88 C / bed 50 C on its own); /DEBUG_MACHINE is back. Bed is ~20 mm lower than
+this morning. regsnap_klipper/stock.txt + regdiff.txt are on the card in /mnt/sd.
 10-27 NIGHT (unattended): repo copy on the card (/mnt/sd/usr/src/dp200/klipper_port) refreshed from git;
 all deployed files == repo (copied the missing dp200-wifi-from-stockdb.sh). USB payload rebuilt
 (/mnt/sd/payload). NAND restore images (ECC-corrected nanddump of mtd0-6) in D:\DP200\backup\nand_images,
