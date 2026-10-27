@@ -1,0 +1,58 @@
+From 9ba3e5a76d46759943a921efa20848e1f66c83b6 Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 17:01:45 -0400
+Subject: [PATCH 7/7] config: sindoh-dp200: measured bed area, wider mesh in X
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config/sindoh-dp200/dp200_macros.cfg  | 11 +++++++----
+ config/sindoh-dp200/dp200_printer.cfg |  4 ++--
+ 2 files changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/config/sindoh-dp200/dp200_macros.cfg b/config/sindoh-dp200/dp200_macros.cfg
+index cfc84e12..4215437f 100644
+--- a/config/sindoh-dp200/dp200_macros.cfg
++++ b/config/sindoh-dp200/dp200_macros.cfg
+@@ -325,10 +325,13 @@ samples_tolerance_retries: 2
+ speed: 80
+ horizontal_move_z: 10      # the pin hangs below the nozzle: keep travel high
+ # Probe coordinates. The pin reaches X -6..248 and Y -32..171 (nozzle travel
+-# + offsets). The front edge of the bed has a full-width grip handle: keep
+-# mesh_min Y well behind it (30 until the handle depth is known).
+-mesh_min: 20, 30
+-mesh_max: 190, 170
++# + offsets). The plate (216 x 209 mm) spans about X -2..212, Y -2..205.5
++# (measured by the user 2026-10-27, +-1 mm); its back corners have 4 x 11 mm
++# cut-outs (old levelling touch points) that the pin can't reach anyway.
++# The front edge of the bed has a full-width grip handle: keep mesh_min Y
++# well behind it (30 until the handle depth is known).
++mesh_min: 8, 30
++mesh_max: 204, 170
+ probe_count: 5, 5
+ algorithm: bicubic
+ fade_start: 1
+diff --git a/config/sindoh-dp200/dp200_printer.cfg b/config/sindoh-dp200/dp200_printer.cfg
+index 9533a465..b9a8e379 100644
+--- a/config/sindoh-dp200/dp200_printer.cfg
++++ b/config/sindoh-dp200/dp200_printer.cfg
+@@ -74,7 +74,7 @@ enable_pin: !smot_en0          # engine CFG bit0 = 1 disables the driver
+ microsteps: 16
+ rotation_distance: 40
+ endstop_pin: xena42            # X home (XIRD1 bit 10): 1 = triggered (stock homing code; carriage was parked on the switch)
+-position_endstop: 216.0        # stock homes X to its MAX end
++position_endstop: 216.0        # stock homes X to its MAX end; the plate spans X ~-2..212
+ position_min: -21.0
+ position_max: 233.6            # stock soft limit; purge bin / park positions are 209-231.2 mm
+ homing_speed: 10               # stock fine approach ~10.4 mm/s
+@@ -90,7 +90,7 @@ rotation_distance: 40
+ endstop_pin: xena43            # Y home (XIRD1 bit 11): active-high, measured (0 = free, 1 = triggered)
+ position_endstop: 5.5
+ position_min: -1.75
+-position_max: 201.5
++position_max: 201.5            # nozzle stops ~4 mm short of the plate's back edge (Y ~205.5)
+ homing_speed: 10
+ second_homing_speed: 5
+ 
+-- 
+2.55.0.windows.5
+
