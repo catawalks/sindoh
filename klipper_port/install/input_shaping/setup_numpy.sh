@@ -13,7 +13,9 @@ VPY=/home/klipper/klippy-env/bin/python
 LINK=/usr/local/lib/dp200-numpy
 
 apt-get update
-apt-get install -y --no-install-recommends python3-numpy
+# --reinstall: the internal-NAND runtime image leaves numpy's files out
+# (install/nand/runtime.exclude) while dpkg still lists it as installed
+apt-get install -y --no-install-recommends --reinstall python3-numpy libblas3 liblapack3 libgfortran5
 mkdir -p $LINK
 ln -sfn /usr/lib/python3/dist-packages/numpy $LINK/numpy
 SITE=$($VPY -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')

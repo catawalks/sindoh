@@ -49,3 +49,9 @@
 ./etc/dp200/rc.dp200.*
 ./opt/dp200/fm_*.bin
 ./opt/dp200/io_*.bin
+# numpy for input shaping is opt-in (~25 MB): setup_numpy.sh reinstalls it
+./usr/lib/python3/dist-packages/numpy
+./usr/local/lib/dp200-numpy
+./usr/lib/arm-linux-gnueabi/blas
+./usr/lib/arm-linux-gnueabi/lapack
+./usr/lib/arm-linux-gnueabi/libgfortran.so.5*

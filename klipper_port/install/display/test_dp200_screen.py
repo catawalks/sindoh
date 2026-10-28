@@ -121,6 +121,24 @@ tap('BACK'); tap('BACK'); tap('BACK')
 check('BACK x3 -> home', ui.screen == 'home')
 tap('FILAMENT'); tap('UNLOCK');       check('UNLOCK asks to confirm', ui.confirm is not None)
 tap('YES');                           check('YES sends CARTRIDGE_RELEASE', sent[-1] == ('/printer/gcode/script', 'CARTRIDGE_RELEASE'))
+# filament dryer
+tap('DRYER');                         check('FILAMENT -> DRYER', ui.screen == 'dryer')
+tap('PETG'); tap('6h'); n = len(sent); tap('START')
+check('START asks to confirm', ui.confirm is not None and len(sent) == n)
+tap('YES')
+check('YES sends FILAMENT_DRY PETG 65 C 6 h',
+      sent[-1] == ('/printer/gcode/script', 'FILAMENT_DRY TEMP=65 HOURS=6 MATERIAL=PETG'))
+tap('ABS'); tap('START')
+check('80 C warns and adds FORCE=1', ui.confirm is not None and 'WARNING' in ui.confirm[0]
+      and ui.confirm[1][1].endswith('FORCE=1'))
+n = len(sent); tap('NO');             check('NO sends nothing', len(sent) == n)
+saved_st = ui.st
+ui.st = dict(saved_st, **{'gcode_macro _DRY': {'active': 1, 'remaining': 100, 'total': 240, 'temp': 50,
+                                                'flipped': 1, 'sheet_max': 70}})
+tap('STOP DRYING'); tap('YES')
+check('running dryer: STOP DRYING sends FILAMENT_DRY_STOP', sent[-1] == ('/printer/gcode/script', 'FILAMENT_DRY_STOP'))
+ui.st = saved_st
+tap('BACK')
 tap('BACK')
 # STOP: a short tap must NOT stop, a 1 s hold must
 tap('STOP');              check('short STOP tap ignored', all(p != '/printer/emergency_stop' for p, _ in sent))

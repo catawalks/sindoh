@@ -1,0 +1,90 @@
+# DP200 Klipper port - active task list
+
+Updated 2026-10-27, late. Ordered roughly by what's next. "(user)" = needs
+the user at the printer (heat, motion, measurements, decisions).
+
+## Next session
+
+1. **XYZ cube results (user):** measure X/Y/Z (target 20.0 mm), check
+   squareness, corners, letters, stringing (filament is damp). Tune from
+   there: retraction, pressure advance, flow.
+2. **Filament dryer: first run (user, heat + motion).** Code is on the
+   printer (FILAMENT_DRY / FILAMENT_DRY_STOP, screen FILAMENT -> DRYER).
+   Check: bed lowers + comes forward with the head parked off the bed, bed
+   holds temperature for hours (idle timeout raised), exhaust fan vents for
+   1 min every 15 min, flip reminder at halfway, lamp flashes at the end,
+   STOP DRYING, PRINT_START cancels drying. Sheet limit 70 C (test printer);
+   higher presets warn and need FORCE=1.
+3. **Beeper (user):** dec_pwm block 10. Add `[output_pin beeper]
+   pin: io:pwm10`, test a short beep, find a sensible PWM value. The dryer
+   (_DRY_SIGNAL) uses it automatically once it exists. Then M300 for
+   slicers / end-of-print beep.
+4. **PRINT_START guard against "Timer too close" after a restart:** the FM
+   clock estimate is ~391 MHz for ~30 s after any Klipper restart; a print
+   started in that window failed in G28. Wait in PRINT_START until the
+   clock has settled (upc_clockcheck could expose a "settled" flag).
+5. **Moonraker can't write some config files** (owned by root after copies
+   over the serial console). chown klipper:klipper the whole config dir
+   and copy with ownership from now on.
+
+## Input shaping (sensor ordered: HOCENWAY ADXL345 USB)
+
+6. When it arrives: plug into a PC first, read VID:PID (Device Manager ->
+   Hardware Ids) and the chip (RP2040 = good; CH340 = won't work here).
+   Pins for dp200_adxl.cfg from the seller's docs.
+7. Test the generic usb-serial binding (/dev/ttyUSB0), SENSOR ON, TEST X/Y,
+   SAVE. If the binding fails: build cdc-acm.ko for kernel 3.2.
+8. Mounts (user measurements): head clip (head width, side notch position /
+   size) and bed clamp (plate thickness at the front edge, space under it);
+   board hole spacing. Then finalise the OpenSCAD files and print them.
+9. Rebuild the USB payload once a real sensor works.
+
+## Screen app
+
+10. **BED LEVEL page** (mockup done): probe, draw the mesh, per-screw hints
+    for the 2 front screws (fixed back support), learn the thread pitch
+    with one full turn + re-probe, confirm which way "raise" is. The probe
+    offset is fixed now, so this is unblocked.
+11. Exclude-object (cancel one object) from the screen during a print.
+12. Screen app crash (once, 10-27): it now restarts itself and logs to
+    /var/log/dp200_screen.log - look there if the screen freezes again.
+
+## Camera
+
+13. **Object-on-bed check** (user idea): before a print, put the bed in a
+    fixed pose with the lamp on, take a snapshot, compare it with a
+    reference of the empty bed; if something is there, stop PRINT_START
+    with "Object on the bed?" (screen: CONTINUE / CANCEL). Feasible with a
+    small Klipper extra (snapshot from ustreamer, Pillow, downscaled
+    difference + blob size). Needs (user): a pose where the camera sees
+    the whole plate (it looks down at the bed close up), a reference
+    image, and tests with real leftovers (a thin first layer is the hard
+    case; faint marks on the sheet must not trigger it).
+14. Spaghetti detection: not on the printer (too little CPU/RAM); owners
+    can run Obico etc. on a main Klipper host against this Moonraker.
+    Document that.
+
+## Internal NAND install
+
+15. Size: runtime image 431 MB raw / 141 MB gzip (2026-10-27; was 367/119
+    on 10-19). mtd5 gives ~190 MB of UBI space, UBIFS needs ~10-25 % more
+    than gzip -> ~155-175 MB: fits, headroom shrinking. numpy is now
+    excluded (opt-in). Further trims if needed: git-core 23 MB (only the
+    Moonraker update manager uses it), /usr/lib/arm-linux-gnueabi 137 MB.
+16. NAND install itself: needs the user's OK (mtd5 backup first, see
+    docs/internal_firmware_plan.md).
+17. Test the zig-built prebuilt images on the printer (only emulator-checked).
+
+## Smaller items
+
+18. Cura: verify the back-corner disallowed areas show at the back.
+19. Mesh Y minimum: the front grip handle's depth (user) - maybe lower
+    mesh_min Y from 30.
+20. Slicer profiles: update speeds/retraction after the cube; PA value.
+21. hardware_notes / README: document tonight's results (probe offset scan
+    method, lever zone, clock-settle issue).
+
+## Later / other models
+
+22. 1X testing; 30X firmware key (unknown); 2X dual extruder.
+23. Cartridge chip: read-only. Writing stays off unless agreed.

@@ -1,7 +1,7 @@
 From b15066683085cd3075b6a7ec401d591d9daaaa27 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 20 Oct 2026 23:43:00 -0400
-Subject: [PATCH 01/12] upc: Add Marvell 88PA6170 UPC port (Sindoh DP200)
+Subject: [PATCH 01/13] upc: Add Marvell 88PA6170 UPC port (Sindoh DP200)
 
 The Sindoh 3DWOX DP200 runs its motion and I/O on the two UPC
 coprocessors (ARMv5) of its Marvell 88PA6170 SoC. This adds a Klipper
