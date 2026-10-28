@@ -71,7 +71,7 @@ Nothing here was run on those printers. It was read from the updates only
 
 ## Boot logo per model
 
-These are implemented in `boot_logo/` in catawalks/sindoh.
+These are implemented in [catawalks/sindoh-boot-logo](https://github.com/catawalks/sindoh-boot-logo).
 
 | Model | Format | Location |
 |---|---|---|
