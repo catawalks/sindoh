@@ -35,6 +35,13 @@ dp200_mount_root() {
             chown 0:$(grep '^klipper:' $ROOT/etc/group | cut -d: -f3) $ROOT/dev/i2c-3
             chmod 660 $ROOT/dev/i2c-3
         fi
+        # USB serial (major 188; accelerometer board, docs/input_shaping.md):
+        # nothing adds nodes to this /dev later, so create them now, group
+        # klipper. Opening one with no board plugged in just fails.
+        for n in 0 1 2 3; do
+            mknod -m 660 $ROOT/dev/ttyUSB$n c 188 $n
+            chown 0:$(grep '^klipper:' $ROOT/etc/group | cut -d: -f3) $ROOT/dev/ttyUSB$n
+        done
         # webcam (uvcvideo): group "video" (gid 44 in the Debian root) so
         # ustreamer runs as the klipper user
         for d in /dev/video*; do

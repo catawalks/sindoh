@@ -13,7 +13,7 @@ Run as root inside the Debian chroot with Debian's python3-pil:
 Anything that moves or heats asks for confirmation first. STOP (bottom
 right on every screen) is an emergency stop: hold it for 1 second.
 """
-import json, os, select, socket, struct, sys, threading, time, urllib.parse, urllib.request
+import json, os, re, select, socket, struct, sys, threading, time, urllib.parse, urllib.request
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -57,6 +57,13 @@ POWER_REQ = '/run/dp200/power'        # "reboot" / "poweroff" for dp200-powerkey
 # Preheat presets (nozzle, bed); bed max_temp is 100, nozzle 260
 PRESETS = (('PLA', 200, 60), ('ABS', 240, 90))
 LOWER_BED_Z = 120                     # Z grows downwards on this machine (bed moves down)
+
+# Input shaping with a USB accelerometer (docs/input_shaping.md): the sensor
+# config is included only while it has the .cfg name (see dp200_printer.cfg)
+ADXL_ON = '/home/klipper/printer_data/config/dp200_adxl.cfg'
+ADXL_OFF = ADXL_ON + '.off'
+NUMPY_LINK = '/usr/local/lib/dp200-numpy/numpy'   # install/input_shaping/setup_numpy.sh
+SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 = ([\d.]+) Hz')
 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
@@ -204,6 +211,10 @@ def query():
     with urllib.request.urlopen(API + '/printer/objects/query?' + q, timeout=3) as r:
         return json.load(r)['result']['status']
 
+def get(path):
+    with urllib.request.urlopen(API + path, timeout=5) as r:
+        return json.load(r)['result']
+
 def post(path, body=None):
     data = json.dumps(body or {}).encode()
     req = urllib.request.Request(API + path, data=data, method='POST',
@@ -264,6 +275,8 @@ class UI:
         self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'list': [], 'page': 0,
                    'busy': None, 'checked': 0.0, 'target': b'', 'kb_for': 'psk',
                    'text': '', 'mode': 'abc', 'shift': False, 'show': False, 'hidden': False}
+        # input shaping page: last recommended shaper per axis from the console
+        self.shp = {'rev': 0, 'checked': 0.0, 'busy': False, 'res': {}}
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
@@ -292,6 +305,8 @@ class UI:
                      lambda: post('/printer/gcode/script', {'script': action[1]}))
         elif kind == 'post':
             self._bg(action[2], lambda: post(action[1]))
+        elif kind == 'adxl':
+            self._bg('Sensor ' + ('on' if action[1] else 'off'), lambda: self.adxl_switch(action[1]))
         elif kind == 'power':
             self.power_request(action[1])
         elif kind == 'screen_off':
@@ -334,6 +349,41 @@ class UI:
                 self.flash('%s failed: %s' % (label, getattr(e, 'reason', e)))
             finally:
                 self.busy = None
+        threading.Thread(target=work, daemon=True).start()
+
+    # ---- input shaping (USB accelerometer) --------------------------------
+    def adxl_switch(self, on):
+        """Enable/disable the sensor config by renaming it, then restart
+        Klipper (it won't start with the sensor's MCU configured but absent)."""
+        src, dst = (ADXL_OFF, ADXL_ON) if on else (ADXL_ON, ADXL_OFF)
+        if not os.path.exists(src):
+            self.flash('Sensor config missing (%s)' % os.path.basename(src))
+            return
+        os.rename(src, dst)
+        self.shp['res'] = {}
+        post('/printer/restart')
+
+    def shaper_tick(self):
+        """While the input shaping page is shown, pick the latest
+        'Recommended shaper_type_x = ...' lines from the console (3 s)."""
+        s = self.shp
+        if self.screen != 'shaper' or s['busy'] or time.time() - s['checked'] < 3:
+            return
+        s['busy'], s['checked'] = True, time.time()
+
+        def work():
+            try:
+                res = {}
+                for m in get('/server/gcode_store?count=200')['gcode_store']:
+                    for ax, typ, freq in SHAPER_RE.findall(m.get('message', '')):
+                        res[ax] = '%s @ %.1f Hz' % (typ, float(freq))
+                if res != s['res']:
+                    s['res'] = res
+                    s['rev'] += 1
+            except Exception:
+                pass
+            finally:
+                s['busy'] = False
         threading.Thread(target=work, daemon=True).start()
 
     def flash(self, text, secs=6):
@@ -899,6 +949,7 @@ class UI:
 
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
+              'calibrate': 'move', 'shaper': 'calibrate',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1040,7 +1091,57 @@ class UI:
                        ('gcode', 'CLEAN_NOZZLE', 'Clean nozzle')), C_BTN, 30, 'nozzle'),
             ('MOTORS OFF', ('gcode', 'M84', 'Motors off')),
             ('BIN EMPTIED', ('gcode', 'BIN_EMPTIED', 'Bin emptied'), C_BTN, 24),
+            ('CALIBRATE', ('screen', 'calibrate'), C_BTN, 28, 'input shaping'),
         ], top=240)
+
+    def page_calibrate(self, d, st):
+        d.text((20, 160), 'Calibrate', font=font(28), fill=C_TXT)
+        self.grid(d, [
+            ('INPUT SHAPING', ('screen', 'shaper'), C_BTN, 24, 'USB accelerometer'),
+        ], top=240)
+
+    def page_shaper(self, d, st):
+        on = os.path.exists(ADXL_ON)
+        d.text((20, 156), 'Input shaping', font=font(28), fill=C_TXT)
+        if on:
+            lines = ['1. Clip the sensor on the print head,', '    then TEST X (about 2 min).',
+                     '2. Clip it on the bed, then TEST Y.',
+                     '3. SAVE (restarts Klipper), then', '    SENSOR OFF and unplug it.']
+        else:
+            lines = ['Measures how the head and bed shake',
+                     'and sets the input shaper to cancel it',
+                     '(less ringing at speed).',
+                     '1. Plug the sensor into the front USB.',
+                     '2. SENSOR ON (restarts Klipper).']
+        for i, l in enumerate(lines):
+            d.text((20, 200 + i * 28), l, font=font(20), fill=C_DIM)
+        y = 200 + len(lines) * 28 + 8
+        if not os.path.exists(NUMPY_LINK):
+            d.text((20, y), 'numpy missing: run setup_numpy.sh', font=font(20), fill=C_WARN)
+            y += 30
+        if on:
+            res = self.shp['res']
+            for ax in 'xy':
+                d.text((20, y), '%s: %s' % (ax.upper(), res.get(ax, 'not measured')),
+                       font=font(24), fill=C_ON if ax in res else C_DIM)
+                y += 34
+            self.grid(d, [
+                ('TEST X', ('confirm', 'Sensor on the print head? Homes, then shakes X.',
+                            ('gcode', '_SINDOH_ENSURE_HOMED\nSHAPER_CALIBRATE AXIS=X', 'Test X')),
+                 C_BTN, 30, 'sensor on head'),
+                ('TEST Y', ('confirm', 'Sensor on the bed? Homes, then shakes Y.',
+                            ('gcode', '_SINDOH_ENSURE_HOMED\nSHAPER_CALIBRATE AXIS=Y', 'Test Y')),
+                 C_BTN, 30, 'sensor on bed'),
+                ('SAVE', ('confirm', 'Save the results? Klipper restarts.',
+                          ('gcode', 'SAVE_CONFIG', 'Save')), C_ON if res else C_BTN, 30),
+                ('SENSOR OFF', ('confirm', 'Turn the sensor off? Klipper restarts; unplug it after.',
+                                ('adxl', 0)), C_BTN, 26),
+            ], top=max(y + 10, 470), rows_h=96)
+        else:
+            self.grid(d, [
+                ('SENSOR ON', ('confirm', 'Sensor plugged into the front USB port? Klipper restarts.',
+                               ('adxl', 1)), C_ON, 28),
+            ], top=max(y + 10, 470))
 
     def page_homing(self, d, st):
         homed = st['toolhead'].get('homed_axes', '')
@@ -1146,6 +1247,9 @@ class UI:
             ('FIRMWARE', ('post', '/printer/firmware_restart', 'Firmware restart'), C_BTN, 28, 'restart'),
             ('KLIPPER', ('post', '/printer/restart', 'Restart'), C_BTN, 28, 'restart'),
             ('NETWORK', ('screen', 'network'), C_BTN, 28, 'WiFi / IP'),
+            # an enabled accelerometer config stops Klipper when the sensor is unplugged
+            ('SENSOR OFF', ('confirm', 'Turn the USB accelerometer config off? Klipper restarts.',
+                            ('adxl', 0)), C_WARN, 26) if os.path.exists(ADXL_ON) else None,
         ], top=500, rows_h=80)
 
     def overlay_confirm(self, d):
@@ -1272,12 +1376,13 @@ def main():
         ui.check_hold()
         ui.wifi_tick()
         ui.net_tick()
+        ui.shaper_tick()
         # Redraw only when something can have changed: new status, touch,
         # STOP being held, the clock minute, a message or busy state, dimming,
         # WiFi state (scan results, connect progress).
         key = (time.strftime('%H:%M'), ui.busy, ui.msg and time.time() < ui.msg[1],
                bool(ui.dimmed()), ui.screen, ui.confirm is not None, view_key(ui), ui.err,
-               ui.wf['rev'], ui.net['rev'])
+               ui.wf['rev'], ui.net['rev'], ui.shp['rev'])
         if events or ui.press or ui.key_down is not None or key != last_key:
             panel.show(ui.render())
             last_key = key

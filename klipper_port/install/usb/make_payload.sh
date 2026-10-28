@@ -26,6 +26,7 @@ MODE=${3:-runtime}
 # Debian's tar needs Debian's libraries: run it inside the root, stream out
 TAR="chroot $ROOT /usr/bin/tar"
 for f in klipper/config/printer.cfg klipper/config/dp200_printer.cfg klipper/config/dp200_macros.cfg \
+         klipper/config/dp200_adxl.cfg.off \
          install/rootfs/home/klipper/printer_data/config/moonraker.conf install/nand/runtime.exclude; do
     [ -f "$PORT/$f" ] || { echo "missing $PORT/$f"; exit 1; }
 done
@@ -41,7 +42,7 @@ PD=home/klipper/printer_data
 S=$ROOT/$STAGE/printer_data
 rm -rf $ROOT/$STAGE; mkdir -p $S/config $S/logs $S/database $S/gcodes $S/comms
 cp "$PORT"/klipper/config/printer.cfg "$PORT"/klipper/config/dp200_printer.cfg \
-   "$PORT"/klipper/config/dp200_macros.cfg \
+   "$PORT"/klipper/config/dp200_macros.cfg "$PORT"/klipper/config/dp200_adxl.cfg.off \
    "$PORT"/install/rootfs/home/klipper/printer_data/config/moonraker.conf $S/config/
 chown -R $(grep '^klipper:' $ROOT/etc/passwd | cut -d: -f3,4) $S
 cp "$PORT"/install/nand/runtime.exclude $ROOT/$STAGE/runtime.exclude
