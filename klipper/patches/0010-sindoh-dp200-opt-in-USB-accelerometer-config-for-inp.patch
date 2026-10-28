@@ -1,7 +1,7 @@
 From 9e1db3cd3d163a9050978ef29f3375c15c8b3309 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 21:55:45 -0400
-Subject: [PATCH 10/12] sindoh-dp200: opt-in USB accelerometer config for input
+Subject: [PATCH 10/13] sindoh-dp200: opt-in USB accelerometer config for input
  shaping
 
 dp200_adxl.cfg.off (BTT ADXL345 V2.0 pins, gentler resonance test) is

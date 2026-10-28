@@ -1,7 +1,7 @@
 From 9ba3e5a76d46759943a921efa20848e1f66c83b6 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 17:01:45 -0400
-Subject: [PATCH 07/12] config: sindoh-dp200: measured bed area, wider mesh in
+Subject: [PATCH 07/13] config: sindoh-dp200: measured bed area, wider mesh in
  X
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

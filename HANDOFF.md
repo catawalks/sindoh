@@ -247,6 +247,10 @@ filament sensor xena46 (0 = present); level probe dsens8 (0 = extended/deployed,
 motorised toggle via X into the left wall works; heated unload retracts (filament snapped - old).
 
 ## Next steps (in order)
+**The current task list is TODO.md** (consolidated 2026-10-27 night); the items below are history.
+10-27 LATE: XYZ cube printed OK (24 min). Filament dryer written and deployed (FILAMENT_DRY macros +
+screen FILAMENT -> DRYER; refusals checked, no heat test yet; screen tests 37/37). NAND runtime size
+431 MB raw / 141 MB gzip; numpy excluded from the runtime image (opt-in, setup_numpy.sh --reinstall).
 OPEN 10-27 (after the first-layer test print; z_offset saved 2.58):
 - DONE 10-27 22:31: probe offsets measured by printing a 12x12x1 mm pad at nozzle X100 Y100 and
   scanning it with the pin (2 mm steps + 3 bisections per edge; script offset_scan.py in this

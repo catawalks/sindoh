@@ -63,12 +63,17 @@ LOWER_BED_Z = 120                     # Z grows downwards on this machine (bed m
 ADXL_ON = '/home/klipper/printer_data/config/dp200_adxl.cfg'
 ADXL_OFF = ADXL_ON + '.off'
 NUMPY_LINK = '/usr/local/lib/dp200-numpy/numpy'   # install/input_shaping/setup_numpy.sh
+# Filament dryer presets (material, bed C, hours) and time choices; the
+# build sheet's continuous limit comes from _DRY's sheet_max (dp200_macros.cfg)
+DRY_PRESETS = (('PLA', 50, 4), ('PETG', 65, 4), ('TPU', 50, 5),
+               ('ABS', 80, 4), ('ASA', 80, 4), ('NYLON', 85, 8))
+DRY_HOURS = (2, 4, 6, 8, 12)
 SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 = ([\d.]+) Hz')
 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
            'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
-           'dp200_cartridge')
+           'dp200_cartridge', 'gcode_macro _DRY')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -249,6 +254,10 @@ def wrap(d, text, f, width):
         lines.append(line)
     return lines
 
+def fmt_mins(m):
+    m = int(max(m, 0))
+    return '%d:%02d' % (m // 60, m % 60)
+
 def fmt_time(s):
     s = int(max(s, 0))
     return '%d:%02d' % (s // 3600, s // 60 % 60) if s >= 3600 else '%d:%02d' % (s // 60, s % 60)
@@ -277,6 +286,7 @@ class UI:
                    'text': '', 'mode': 'abc', 'shift': False, 'show': False, 'hidden': False}
         # input shaping page: last recommended shaper per axis from the console
         self.shp = {'rev': 0, 'checked': 0.0, 'busy': False, 'res': {}}
+        self.dry = {'mat': 'PLA', 'temp': 50, 'hours': 4}   # dryer page selection
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
@@ -305,6 +315,10 @@ class UI:
                      lambda: post('/printer/gcode/script', {'script': action[1]}))
         elif kind == 'post':
             self._bg(action[2], lambda: post(action[1]))
+        elif kind == 'dry_mat':
+            self.dry.update(mat=action[1], temp=action[2], hours=action[3])
+        elif kind == 'dry_hours':
+            self.dry['hours'] = action[1]
         elif kind == 'adxl':
             self._bg('Sensor ' + ('on' if action[1] else 'off'), lambda: self.adxl_switch(action[1]))
         elif kind == 'power':
@@ -949,7 +963,7 @@ class UI:
 
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
-              'calibrate': 'move', 'shaper': 'calibrate',
+              'calibrate': 'move', 'shaper': 'calibrate', 'dryer': 'filament',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1018,8 +1032,13 @@ class UI:
             ('PREHEAT', ('screen', 'preheat')),
             ('MOVE', ('screen', 'move')),
             ('SYSTEM', ('screen', 'system')),
-            ('COOL DOWN', ('gcode', 'TURN_OFF_HEATERS', 'Cool down')),
+            ('COOL DOWN', ('gcode', 'FILAMENT_DRY_STOP\nTURN_OFF_HEATERS', 'Cool down')),
         ], top=236)
+        dry = st.get('gcode_macro _DRY') or {}
+        if dry.get('active'):
+            d.rectangle((0, 190, PW, 228), fill=C_BG)
+            d.text((20, 196), 'Drying: %s left, bed %d C' % (fmt_mins(dry['remaining']), dry['temp']),
+                   font=font(20), fill=C_WARN)
 
     def page_print(self, d, st):
         ps, vs = st['print_stats'], st.get('virtual_sdcard', {})
@@ -1067,6 +1086,7 @@ class UI:
                                             ('gcode', 'UNLOAD_FILAMENT MATERIAL=' + mat, 'Unload ' + mat))))
         items.append(('UNLOCK', ('confirm', 'Release the cartridge latch for 4 s? Unload the filament first.',
                                  ('gcode', 'CARTRIDGE_RELEASE', 'Cartridge release')), C_BTN, 28, 'cartridge'))
+        items.append(('DRYER', ('screen', 'dryer'), C_BTN, 28, 'spool on bed'))
         self.grid(d, items, top=270, rows_h=96)
 
     def page_preheat(self, d, st):
@@ -1093,6 +1113,50 @@ class UI:
             ('BIN EMPTIED', ('gcode', 'BIN_EMPTIED', 'Bin emptied'), C_BTN, 24),
             ('CALIBRATE', ('screen', 'calibrate'), C_BTN, 28, 'input shaping'),
         ], top=240)
+
+    def page_dryer(self, d, st):
+        dry = st.get('gcode_macro _DRY') or {}
+        limit = dry.get('sheet_max', 70)
+        bed = st['heater_bed']
+        d.text((20, 156), 'Filament dryer', font=font(28), fill=C_TXT)
+        if dry.get('active'):
+            done = dry['total'] - dry['remaining']
+            lines = [('Drying: bed %.0f / %.0f C' % (bed['temperature'], bed['target']), C_TXT),
+                     ('%s left of %s' % (fmt_mins(dry['remaining']), fmt_mins(dry['total'])), C_TXT),
+                     ('Flip the spool now (halfway)' if dry.get('flipped') else
+                      'Flip the spool at halfway (%s)' % fmt_mins(dry['total'] // 2),
+                      C_WARN if dry.get('flipped') and done < dry['total'] // 2 + 30 else C_DIM),
+                     ('Keep the doors closed.', C_DIM)]
+            for i, (l, c) in enumerate(lines):
+                d.text((20, 210 + i * 36), l, font=font(24 if i < 2 else 20), fill=c)
+            self.grid(d, [('STOP DRYING', ('confirm', 'Stop drying? The bed turns off.',
+                                    ('gcode', 'FILAMENT_DRY_STOP', 'Stop drying')), C_RED, 30)],
+                      top=560, cols=1, rows_h=90)
+            return
+        sel = self.dry
+        hot = sel['temp'] > limit
+        d.text((20, 196), 'Material (bed temperature):', font=font(20), fill=C_DIM)
+        items = []
+        for mat, temp, hours in DRY_PRESETS:
+            col = C_ON if mat == sel['mat'] else (C_WARN if temp > limit else C_BTN)
+            items.append((mat, ('dry_mat', mat, temp, hours), col, 24, '%d C' % temp))
+        self.grid(d, items, top=226, rows_h=70, cols=3)
+        d.text((20, 404), 'Time:', font=font(20), fill=C_DIM)
+        self.grid(d, [('%dh' % h, ('dry_hours', h), C_ON if h == sel['hours'] else C_BTN, 24)
+                      for h in DRY_HOURS], top=432, rows_h=60, cols=5)
+        msg = '%s: bed %d C for %d h' % (sel['mat'], sel['temp'], sel['hours'])
+        d.text((20, 506), msg, font=font(22), fill=C_TXT)
+        if hot:
+            d.text((20, 536), 'Above the build sheet limit (%d C)!' % limit, font=font(20), fill=C_WARN)
+        q = ('Bed goes down and forward. Lay the spool flat on it, close the doors. %s at %d C for %d h?'
+             % (sel['mat'], sel['temp'], sel['hours']))
+        if hot:
+            q = ('WARNING: %d C is above the %d C build sheet limit - only for sheets rated higher. '
+                 % (sel['temp'], limit)) + q
+        cmd = 'FILAMENT_DRY TEMP=%d HOURS=%d MATERIAL=%s%s' % (sel['temp'], sel['hours'], sel['mat'],
+                                                            ' FORCE=1' if hot else '')
+        self.grid(d, [('START', ('confirm', q, ('gcode', cmd, 'Dryer')), C_WARN if hot else C_ON, 30)],
+                  top=574, cols=1, rows_h=80)
 
     def page_calibrate(self, d, st):
         d.text((20, 160), 'Calibrate', font=font(28), fill=C_TXT)
@@ -1310,7 +1374,8 @@ def view_key(ui):
             st.get('filament_switch_sensor cartridge_lever', {}).get('filament_detected'),
             st.get('filament_motion_sensor filament_encoder', {}).get('enabled'), ui.ip,
             tuple(sorted((st.get('dp200_cartridge') or {}).items(), key=lambda kv: kv[0]))
-            if st.get('dp200_cartridge') else None)
+            if st.get('dp200_cartridge') else None,
+            tuple(sorted((st.get('gcode_macro _DRY') or {}).items())), ui.dry['mat'], ui.dry['hours'])
 
 # ---------------------------------------------------------------------------
 def main():
