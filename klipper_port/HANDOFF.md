@@ -64,6 +64,17 @@ after a hook boot. The JTAGulator was unplugged from CN3 (not the cause). The st
 comparison (heated nozzle to ~88 C / bed 50 C on its own); /DEBUG_MACHINE is back. Bed is ~20 mm lower than
 this morning. regsnap_klipper/stock.txt + regdiff.txt are on the card in /mnt/sd. prebuilt/ rebuilt (zig) and
 the USB payload rebuilt with the fixed fm.bin (release_check PASSED 21:12 printer time).
+10-27 EVENING (user present) - FIRST TEST PRINTS: filament loaded (clutch can stay off while
+extruding). PROBE_ACCURACY range 0.019 mm; 4x4 mesh 0.34 mm spread (front-left high, back-right low).
+First layer OK, z_offset saved 2.58. G28 failed after parking at the purge bin (X 231.2 is 15 mm past
+the X switch at 216): _SINDOH_HOME_X now backs off 20 mm when the switch reads triggered. 20 mm box
+leaned ~1 mm right/back per 10 mm: X/Y lost ~0.2 step per direction change (CTRL rewritten while a
+step pulse was running) - fixed in gpio.c smot_set_dir, drift test 0.000 mm after (hardware_notes;
+script drift_test.py in this session's scratchpad). New fm.bin built on the printer (/opt/dp200, old
+in fm.bin.prev); prebuilt/ FM rebuilt (zig, emulator OK); card fallbacks /mnt/sd/dp200/klipper_{fm,io}.bin
+= current prebuilt (10-18 builds kept as *.bin.1018). Screen app now runs under rc.dp200 screen-loop
+(restarts on exit, /var/log/dp200_screen.log). Stock root crontab relaunches lighttpd every minute
+(took port 80 during an rc.dp200 restart): dp200-start.sh runs crond from a filtered copy in /tmp.
 10-27 NIGHT (unattended): repo copy on the card (/mnt/sd/usr/src/dp200/klipper_port) refreshed from git;
 all deployed files == repo (copied the missing dp200-wifi-from-stockdb.sh). USB payload rebuilt
 (/mnt/sd/payload). NAND restore images (ECC-corrected nanddump of mtd0-6) in D:\DP200\backup\nand_images,
@@ -189,7 +200,8 @@ versions, user docs.
   `udhcpc -i mlan0 -n -q -t 5 -T 2`. PC is 10.10.0.85 (Windows firewall blocks inbound,
   so push files: on printer `nc -l -p 9001 </dev/null > FILE &`, on PC
   `python -I tools/net_send.py 10.10.0.21 9001 FILE`).
-- Files on printer: /mnt/sd/dp200/ (upctool, probe_*.bin, klipper_fm.bin, klipper_io.bin).
+- Files on printer: /mnt/sd/dp200/ (upctool, probe_*.bin, klipper_fm.bin, klipper_io.bin = prebuilt/
+  zig images, fallback only; the running firmware is /mnt/sd/opt/dp200/{fm,io}.bin).
 
 ## Tools on this PC (absolute paths; previous session scratchpad)
 S = C:\Users\TEMP~1.DES\AppData\Local\Temp\claude\D--DP200-backup\76623204-70a7-4636-98e6-f2dae1da921f\scratchpad
@@ -228,9 +240,14 @@ OPEN 10-27 (after the first-layer test print; z_offset saved 2.58):
   ~15-20 mm from the left at X 8, i.e. ~6-8 mm further right than x_offset 15 predicts. Measure
   the real X/Y offsets (nozzle on a mark, then probe pin on the same mark), fix x/y_offset, then
   recheck mesh_min/mesh_max so the right column stays on the plate.
-- Screen app died once (frozen frame, pid gone) during the 10-27 session; cause unknown (it
-  survived a later Klipper restart). It now logs to /tmp/dp200_screen.log only when started by
-  hand: make rc.dp200 keep a log and restart it if it exits.
+- Screen app died once (frozen frame, pid gone) on 10-27, cause unknown. It now restarts on its
+  own and logs to /var/log/dp200_screen.log: check that log if it happens again.
+- Reprint of the 20 mm box with the direction-change fix: check it is straight.
+- Screen app BED LEVEL page (user idea; mockup in this session's scratchpad bedlevel_mock.png):
+  probe, draw the mesh, per-screw hints. Bed has 2 screws ~10 mm in from the front corners and a
+  fixed back support; thread pitch unknown (learn it: one full turn + re-probe). Needs the probe
+  offset fix first; confirm which way "raise" is.
+- Cura disallowed-area sign (back corners) still unverified.
 - Spaghetti detection (Obico etc.) can't run on the printer; leave it to a main Klipper host
   that drives this printer's Moonraker. Per-object cancel already works ([exclude_object] +
   PrusaSlicer/Orca labels).
