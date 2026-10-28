@@ -248,10 +248,12 @@ motorised toggle via X into the left wall works; heated unload retracts (filamen
 
 ## Next steps (in order)
 OPEN 10-27 (after the first-layer test print; z_offset saved 2.58):
-- Probe X offset: the user saw the probe ~1-2 mm from the plate's right edge at mesh X 204 and
-  ~15-20 mm from the left at X 8, i.e. ~6-8 mm further right than x_offset 15 predicts. Measure
-  the real X/Y offsets (nozzle on a mark, then probe pin on the same mark), fix x/y_offset, then
-  recheck mesh_min/mesh_max so the right column stays on the plate.
+- DONE 10-27 22:31: probe offsets measured by printing a 12x12x1 mm pad at nozzle X100 Y100 and
+  scanning it with the pin (2 mm steps + 3 bisections per edge; script offset_scan.py in this
+  session's scratchpad): x_offset 23.5 (was 15), y_offset -28.0 (was -30); pad width 13.25/13.75 mm
+  incl. the pin. Set in printer.cfg on the printer (backup printer.cfg.bak-20261027) and in the
+  repo template. Mesh limits still fine (nozzle X -15.5..180.5, Y 58..198).
+- XYZ cube (PrusaSlicer, our profile) started 22:36 with the new offsets: check dimensions.
 - Screen app died once (frozen frame, pid gone) on 10-27, cause unknown. It now restarts on its
   own and logs to /var/log/dp200_screen.log: check that log if it happens again.
 - Reprint of the 20 mm box with the direction-change fix: check it is straight.
