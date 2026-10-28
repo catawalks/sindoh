@@ -2,6 +2,9 @@
 
 Updated 2026-10-27, late. Ordered roughly by what's next. "(user)" = needs
 the user at the printer (heat, motion, measurements, decisions).
+Larger, self-contained projects (kernel, SD boot, NAND install, camera
+check, faster stepping, other models) are in [PROJECTS.md](PROJECTS.md),
+written so they can be handed to another agent.
 
 ## Next session
 
@@ -49,30 +52,10 @@ the user at the printer (heat, motion, measurements, decisions).
 12. Screen app crash (once, 10-27): it now restarts itself and logs to
     /var/log/dp200_screen.log - look there if the screen freezes again.
 
-## Camera
+## Camera, NAND install -> PROJECTS.md
 
-13. **Object-on-bed check** (user idea): before a print, put the bed in a
-    fixed pose with the lamp on, take a snapshot, compare it with a
-    reference of the empty bed; if something is there, stop PRINT_START
-    with "Object on the bed?" (screen: CONTINUE / CANCEL). Feasible with a
-    small Klipper extra (snapshot from ustreamer, Pillow, downscaled
-    difference + blob size). Needs (user): a pose where the camera sees
-    the whole plate (it looks down at the bed close up), a reference
-    image, and tests with real leftovers (a thin first layer is the hard
-    case; faint marks on the sheet must not trigger it).
-14. Spaghetti detection: not on the printer (too little CPU/RAM); owners
-    can run Obico etc. on a main Klipper host against this Moonraker.
-    Document that.
-
-## Internal NAND install
-
-15. Size: runtime image 431 MB raw / 141 MB gzip (2026-10-27; was 367/119
-    on 10-19). mtd5 gives ~190 MB of UBI space, UBIFS needs ~10-25 % more
-    than gzip -> ~155-175 MB: fits, headroom shrinking. numpy is now
-    excluded (opt-in). Further trims if needed: git-core 23 MB (only the
-    Moonraker update manager uses it), /usr/lib/arm-linux-gnueabi 137 MB.
-16. NAND install itself: needs the user's OK (mtd5 backup first, see
-    docs/internal_firmware_plan.md).
+13. Object-on-bed check: PROJECTS.md #4. Spaghetti detection: #7.
+15. NAND size and install: PROJECTS.md #3.
 17. Test the zig-built prebuilt images on the printer (only emulator-checked).
 
 ## Smaller items
@@ -84,7 +67,7 @@ the user at the printer (heat, motion, measurements, decisions).
 21. hardware_notes / README: document tonight's results (probe offset scan
     method, lever zone, clock-settle issue).
 
-## Later / other models
+## Later
 
-22. 1X testing; 30X firmware key (unknown); 2X dual extruder.
-23. Cartridge chip: read-only. Writing stays off unless agreed.
+22. Other models, cartridge writing, kernel, SD boot, faster stepping:
+    PROJECTS.md.
