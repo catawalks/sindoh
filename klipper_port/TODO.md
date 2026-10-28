@@ -1,6 +1,6 @@
 # DP200 Klipper port - active task list
 
-Updated 2026-10-27, late. Ordered roughly by what's next. "(user)" = needs
+Updated 2026-10-28. Ordered roughly by what's next. "(user)" = needs
 the user at the printer (heat, motion, measurements, decisions).
 Larger, self-contained projects (kernel, SD boot, NAND install, camera
 check, faster stepping, other models) are in [PROJECTS.md](PROJECTS.md),
@@ -8,9 +8,13 @@ written so they can be handed to another agent.
 
 ## Next session
 
-1. **XYZ cube results (user):** measure X/Y/Z (target 20.0 mm), check
-   squareness, corners, letters, stringing (filament is damp). Tune from
-   there: retraction, pressure advance, flow.
+1. **XYZ cube results (user):** measured 10-28: X 20.1, Y 20.0, Z 20.2 mm
+   (target 20.0). Within normal print/caliper tolerance: no
+   rotation_distance change. X +0.1 is typical wall bulge; Z +0.2 is more
+   likely a constant first-layer offset (z_offset/babystep) than a scale
+   error (a 1 % Z scale error would need a 40+ mm print to confirm).
+   Still to check: squareness, corners, letters, stringing (filament is
+   damp). Tune from there: retraction, pressure advance, flow.
 2. **Filament dryer: first run (user, heat + motion).** Code is on the
    printer (FILAMENT_DRY / FILAMENT_DRY_STOP, screen FILAMENT -> DRYER).
    Check: bed lowers + comes forward with the head parked off the bed, bed
