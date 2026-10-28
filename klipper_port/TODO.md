@@ -36,7 +36,8 @@ written so they can be handed to another agent.
    Hardware Ids) and the chip (RP2040 = good; CH340 = won't work here).
    Pins for dp200_adxl.cfg from the seller's docs.
 7. Test the generic usb-serial binding (/dev/ttyUSB0), SENSOR ON, TEST X/Y,
-   SAVE. If the binding fails: build cdc-acm.ko for kernel 3.2.
+   SAVE. If the binding fails: cdc-acm.ko is built and verified offline
+   (install/kernel_modules/README.md has the insmod test plan).
 8. Mounts (user measurements): head clip (head width, side notch position /
    size) and bed clamp (plate thickness at the front edge, space under it);
    board hole spacing. Then finalise the OpenSCAD files and print them.

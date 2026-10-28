@@ -30,7 +30,8 @@ Klipper's USB ID at boot:
 
 so the board appears as `/dev/ttyUSB0` (`dp200-mounts.sh` creates the
 ttyUSB0-3 nodes in the chroot). If that turns out not to work with a real
-board, the fallback is building `cdc-acm.ko` for this kernel.
+board, the fallback is `cdc-acm.ko`, built for this kernel and verified
+offline (install/kernel_modules/README.md; not loaded yet).
 
 To check by hand after plugging the board in (stock shell):
 
