@@ -19,6 +19,20 @@ Prepared 2026-10-22 (unattended, no heat, no motion):
   - `dp200_box_20mm.gcode`: 20×20×10 mm open box, 2 walls, ~0.35 m.
 - A PrusaSlicer profile: `install/slicer/DP200_Klipper_PrusaSlicer.ini`.
 
+## Status 2026-10-27
+
+- Steps 1, 2, 4, 5, 6 done; 3 (thermocouple) skipped. Clutch stays off while
+  extruding (plastic came out with it off).
+- Step 5: PROBE_ACCURACY range 0.019 mm (std dev 0.005); 4x4 mesh spread
+  0.34 mm. G28 failed after parking at the purge bin: fixed (homing backs X off
+  the switch first).
+- Step 6: first layer good after -0.05 mm; z_offset saved as 2.58.
+- Step 7: the first box leaned ~1 mm right/back over 10 mm. Cause: X/Y lost
+  ~0.2 step per direction change (step-engine CTRL rewritten mid-pulse); fixed
+  in the FM firmware, drift test 0.000 mm after. Reprint running.
+- Found while watching the mesh: the probe's X offset looks ~6-8 mm larger than
+  configured (see HANDOFF open items).
+
 ## 1. Filament choice (user, 2 min)
 
 Use **PLA, 1.75 mm**, ideally fresh or dried (the old spool snapped on
