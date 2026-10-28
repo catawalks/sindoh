@@ -1,7 +1,7 @@
 From 2e5addc5acd7ff377fbcd0aa2098962134be71f8 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 21:02:53 -0400
-Subject: [PATCH 09/11] sindoh-dp200: Wait for the running step pulse before
+Subject: [PATCH 09/12] sindoh-dp200: Wait for the running step pulse before
  changing direction
 
 Klipper changes direction ~2 us after the last step started, while that
