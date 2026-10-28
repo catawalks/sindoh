@@ -1,7 +1,7 @@
 From 10f6c6e0187acd4a08d471b9fe2d3f63e46c9a3f Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 23:23:21 -0400
-Subject: [PATCH 13/13] sindoh-dp200: filament dryer macros (FILAMENT_DRY)
+Subject: [PATCH 13/14] sindoh-dp200: filament dryer macros (FILAMENT_DRY)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---

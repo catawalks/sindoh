@@ -19,13 +19,13 @@ the user at the printer (heat, motion, measurements, decisions).
    pin: io:pwm10`, test a short beep, find a sensible PWM value. The dryer
    (_DRY_SIGNAL) uses it automatically once it exists. Then M300 for
    slicers / end-of-print beep.
-4. **PRINT_START guard against "Timer too close" after a restart:** the FM
-   clock estimate is ~391 MHz for ~30 s after any Klipper restart; a print
-   started in that window failed in G28. Wait in PRINT_START until the
-   clock has settled (upc_clockcheck could expose a "settled" flag).
-5. **Moonraker can't write some config files** (owned by root after copies
-   over the serial console). chown klipper:klipper the whole config dir
-   and copy with ownership from now on.
+4. DONE 10-27: "Timer too close" after a restart - UPC_WAIT_CLOCK
+   (upc_clockcheck) waits until the MCU clock estimates are within 0.3 %;
+   the homing override calls it first. Tested: 1.2 % off at ready, settled
+   after 19 s. (A plain RESTART doesn't reload changed extras: use
+   rc.dp200 restart-klipper.)
+5. DONE 10-27: config dir chowned to klipper:klipper (Moonraker could not
+   write root-owned files). Keep copying with `cat >` or chown after.
 
 ## Input shaping (sensor ordered: HOCENWAY ADXL345 USB)
 

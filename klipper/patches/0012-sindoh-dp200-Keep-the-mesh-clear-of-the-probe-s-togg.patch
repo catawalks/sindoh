@@ -1,7 +1,7 @@
 From cab9474ce304d1cc758421416890b6f2e35c9211 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 22:40:19 -0400
-Subject: [PATCH 12/13] sindoh-dp200: Keep the mesh clear of the probe's toggle
+Subject: [PATCH 12/14] sindoh-dp200: Keep the mesh clear of the probe's toggle
  lever (mesh_min X 18)
 
 With the measured x_offset 23.5 the first mesh column (probe X 8) put the
