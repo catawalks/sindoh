@@ -75,6 +75,12 @@ in fm.bin.prev); prebuilt/ FM rebuilt (zig, emulator OK); card fallbacks /mnt/sd
 = current prebuilt (10-18 builds kept as *.bin.1018). Screen app now runs under rc.dp200 screen-loop
 (restarts on exit, /var/log/dp200_screen.log). Stock root crontab relaunches lighttpd every minute
 (took port 80 during an rc.dp200 restart): dp200-start.sh runs crond from a filtered copy in /tmp.
+Box reprint with the fix: walls straight (user). Card repo copy refreshed from git and the USB payload
+rebuilt with the fixed fm.bin (release_check PASSED 02:41 printer time, 10-28 CET).
+Input shaping idea: no CDC ACM in the kernel, but usb-serial "generic" has new_id -> try
+`echo 1d50 614e > /sys/bus/usb-serial/drivers/generic/new_id` with an RP2040 USB ADXL345 on the front
+USB port (ftdi_sio also built in; CH340 boards won't work). numpy missing in klippy-env. User to
+check the Sonic Pad sensor's VID/PID or buy a BTT/Mellow RP2040 ADXL345.
 10-27 NIGHT (unattended): repo copy on the card (/mnt/sd/usr/src/dp200/klipper_port) refreshed from git;
 all deployed files == repo (copied the missing dp200-wifi-from-stockdb.sh). USB payload rebuilt
 (/mnt/sd/payload). NAND restore images (ECC-corrected nanddump of mtd0-6) in D:\DP200\backup\nand_images,
