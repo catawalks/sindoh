@@ -247,7 +247,8 @@ filament sensor xena46 (0 = present); level probe dsens8 (0 = extended/deployed,
 motorised toggle via X into the left wall works; heated unload retracts (filament snapped - old).
 
 ## Next steps (in order)
-**The current task list is TODO.md** (consolidated 2026-10-27 night); the items below are history.
+**The current task list is TODO.md** (consolidated 2026-10-27 night); larger hand-off-able projects are in
+PROJECTS.md (kernel/cdc-acm, SD boot, NAND install, camera check, faster stepping, other models). The items below are history.
 10-27 LATE: XYZ cube printed OK (24 min). Filament dryer written and deployed (FILAMENT_DRY macros +
 screen FILAMENT -> DRYER; refusals checked, no heat test yet; screen tests 37/37). NAND runtime size
 431 MB raw / 141 MB gzip; numpy excluded from the runtime image (opt-in, setup_numpy.sh --reinstall).
