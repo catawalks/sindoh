@@ -1,0 +1,46 @@
+From c0a2c983f6bb944951909fa26994fb327b3777a8 Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 22:32:23 -0400
+Subject: [PATCH 11/11] sindoh-dp200: Measured probe offsets: x 23.5, y -28.0
+
+A 12x12x1 mm pad printed at nozzle X100 Y100 and scanned with the
+probe pin put its centre 8.5 mm / 2.0 mm off from the old offsets
+(15, -30), matching what was seen at the bed edges during the mesh.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config/sindoh-dp200/dp200_macros.cfg | 2 +-
+ config/sindoh-dp200/printer.cfg      | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/config/sindoh-dp200/dp200_macros.cfg b/config/sindoh-dp200/dp200_macros.cfg
+index e4c6a7f8..46b712fe 100644
+--- a/config/sindoh-dp200/dp200_macros.cfg
++++ b/config/sindoh-dp200/dp200_macros.cfg
+@@ -324,7 +324,7 @@ samples_tolerance_retries: 2
+ [bed_mesh]
+ speed: 80
+ horizontal_move_z: 10      # the pin hangs below the nozzle: keep travel high
+-# Probe coordinates. The pin reaches X -6..248 and Y -32..171 (nozzle travel
++# Probe coordinates. The pin reaches X 2.5..257 and Y -30..173.5 (nozzle travel
+ # + offsets). The plate (216 x 209 mm) spans about X -2..212, Y -2..205.5
+ # (measured by the user 2026-10-27, +-1 mm); its back corners have 4 x 11 mm
+ # cut-outs (old levelling touch points) that the pin can't reach anyway.
+diff --git a/config/sindoh-dp200/printer.cfg b/config/sindoh-dp200/printer.cfg
+index c4649009..59996dbd 100644
+--- a/config/sindoh-dp200/printer.cfg
++++ b/config/sindoh-dp200/printer.cfg
+@@ -21,8 +21,8 @@ position_endstop: 2.275
+ [probe]
+ # Pin position relative to the nozzle (measure with a ruler): the pin sits
+ # front-right of the nozzle on the DP200 (front = lower Y).
+-x_offset: 15
+-y_offset: -30
++x_offset: 23.5   # measured 2026-10-27 on the test printer (printed pad + probe scan)
++y_offset: -28.0
+ # Pin tip below the nozzle: LV_PROBE_CALIBRATE -> paper test -> ACCEPT ->
+ # LV_PROBE_CALIBRATE_SAVE Z=<accepted> -> SAVE_CONFIG. First unit: 2.530.
+ z_offset: 2.530
+-- 
+2.55.0.windows.5
+
