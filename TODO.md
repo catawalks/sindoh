@@ -20,8 +20,12 @@ written so they can be handed to another agent.
    start there; no pressure advance configured yet), top face rough with
    scuff marks, a dragged scar and a blob at one corner (profile has
    retract_lift = 0, so the nozzle travels over finished top layers).
-   Next: z-hop 0.2 in the profile, a pressure-advance tower, dry the
-   filament (dryer test), then a retraction test with two towers.
+   DONE 10-28: z-hop 0.2 in all three slicer profiles; PA tower
+   (make_pa_tower.py): best corners ~15 mm, walls thin/split from 35-40 mm
+   -> pressure_advance 0.30 in dp200_printer.cfg (live, verified). The
+   tower changed little below 35 mm, so recheck with dry filament.
+   Next: dry the filament (dryer test), reprint the cube (top face,
+   letter blobs), then a retraction test with two towers.
 2. **Filament dryer: first run (user, heat + motion).** Code is on the
    printer (FILAMENT_DRY / FILAMENT_DRY_STOP, screen FILAMENT -> DRYER).
    Check: bed lowers + comes forward with the head parked off the bed, bed
