@@ -14,7 +14,20 @@ All profiles describe the same machine:
   send its own heating commands.
 - **End G-code:** `PRINT_END`.
 - **Extrusion:** relative (M83), 4 mm retraction at 35 mm/s on the long
-  bowden. Retraction and pressure advance are first guesses.
+  bowden, 0.2 mm z-hop on every retraction (without it the nozzle scuffed
+  finished top surfaces on the XYZ cube). Retraction and pressure advance
+  are first guesses.
+
+## Pressure-advance tower
+
+`make_pa_tower.py` writes a ready-to-print tower (no slicer needed) for
+Klipper's TUNING_TOWER method: `python make_pa_tower.py` →
+`dp200_pa_tower.gcode`, upload and print. Pressure advance rises 0.020 per
+mm of height (0 at the bed, 1.0 at the top of the 50 mm tower). Find the
+height where the corners are sharpest with no bulge before them and no gap
+after them, ignoring the front-left corner (layer-change seam), then put
+`pressure_advance: <0.020 × height>` in the `[extruder]` section of
+printer.cfg.
 - **Starting point:** a 0.20 mm PLA process (210 °C first layer, 205 °C,
   bed 60 °C).
 

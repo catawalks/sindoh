@@ -39,6 +39,8 @@
         "retraction_amount": { "default_value": 4 },
         "retraction_speed": { "default_value": 35 },
         "retraction_min_travel": { "value": 2 },
+        "retraction_hop_enabled": { "value": true },
+        "retraction_hop": { "value": 0.2 },
         "layer_height_0": { "value": 0.25 },
         "speed_print": { "value": 40 },
         "speed_wall_0": { "value": 25 },
