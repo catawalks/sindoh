@@ -199,7 +199,7 @@ S = C:\Users\TEMP~1.DES\AppData\Local\Temp\claude\D--DP200-backup\76623204-70a7-
 - Build both MCU images (Thumb):
   `python $S\tools\kbuild.py $S\kl\klipper-master D:\DP200\backup\klipper_port klipper\configs\dp200_fm.config $S\build\kfm -Wno-unknown-attributes -mthumb`
   (same with dp200_io.config -> $S\build\kio). Output klipper.bin must stay <= 16384 B
-  (now FM 15824, IO 15920 - IO has ~460 B left).
+  (now FM 15904, IO 15920 - FM ~480 B, IO ~460 B left).
 - Emulator regression: `python $S\tools\kemu.py $S\kl\klipper-master $S\build\kfm\klipper.bin fm`
   (env TICK=40, T1INIT=0x9abcdef0)
 - Config checks: tools/cfglint.py (Jinja templates), $S\tools\cfgcheck.py (pins vs dict)

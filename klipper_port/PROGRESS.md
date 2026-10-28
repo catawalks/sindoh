@@ -15,7 +15,7 @@ klipper_io.bin (with PWM config bits + dsens pins). Filament is still loaded.
 - Extruder DIR 1 = retract -> `dir_pin: !smot_dir3`.
 - Filament sensor xena46 (0 = present); LV sensor = dec_sensor +0x210 bit 8 (`dsens8`).
 - Port: PWM blocks get their stock ctrl config bits; new dsens0..31 input pins.
-  Builds: FM 15824 B, IO 15920 B; FM emulation regression passes.
+  Builds: FM 15904 B, IO 15920 B; FM emulation regression passes.
 - New klipper/config/dp200_macros.cfg: CLEAN_NOZZLE, UNLOAD_FILAMENT,
   LOAD_FILAMENT (+_FINISH), BIN_EMPTIED, LV_TOGGLE, clutch/solenoid pins,
   filament sensor, probe (commented). 14 templates compile; 29 pins valid.

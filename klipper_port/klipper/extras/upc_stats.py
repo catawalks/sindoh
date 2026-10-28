@@ -1,5 +1,6 @@
 # DP200 / UPC port diagnostics: report the step-engine counters of the FM
-# MCU (pulses issued, pulses requested while the engine was still busy).
+# MCU (pulses issued, pulses requested while the engine was still busy,
+# direction changes that had to wait for a running pulse).
 #
 # Install: copy to ~/klipper/klippy/extras/, add [upc_stats] to printer.cfg.
 # G-code: UPC_STEP_STATS
@@ -21,7 +22,8 @@ class UpcStats:
     def _build_config(self):
         self.query = self.mcu.lookup_query_command(
             "upc_step_stats engine=%c",
-            "upc_step_stats_result engine=%c pulses=%u busy_hits=%u")
+            "upc_step_stats_result engine=%c pulses=%u busy_hits=%u"
+            " dir_waits=%u")
     cmd_UPC_STEP_STATS_help = "Report UPC step-engine pulse / busy-hit counters"
     def cmd_UPC_STEP_STATS(self, gcmd):
         if self.query is None:
@@ -29,8 +31,9 @@ class UpcStats:
         lines = []
         for name, n in ENGINES:
             r = self.query.send([n])
-            lines.append("%s (engine %d): pulses=%d busy_hits=%d"
-                         % (name, n, r['pulses'], r['busy_hits']))
+            lines.append("%s (engine %d): pulses=%d busy_hits=%d dir_waits=%d"
+                         % (name, n, r['pulses'], r['busy_hits'],
+                            r['dir_waits']))
         gcmd.respond_info("\n".join(lines))
 
 def load_config(config):
