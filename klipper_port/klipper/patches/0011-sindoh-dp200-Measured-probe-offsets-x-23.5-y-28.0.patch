@@ -1,7 +1,7 @@
 From c0a2c983f6bb944951909fa26994fb327b3777a8 Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 22:32:23 -0400
-Subject: [PATCH 11/11] sindoh-dp200: Measured probe offsets: x 23.5, y -28.0
+Subject: [PATCH 11/12] sindoh-dp200: Measured probe offsets: x 23.5, y -28.0
 
 A 12x12x1 mm pad printed at nozzle X100 Y100 and scanned with the
 probe pin put its centre 8.5 mm / 2.0 mm off from the old offsets

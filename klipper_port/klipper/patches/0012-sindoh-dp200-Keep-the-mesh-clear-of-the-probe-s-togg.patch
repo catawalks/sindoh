@@ -1,0 +1,34 @@
+From cab9474ce304d1cc758421416890b6f2e35c9211 Mon Sep 17 00:00:00 2001
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 22:40:19 -0400
+Subject: [PATCH 12/12] sindoh-dp200: Keep the mesh clear of the probe's toggle
+ lever (mesh_min X 18)
+
+With the measured x_offset 23.5 the first mesh column (probe X 8) put the
+nozzle at X -15.5, where the carriage pushes the deploy/stow lever:
+'Probe triggered prior to movement'. Nozzle now stays right of X -5.5.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config/sindoh-dp200/dp200_macros.cfg | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/config/sindoh-dp200/dp200_macros.cfg b/config/sindoh-dp200/dp200_macros.cfg
+index 46b712fe..d87d1ea4 100644
+--- a/config/sindoh-dp200/dp200_macros.cfg
++++ b/config/sindoh-dp200/dp200_macros.cfg
+@@ -330,7 +330,10 @@ horizontal_move_z: 10      # the pin hangs below the nozzle: keep travel high
+ # cut-outs (old levelling touch points) that the pin can't reach anyway.
+ # The front edge of the bed has a full-width grip handle: keep mesh_min Y
+ # well behind it (30 until the handle depth is known).
+-mesh_min: 8, 30
++# Left limit: the nozzle must stay right of X -5.6. Between X -10 and -20 the
++# carriage pushes the probe's deploy/stow lever (LV_TOGGLE): a mesh point at
++# probe X 8 (nozzle X -15.5) read "Probe triggered prior to movement".
++mesh_min: 18, 30
+ mesh_max: 204, 170
+ probe_count: 5, 5
+ algorithm: bicubic
+-- 
+2.55.0.windows.5
+

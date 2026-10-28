@@ -253,7 +253,12 @@ OPEN 10-27 (after the first-layer test print; z_offset saved 2.58):
   session's scratchpad): x_offset 23.5 (was 15), y_offset -28.0 (was -30); pad width 13.25/13.75 mm
   incl. the pin. Set in printer.cfg on the printer (backup printer.cfg.bak-20261027) and in the
   repo template. Mesh limits still fine (nozzle X -15.5..180.5, Y 58..198).
-- XYZ cube (PrusaSlicer, our profile) started 22:36 with the new offsets: check dimensions.
+- XYZ cube (PrusaSlicer, our profile) printing 22:40 with the new offsets: check dimensions.
+  Two failed starts first: (1) "Timer too close" during G28 when the print started 1 s after a
+  Klipper restart - the FM clock estimate is ~391 MHz for the first ~30 s (upc_clockcheck's
+  warning): wait ~40 s after any restart before printing; a PRINT_START guard would be better.
+  (2) "Probe triggered prior to movement" at mesh point X 8: with x_offset 23.5 the nozzle went
+  to X -15.5, where the carriage pushes the LV toggle lever (X -10..-20) -> mesh_min X 18.
 - Screen app died once (frozen frame, pid gone) on 10-27, cause unknown. It now restarts on its
   own and logs to /var/log/dp200_screen.log: check that log if it happens again.
 - Reprint of the 20 mm box with the direction-change fix: check it is straight.
