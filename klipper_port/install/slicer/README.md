@@ -15,8 +15,8 @@ All profiles describe the same machine:
 - **End G-code:** `PRINT_END`.
 - **Extrusion:** relative (M83), 4 mm retraction at 35 mm/s on the long
   bowden, 0.2 mm z-hop on every retraction (without it the nozzle scuffed
-  finished top surfaces on the XYZ cube). Retraction and pressure advance
-  are first guesses.
+  finished top surfaces on the XYZ cube). Retraction is a first guess;
+  pressure advance (0.30, from the tower) is in dp200_printer.cfg.
 
 ## Pressure-advance tower
 
