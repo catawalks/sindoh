@@ -4,7 +4,8 @@
 #
 #   rc.dp200 start | stop | restart | status
 #   rc.dp200 restart-klipper           (after editing printer.cfg firmware)
-#   rc.dp200 restart-screen            (touch UI; SCREEN_ENABLED=0 in /etc/dp200/screen.conf disables it)
+#   rc.dp200 restart-screen            (touch UI; SCREEN_ENABLED=0 in /etc/dp200/screen.conf disables it;
+#                                       restarted if it exits, log in /var/log/dp200_screen.log)
 #   rc.dp200 restart-webcam            (after editing /etc/dp200/webcam.conf:
 #                                       WEBCAM_RES=640x480 WEBCAM_FPS=15 WEBCAM_ENABLED=1
 #                                       WEBCAM_CTRLS="power_line_frequency=2 sharpness=3")
@@ -83,7 +84,7 @@ SCREEN_ENABLED=1
 start_screen() {
     [ "$SCREEN_ENABLED" = 1 ] && [ -e /dev/fb0 ] && [ -e /dev/event0 ] || return 0
     $SSD --start --background --make-pidfile --pidfile $RUN/screen.pid \
-        --exec /usr/bin/python3 -- /usr/local/bin/dp200_screen.py
+        --exec /bin/sh -- /etc/dp200/rc.dp200 screen-loop
 }
 
 stop_pid() {
@@ -125,6 +126,23 @@ restart-webcam)
 restart-screen)
     stop_pid screen
     start_screen
+    ;;
+screen-loop)
+    # Keep the touch UI running (started by start_screen): it died once on
+    # 2026-10-27 with no log. Restart it 5 s after it exits; keep its output.
+    LOG=/var/log/dp200_screen.log
+    child=
+    trap '[ -n "$child" ] && kill $child; exit 0' TERM INT
+    while :; do
+        [ -f $LOG ] && [ "$(stat -c %s $LOG)" -gt 1000000 ] && mv $LOG $LOG.old
+        echo "==== start $(date)" >> $LOG
+        /usr/bin/python3 /usr/local/bin/dp200_screen.py >> $LOG 2>&1 &
+        child=$!
+        wait $child
+        echo "==== exited ($?) $(date)" >> $LOG
+        child=
+        sleep 5
+    done
     ;;
 restart-klipper)
     stop_pid klipper
