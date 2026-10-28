@@ -37,8 +37,16 @@ snapshot are in `docs/kernel/`. A GPL source request is drafted in that doc
    the module touches; test by loading it only with the user's OK and with
    a power cycle as the way back. Done = the module loads and a Klipper
    RP2040 board appears as /dev/ttyACM0.
-2. **GPL request** (user sends the draft) - if the source arrives, rebuild the
-   vendor kernel with Thumb, swap and CDC-ACM.
+   **BUILT 2026-10-28** (install/kernel_modules/, README there): vanilla 3.2 +
+   vendor config, native GCC 14 on the printer, vermagic identical. Checked
+   read-only: 165 structs identical to the vendor modules' debug info,
+   145/148 USB/tty field offsets identical to the running kernel's own code
+   (the 3 differences are code generation), all 65 imports exported, only
+   ABS32/CALL relocations. Risk low. Next: the insmod test (user present).
+   The same recipe can build other missing modules (e.g. ch341, cp210x).
+2. **GPL request** (user sends the draft; what it is and the realistic
+   chances: kernel_research.md, "What a GPL source request is") - if the
+   source arrives, rebuild the vendor kernel with Thumb, swap and CDC-ACM.
 3. **Mainline kernel (6.x) with a new device tree**, booted from RAM via
    U-Boot first (milestone 1: UART + GIC + timer). Weeks of work; see the
    "routes" section of kernel_research.md. Needs SD boot (project 2).

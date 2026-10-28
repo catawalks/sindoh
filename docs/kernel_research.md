@@ -115,6 +115,87 @@ state bit, so programs would crash randomly on signals.
    UART + GIC + timer DT, loaded into RAM. Nothing is written to flash, and
    a power cycle returns to stock.
 
+## What a GPL source request is, and whether it can work
+
+*Written 2026-10-28 for the user, who doubts an individual can get anywhere
+with it. General knowledge about how GPL compliance works; nothing here is
+specific knowledge of Sindoh's or Marvell's practices, and it isn't legal
+advice.*
+
+**What the license requires.** The Linux kernel and U-Boot are licensed
+under the GNU GPL version 2. A company may put them in a product and sell
+it, but in exchange it must give the people who receive the binaries the
+matching source code: the "complete corresponding source", meaning the
+code plus the scripts and configuration used to build it. GPLv2 section 3
+gives the distributor three ways to do that: ship the source with the
+product, include a **written offer**, valid for at least three years, to
+provide it on request, or (for non-commercial redistribution only) pass on
+an offer they received. Sindoh sells the printer commercially, so the
+second option is the realistic one: somewhere in the manual, the printer's
+legal/about screen or the support site there should be a notice like "this
+product contains GPL software; source available on request from ...".
+
+**Who has to answer.** The obligation is on whoever distributed the
+binaries to you: **Sindoh**, who built this kernel (the module paths name a
+Sindoh build machine) and shipped it in the printer. Marvell wrote most of
+the platform code (the "LSP") and gave it to Sindoh, so Marvell owed Sindoh
+the source, but Marvell didn't distribute anything to you. That's why the
+request goes to **Sindoh first**. Asking Marvell as well is reasonable and
+costs nothing (they sometimes publish LSP trees for their chips), but they
+have no direct duty to a printer owner.
+
+**Why an individual has standing.** The GPL's written offer must be valid
+for "any third party" (GPLv2 3b), and the source must reach the recipients
+of the binaries; you received them when you bought the printer. You don't
+need to be a company, a developer, or a customer of record. Requests from
+individual owners are exactly what the mechanism is for, and most source
+releases of consumer devices (routers, TVs, NAS boxes, cameras) happened
+because individuals asked.
+
+**Why companies tend to answer.** Ignoring a request carries a real risk.
+Copyright holders of kernel code, and groups that work with them
+(Software Freedom Conservancy, gpl-violations.org in the past), have
+enforced the GPL against device makers; lawsuits are rare but have been won
+(e.g. Germany, against several consumer-electronics companies). Large
+companies usually have an open-source compliance contact and a standard
+process because it's cheaper than a dispute. A polite, specific, written
+request is the normal and expected first step; it's not hostile.
+
+**Honest expectations.**
+- **Likely outcomes, roughly:** a download link or archive (best case); a
+  partial tarball (often missing the build config or vendor drivers, which
+  is then worth a polite follow-up); a long wait; or no answer at all.
+  Smaller companies and regional subsidiaries (Sindoh is mostly a Korean
+  office-equipment maker) answer less reliably than large ones.
+- **The code is old** (kernel built 2016 from a 2014 LSP). The three-year
+  offer period may be argued to have run out for older firmware, but it
+  counts from the last time they distributed the binaries (e.g. as a
+  firmware download), so an old product isn't automatically a lost cause.
+- Even a perfect answer only gives the vendor kernel, which would let us
+  rebuild it with Thumb, swap and CDC-ACM. It doesn't make the mainline port
+  unnecessary for a modern kernel.
+- **Nothing depends on it:** the cdc-acm module is built without it
+  (install/kernel_modules/), and everything printing-related works on the
+  existing kernel.
+
+**How to send it.**
+- Look first for the written offer (manual, printer legal screen,
+  sindoh.com support pages) and use the address it names. Otherwise use
+  Sindoh's support or contact form, ideally the global/US support plus Korea
+  HQ.
+- Include: the model (3DWOX DP200), the serial number, the firmware version
+  you're running, and the exact kernel string (below). Ask for the kernel
+  (with the mv61x0 platform code and the .config), U-Boot and any other
+  GPL/LGPL components.
+- Keep it short and polite. Give a reasonable time frame (e.g. 30 days) and
+  ask for an acknowledgement.
+- If there's no answer after the time frame: one reminder; then optionally
+  ask Software Freedom Conservancy (compliance@sfconservancy.org) for
+  advice. They take reports from users and contact companies themselves for
+  devices that contain Linux.
+- Marvell: a separate, shorter note asking whether the 88PA6170 (mv61x0)
+  LSP kernel source is available, mentioning the product it's in.
+
 ## Draft GPL request (for the user to send, edit as needed)
 
 > Subject: GPL source code request - Sindoh DP200 (3DWOX) firmware
@@ -128,7 +209,12 @@ state bit, so programs would crash randomly on signals.
 > mv61x0 platform code, drivers and the build configuration), for U-Boot,
 > and for any other GPL-licensed components in the current DP200 firmware.
 >
-> A download link or an archive by email would be ideal.
+> Printer serial number: [serial]. Firmware version: [version from the
+> printer's info screen].
+>
+> A download link or an archive by email would be ideal. Could you confirm
+> that you received this request, and let me know when I can expect the
+> source (within 30 days if possible)?
 >
 > Thank you,
 > [name]
