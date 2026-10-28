@@ -168,19 +168,29 @@ smot_claim(uint8_t n)
 // reports busy (+0x64 bit 8); in that case wait for the running pulse (a
 // few us) instead of overwriting it. upc_step_stats reports the counters.
 static uint32_t smot_pulses[SMOT_COUNT], smot_busy_hits[SMOT_COUNT];
+static uint32_t smot_dir_waits[SMOT_COUNT];
+
+// Wait (bounded) until the engine's running pulse has finished. Returns
+// nonzero if it had to wait.
+static inline int
+smot_wait_idle(uint32_t b)
+{
+    if (!(reg_read(b + SMOT_STATUS) & SMOT_DONE_BIT))
+        return 0;
+    // one pulse is 2 edges of CONFIG_UPC_STEP_HALF_TICKS: bound the wait
+    for (uint32_t i = 0; i < 4096; i++)
+        if (!(reg_read(b + SMOT_STATUS) & SMOT_DONE_BIT))
+            break;
+    return 1;
+}
 
 static inline void
 smot_pulse(uint8_t n)
 {
     uint32_t b = SMOT_BASE(n);
     smot_pulses[n]++;
-    if (reg_read(b + SMOT_STATUS) & SMOT_DONE_BIT) {
+    if (smot_wait_idle(b))
         smot_busy_hits[n]++;
-        // one pulse is 2 edges of CONFIG_UPC_STEP_HALF_TICKS: bound the wait
-        for (uint32_t i = 0; i < 4096; i++)
-            if (!(reg_read(b + SMOT_STATUS) & SMOT_DONE_BIT))
-                break;
-    }
     reg_write(b + SMOT_CLEAR, SMOT_DONE_BIT);
     reg_write(b + SMOT_CMD, (2u << 16) | SMOT_MODE_CONST);
     reg_write(b + SMOT_START, 1);
@@ -194,7 +204,8 @@ command_upc_step_stats(uint32_t *args)
     if (n >= SMOT_COUNT)
         shutdown("Invalid engine");
     sendf("upc_step_stats_result engine=%c pulses=%u busy_hits=%u"
-          , n, smot_pulses[n], smot_busy_hits[n]);
+          " dir_waits=%u"
+          , n, smot_pulses[n], smot_busy_hits[n], smot_dir_waits[n]);
 }
 DECL_COMMAND(command_upc_step_stats, "upc_step_stats engine=%c");
 #endif
@@ -202,9 +213,16 @@ DECL_COMMAND(command_upc_step_stats, "upc_step_stats engine=%c");
 static void
 smot_set_dir(uint8_t n, uint8_t val)
 {
+    // Klipper changes direction ~2 us after the last step started, while
+    // that 4 us engine pulse is still running. The stock app only writes
+    // CTRL to an idle engine; doing it mid-pulse lost ~0.2 step per
+    // back-and-forth cycle on X/Y (2026-10-27 drift test). Klipper's dir
+    // setup time before the next step starts after this returns.
+    uint32_t b = SMOT_BASE(n);
+    if (smot_wait_idle(b))
+        smot_dir_waits[n]++;
     dir_level[n] = !!val;
-    reg_write(SMOT_BASE(n) + SMOT_CTRL
-              , SMOT_CTRL_STOCK | (val ? SMOT_CTRL_DIR : 0));
+    reg_write(b + SMOT_CTRL, SMOT_CTRL_STOCK | (val ? SMOT_CTRL_DIR : 0));
 }
 
 static void

@@ -1,7 +1,7 @@
 From 7c9b2167a6011a5f124baa4bfe5f8d174a6b448f Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 15:54:34 -0400
-Subject: [PATCH 6/8] upc: set up the step engines like the stock app
+Subject: [PATCH 6/9] upc: set up the step engines like the stock app
 
 Without the stock app (a /DEBUG_MACHINE boot) the engines keep their
 power-on setup and produce no output. Write the stock values for +0x00,
