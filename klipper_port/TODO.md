@@ -13,8 +13,15 @@ written so they can be handed to another agent.
    rotation_distance change. X +0.1 is typical wall bulge; Z +0.2 is more
    likely a constant first-layer offset (z_offset/babystep) than a scale
    error (a 1 % Z scale error would need a 40+ mm print to confirm).
-   Still to check: squareness, corners, letters, stringing (filament is
-   damp). Tune from there: retraction, pressure advance, flow.
+   Diagonals of the top 27.8/27.9 (skew ~0.2 deg, no correction). Photos:
+   side walls very clean (even layers, no ringing or banding visible),
+   corners sharp, no stringing (but nothing on the cube tests it). Faults:
+   small blobs where the X and Y cut-outs meet in a point (tiny islands
+   start there; no pressure advance configured yet), top face rough with
+   scuff marks, a dragged scar and a blob at one corner (profile has
+   retract_lift = 0, so the nozzle travels over finished top layers).
+   Next: z-hop 0.2 in the profile, a pressure-advance tower, dry the
+   filament (dryer test), then a retraction test with two towers.
 2. **Filament dryer: first run (user, heat + motion).** Code is on the
    printer (FILAMENT_DRY / FILAMENT_DRY_STOP, screen FILAMENT -> DRYER).
    Check: bed lowers + comes forward with the head parked off the bed, bed
