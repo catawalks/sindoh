@@ -89,7 +89,8 @@ install -m 755 $PORT/install/printer/*.sh /dp200/
 cp -n $PORT/install/rootfs/home/klipper/printer_data/config/moonraker.conf $KHOME/printer_data/config/ || true
 # dp200_*.cfg belong to this port (replaced on every build/update);
 # printer.cfg is the user's file (only created if missing)
-cp $PORT/klipper/config/dp200_printer.cfg $PORT/klipper/config/dp200_macros.cfg $KHOME/printer_data/config/
+cp $PORT/klipper/config/dp200_printer.cfg $PORT/klipper/config/dp200_macros.cfg \
+   $PORT/klipper/config/dp200_adxl.cfg.off $KHOME/printer_data/config/
 cp -n $PORT/klipper/config/printer.cfg $KHOME/printer_data/config/printer.cfg || true
 cp $PORT/klipper/extras/upc_stats.py $PORT/klipper/extras/upc_clockcheck.py \
    $PORT/klipper/extras/dp200_cartridge.py $KHOME/klipper/klippy/extras/

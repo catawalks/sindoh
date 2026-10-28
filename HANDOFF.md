@@ -81,6 +81,12 @@ Input shaping idea: no CDC ACM in the kernel, but usb-serial "generic" has new_i
 `echo 1d50 614e > /sys/bus/usb-serial/drivers/generic/new_id` with an RP2040 USB ADXL345 on the front
 USB port (ftdi_sio also built in; CH340 boards won't work). numpy missing in klippy-env. User to
 check the Sonic Pad sensor's VID/PID or buy a BTT/Mellow RP2040 ADXL345.
+Input shaping PREPARED (docs/input_shaping.md), untested without a sensor: dp200-start.sh binds
+1d50:614e to usb-serial generic; dp200-mounts.sh makes /dev/ttyUSB0-3 in the chroot; dp200_adxl.cfg.off
+(BTT ADXL345 V2.0 pins) + [include dp200_adxl*.cfg] in dp200_printer.cfg; numpy installed on this printer
+(install/input_shaping/setup_numpy.sh, opt-in); screen MOVE -> CALIBRATE -> INPUT SHAPING (SENSOR ON/OFF
+renames the cfg + restarts Klipper, TEST X/Y, SAVE; error page has SENSOR OFF); screen tests 31/31 on the
+printer. OpenSCAD mount drafts in install/input_shaping/mounts/ need real head/plate measurements.
 10-27 NIGHT (unattended): repo copy on the card (/mnt/sd/usr/src/dp200/klipper_port) refreshed from git;
 all deployed files == repo (copied the missing dp200-wifi-from-stockdb.sh). USB payload rebuilt
 (/mnt/sd/payload). NAND restore images (ECC-corrected nanddump of mtd0-6) in D:\DP200\backup\nand_images,

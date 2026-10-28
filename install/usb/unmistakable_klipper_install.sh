@@ -151,7 +151,9 @@ if [ -d /tmp/klipper_cfg_keep ]; then
     # keep the user's printer.cfg (calibration, SAVE_CONFIG data) and other
     # files, but take dp200_*.cfg (port-owned) from the new payload
     mkdir -p /tmp/klipper_cfg_new
-    cp -a $CFG/dp200_*.cfg /tmp/klipper_cfg_new/ 2>/dev/null
+    # (dp200_*.cfg.off = port files shipped disabled, e.g. the accelerometer;
+    # an enabled copy the user made stays as it was)
+    cp -a $CFG/dp200_*.cfg $CFG/dp200_*.cfg.off /tmp/klipper_cfg_new/ 2>/dev/null
     cp -a /tmp/klipper_cfg_keep/. $CFG/
     cp -a /tmp/klipper_cfg_new/. $CFG/
 fi

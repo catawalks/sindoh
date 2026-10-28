@@ -1,7 +1,7 @@
 From 26fcc1013935eaead05861fa11e59cb56a9944bd Mon Sep 17 00:00:00 2001
 From: catawalks <59056948+catawalks@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 18:25:10 -0400
-Subject: [PATCH 8/9] sindoh-dp200: back X off the switch before homing from
+Subject: [PATCH 08/10] sindoh-dp200: back X off the switch before homing from
  the purge bin
 
 The bin (X 231.2) and park (X 229) are ~15 mm past the X switch, deeper

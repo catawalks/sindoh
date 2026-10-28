@@ -1,0 +1,37 @@
+# USB accelerometer for input shaping - see docs/input_shaping.md.
+# Port-owned like the other dp200_*.cfg files. Enabled by renaming it to
+# dp200_adxl.cfg (touch screen: MOVE -> CALIBRATE -> INPUT SHAPING ->
+# SENSOR ON), disabled again by renaming it back (SENSOR OFF). Only enable
+# it while the sensor is plugged into the front USB port: Klipper won't
+# start with a configured MCU missing.
+#
+# The board must run Klipper firmware (RP2040 boards such as the BTT ADXL345
+# V2.0 or Mellow Fly-ADXL345 USB, or a Pico + ADXL345). The printer's kernel
+# has no USB CDC-ACM driver; dp200-start.sh hands Klipper's USB ID 1d50:614e
+# to the generic USB serial driver instead, so the board is /dev/ttyUSB0.
+
+[mcu adxl]
+serial: /dev/ttyUSB0
+
+# Pins for the BTT ADXL345 V2.0. Other boards: use the pins from the board's
+# own Klipper example (Pico + ADXL345 module per Klipper's Measuring
+# Resonances guide: cs_pin: adxl:gpio1, spi_bus: spi0a).
+[adxl345]
+cs_pin: adxl:gpio9
+spi_software_sclk_pin: adxl:gpio10
+spi_software_mosi_pin: adxl:gpio11
+spi_software_miso_pin: adxl:gpio12
+# The sensor is moved between the head (X) and the bed (Y), so the test runs
+# one axis at a time and only that axis' direction matters. If
+# SHAPER_CALIBRATE finds nothing, check the mapping with ACCELEROMETER_QUERY
+# while the axis moves and set axes_map (e.g. axes_map: y,x,z).
+
+[resonance_tester]
+accel_chip: adxl345
+# bed centre, bed 20 mm below the nozzle
+probe_points: 105, 100, 20
+# Gentler than Klipper's defaults (75 / 133 Hz -> up to ~10000 mm/s^2):
+# the A4982 drivers run at stock current and lost steps would spoil the
+# measurement. Raise if the result looks cut off at the top.
+accel_per_hz: 50
+max_freq: 100
