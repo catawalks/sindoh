@@ -76,6 +76,15 @@ killall appBrowser 2>/dev/null
 # leaked > 50 threads), which would fight nginx for port 80: stop it first.
 for p in $(ps | grep '[r]ecovery.check' | awk '{print $1}'); do kill $p; done
 killall lighttpd 2>/dev/null
+# The stock root crontab also starts lighttpd every minute when none is
+# running; it then takes port 80 whenever nginx restarts (rc.dp200 restart).
+# Run crond from a copy without that line; the stock crontab is untouched.
+if [ -f /var/spool/cron/crontabs/root ]; then
+    mkdir -p /tmp/dp200-crontabs
+    grep -v lighttpd /var/spool/cron/crontabs/root > /tmp/dp200-crontabs/root
+    killall crond 2>/dev/null
+    crond -l 9 -c /tmp/dp200-crontabs
+fi
 # The stock mjpg_streamer (YUYV + software JPEG, ~1 core) holds /dev/video0;
 # ustreamer in the chroot replaces it (rc.dp200 start_webcam)
 killall mjpg_streamer 2>/dev/null
