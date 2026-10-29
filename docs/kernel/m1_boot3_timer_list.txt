@@ -1,0 +1,51 @@
+﻿cat /proc/timer_list | grep -v "^ *$" | grep -v -E "clock [1-7]:|\.base:|\.ind
+ex:|active timers:$"; echo RDY__
+Timer List Version: v0.10
+HRTIMER_MAX_CLOCK_BASES: 8
+now at 108532745000 nsecs
+cpu: 0
+ clock 0:
+  .resolution: 10000000 nsecs
+ #0: <(ptrval)>, 0xc00450b0, S:01
+ # expires at 109469924000-109469924000 nsecs [in 937179000 to 937179000 nsecs]
+ #1: <(ptrval)>, 0xc006bf28, S:01
+ # expires at 2147483647500-2147483647500 nsecs [in 2038950902500 to 2038950902500 nsecs]
+  .resolution: 10000000 nsecs
+  .resolution: 10000000 nsecs
+  .resolution: 10000000 nsecs
+  .resolution: 10000000 nsecs
+  .resolution: 10000000 nsecs
+  .resolution: 10000000 nsecs
+  .resolution: 10000000 nsecs
+Tick Device: mode:     0
+Broadcast device
+Clock Event Device: mv61x0_timer1
+ max_delta_ns:   4294966591001
+ min_delta_ns:   2000
+ mult:           2147484
+ shift:          31
+ mode:           2
+ next_event:     9223372036854775807 nsecs
+ set_next_event: 0xc011e7a8
+ shutdown:       0xc011e6d8
+ periodic:       0xc011e6a4
+ oneshot:        0xc011e6d8
+ resume:         0xc011e6d8
+ event_handler:  0xc006b8b8
+ retries:        0
+tick_broadcast_mask: 1
+Tick Device: mode:     0
+Per CPU device: 0
+Clock Event Device: dummy_timer
+ max_delta_ns:   0
+ min_delta_ns:   0
+ mult:           0
+ shift:          0
+ mode:           1
+ next_event:     9223372036854775807 nsecs
+ set_next_event: 0x00000000
+ event_handler:  0xc006b398
+ retries:        0
+Wakeup Device: <NULL>
+RDY__
+# 

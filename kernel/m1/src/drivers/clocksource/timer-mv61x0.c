@@ -167,9 +167,16 @@ static bool mv61x0_ack(unsigned int n)
 static irqreturn_t mv61x0_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *ce = dev_id;
+	static unsigned int count;
 
 	if (!mv61x0_ack(MV61X0_CE_TIMER))
 		return IRQ_NONE;
+
+	/* Bring-up trace: tick rate against the raw clocksource */
+	count++;
+	if (count <= 3 || count == 100 || count == 1000 || count == 10000)
+		pr_info("mv61x0-timer: timer 1 irq #%u at timer 2 count %08x\n",
+			count, readl_relaxed(mv61x0_cs_count));
 
 	if (clockevent_state_oneshot(ce))
 		mv61x0_ce_stop();

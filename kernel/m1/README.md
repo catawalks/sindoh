@@ -19,7 +19,7 @@ on this SoC needs that exact version.
 | Kconfig/Makefile hooks | `patches/0001-*.patch` | arch/arm Kconfig + Makefile, clocksource Kconfig + Makefile, dts Makefile. |
 | Device tree | `src/arch/arm/boot/dts/marvell/88pa6170-dp200.dts` | CPU, A9-style SCU/GIC, the timer, UART0 as `ns16550a` (25 MHz, shift 2, 32-bit), 512 MB of RAM, and the boot-logo framebuffer at 0x18000000 reserved. |
 | Config | `m1.config` | Merged over `make tinyconfig`. UP-capable SMP kernel (`maxcpus=1`), periodic 100 Hz tick, no network/block/modules, XZ zImage, DEBUG_LL + DEBUG_UNCOMPRESS on UART0. |
-| Userspace | `busybox.config`, `initramfs/init` | Static BusyBox 1.38.0 on musl 1.2.6 (armhf, Thumb-2), built into the kernel. `/init` prints the milestone checks, then loops a shell on ttyS0. |
+| Userspace | `busybox.config`, `initramfs/init`, `initramfs/m1-checks.sh` | Static BusyBox 1.38.0 on musl 1.2.6 (armhf, Thumb-2), built into the kernel. `/init` runs `/etc/m1-checks.sh` as a child, then loops a shell on ttyS0. |
 
 ## Building
 
@@ -70,7 +70,8 @@ back to U-Boot and the stock firmware.
 | Image (md5) | Result |
 |---|---|
 | 870017 B, `86595c02…` (2026-10-29) | Boots to the shell. Earlycon, DT, GIC, clocksource and UART work (log: `docs/kernel/m1_boot1.log`). **Timekeeping broken:** uptime jumps by 2^32 µs, `sleep` returns at once, timer 1 interrupts stop after ~0.5 s, and timer 2's status bit stays pending. |
-| 771801 B, `c073d1ea…` | Fix attempt. Status bits are cleared after timer 2 starts; IRQs 52/54/55 are taken and acked like the vendor's; clocksource reads are filtered and counted; restart handler; `panic=10`; config trimmed (VT, input, HID, STRICT_KERNEL_RWX off). `/init` now prints a sleep-2 check: timer 2 µs against uptime, the glitch counters, and timer status. |
+| 771801 B, `c073d1ea…` | Status bits are cleared after timer 2 starts; IRQs 52/54/55 are taken and acked like the vendor's; clocksource reads are filtered and counted; restart handler; `panic=10`; config trimmed (VT, input, HID, STRICT_KERNEL_RWX off). **Boot 2 (`m1_boot2.log`):** timer probe status 0; the restart handler works (panic → reset → stock). `/init` died with exit 2 at 0.40 s because BusyBox lacked `$(( ))` (`FEATURE_SH_MATH` off). Linux IRQ 24 is now timer 0; timer 1 is IRQ 27. |
+| 773633 B, `d583f22f…` | `FEATURE_SH_MATH` on. `/init` is minimal and runs the checks as a child (`/etc/m1-checks.sh`), so PID 1 can't exit. The driver logs timer 1 interrupts #1-3, #100, #1000 and #10000 with the raw timer 2 count. |
 
 ## Expected output, and what a hang means
 

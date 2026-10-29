@@ -81,15 +81,17 @@ fi
 # 4. Initramfs list (gen_init_cpio format), applet links from busybox.links
 mkdir -p "$IRFS"
 tr -d '\r' < "$M1/initramfs/init" > "$IRFS/init"
+tr -d '\r' < "$M1/initramfs/m1-checks.sh" > "$IRFS/m1-checks.sh"
 {
 	echo "dir /dev 0755 0 0"
 	echo "nod /dev/console 0600 0 0 c 5 1"
-	for d in proc sys bin sbin usr usr/bin usr/sbin root; do
+	for d in proc sys bin sbin usr usr/bin usr/sbin root etc; do
 		echo "dir /$d 0755 0 0"
 	done
 	echo "dir /tmp 1777 0 0"
 	echo "file /bin/busybox $BB/busybox 0755 0 0"
 	echo "file /init $IRFS/init 0755 0 0"
+	echo "file /etc/m1-checks.sh $IRFS/m1-checks.sh 0755 0 0"
 	grep -v '^/bin/busybox$' "$BB/busybox.links" | sort -u |
 		while read -r l; do echo "slink $l /bin/busybox 0777 0 0"; done
 } > "$IRFS/initramfs.list"
