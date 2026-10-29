@@ -275,6 +275,22 @@ static int __init mv61x0_timer_init(struct device_node *np)
 		readl_relaxed(mv61x0_base + MV61X0_CTRL(3)),
 		readl_relaxed(mv61x0_base + MV61X0_IRQ_STATUS), pre);
 
+	/*
+	 * The kexec loader (netload, KEXEC_WDT) may arm the watchdog so that
+	 * a kernel which never gets here resets the board: we got here, so
+	 * stop it. U-Boot leaves it off (wdt 0000000f, ctrl 0).
+	 */
+	if ((readl_relaxed(mv61x0_base + MV61X0_WDT_CTRL) & MV61X0_WDT_ENABLE) ||
+	    (readl_relaxed(mv61x0_base + MV61X0_CTRL(MV61X0_WDT_TIMER)) &
+	     MV61X0_CTRL_ENABLE)) {
+		void __iomem *wdt = mv61x0_base + MV61X0_WDT_CTRL;
+
+		writel(0, mv61x0_base + MV61X0_CTRL(MV61X0_WDT_TIMER));
+		writel((readl(wdt) ^ 0xf) & ~MV61X0_WDT_ENABLE, wdt);
+		pr_info("mv61x0-timer: stopped the watchdog the loader armed (wdt %08x)\n",
+			readl(wdt));
+	}
+
 	/* Take over timers 1 and 2 */
 	writel_relaxed(0, mv61x0_base + MV61X0_CTRL(MV61X0_CE_TIMER));
 	writel_relaxed(0, mv61x0_base + MV61X0_CTRL(MV61X0_CS_TIMER));

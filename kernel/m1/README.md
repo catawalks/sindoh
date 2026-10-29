@@ -175,9 +175,19 @@ state, then waits.
    address, port and file name are built in (`ETHLOAD_PC`, `ETHLOAD_PORT`,
    `ETHLOAD_FILE`). The kernel arguments `ethload.pc=`, `ethload.port=`,
    `ethload.file=` and `ethload.off` override them.
-4. Not yet proven on hardware: kexec itself. netload takes eth0 down first
-   because stmmac has no shutdown hook. If the kexec'd kernel hangs,
-   power-cycle and fall back to `tools/sd_kernel_boot.sh`.
+4. kexec: the first try (m1-eth ce7dd3c9) hung with "no ATAGS support:
+   can't continue". kexec-tools loads a zImage only up to its header's end,
+   so the appended DTB was dropped. netload now fetches `<name>.dtb`
+   (`next.dtb` for the fast path) and runs `kexec --dtb`. eth0 goes down
+   first because stmmac has no shutdown hook.
+5. Recovery (proposed, needs the user's OK; off by default): with
+   `ethload.wdt=SECONDS` on the loader's command line (or `KEXEC_WDT=SECONDS
+   netload ...`), netload arms the SoC watchdog right before `kexec -e`,
+   using U-Boot's reset sequence with a long count. A kernel that hangs
+   before its timer driver starts then resets the board after SECONDS. The
+   timer driver stops the watchdog at time_init, so it never fires on a good
+   boot. It disarms only if it finds the watchdog armed; U-Boot leaves it
+   off. Only kernels built from now on stop it.
 
 ### net: join Wi-Fi, then load kernels over the network
 
