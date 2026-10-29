@@ -51,12 +51,12 @@ iw dev
 if [ -e /sys/class/net/mlan0 ]; then
 	ifconfig mlan0 up
 	echo "--- passive scan:"
-	iw dev mlan0 scan passive | grep -E '^BSS|SSID:|signal:|freq:' | head -60
+	iw dev mlan0 scan passive | grep -E '^BSS|SSID:|signal:|freq:' | head -n 60
 fi
 
 # Webcam: one MJPEG frame into RAM (starts with ff d8 if it is a JPEG)
 echo "--- webcam: $(ls /dev/video* 2>/dev/null)"
 if [ -e /dev/video0 ]; then
-	uvcgrab /dev/video0 /tmp/frame.jpg && hexdump -C /tmp/frame.jpg | head -2
+	uvcgrab /dev/video0 /tmp/frame.jpg && hexdump -C /tmp/frame.jpg | head -n 2
 fi
 echo "=== shell on the console; type to test UART interrupts"

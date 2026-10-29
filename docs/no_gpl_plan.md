@@ -39,6 +39,50 @@ New files:
 
 ---
 
+## Status 2026-10-29: what works on the printer (RAM boot only)
+
+The images are built by `kernel/m1/build.sh`; the boot history is in
+`kernel/m1/README.md` and the logs are `docs/kernel/m1_boot1.log` ..
+`m1_boot7.log`. Linux 6.18.59 starts from U-Boot `bootm`. The image is typed
+in over the serial console by `tools/uboot_upload.py` at about 111 KB/min:
+870 KB took 7:38, and the 1.86 MB Wi-Fi image takes about 17 min. Nothing
+is written to NAND or to the U-Boot environment. `reboot` and a panic
+(`panic=10`) reset through the watchdog back to the stock firmware.
+
+| Block | Result | Proven in |
+|---|---|---|
+| CPU | PJ4B-MP with the vendor's own aux-register setup (patch 0001), MMU and caches on, no L2 yet | every boot |
+| Timer | New `timer-mv61x0` driver. Timer 1 is the clockevent at 100 Hz (the broadcast device next to `dummy_timer`, as stock); timer 2 is the 1 MHz clocksource and sched_clock. `sleep 10` = 10.0 s | boots 3-4 |
+| Console, userspace | ttyS0 IRQ-driven (a DesignWare APB UART driven as 16550A). Static musl BusyBox in the initramfs | boot 4 |
+| Restart | Watchdog restart handler (U-Boot's `reset_cpu` sequence) | boot 2 on |
+| SMP | Both cores (vendor mailbox at 0xfa000000 + SGI) | boot 5 |
+| Panel | `simple-framebuffer` + fbcon on U-Boot's boot-logo buffer | boot 5 |
+| SIC0/SIC1 | Chained irqchips registered; no users yet | boot 5 |
+| USB host | Both EHCI controllers (ChipIdea, vendor PHY init); hub 1a40:0101, Wi-Fi, webcam at 480 Mb/s | boot 6 |
+| Wi-Fi | mwifiex + 88W8782 patch (0004) loads the stock firmware 14.69.12.p50. A passive scan sees 15 BSS (2.4 GHz and 5 GHz) | boot 7 |
+| Webcam | UVC, one 640×480 MJPEG frame grabbed | boot 7 |
+| Ethernet | stmmac probes (DWMAC1000, core 3.6), but the PHY at MDIO address 0 reads ID 0. Most likely it is still held in reset: the vendor kernel releases GPIO 62 at boot (`mach_phyHWInit`), and m1 does not. No cable is plugged in anyway | boot 6 |
+
+Traps found on the way, all fixed in `m1.config`/`busybox.config`:
+- tinyconfig turns the MMU off on ARM;
+- it leaves `AUTO_ZRELADDR` off, which puts PHYS_OFFSET at 8 MB;
+- it leaves `COMPAT_32BIT_TIME` off, so musl's sleeps fail with ENOSYS;
+- BusyBox needs `FEATURE_SH_MATH` and, with musl, `LFS`.
+
+## Next steps (ranked) and what the user must do
+
+| # | Step | Work (offline unless noted) | The user must |
+|---|---|---|---|
+| 1 | **Join Wi-Fi, then load over the network.** This replaces the 17-min serial upload: a small serial-loaded image fetches the rest over Wi-Fi (NFS root, or kexec into a bigger kernel) | Static `wpa_supplicant` (nl80211, internal TLS) and `udhcpc`; `UNIX98_PTYS`; optionally `KEXEC` | Approve how the credentials get in. Recommended: typed at the serial shell each boot (`wpa_passphrase`), never stored in an image |
+| 2 | **UPC driver**, ABI-compatible with stock `upc.ko`, so upctool, the bridge and the Klipper UPC firmware run unchanged (`docs/kernel/upc_mainline_design.md`) | About 300 lines + DT; panic/reboot hooks that hold the cores and force outputs off | Be present for each step of the bring-up order in that document; heaters and motion only while watching |
+| 3 | **SD card** (`sdhci-pxav3`-style glue with the vendor quirks: host version and slot status read 0, capability bit 25 cleared) | Driver + DT | Insert **only the 2 GB rescue card** and confirm it before boot. First boot mounts it read-only |
+| 4 | **GPIO** (8 banks × 32 at 0xf8040000: input +0, output +4, direction +8, plus the vendor's pin-select) | Driver; no pin driven at probe | Be present; approve each output pin by name (the first is GPIO 62, Ethernet PHY reset) |
+| 5 | **Ethernet: pin mux + PHY reset.** MDIO completes but reads ID 0, i.e. the line is held low. The stock board code sets 121 pin functions at boot (`set_pin_config` in the stock dmesg), and U-Boot, with no Ethernet driver, probably leaves the RGMII/MDIO pins unrouted. Then `reset-gpios` = GPIO 62 (low 125 ms, as the vendor does) and the PHY ID check | Recover the `set_pin_config` table from the vendor image (pin → function), then DT; after step 4 | Be present (pin mux = GPIO work); plug in a cable if a link test is wanted |
+| 6 | **I²C (DesignWare) + touch (bu21029) + backlight/PMIC** | DT, mainline drivers | Be present (the PMIC can switch power rails) |
+| 7 | **NAND** (`marvell_nand`, PXA3xx NFC at 0xf9082000), read-only partitions first | DT with every partition read-only | Approve. Never any write or erase |
+| 8 | **L2 cache (PL310)** | Find the base (vendor: virt 0xfee00000 = phys 0xfa300000), aux-control value | Nothing special (RAM boot) |
+| 9 | **Persistent install** (kernel on SD or NAND) | Only after 1-8 | Explicit approval; it changes what the printer boots |
+
 ## 0. What the offline analysis found
 
 | Fact | Value | Source |
@@ -319,6 +363,9 @@ off, no heat/motion, nothing saved):
 ---
 
 ## 3. Ranked step list
+
+(Original list from 2026-10-28, kept for reference: milestone 1 and the
+loader are done. The current list is "Next steps (ranked)" near the top.)
 
 Ordered by value per effort, with what each step unblocks. Steps 1-4
 don't depend on the GPL answer; from step 5 on this is route B proper.
