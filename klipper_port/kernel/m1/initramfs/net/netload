@@ -1,11 +1,20 @@
 #!/bin/sh
 # netload <pc-address> [file] [kernel args]
 #
-# Fetch a zImage with its DTB appended (build.sh's m1*-zImage-dtb.bin) from
-# the PC over HTTP and kexec it. On the PC, in D:\DP200\kernel\out:
-#   python -m http.server 8000
-# Like U-Boot, kexec passes the memory size and the extra kernel arguments
-# as ATAGs; the new kernel's DTB bootargs come first.
+# Fetch a zImage (build.sh's m1*-zImage-dtb.bin) and its DTB (m1*.dtb, or
+# next.dtb for next-zImage-dtb.bin) from the PC over HTTP and kexec them.
+# On the PC, in D:\DP200\kernel\out:  python -m http.server 8000
+# kexec-tools drops a DTB appended to a zImage (it loads only up to the
+# header's end), so the DTB goes separately with --dtb; with --atags the
+# new kernel stops at "no ATAGS support" (first fast-path test). Without
+# kernel args the DTB's own bootargs are used; with them, this kernel's
+# command line (minus ethload.*) plus the args replace them.
+#
+# KEXEC_WDT=SECONDS (proposed, off unless set; needs the user's OK): arm
+# the SoC watchdog right before kexec -e, so a kernel that hangs before its
+# timer driver starts resets the board instead of needing a power cycle.
+# The timer driver stops the watchdog at time_init. Kernels built before
+# that change would be reset after SECONDS.
 if [ -z "$1" ]; then
 	echo "usage: netload <pc-address> [file] [kernel args]"
 	exit 1
@@ -16,12 +25,28 @@ file=${1:-m1-zImage-dtb.bin}
 [ $# -gt 0 ] && shift
 args="$*"
 port=${PORT:-8000}
+case $file in
+next-zImage-dtb.bin) dtb=next.dtb ;;
+*-zImage-dtb.bin) dtb=${file%-zImage-dtb.bin}.dtb ;;
+*) dtb=${DTB:?"set DTB=<file.dtb> for $file"} ;;
+esac
 
-rm -f /tmp/kernel.bin
+rm -f /tmp/kernel.bin /tmp/kernel.dtb
 wget -O /tmp/kernel.bin "http://$host:$port/$file" || exit 1
+wget -O /tmp/kernel.dtb "http://$host:$port/$dtb" || exit 1
 echo "$file: $(wc -c < /tmp/kernel.bin) bytes, md5 $(md5sum < /tmp/kernel.bin | cut -d' ' -f1)"
+echo "$dtb: $(wc -c < /tmp/kernel.dtb) bytes, md5 $(md5sum < /tmp/kernel.dtb | cut -d' ' -f1)"
 
-kexec -l /tmp/kernel.bin --atags --command-line="$args" || exit 1
+if [ -n "$args" ]; then
+	cmdline=
+	for a in $(cat /proc/cmdline); do
+		case $a in ethload.*) ;; *) cmdline="$cmdline $a" ;; esac
+	done
+	kexec -l /tmp/kernel.bin --dtb=/tmp/kernel.dtb \
+		--command-line="${cmdline# } $args" || exit 1
+else
+	kexec -l /tmp/kernel.bin --dtb=/tmp/kernel.dtb || exit 1
+fi
 
 # Stop the Wi-Fi driver first (its shutdown command to the firmware); the
 # 8782 keeps power, so the next kernel finds its firmware still running
@@ -33,5 +58,23 @@ done
 # new kernel reuses the memory (the pins and the PHY stay set up)
 ifconfig eth0 down 2>/dev/null
 sync
+
+if [ -n "$KEXEC_WDT" ]; then
+	# U-Boot's reset_cpu sequence (timer-mv61x0.c mv61x0_restart) with a
+	# long count: timer 0 at 1 MHz (prescale 198), 0xf8020000 = control
+	T=0xf8020000
+	devmem $T 32 $(( $(devmem $T) ^ 0xf ))
+	devmem $((T + 8)) 32 0
+	devmem $((T + 4)) 32 $((KEXEC_WDT * 1000000))
+	devmem $((T + 8)) 32 3
+	devmem $T 32 $(( ($(devmem $T) ^ 0xf) | 0x80000000 ))
+	echo "netload: watchdog armed, ${KEXEC_WDT} s"
+fi
 echo "netload: starting $file"
 kexec -e
+# only reached if kexec -e failed: disarm again
+if [ -n "$KEXEC_WDT" ]; then
+	devmem 0xf8020008 32 0
+	devmem 0xf8020000 32 $(( ($(devmem 0xf8020000) ^ 0xf) & 0x7fffffff ))
+fi
+exit 1

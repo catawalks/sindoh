@@ -25,12 +25,19 @@ loader=$out/m1-eth.uimg
 [ -f "$loader" ] || { echo "$loader: not found (VARIANT=eth build.sh)"; exit 1; }
 
 # 1. publish the test kernel under the name the loader fetches
+# and its DTB as next.dtb (kexec-tools drops an appended DTB: netload
+# passes it with --dtb)
 if [ "$(basename "$img")" != next-zImage-dtb.bin ]; then
+	dtb=${img%-zImage-dtb.bin}.dtb
+	[ -f "$dtb" ] || { echo "$dtb: not found"; exit 1; }
 	cp "$img" "$out/next-zImage-dtb.bin"
+	cp "$dtb" "$out/next.dtb"
 fi
 echo "next: $(basename "$img"), md5 $(md5sum "$out/next-zImage-dtb.bin" | cut -d' ' -f1)"
-curl -sf -o /dev/null "http://$pc:8099/next-zImage-dtb.bin" ||
-	{ echo "no HTTP server at $pc:8099 serving $out"; exit 1; }
+for f in next-zImage-dtb.bin next.dtb; do
+	curl -sf -o /dev/null "http://$pc:8099/$f" ||
+		{ echo "no HTTP server at $pc:8099 serving $out/$f"; exit 1; }
+done
 
 # 2. U-Boot: load the loader from the card and check it is this build
 size=$(wc -c < "$loader")
