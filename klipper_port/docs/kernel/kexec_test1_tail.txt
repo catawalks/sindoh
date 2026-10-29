@@ -1,0 +1,25 @@
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+          Interrupt:23 Base address:0x4000 
+
+Connecting to 10.10.0.85:8099 (10.10.0.85:8099)
+saving to '/tmp/kernel.bin'
+'/tmp/kernel.bin' saved
+next-zImage-dtb.bin: 2203094 bytes, md5 36e7c07cf9744f01c11737f0c137872f
+Cannot open /proc/atags: No such file or directory
+Cannot open /proc/device-tree/memory/reg: No such file or directory
+[   12.443706] stmmaceth f9050000.ethernet eth0: Link is Down
+netload: starting next-zImage-dtb.bin
+[   12.467579] kexec_core: Starting new kernel
+[   12.472500] Bye!
+C:0x000080E0-0x00220BE0->0x00590400-0x007A8F00
+Uncompressing Linux... done, booting the kernel.
+no ATAGS support: can't continue
+
+--- 11938 bytes in 75 s
+
+# 2026-10-29 Ethernet fast-path test 1: loader m1-eth ce7dd3c9 (from the SD card)
+# fetched m1-sd (md5 36e7c07c) over Ethernet and kexec'd it. The new kernel then
+# stopped at "no ATAGS support": it received ATAGs, but its appended DTB wasn't used.
+# It hung with no watchdog and needed a power cycle.
