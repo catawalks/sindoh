@@ -38,4 +38,25 @@ done
 for e in /sys/bus/usb/devices/*:1.0/ep_*; do
 	[ -d "$e" ] && echo "  $e $(cat $e/type) $(cat $e/direction) max=$(cat $e/wMaxPacketSize)"
 done
+
+# Wi-Fi (88W8782 via patched mwifiex): firmware load and a PASSIVE scan
+# only. No association: the credentials stay on the stock printer.
+echo "--- Wi-Fi: waiting for mlan0"
+i=0
+while [ ! -e /sys/class/net/mlan0 ] && [ $i -lt 20 ]; do
+	sleep 1
+	i=$((i + 1))
+done
+iw dev
+if [ -e /sys/class/net/mlan0 ]; then
+	ifconfig mlan0 up
+	echo "--- passive scan:"
+	iw dev mlan0 scan passive | grep -E '^BSS|SSID:|signal:|freq:' | head -60
+fi
+
+# Webcam: one MJPEG frame into RAM (starts with ff d8 if it is a JPEG)
+echo "--- webcam: $(ls /dev/video* 2>/dev/null)"
+if [ -e /dev/video0 ]; then
+	uvcgrab /dev/video0 /tmp/frame.jpg && hexdump -C /tmp/frame.jpg | head -2
+fi
 echo "=== shell on the console; type to test UART interrupts"
