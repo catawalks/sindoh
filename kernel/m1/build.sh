@@ -202,6 +202,13 @@ if [ -d "$M1/initramfs/$VARIANT" ]; then
 		tr -d '\r' < "$f" > "$IRFS/$(basename "$f")"
 	done
 fi
+# eth: the fast path's defaults (the PC's HTTP server and the file name
+# tools/eth_kernel_boot.sh publishes the next test kernel under)
+if [ "$VARIANT" = eth ]; then
+	printf 'PC=%s\nPORT=%s\nFILE=%s\n' "${ETHLOAD_PC:-10.10.0.85}" \
+		"${ETHLOAD_PORT:-8099}" "${ETHLOAD_FILE:-next-zImage-dtb.bin}" \
+		> "$IRFS/ethload.conf"
+fi
 {
 	echo "dir /dev 0755 0 0"
 	echo "nod /dev/console 0600 0 0 c 5 1"
@@ -221,6 +228,8 @@ fi
 		echo "file /usr/bin/ethload $IRFS/ethload 0755 0 0"
 	[ -f "$IRFS/eth-pinmux.sh" ] &&
 		echo "file /etc/eth-pinmux.sh $IRFS/eth-pinmux.sh 0755 0 0"
+	[ -f "$IRFS/ethload.conf" ] &&
+		echo "file /etc/ethload.conf $IRFS/ethload.conf 0644 0 0"
 	[ -f "$IRFS/variant.sh" ] &&
 		echo "file /etc/m1-variant.sh $IRFS/variant.sh 0755 0 0"
 	for u in $USERSPACE; do

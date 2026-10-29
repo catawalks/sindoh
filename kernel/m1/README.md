@@ -161,6 +161,24 @@ state, then waits.
    (XZ's ARM filter already packs ARM code well), so it isn't worth the
    risk.
 
+### Fast path: test kernels over Ethernet (the default loop)
+
+1. Once: put the loader on the 2 GB card with
+   `tools/sd_kernel_boot.sh D:/DP200/kernel/out/m1-eth.uimg`. Repeat after
+   every m1-eth rebuild; the tool below refuses a stale copy (CRC check).
+2. On the PC: `(cd /d/DP200/kernel/out && python -m http.server 8099 --bind 10.10.0.85)`.
+3. Each test: `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-upc-zImage-dtb.bin`.
+   It copies the image to `next-zImage-dtb.bin`, catches U-Boot, routes
+   the SD pins, ext2loads and CRC-checks the loader, and runs bootm. The
+   loader's init waits 3 s (Enter gives a shell), then `ethload` fetches
+   `next-zImage-dtb.bin` and kexecs it. No setenv and no saveenv: the PC
+   address, port and file name are built in (`ETHLOAD_PC`, `ETHLOAD_PORT`,
+   `ETHLOAD_FILE`). The kernel arguments `ethload.pc=`, `ethload.port=`,
+   `ethload.file=` and `ethload.off` override them.
+4. Not yet proven on hardware: kexec itself. netload takes eth0 down first
+   because stmmac has no shutdown hook. If the kexec'd kernel hangs,
+   power-cycle and fall back to `tools/sd_kernel_boot.sh`.
+
 ### net: join Wi-Fi, then load kernels over the network
 
 1. Boot `m1-net.uimg` (uniprocessor; Wi-Fi as in boot 7).
