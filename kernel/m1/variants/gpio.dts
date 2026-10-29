@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0
+/* gpio variant: the base board with GPIO banks A-H registered */
+#include "88pa6170-dp200.dts"
+
+&gpio0 { status = "okay"; };
+&gpio1 { status = "okay"; };
+&gpio2 { status = "okay"; };
+&gpio3 { status = "okay"; };
+&gpio4 { status = "okay"; };
+&gpio5 { status = "okay"; };
+&gpio6 { status = "okay"; };
+&gpio7 { status = "okay"; };

@@ -1,0 +1,50 @@
+#!/bin/sh
+# wifi-join: join a WPA2-PSK network on mlan0, then DHCP.
+# The SSID and passphrase are typed here on the console. They never go into
+# an image: only wpa_supplicant's derived key ends up in /tmp (RAM), and it
+# is gone at the next reset.
+IF=${IF:-mlan0}
+CONF=/tmp/wpa.conf
+
+if [ ! -e /sys/class/net/$IF ]; then
+	echo "wifi-join: no $IF (did the 88W8782 firmware load?)"
+	exit 1
+fi
+
+printf 'SSID: '
+read -r ssid
+printf 'Passphrase (not shown): '
+stty -echo
+read -r psk
+stty echo
+echo
+
+umask 077
+if ! net=$(wpa_passphrase "$ssid" "$psk"); then
+	echo "wifi-join: $net"
+	exit 1
+fi
+psk=
+# Drop the plaintext comment line wpa_passphrase adds
+echo "$net" | grep -v '^[[:space:]]*#psk=' > $CONF
+net=
+
+ifconfig $IF up
+killall wpa_supplicant 2>/dev/null
+wpa_supplicant -B -D nl80211 -i $IF -c $CONF -P /tmp/wpa.pid || exit 1
+
+i=0
+while ! iw dev $IF link | grep -q '^Connected'; do
+	i=$((i + 1))
+	if [ $i -gt 30 ]; then
+		echo "wifi-join: not associated after 30 s"
+		exit 1
+	fi
+	sleep 1
+done
+iw dev $IF link | grep -E 'Connected|SSID|freq|signal'
+
+udhcpc -i $IF -n -q -t 10 || exit 1
+ifconfig $IF
+route -n
+echo "wifi-join: done. Next: netload <pc-address> [file] [kernel args]"

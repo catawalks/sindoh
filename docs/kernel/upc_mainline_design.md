@@ -32,7 +32,7 @@ device and char device (minor = core).
 | CPUSoftReset | XENA + 0x154; 1 = both cores run, 0 = both held (no per-core reset) | `upc_soft_reset` |
 | GPStatus | XENA + 0x150; bit 0/1 raised by the cores, cleared by the IRQ handler | `upc_get/set_gp_status`, `upc_platform_irq` |
 | Mailboxes 0-5 | XENA + 0x128, +0x12c, +0x1130, +0x1134, +0x1138, +0x113c | `upc_write/read_mailbox` |
-| UPC clocks | APB config 0xf8000180: bits 12:8 IO clock, bits 7:5 XCPU clock (exported helpers; upc.ko itself does not call them) | `upc_set_apb_io_clock`, `upc_set_apb_xcpu_clock` |
+| UPC clocks | APB config 0xf8000180: bits 12:8 IO clock, bits 7:5 XCPU clock (stock `init_module` sets bits 7:5 = 3 before registering the driver; the IO field is only an exported helper) | `upc_set_apb_io_clock`, `upc_set_apb_xcpu_clock` |
 
 ioctls (one global mutex):
 
@@ -67,26 +67,31 @@ upc: upc@f9200000 {
 - **Device nodes:** one platform device, two misc devices `upc0`/`upc1`
   with the ioctls, read/write semantics, limits and mutex above.
   `MISC_DYNAMIC_MINOR`; devtmpfs creates `/dev/upc0` and `/dev/upc1`.
-- **Mailbox wait:** a shared completion, as stock;
-  `wait_for_completion_interruptible`, so Ctrl-C works.
+- **Mailbox wait:** as stock, one completion per core (core n's IRQ clears
+  GPStatus bit n only); box 0/5 wait for bit 0, box 1 for bit 1; one
+  write-and-wait at a time, interruptible, returning -EINTR like stock. The
+  register lock is not held while waiting, so `UPC_IOC_HOLD` still works.
 - **Memory access:** `ioremap` only. It does not reserve the regions with
   `request_mem_region`, so `/dev/mem` (DEVMEM=y, STRICT_DEVMEM allows I/O,
   IO_STRICT_DEVMEM off) keeps working for upctool unchanged.
-- **Later improvements:** an `mmap` of DTCM on `/dev/upcN` would let upctool
-  drop `/dev/mem` and the nonce search; a safe-state hook (below).
-- **Probe does nothing to the cores**, like stock: no reset change, no clock
-  change. Nothing starts until `upctool load`.
-- **Safety hooks (new):** a reboot notifier and a panic notifier that hold
+- **Later improvement:** an `mmap` of DTCM on `/dev/upcN` would let upctool
+  drop `/dev/mem` and the nonce search.
+- **Probe:** sets the XCPU clock field like stock `init_module`, then holds
+  the cores and applies the safe state (below). Nothing starts until
+  `upctool load`. The driver cannot be unbound (`suppress_bind_attrs`).
+- **Safety hooks (new):** probe, every probe error, remove, shutdown, a
+  reboot notifier and a panic notifier hold
   the cores (CPUSoftReset = 0) and apply upctool's `safe` state: every PWM
   block's CTRL loses LEVEL then RUN, every stepper engine gets
   `SMOT_ABORT = 0x100` and `SMOT_CFG |= 1` (addresses in
   `common/upc_hw.h`). With `panic=10` that turns heaters and drivers off
   before the reset; on stock, a kernel crash leaves the cores running. The
   Klipper heater `max_duration` stays the firmware-side backstop.
-- **Clocks:** read `0xf8000180` on stock Linux and on m1 (both read-only
-  `devmem`). If m1 differs, the driver sets the stock value from a DT
-  property at probe, before any load. Klipper's `CONFIG_CLOCK_FREQ` assumes
-  the stock FM clock (~396 MHz).
+- **Clocks:** the driver does what stock does (bits 7:5 = 3) and logs the
+  old and new APB words; still compare with `devmem 0xf8000180` on stock.
+  Klipper's `CONFIG_CLOCK_FREQ` assumes the stock FM clock (~396 MHz).
+- **Not covered:** SysRq-B, `emergency_restart()` without a panic, and a
+  non-fatal oops; Klipper's heater `max_duration` is the backstop there.
 
 Size: about 300 lines. Kernel config extras: `UNIX98_PTYS` (devpts mounted
 by init) for the bridge, plus Wi-Fi association for a remote klippy.

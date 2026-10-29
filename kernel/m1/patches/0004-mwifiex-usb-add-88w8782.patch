@@ -51,7 +51,16 @@
  	case USB8766_PID_1:
  	case USB8766_PID_2:
  		adapter->tx_buf_size = MWIFIEX_TX_DATA_BUF_SIZE_2K;
-@@ -1519,6 +1527,16 @@
+@@ -1516,9 +1524,25 @@
+ 
+ 	if (card->usb_boot_state == USB8XXX_FW_DNLD) {
+ 		ret = mwifiex_prog_fw_w_helper(adapter, fw);
++		if (ret && le16_to_cpu(card->udev->descriptor.idProduct) ==
++		    USB8782_PID) {
++			mwifiex_dbg(adapter, MSG,
++				    "8782: no boot ROM answer, assuming the firmware runs\n");
++			ret = 0;
++		}
  		if (ret)
  			return -1;
  
@@ -68,7 +77,7 @@
  		/* Boot state changes after successful firmware download */
  		if (card->usb_boot_state == USB8XXX_FW_DNLD)
  			return -1;
-@@ -1607,6 +1625,7 @@
+@@ -1607,6 +1631,7 @@
  MODULE_DESCRIPTION("Marvell WiFi-Ex USB Driver version" USB_VERSION);
  MODULE_VERSION(USB_VERSION);
  MODULE_LICENSE("GPL v2");

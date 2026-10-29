@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
+/* sd variant: the base board with the SD socket (vendor mmc0) enabled */
+#include "88pa6170-dp200.dts"
+
+&sdhci0 {
+	status = "okay";
+};

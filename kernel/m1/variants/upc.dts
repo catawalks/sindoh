@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
+/* upc variant: the base board with the UPC coprocessors enabled */
+#include "88pa6170-dp200.dts"
+
+&upc {
+	status = "okay";
+};

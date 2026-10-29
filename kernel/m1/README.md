@@ -35,6 +35,25 @@ The build runs in WSL (Debian 13; WSL1 is fine):
 wsl -d Debian -- bash /mnt/d/DP200/backup/klipper_port/kernel/m1/build.sh
 ```
 
+Each test step is its own image variant (see the test cards below):
+
+```bash
+wsl -d Debian -- bash -c "VARIANT=upc bash /mnt/d/DP200/backup/klipper_port/kernel/m1/build.sh"
+```
+
+| VARIANT | Output | Adds on top of the base image |
+|---|---|---|
+| `base` (default) | `m1.uimg` | Milestone 1 + SMP, panel, USB, Wi-Fi scan, webcam |
+| `net` | `m1-net.uimg` | Uniprocessor loader: `wifi-join` (wpa_supplicant, udhcpc) and `netload` (kexec-tools) |
+| `upc` | `m1-upc.uimg` | `/dev/upc0`, `/dev/upc1` (`src/drivers/misc/mv61x0-upc.c`), PTYs, `upctool` |
+| `sd` | `m1-sd.uimg` | SD socket (`sdhci-mv61x0.c`), block layer, ext4/vfat, read-only use |
+| `gpio` | `m1-gpio.uimg` | GPIO banks A-H (`gpio-mv61x0.c`) registered, debugfs |
+
+A variant merges `variants/<v>.config` after `m1.config`, uses
+`variants/<v>.dts` (the base DTS plus `status = "okay"` for its nodes;
+every new node is `disabled` in the base DTS), and adds `initramfs/<v>/`.
+`/init` runs that variant's `variant.sh` checks after the common ones.
+
 One-time packages (`apt-get install`, as root):
 `build-essential gcc-arm-linux-gnueabihf bc flex bison xz-utils u-boot-tools cpio python3 rsync`.
 
@@ -108,5 +127,82 @@ The BusyBox binary was not run on the PC: qemu-user cannot map a 32-bit
 guest under WSL1. Its ELF attributes were checked instead (ARMv7-A,
 Thumb-2, VFPv3-D16, hard-float, static), and it worked on the first boot.
 
-The kernel never touches GPIOs, heaters, motors or NAND. Power-cycling
-the printer returns it to the stock firmware.
+The base image never touches GPIOs, heaters, motors or NAND. The `upc`
+variant only ever forces the UPC-driven outputs *off* (until `upctool load`
+starts firmware), and the `gpio` variant registers the banks without
+driving anything. No image writes NAND. Power-cycling the printer returns
+it to the stock firmware.
+
+## Test cards (each needs the user at the printer)
+
+Common to all: upload as usual (`tools/uboot_upload.py` to 0x02000000,
+then `bootm 0x02000000`). `reboot -f` returns to stock. A panic resets
+after 10 s. Back out any test by power-cycling.
+
+### net: join Wi-Fi, then load kernels over the network
+
+1. Boot `m1-net.uimg` (uniprocessor; Wi-Fi as in boot 7).
+2. At the shell, type `wifi-join`. It asks for the SSID and the passphrase
+   (not echoed). Only the derived key lands in `/tmp`; nothing is stored in
+   any image. The user types them; don't paste them into logs.
+3. **Success:** `iw dev mlan0 link` says "Connected", udhcpc prints a lease,
+   and `ping <pc-address>` answers.
+4. On the PC, in `D:\DP200\kernel\out`: `python -m http.server 8000` (allow
+   it through the Windows firewall for the private network).
+5. On the printer: `netload <pc-address> m1-upc-zImage-dtb.bin` (any
+   `*-zImage-dtb.bin`; extra kernel arguments may follow).
+6. **Success:** the new kernel's boot log on the serial console, in seconds
+   instead of a 17-min upload.
+7. **Known risk, untested:** the 88W8782 keeps its firmware running across
+   kexec. Patch 0004 then skips the download ("no boot ROM answer, assuming
+   the firmware runs"). If Wi-Fi fails in the kexec'd kernel, power-cycle
+   before the next Wi-Fi test.
+
+### upc: the UPC driver (Klipper MCUs)
+
+1. Boot `m1-upc.uimg`, or `netload` it.
+2. Automatic checks (`/etc/m1-variant.sh`) read back CPUSoftReset (must be
+   0 = held), the first PWM CTRL words (bits 0 and 2 clear), the stepper
+   CFG words (bit 0 set = driver off), and the UPC clock register 0xf8000180.
+   Like stock `upc.ko` at load, the driver sets its bits 7:5 to 3 and logs
+   "APB config old -> new". Compare with stock (`devmem 0xf8000180` there).
+3. The user runs `upctool info` (reads only), then `upctool safe`.
+4. Only then, with the user watching, try the passive probe firmware
+   (`upc_fw/probe`). Klipper firmware, heaters and motion come later, one at
+   a time (`docs/kernel/upc_mainline_design.md`, bring-up order).
+5. **Success:** `/dev/upc0` and `/dev/upc1` exist, the dmesg line reads
+   "cores held, outputs safe", and upctool sees the DTCM nonce.
+6. Safety paths: `reboot -f` logs "reboot: cores held, outputs off";
+   `echo c > /proc/sysrq-trigger` forces a panic, which must print
+   "mv61x0-upc: panic: cores held, outputs off" before the 10 s reset.
+   Repeat both later while the probe firmware runs, to prove the outputs
+   really go off.
+
+### sd: the SD socket, read-only
+
+0. Pre-check, read-only, before spending a boot: at the U-Boot prompt
+   `md.l 0xf804008c 4; md.l 0xf8041080 2`. These are the SD pins' function
+   selects (bits 2:0 must be 2). The stock kernel sets them itself and
+   mainline does not yet. If they aren't 2, skip this test until an
+   approved pin-mux step exists; the image would only report "no card".
+1. **The user inserts the 2 GB rescue card**, never the 4 GB working card,
+   and confirms it before the upload.
+2. Boot `m1-sd.uimg`. The checks wait for `mmcblk0`, set `force_ro`, print
+   `/proc/partitions` and mount nothing.
+3. Read-only look: `mount -o ro,noload /dev/mmcblk0p1 /mnt` (ext4; `noload`
+   skips the journal replay, which would write).
+4. **Success:** a "new ... SDHC card" line, the partitions match what the PC
+   shows for that card, and the file listing works. `umount /mnt` before
+   `reboot -f`.
+
+### gpio: the GPIO banks, nothing driven
+
+1. Boot `m1-gpio.uimg`.
+2. Each bank logs "32 lines: in .. out .. dir .. (untouched)". The checks
+   print the bank registers again and `/sys/kernel/debug/gpio`.
+3. **Success:** eight gpiochips (A-H = 0xf8040000-0xf8047000), and the
+   in/out/dir values equal the probe lines and the U-Boot `md.l` values,
+   i.e. nothing changed.
+4. Nothing requests a line in this image. The first real use (Ethernet PHY
+   reset, GPIO 62 = bank B line 30) needs a DT `reset-gpios` and the user's
+   OK, because requesting a line switches its pin to the GPIO function.
