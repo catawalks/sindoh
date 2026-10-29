@@ -13,7 +13,7 @@ on this SoC needs that exact version.
 
 | Part | Where | Notes |
 |---|---|---|
-| Timer driver | `src/drivers/clocksource/timer-mv61x0.c` | New. Timer 1 is the clockevent (SPI 21), timer 2 the free-running clocksource and sched_clock, at 1 MHz (prescaler 198). Register sequences copied from the vendor 3.2 kernel. At boot it logs what U-Boot left in the timer block and the measured count direction. |
+| Timer driver | `src/drivers/clocksource/timer-mv61x0.c` | New. Timer 1 is the clockevent (SPI 21), timer 2 the free-running clocksource and sched_clock, at 1 MHz (prescaler 198). Register sequences copied from the vendor 3.2 kernel. All four timer IRQs are acknowledged, as the vendor does. Clocksource reads are filtered: two back-to-back reads must agree within 1 ms, and rejected reads are counted in `/sys/module/timer_mv61x0/parameters/`. A restart handler replays U-Boot's `reset_cpu` (watchdog on timer 0). At boot the driver logs what U-Boot left in the timer block and the measured count direction. |
 | SoC entry | `src/arch/arm/mach-mv61x0/` | `ARCH_MV61X0` selects GIC, `CPU_PJ4B` and the timer. The DT machine is "Marvell 88PA61x0". |
 | CPU setup | `patches/0001-*.patch` (proc-v7.S) | A PJ4B-MP entry (MIDR 0x560f5840/0xff0ffff0) with the vendor's `__v7_pj4bmp_setup` register values, including the A9-style SMP/FW bits in ACTLR. Mainline's `__v7_pj4b_setup` targets Armada XP and sets different bits. |
 | Kconfig/Makefile hooks | `patches/0001-*.patch` | arch/arm Kconfig + Makefile, clocksource Kconfig + Makefile, dts Makefile. |
@@ -60,7 +60,17 @@ To try options without rebuilding, use `setenv bootargs <extra args>`
 (never `saveenv`). Later values win, for example `maxcpus=2`.
 
 DT bootargs:
-`console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init`
+`console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init panic=10`
+
+`reboot` and a panic (after 10 s) reset the SoC through the watchdog,
+back to U-Boot and the stock firmware.
+
+## Boot history
+
+| Image (md5) | Result |
+|---|---|
+| 870017 B, `86595c02…` (2026-10-29) | Boots to the shell. Earlycon, DT, GIC, clocksource and UART work (log: `docs/kernel/m1_boot1.log`). **Timekeeping broken:** uptime jumps by 2^32 µs, `sleep` returns at once, timer 1 interrupts stop after ~0.5 s, and timer 2's status bit stays pending. |
+| 771801 B, `c073d1ea…` | Fix attempt. Status bits are cleared after timer 2 starts; IRQs 52/54/55 are taken and acked like the vendor's; clocksource reads are filtered and counted; restart handler; `panic=10`; config trimmed (VT, input, HID, STRICT_KERNEL_RWX off). `/init` now prints a sleep-2 check: timer 2 µs against uptime, the glitch counters, and timer status. |
 
 ## Expected output, and what a hang means
 
@@ -71,13 +81,17 @@ DT bootargs:
 | `Booting Linux on physical CPU 0x0` ... `Machine model: Sindoh DP200` | earlycon works, DT accepted |
 | `mv61x0-timer: wdt ... ctrl ... prescale 198` then `timer 2 counts up (...), 1000000 Hz` | timer block reachable; direction confirmed |
 | hang at `Calibrating delay loop...` | timer 1 interrupts do not arrive (GIC/IRQ number/trigger type) |
-| `printk: console [ttyS0] enabled` then silence | the 8250 driver took over and broke the UART (check CPR/UCV: DesignWare → `snps,dw-apb-uart` + `SERIAL_8250_DW`) |
+| `printk: console [ttyS0] enabled` then silence | the 8250 driver took over and broke the UART (it is a DesignWare UART: try `snps,dw-apb-uart` + `SERIAL_8250_DW`) |
 | `=== DP200 milestone 1` and a `#` prompt | milestone 1 reached; `/init` printed the clocksource, the clockevent and `/proc/interrupts` twice |
 
 Milestone-1 checks (no_gpl_plan 2.4): earlycon output; `mv61x0_timer2` as
 the clocksource; the `mv61x0_timer1` count in `/proc/interrupts` grows by
 about 100 per second; typing works at the shell (UART RX interrupt).
 `devmem` is included for register reads from the shell.
+
+The BusyBox binary was not run on the PC: qemu-user cannot map a 32-bit
+guest under WSL1. Its ELF attributes were checked instead (ARMv7-A,
+Thumb-2, VFPv3-D16, hard-float, static), and it worked on the first boot.
 
 The kernel never touches GPIOs, heaters, motors or NAND. Power-cycling
 the printer returns it to the stock firmware.
