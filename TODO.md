@@ -34,8 +34,15 @@ written so they can be handed to another agent.
    -> Mainsail prompt + screen YES/NO dialog, valid 5 min, one homing);
    tested live (G28 refused, nothing moved; dialog on the panel). Cold 4x4
    mesh after: front-left 0.23 mm lower and back-right 0.15 mm higher than
-   the 60 C mesh before the cube print (same grid) - recheck at 60 C
-   before reading it as a bed shift.
+   the 60 C mesh before the cube print (same grid). Confirmed at 60 C:
+   -0.23/+0.02 front, -0.05/+0.13 back (L/R). Lead screws are back-left
+   and back-right, belt-coupled: the left side is ~0.2 mm lower front and
+   back = the belt likely skipped on the left pulley. Mesh covers it; real
+   fix = re-sync the belt (needs screw lead + pulley teeth from the user).
+   Spring-loaded part hanging under the bed: watched all XENA inputs,
+   dec_sensor and GPIO banks 0-7 (regwatch, bit-level noise filter) while
+   the user pressed it - no input changed. Mechanical, or not wired to
+   anything we read.
 2. **Filament dryer.** DONE 10-28, first run (screen FILAMENT -> DRYER,
    PLA 4 h, 15:55-19:59): bed down + forward, head parked, extruder off;
    bed 22 -> 50 C in 8 min, then 50.0 C for the whole 4 h at 18-46 %
