@@ -37,8 +37,12 @@ written so they can be handed to another agent.
    the 60 C mesh before the cube print (same grid). Confirmed at 60 C:
    -0.23/+0.02 front, -0.05/+0.13 back (L/R). Lead screws are back-left
    and back-right, belt-coupled: the left side is ~0.2 mm lower front and
-   back = the belt likely skipped on the left pulley. Mesh covers it; real
-   fix = re-sync the belt (needs screw lead + pulley teeth from the user).
+   back = the belt likely skipped on the left pulley. FIXED 10-28: lead =
+   1 mm per screw turn (2 mm bed = 2 turns; bed down = CCW from above);
+   user loosened the belt and turned the left screw 1/5 turn CW. Mesh
+   after (cold): left-right within +0.05/-0.02 mm on every row (before
+   the crush: up to -0.13), range 0.23 mm, mostly front-to-back (front
+   screws). Check the first layer on the next print.
    Spring-loaded part hanging under the bed: watched all XENA inputs,
    dec_sensor and GPIO banks 0-7 (regwatch, bit-level noise filter) while
    the user pressed it - no input changed. Mechanical, or not wired to
