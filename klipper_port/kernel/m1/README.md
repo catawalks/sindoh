@@ -14,7 +14,9 @@ on this SoC needs that exact version.
 | Part | Where | Notes |
 |---|---|---|
 | Timer driver | `src/drivers/clocksource/timer-mv61x0.c` | New. Timer 1 is the clockevent (SPI 21), timer 2 the free-running clocksource and sched_clock, at 1 MHz (prescaler 198). Register sequences copied from the vendor 3.2 kernel. All four timer IRQs are acknowledged, as the vendor does. Clocksource reads are filtered: two back-to-back reads must agree within 1 ms, and rejected reads are counted in `/sys/module/timer_mv61x0/parameters/`. A restart handler replays U-Boot's `reset_cpu` (watchdog on timer 0). At boot the driver logs what U-Boot left in the timer block and the measured count direction. |
-| SoC entry | `src/arch/arm/mach-mv61x0/` | `ARCH_MV61X0` selects GIC, `CPU_PJ4B` and the timer. The DT machine is "Marvell 88PA61x0". |
+| SoC entry | `src/arch/arm/mach-mv61x0/` | `ARCH_MV61X0` selects GIC, `CPU_PJ4B`, the SIC and the timer. The DT machine is "Marvell 88PA61x0". `platsmp.c` starts CPU 1 the vendor's way: SCU enable, `secondary_startup` to the mailbox at 0xfa000000, then an SGI (`enable-method = "marvell,88pa6170-smp"`). |
+| SIC irqchips | `src/drivers/irqchip/irq-mv61x0-sic.c`, `patches/0002-*.patch` | SIC0 (0xf9300100, SPI 101) and SIC1 (0xf9300200, SPI 103), 32 inputs each, chained. Registers from the vendor: +0 enable-set, +0xc clear, +0x14 enable-clear, +0x18 status. No users yet; the DEC timers are SIC0 inputs 0-7. |
+| Panel console | DTS `/chosen/framebuffer@18000000`, `m1.config` | `simple-framebuffer` on the boot-logo buffer U-Boot left running: 800×480 RGB565, stride 1600. fbcon shows the kernel console there (`console=tty0`). Display only: no touch, no backlight control. The panel is mounted in portrait; append `fbcon=rotate:1` (or 3) to turn the text. |
 | CPU setup | `patches/0001-*.patch` (proc-v7.S) | A PJ4B-MP entry (MIDR 0x560f5840/0xff0ffff0) with the vendor's `__v7_pj4bmp_setup` register values, including the A9-style SMP/FW bits in ACTLR. Mainline's `__v7_pj4b_setup` targets Armada XP and sets different bits. |
 | Kconfig/Makefile hooks | `patches/0001-*.patch` | arch/arm Kconfig + Makefile, clocksource Kconfig + Makefile, dts Makefile. |
 | Device tree | `src/arch/arm/boot/dts/marvell/88pa6170-dp200.dts` | CPU, A9-style SCU/GIC, the timer, UART0 as `ns16550a` (25 MHz, shift 2, 32-bit), 512 MB of RAM, and the boot-logo framebuffer at 0x18000000 reserved. |
@@ -60,7 +62,10 @@ To try options without rebuilding, use `setenv bootargs <extra args>`
 (never `saveenv`). Later values win, for example `maxcpus=2`.
 
 DT bootargs:
-`console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init panic=10`
+`console=tty0 console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 rdinit=/init panic=10`
+
+If the second CPU causes trouble, boot the same image with
+`setenv bootargs maxcpus=1`; the appended value keeps CPU 1 parked.
 
 `reboot` and a panic (after 10 s) reset the SoC through the watchdog,
 back to U-Boot and the stock firmware.
@@ -72,7 +77,8 @@ back to U-Boot and the stock firmware.
 | 870017 B, `86595c02…` (2026-10-29) | Boots to the shell. Earlycon, DT, GIC, clocksource and UART work (log: `docs/kernel/m1_boot1.log`). **Timekeeping broken:** uptime jumps by 2^32 µs, `sleep` returns at once, timer 1 interrupts stop after ~0.5 s, and timer 2's status bit stays pending. |
 | 771801 B, `c073d1ea…` | Status bits are cleared after timer 2 starts; IRQs 52/54/55 are taken and acked like the vendor's; clocksource reads are filtered and counted; restart handler; `panic=10`; config trimmed (VT, input, HID, STRICT_KERNEL_RWX off). **Boot 2 (`m1_boot2.log`):** timer probe status 0; the restart handler works (panic → reset → stock). `/init` died with exit 2 at 0.40 s because BusyBox lacked `$(( ))` (`FEATURE_SH_MATH` off). Linux IRQ 24 is now timer 0; timer 1 is IRQ 27. |
 | 773633 B, `d583f22f…` | `FEATURE_SH_MATH` on. `/init` is minimal and runs the checks as a child (`/etc/m1-checks.sh`), so PID 1 can't exit. The driver logs timer 1 interrupts #1-3, #100, #1000 and #10000 with the raw timer 2 count. **Boot 3:** the timer 1 tick runs at 100 Hz (#1000 at 10.017 s), uptime matches real time, no clocksource glitches. But every timed sleep returns at once: tinyconfig leaves `COMPAT_32BIT_TIME` off, musl uses the time32 `nanosleep`/`ppoll` for small values, and gets ENOSYS. |
-| 783265 B, `f34f8ba8…` | `COMPAT_32BIT_TIME` and `POSIX_TIMERS` on. |
+| 783265 B, `f34f8ba8…` | `COMPAT_32BIT_TIME` and `POSIX_TIMERS` on. **Boot 4: milestone 1 done.** `sleep 2` = 2014135 µs, `sleep 10` = 10.0 s, timer 1 at 100 Hz, no glitches, UART input works, `reboot -f` returns to stock. |
+| 842710 B, `25e2d0da…` | Next steps: SMP (no `maxcpus=1`), SIC0/SIC1 irqchip, panel console via simple-framebuffer (VT + fbcon; keyboard/mouse/serio off). `/init` also prints the online CPUs and `/proc/fb`. |
 
 ## Expected output, and what a hang means
 

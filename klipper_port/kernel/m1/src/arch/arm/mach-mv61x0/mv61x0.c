@@ -2,9 +2,8 @@
 /*
  * Marvell 88PA61x0 printer SoCs (88PA6170 in the Sindoh DP200).
  *
- * The device tree describes everything milestone 1 needs. Still to come:
- * secondary CPU start (vendor: physical address of secondary_startup to
- * 0xfa000000, then an SGI) and the PL310 L2 cache.
+ * The device tree describes the hardware; secondary CPU start is in
+ * platsmp.c. Still to come: the PL310 L2 cache.
  */
 #include <asm/mach/arch.h>
 

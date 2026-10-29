@@ -6,6 +6,7 @@ config ARCH_MV61X0
 	select CPU_PJ4B
 	select HAVE_ARM_SCU if SMP
 	select HAVE_ARM_TWD if SMP
+	select MV61X0_SIC
 	select MV61X0_TIMER
 	help
 	  Support for the Marvell 88PA6170 SoC of the Sindoh DP200 3D

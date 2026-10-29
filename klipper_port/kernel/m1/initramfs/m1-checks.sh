@@ -4,6 +4,7 @@ echo
 echo "=== DP200 milestone 1: $(uname -a)"
 echo "--- cmdline: $(cat /proc/cmdline)"
 grep -E '^(model name|Features|CPU (implementer|variant|part|revision))' /proc/cpuinfo
+echo "--- CPUs online: $(cat /sys/devices/system/cpu/online), framebuffer: $(cat /proc/fb)"
 echo "--- clocksource: $(cat /sys/devices/system/clocksource/clocksource0/current_clocksource)"
 echo "--- clockevent: $(cat /sys/devices/system/clockevents/clockevent0/current_device)"
 echo "--- /proc/interrupts:"
