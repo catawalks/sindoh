@@ -1210,7 +1210,8 @@ class UI:
         y1 = top + (BL_PLATE[3] - BL_PLATE[1]) * sc
         px = lambda x: x0 + (x - BL_PLATE[0]) * sc
         py = lambda y: y1 - (y - BL_PLATE[1]) * sc
-        d.rounded_rectangle((x0, top, x0 + w, y1), radius=8, fill=(44, 44, 54), outline=(90, 90, 100))
+        # drawn wider than the plate's true shape so the value boxes stay inside
+        d.rounded_rectangle((x0 - 34, top, x0 + w + 34, y1), radius=8, fill=(44, 44, 54), outline=(90, 90, 100))
         xs = bl['xs'] or [18 + 62 * i for i in range(4)]
         ys = bl['ys'] or [30 + 140 * i / 3 for i in range(4)]
         small = w < 250
@@ -1230,8 +1231,8 @@ class UI:
             d.line((cx - 7, cy, cx + 7, cy), fill=(40, 40, 40), width=3)
         cx, cy = px(BL_PIVOT[0]), py(BL_PIVOT[1])
         d.polygon(((cx, cy - 9), (cx - 10, cy + 8), (cx + 10, cy + 8)), fill=(200, 200, 210))
-        d.text((x0 + 6, y1 + 6), 'FRONT (door)', font=font(16), fill=C_DIM)
-        d.text((x0 + w - 6 - d.textlength('BACK', font=font(16)), top - 22), 'BACK', font=font(16), fill=C_DIM)
+        d.text((x0 - 28, y1 + 6), 'FRONT (door)', font=font(16), fill=C_DIM)
+        d.text((x0 + w + 28 - d.textlength('BACK', font=font(16)), top - 22), 'BACK', font=font(16), fill=C_DIM)
         return y1
 
     def page_bedlevel(self, d, st):
