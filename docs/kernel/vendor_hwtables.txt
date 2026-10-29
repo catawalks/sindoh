@@ -1,0 +1,355 @@
+== gogin_io_desc (virtual -> physical, length, type)
+  virt f8000000  phys f8000000  len 00000400  DEVICE
+  virt f8fe0000  phys f8fe0000  len 00002000  DEVICE
+  virt fed20000  phys f8020000  len 00001000  DEVICE
+  virt fed30000  phys f8030000  len 00001000  DEVICE
+  virt f80d0000  phys f80d0000  len 00000080  DEVICE
+  virt f90b0000  phys f90b0000  len 00001000  DEVICE
+  virt f90b1000  phys f90b1000  len 00000180  DEVICE
+  virt f8060000  phys f8060000  len 00000100  DEVICE
+  virt fed60000  phys f9600000  len 00000020  DEVICE
+  virt f80a0000  phys f80a0000  len 00000400  DEVICE
+  virt f9082000  phys f9082000  len 00000200  DEVICE
+  virt f8100000  phys f8100000  len 00000030  DEVICE
+  virt f9020000  phys f9020000  len 00006000  DEVICE
+  virt f9090000  phys f9090000  len 00010000  DEVICE
+  virt fee00000  phys fa300000  len 00002000  4
+  virt f9300000  phys f9300000  len 0000c000  DEVICE
+  virt f9200000  phys f9200000  len 000c0000  DEVICE
+  virt f9400000  phys f9400000  len 00004000  DEVICE
+  virt f9410000  phys f9410000  len 00008000  DEVICE
+  virt f9418000  phys f9418000  len 00008000  DEVICE
+  virt f9440000  phys f9440000  len 00004000  DEVICE
+  virt f9480000  phys f9480000  len 00020000  DEVICE
+  virt f94c0000  phys f94c0000  len 00040000  DEVICE
+  virt f8040000  phys f8040000  len 00000100  DEVICE
+  virt f8041000  phys f8041000  len 00000100  DEVICE
+  virt f8042000  phys f8042000  len 00000100  DEVICE
+  virt f8043000  phys f8043000  len 00000100  DEVICE
+  virt f8044000  phys f8044000  len 00000100  DEVICE
+  virt f8045000  phys f8045000  len 00000100  DEVICE
+  virt f8047000  phys f8047000  len 00000100  DEVICE
+  virt f8150000  phys f8150000  len 00006000  DEVICE
+  virt fa000000  phys fa000000  len 00010000  DEVICE
+  virt f8180000  phys f8180000  len 00004000  DEVICE
+  virt f8184000  phys f8184000  len 00004000  DEVICE
+  (34 entries)
+
+== struct resource entries (MMIO in f8000000-fa3fffff, or IRQ)
+  [pmu_resources]
+    c09a8fd0  IRQ 59                   flags 00000400  
+  [tsen_resources]
+    c09a8fec  MEM f80f0000-f80f001c    flags 00000200  
+    c09a9008  MEM f8010000-f8010007    flags 00000200  
+    c09a9024  MEM f9090000-f909003f    flags 00000200  
+  [gogin_res_gpioA]
+    c09a9050  MEM f8040000-f8040053    flags 00000200  
+    c09a906c  IRQ 38                   flags 00000400  
+  [gogin_res_gpioB]
+    c09a9098  MEM f8041000-f8041053    flags 00000200  
+    c09a90b4  IRQ 39                   flags 00000400  
+  [gogin_res_gpioC]
+    c09a90e0  MEM f8042000-f8042053    flags 00000200  
+    c09a90fc  IRQ 40                   flags 00000400  
+  [gogin_res_gpioD]
+    c09a9128  MEM f8043000-f8043053    flags 00000200  
+    c09a9144  IRQ 41                   flags 00000400  
+  [gogin_res_gpioE]
+    c09a9170  MEM f8044000-f8044053    flags 00000200  
+    c09a918c  IRQ 42                   flags 00000400  
+  [gogin_res_gpioF]
+    c09a91b8  MEM f8045000-f8045053    flags 00000200  
+    c09a91d4  IRQ 43                   flags 00000400  
+  [gogin_res_gpioG]
+    c09a9200  MEM f8046000-f8046053    flags 00000200  
+    c09a921c  IRQ 44                   flags 00000400  
+  [gogin_res_gpioH]
+    c09a9248  MEM f8047000-f8047053    flags 00000200  
+    c09a9264  IRQ 45                   flags 00000400  
+  [pxa3xx_resources_nand]
+    c09a9460  MEM f9082000-f9082200    flags 00000200  
+    c09a947c  IRQ 65                   flags 00000400  
+  [sdmmc0_resources]
+    c09a9498  MEM f9080000-f90800ff    flags 00000200  
+    c09a94b4  IRQ 66                   flags 00000400  
+  [sdmmc1_resources]
+    c09a94d0  MEM f9080200-f90802ff    flags 00000200  
+    c09a94ec  IRQ 66                   flags 00000400  
+  [GLAN_MAC_resources]
+    c09a9508  MEM f9050000-f90510ff    flags 00000200  
+    c09a9524  IRQ 96                   flags 00000400  
+  [usb2D_resources]
+    c09a9548  MEM f9040000-f9040fff    flags 00000200  
+    c09a9564  IRQ 97                   flags 00000400  
+    c09a9580  MEM f904f040-f904f06f    flags 00000200  
+  [usb2H_resources]
+    c09a95a8  MEM f9041000-f9041fff    flags 00000200  
+    c09a95c4  IRQ 98                   flags 00000400  
+    c09a95e0  MEM f904f080-f904f0af    flags 00000200  
+  [usb2O_resources]
+    c09a9608  MEM f9048000-f9048fff    flags 00000200  
+    c09a9624  IRQ 99                   flags 00000400  
+    c09a9640  MEM f904f0c0-f904f0ef    flags 00000200  
+  [m2m_dev0_res]
+    c09a965c  MEM f90c0000-f90c0fff    flags 00000200  regs
+    c09a9678  IRQ 101                  flags 00000400  irq
+  [m2m_dev1_res]
+    c09a9694  MEM f90c1000-f90c1fff    flags 00000200  regs
+    c09a96b0  IRQ 101                  flags 00000400  irq
+  [gogin_i2c_res2]
+    c09a96cc  MEM f80a2000-f80a20ff    flags 00000200  
+    c09a96e8  IRQ 72                   flags 00000400  
+  [gogin_i2c_res3]
+    c09a9704  MEM f80a3000-f80a30ff    flags 00000200  
+    c09a9720  IRQ 73                   flags 00000400  
+  [gogin_bspi_res]
+    c09a973c  MEM f9010000-f9010033    flags 00000200  marvell Boot SPI
+  [gogin_spi_res0]
+    c09a9758  MEM f8070000-f8070100    flags 00000200  spi base 0
+    c09a9774  IRQ 91                   flags 00000400  
+  [gogin_spi_res1]
+    c09a9790  MEM f8071000-f8071100    flags 00000200  spi base 1
+    c09a97ac  IRQ 92                   flags 00000400  
+  [gogin_spi_res2]
+    c09a97c8  MEM f8072000-f8072100    flags 00000200  spi base 2
+    c09a97e4  IRQ 93                   flags 00000400  
+  [pip_resources]
+    c09a9808  MEM f90a0000-f90a0003    flags 00000200  regs-zx
+    c09a9824  MEM f9100000-f9100003    flags 00000200  regs-pip-top
+    c09a9840  MEM f9103000-f9103003    flags 00000200  regs-pip-tp
+    c09a985c  MEM f9102000-f9103003    flags 00000200  regs-pip-cp
+    c09a9878  MEM f9108000-f9108003    flags 00000200  regs-pip-cr
+    c09a9894  MEM f9104000-f9104003    flags 00000200  regs-pip-csc
+    c09a98b0  MEM f910a000-f910a003    flags 00000200  regs-pip-nga
+    c09a98cc  MEM f9110000-f9110003    flags 00000200  regs-pip-sccsc
+    c09a98e8  MEM f9111000-f9111003    flags 00000200  regs-pip-serp
+    c09a9904  MEM f9140000-f9140003    flags 00000200  regs-pip-ued
+    c09a9920  MEM f9139000-f9139003    flags 00000200  regs-pip-yipi
+    c09a993c  MEM f913a000-f913a003    flags 00000200  regs-pip-autoht
+    c09a9958  MEM f913c000-f913c003    flags 00000200  regs-pip-kmod
+    c09a9974  MEM f9153000-f9153003    flags 00000200  regs-pip-stat-cdma0
+    c09a9990  MEM f9154000-f9154003    flags 00000200  regs-pip-stat-cdma1
+    c09a99ac  MEM f9155000-f9155003    flags 00000200  regs-pip-stat-cdma2
+    c09a99c8  MEM f915f000-f915f003    flags 00000200  regs-pip-odma0
+    c09a99e4  MEM f9160000-f9160003    flags 00000200  regs-pip-odma1
+    c09a9a00  MEM f9161000-f9161003    flags 00000200  regs-pip-odma2
+    c09a9a1c  MEM f9162000-f9162003    flags 00000200  regs-pip-odma3
+    c09a9a38  MEM f9163000-f9163003    flags 00000200  regs-pip-odma4
+    c09a9a54  MEM f9164000-f9164003    flags 00000200  regs-pip-odma5
+    c09a9a70  MEM f9165000-f9165003    flags 00000200  regs-pip-odma6
+    c09a9a8c  MEM f9166000-f9166003    flags 00000200  regs-pip-odma7
+    c09a9aa8  MEM f910b000-f910b003    flags 00000200  regs-pip-pa-cdma
+    c09a9ac4  MEM f910c000-f910c003    flags 00000200  regs-pip-pa
+    c09a9ae0  MEM f910e000-f910e003    flags 00000200  regs-pip-pa-odma
+    c09a9afc  MEM f910f000-f910f003    flags 00000200  regs-pip-pa-idma
+    c09a9b18  MEM f9138000-f9138003    flags 00000200  regs-pip-ht-db
+    c09a9b34  MEM f913d000-f913d003    flags 00000200  regs-pip-kmod-db
+    c09a9b50  MEM f9112000-f9112003    flags 00000200  regs-pip-serp-db
+    c09a9b6c  MEM f9101000-f9101003    flags 00000200  regs-pip-fhs
+    c09a9b88  MEM f9118000-f9118003    flags 00000200  regs-pip-th0
+    c09a9ba4  MEM f9120000-f9120003    flags 00000200  regs-pip-th1
+    c09a9bc0  MEM f9128000-f9128003    flags 00000200  regs-pip-th2
+    c09a9bdc  MEM f9130000-f9130003    flags 00000200  regs-pip-th3
+    c09a9bf8  MEM f9109000-f9109003    flags 00000200  regs-pip-mip
+    c09a9c14  MEM f913e000-f913e003    flags 00000200  regs-pip-bloom
+    c09a9c30  MEM f9156000-f9156003    flags 00000200  regs-pip-cre
+    c09a9c4c  MEM f9167000-f9167003    flags 00000200  regs-pip-planar
+    c09a9c68  MEM f9152000-f9152003    flags 00000200  regs-pip-stats
+    c09a9c84  IRQ 81                   flags 00000400  irq-zx
+    c09a9ca0  IRQ 128                  flags 00000400  irq-pip
+  [imgpipe_resources]
+    c09a9ce4  IRQ 113                  flags 00000400  irq-scan
+    c09a9d00  IRQ 111                  flags 00000400  irq-pic
+    c09a9d1c  IRQ 110                  flags 00000400  irq-pie
+    c09a9d38  IRQ 81                   flags 00000400  irq-zx
+    c09a9d54  IRQ 128                  flags 00000400  irq-pip
+    c09a9d70  IRQ 114                  flags 00000400  irq-ice-test
+  [lpc_resources]
+    c09a9d98  MEM f9100000-f9100003    flags 00000200  regs-pip-top
+    c09a9db4  MEM f9157000-f9157fff    flags 00000200  regs-lpc0
+    c09a9dd0  MEM f9158000-f9158fff    flags 00000200  regs-lpc1
+    c09a9dec  MEM f9159000-f9159fff    flags 00000200  regs-lpc2
+    c09a9e08  MEM f915a000-f915afff    flags 00000200  regs-lpc3
+    c09a9e24  MEM f915b000-f915bfff    flags 00000200  regs-idma0
+    c09a9e40  MEM f915c000-f915cfff    flags 00000200  regs-idma1
+    c09a9e5c  MEM f915d000-f915dfff    flags 00000200  regs-idma2
+    c09a9e78  MEM f915e000-f915efff    flags 00000200  regs-idma3
+    c09a9e94  MEM f915f000-f915ffff    flags 00000200  regs-odma0
+    c09a9eb0  MEM f9160000-f9160fff    flags 00000200  regs-odma1
+    c09a9ecc  MEM f9161000-f9161fff    flags 00000200  regs-odma2
+    c09a9ee8  MEM f9163000-f9163fff    flags 00000200  regs-odma3
+  [msigen_resources]
+    c09a9f20  IRQ 113                  flags 00000400  irq-scan
+    c09a9f3c  IRQ 111                  flags 00000400  irq-pic
+    c09a9f58  IRQ 110                  flags 00000400  irq-pie
+    c09a9f74  IRQ 81                   flags 00000400  irq-zx
+    c09a9f90  IRQ 128                  flags 00000400  irq-pip
+    c09a9fac  IRQ 100                  flags 00000400  irq-pcie
+  [jpeg_resources]
+    c09a9fc8  MEM f9030000-f9033fff    flags 00000200  jpeg-regs
+    c09a9fe4  IRQ 89                   flags 00000400  irq-jpeg-read
+    c09aa000  IRQ 88                   flags 00000400  irq-jpeg-mcu
+    c09aa01c  IRQ 90                   flags 00000400  irq-jpeg-write
+  [sizar_resources]
+    c09aa038  MEM f9420000-f942007f    flags 00000200  sizar-regs
+    c09aa054  IRQ 112                  flags 00000400  irq-sizar
+  [antic_resources]
+    c09aa070  MEM f90d0000-f90d002b    flags 00000200  antic-regs
+    c09aa08c  MEM f90d1000-f90d1033    flags 00000200  antic-idma
+    c09aa0a8  MEM f90d2000-f90d2037    flags 00000200  antic-odma
+    c09aa0c4  IRQ 132                  flags 00000400  irq-antic
+  [bootspi_resources]
+    c09aa0e0  MEM f9010000-f9010033    flags 00000200  
+  [asela_resources]
+    c09aa108  MEM f9500000-f950ffff    flags 00000200  register_block
+    c09aa124  MEM f9510000-f9511fff    flags 00000200  SRAM
+    c09aa140  MEM f9600000-f9600003    flags 00000200  AgateTopAselaMuxSel
+    c09aa15c  MEM f9602000-f9602003    flags 00000200  EIAselaMuxSel
+    c09aa178  MEM f9601080-f9601083    flags 00000200  SAP0AselaMuxSel
+    c09aa194  MEM f9601100-f9601103    flags 00000200  SAP1AselaMuxSel
+    c09aa1b0  MEM f9440300-f9440303    flags 00000200  LvdsAfeAselaMuxSel
+    c09aa1cc  IRQ 131                  flags 00000400  irq-asela
+  [sccp0_resources]
+    c09aa1e8  MEM f8180000-f8183fff    flags 00000200  Marvell SCCP
+    c09aa204  IRQ 36                   flags 00000400  
+  [sccp1_resources]
+    c09aa220  MEM f8184000-f8187fff    flags 00000200  Marvell SCCP
+    c09aa23c  IRQ 37                   flags 00000400  
+  [gogin_upc0_res]
+    c09aa258  MEM f9200000-f920ffff    flags 00000200  Marvell UPC
+    c09aa274  IRQ 126                  flags 00000400  
+  [gogin_upc1_res]
+    c09aa290  MEM f9210000-f92bffff    flags 00000200  Marvell UPC
+    c09aa2ac  IRQ 127                  flags 00000400  
+  [gogin_rtc_res]
+    c09aa2c8  MEM f8100000-f810002f    flags 00000200  Gogin Real Time Clock Regs
+    c09aa2e4  MEM f8000000-f80002ff    flags 00000200  Gogin APB Config Regs
+    c09aa300  IRQ 64                   flags 00000400  
+  [mv61_cdma0_res]
+    c09ab92c  MEM f9060000-f9060fff    flags 00000200  
+    c09ab948  MEM f9061000-f9061fff    flags 00000200  
+    c09ab964  MEM f9062000-f9062fff    flags 00000200  
+    c09ab980  MEM f9063000-f9063fff    flags 00000200  
+    c09ab99c  MEM f9064000-f9064fff    flags 00000200  
+    c09ab9b8  MEM f9065000-f9065fff    flags 00000200  
+    c09ab9d4  MEM f9066000-f9066fff    flags 00000200  
+    c09ab9f0  MEM f9067000-f9067fff    flags 00000200  
+    c09aba0c  MEM f9068000-f9068fff    flags 00000200  
+    c09aba28  MEM f9069000-f9069fff    flags 00000200  
+    c09aba44  MEM f906a000-f906afff    flags 00000200  
+    c09aba60  MEM f906b000-f906bfff    flags 00000200  
+    c09aba7c  MEM f906c000-f906cfff    flags 00000200  
+    c09aba98  IRQ 109                  flags 00000400  
+  [hips_pll_resources]
+    c09af0f8  MEM f9090000-f9090fff    flags 00000200  hips_pll
+  [dec_fuser_resources]
+    c09af21c  MEM f9300300-f93003ff    flags 00000200  dec_fuser
+    c09af238  IRQ 166                  flags 00000400  
+  [dec_adc_resources]
+    c09af35c  MEM f930a000-f930afff    flags 00000200  dec_adc
+    c09af378  IRQ 167                  flags 00000400  
+  [dec_pwm_resources]
+    c09af49c  MEM f9304000-f9307fff    flags 00000200  dec_pwm
+    c09af4b8  IRQ 168                  flags 00000400  
+  [dec_config_resources]
+    c09af5dc  MEM f9300000-f93000ff    flags 00000200  dec_config
+  [dec_sensor_resources]
+    c09af700  MEM f9301000-f9301fff    flags 00000200  dec_sensor
+  [dcmotor_6pin_block0_resources]
+    c09af824  MEM f8140000-f8140fff    flags 00000200  dcmotor_6pin_block0
+  [dcmotor_6pin_block1_resources]
+    c09af948  MEM f8141000-f8141fff    flags 00000200  dcmotor_6pin_block1
+  [dcmotor_6pin_block2_resources]
+    c09afa6c  MEM f8142000-f8142fff    flags 00000200  dcmotor_6pin_block2
+  [video_resources]
+    c09afb90  MEM f9090000-f909afff    flags 00000200  video
+  [apb_config_resources]
+    c09afcb4  MEM f8000000-f80006ff    flags 00000200  apb_config
+  [dec_wavegen_resources]
+    c09afdd8  MEM f9309000-f93090ff    flags 00000200  dec_wavegen0
+    c09afdf4  MEM f9309100-f93091ff    flags 00000200  dec_wavegen1
+    c09afe10  MEM f9309200-f93092ff    flags 00000200  dec_wavegen2
+    c09afe2c  MEM f9309300-f93093ff    flags 00000200  dec_wavegen3
+  [dec_lscan_hsync_resources]
+    c09aff50  MEM f930b000-f930b0ff    flags 00000200  dec_lscan_hsync
+  [dec_lscan_mirror_resources]
+    c09b0074  MEM f930b100-f930b1ff    flags 00000200  dec_lscan_mirror0
+    c09b0090  MEM f930b200-f930b2ff    flags 00000200  dec_lscan_mirror1
+  [dec_lscan_wfg_resources]
+    c09b01b4  MEM f930b300-f930b3ff    flags 00000200  dec_lscan_wfg0
+    c09b01d0  MEM f930b400-f930b4ff    flags 00000200  dec_lscan_wfg1
+    c09b01ec  MEM f930b500-f930b5ff    flags 00000200  dec_lscan_wfg2
+    c09b0208  MEM f930b600-f930b6ff    flags 00000200  dec_lscan_wfg3
+  [dec_lscan_wfs_resources]
+    c09b032c  MEM f930b800-f930bbff    flags 00000200  dec_lscan_wfs
+  [jbig_codec_resources]
+    c09b0450  MEM f9020000-f9020fff    flags 00000200  jbig_codec
+  [jbig_codec_idma_resources]
+    c09b0574  MEM f9021000-f9021fff    flags 00000200  jbig_codec_idma
+  [jbig_codec_odma_resources]
+    c09b0698  MEM f9022000-f9022fff    flags 00000200  jbig_codec_odma
+  [pip_resources]
+    c09b08d0  MEM f90a0000-f90a0003    flags 00000200  regs-zx
+    c09b08ec  MEM f9100000-f9100003    flags 00000200  regs-pip-top
+    c09b0908  MEM f9103000-f9103003    flags 00000200  regs-pip-tp
+    c09b0924  MEM f9102000-f9102003    flags 00000200  regs-pip-cp
+    c09b0940  MEM f9108000-f9108003    flags 00000200  regs-pip-cr
+    c09b095c  MEM f9104000-f9104003    flags 00000200  regs-pip-csc
+    c09b0978  MEM f910a000-f910a003    flags 00000200  regs-pip-nga
+    c09b0994  MEM f9110000-f9110003    flags 00000200  regs-pip-sccsc
+    c09b09b0  MEM f9111000-f9111003    flags 00000200  regs-pip-serp
+    c09b09cc  MEM f9140000-f9140003    flags 00000200  regs-pip-ued
+    c09b09e8  MEM f9139000-f9139003    flags 00000200  regs-pip-yipi
+    c09b0a04  MEM f913a000-f913a003    flags 00000200  regs-pip-autoht
+    c09b0a20  MEM f913c000-f913c003    flags 00000200  regs-pip-kmod
+    c09b0a3c  MEM f9153000-f9153003    flags 00000200  regs-pip-stat-cdma0
+    c09b0a58  MEM f9154000-f9154003    flags 00000200  regs-pip-stat-cdma1
+    c09b0a74  MEM f9155000-f9155003    flags 00000200  regs-pip-stat-cdma2
+    c09b0a90  MEM f915f000-f915f003    flags 00000200  regs-pip-odma0
+    c09b0aac  MEM f9160000-f9160003    flags 00000200  regs-pip-odma1
+    c09b0ac8  MEM f9161000-f9161003    flags 00000200  regs-pip-odma2
+    c09b0ae4  MEM f9162000-f9162003    flags 00000200  regs-pip-odma3
+    c09b0b00  MEM f9163000-f9163003    flags 00000200  regs-pip-odma4
+    c09b0b1c  MEM f9164000-f9164003    flags 00000200  regs-pip-odma5
+    c09b0b38  MEM f9165000-f9165003    flags 00000200  regs-pip-odma6
+    c09b0b54  MEM f9166000-f9166003    flags 00000200  regs-pip-odma7
+    c09b0b70  MEM f910b000-f910b003    flags 00000200  regs-pip-pa-cdma
+    c09b0b8c  MEM f910c000-f910c003    flags 00000200  regs-pip-pa
+    c09b0ba8  MEM f910e000-f910e003    flags 00000200  regs-pip-pa-odma
+    c09b0bc4  MEM f910f000-f910f003    flags 00000200  regs-pip-pa-idma
+    c09b0be0  MEM f9138000-f9138003    flags 00000200  regs-pip-ht-db
+    c09b0bfc  MEM f913d000-f913d003    flags 00000200  regs-pip-kmod-db
+    c09b0c18  MEM f9112000-f9112003    flags 00000200  regs-pip-serp-db
+    c09b0c34  MEM f9101000-f9101003    flags 00000200  regs-pip-fhs
+    c09b0c50  MEM f9118000-f9118003    flags 00000200  regs-pip-th0
+    c09b0c6c  MEM f9120000-f9120003    flags 00000200  regs-pip-th1
+    c09b0c88  MEM f9128000-f9128003    flags 00000200  regs-pip-th2
+    c09b0ca4  MEM f9130000-f9130003    flags 00000200  regs-pip-th3
+    c09b0cc0  MEM f9109000-f9109003    flags 00000200  regs-pip-mip
+    c09b0cdc  MEM f913e000-f913e003    flags 00000200  regs-pip-bloom
+    c09b0cf8  MEM f9156000-f9156003    flags 00000200  regs-pip-cre
+    c09b0d14  MEM f9167000-f9167003    flags 00000200  regs-pip-planar
+    c09b0d30  MEM f9152000-f9152003    flags 00000200  regs-pip-stats
+    c09b0d4c  IRQ 81                   flags 00000400  irq-zx
+    c09b0d68  IRQ 128                  flags 00000400  irq-pip
+  [efuse_resources]
+    c09b0e8c  MEM f80d0000-f80d007f    flags 00000200  efuse
+  [stepper0_res]
+    c09b0ea8  MEM f8150000-f8154fff    flags 00000200  Gogin Stepper Motor
+
+== machine_desc
+  machine nr 10000 (0x2710) name 'mv61x0'
+    +0x28: c0575364 gogin_map_io
+    +0x2c: c0576380 mv61x0_init_early
+    +0x30: c05752cc mv61x0_init_irq
+    +0x34: c09aa780 gogin_timer
+    +0x38: c0574fe8 mv61x0_mach_init
+    +0x3c: 54410009
+    +0x40: c05716bc parse_tag_cmdline
+    +0x44: 54410007
+    +0x48: c05715b4 parse_tag_revision
+    +0x4c: 54410006
+    +0x50: c0571584 parse_tag_serialnr
+    +0x54: 54410004
+    +0x58: c057156c parse_tag_ramdisk
+    +0x5c: 54410003
