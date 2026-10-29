@@ -139,6 +139,46 @@ Common to all: upload as usual (`tools/uboot_upload.py` to 0x02000000,
 then `bootm 0x02000000`). `reboot -f` returns to stock. A panic resets
 after 10 s. Back out any test by power-cycling.
 
+### eth: the Ethernet loader (cable plugged in)
+
+`m1-eth.uimg` (`VARIANT=eth`) is about 1.2 MB, roughly 11 min over serial.
+It's uniprocessor, with stmmac, IPv4, BusyBox and kexec only: no USB,
+Wi-Fi, media or panel. Its `/init` prints the MDIO PHY ID and GPIO 62's
+state, then waits.
+
+1. **Pin mux and PHY reset** (approved by the user; test 2 passed,
+   docs/kernel/m1_eth_test2.md). U-Boot sets neither. `ethload` runs
+   `/etc/eth-pinmux.sh` first: GPIO 48-61 and 63 to function 1 (0x1001, the
+   RGMII + MDC/MDIO pins from the vendor's gr_def_mpp_list), bank 3 to the
+   stock state, then GPIO 62 low for 125 ms, then it rebinds stmmac.
+2. On the PC, in `D:\DP200\kernel\out`: `python -m http.server 8000`.
+3. On the printer: `ethload <pc-address> m1-upc-zImage-dtb.bin`, or
+   `ethload dhcp <pc-address> <file>`. Static IP 10.10.0.250/24.
+4. **Success:** the MDIO PHY ID reads 0x01410dd1, eth0 gets a carrier,
+   wget fetches the file at Ethernet speed (about 10.5 MB/s in test 2), and the fetched kernel boots via
+   kexec.
+5. A size note: `THUMB2=1` builds `m1-eth-t2.uimg`. It's only about 1% smaller
+   (XZ's ARM filter already packs ARM code well), so it isn't worth the
+   risk.
+
+### Fast path: test kernels over Ethernet (the default loop)
+
+1. Once: put the loader on the 2 GB card with
+   `tools/sd_kernel_boot.sh D:/DP200/kernel/out/m1-eth.uimg`. Repeat after
+   every m1-eth rebuild; the tool below refuses a stale copy (CRC check).
+2. On the PC: `(cd /d/DP200/kernel/out && python -m http.server 8099 --bind 10.10.0.85)`.
+3. Each test: `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-upc-zImage-dtb.bin`.
+   It copies the image to `next-zImage-dtb.bin`, catches U-Boot, routes
+   the SD pins, ext2loads and CRC-checks the loader, and runs bootm. The
+   loader's init waits 3 s (Enter gives a shell), then `ethload` fetches
+   `next-zImage-dtb.bin` and kexecs it. No setenv and no saveenv: the PC
+   address, port and file name are built in (`ETHLOAD_PC`, `ETHLOAD_PORT`,
+   `ETHLOAD_FILE`). The kernel arguments `ethload.pc=`, `ethload.port=`,
+   `ethload.file=` and `ethload.off` override them.
+4. Not yet proven on hardware: kexec itself. netload takes eth0 down first
+   because stmmac has no shutdown hook. If the kexec'd kernel hangs,
+   power-cycle and fall back to `tools/sd_kernel_boot.sh`.
+
 ### net: join Wi-Fi, then load kernels over the network
 
 1. Boot `m1-net.uimg` (uniprocessor; Wi-Fi as in boot 7).

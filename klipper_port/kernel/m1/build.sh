@@ -8,6 +8,7 @@
 #   VARIANT=upc             $OUT/m1-upc.uimg       UPC driver (/dev/upc0/1)
 #   VARIANT=sd              $OUT/m1-sd.uimg        SD socket, read-only use
 #   VARIANT=gpio            $OUT/m1-gpio.uimg      GPIO banks, nothing driven
+#   VARIANT=eth             $OUT/m1-eth.uimg       small Ethernet + kexec loader
 #
 # A variant merges variants/<v>.config after m1.config, uses
 # variants/<v>.dts (the base DTS with nodes enabled) if present, and adds
@@ -40,7 +41,8 @@ base)	USERSPACE="iw uvcgrab" ;;
 net)	USERSPACE="iw uvcgrab wpa kexec" ;;
 upc)	USERSPACE="iw uvcgrab upctool" ;;
 sd|gpio) USERSPACE="iw uvcgrab" ;;
-*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio)" >&2; exit 1 ;;
+eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
+*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio eth)" >&2; exit 1 ;;
 esac
 if [ "$VARIANT" = base ]; then
 	NAME=m1
@@ -50,6 +52,12 @@ else
 	NAME=m1-$VARIANT
 	KOUT=$WORK/build-m1-$VARIANT
 	IRFS=$WORK/initramfs-m1-$VARIANT
+fi
+
+# THUMB2=1: Thumb-2 kernel (smaller; not yet proven on the PJ4B-MP)
+if [ "${THUMB2:-0}" = 1 ]; then
+	NAME=$NAME-t2
+	KOUT=$KOUT-t2
 fi
 
 KSRC=$WORK/linux-$KVER
@@ -178,17 +186,28 @@ for u in $USERSPACE; do "build_$u"; done
 # 5. Wi-Fi firmware from the stock rootfs (a Marvell binary: never commit
 #    it, and don't publish the images that contain it)
 FW8782=${FW8782:-/mnt/d/DP200/backup/171114_4_open/lib/firmware/mrvl/usb8782_uapsta.bin}
-echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
+if [ "$VARIANT" != eth ]; then
+	echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
+fi
 
 # 6. Initramfs list (gen_init_cpio format), applet links from busybox.links
 rm -rf "$IRFS" && mkdir -p "$IRFS"
 for f in init m1-checks.sh; do
 	tr -d '\r' < "$M1/initramfs/$f" > "$IRFS/$f"
 done
+tr -d '\r' < "$M1/initramfs/net/netload" > "$IRFS/netload"
+tr -d '\r' < "$M1/initramfs/net/udhcpc.script" > "$IRFS/udhcpc.script"
 if [ -d "$M1/initramfs/$VARIANT" ]; then
 	for f in "$M1/initramfs/$VARIANT"/*; do
 		tr -d '\r' < "$f" > "$IRFS/$(basename "$f")"
 	done
+fi
+# eth: the fast path's defaults (the PC's HTTP server and the file name
+# tools/eth_kernel_boot.sh publishes the next test kernel under)
+if [ "$VARIANT" = eth ]; then
+	printf 'PC=%s\nPORT=%s\nFILE=%s\n' "${ETHLOAD_PC:-10.10.0.85}" \
+		"${ETHLOAD_PORT:-8099}" "${ETHLOAD_FILE:-next-zImage-dtb.bin}" \
+		> "$IRFS/ethload.conf"
 fi
 {
 	echo "dir /dev 0755 0 0"
@@ -202,7 +221,15 @@ fi
 	echo "file /bin/busybox $BB/busybox 0755 0 0"
 	echo "file /init $IRFS/init 0755 0 0"
 	echo "file /etc/m1-checks.sh $IRFS/m1-checks.sh 0755 0 0"
-	echo "file /lib/firmware/mrvl/usb8782_uapsta.bin $FW8782 0644 0 0"
+	echo "file /usr/share/udhcpc/default.script $IRFS/udhcpc.script 0755 0 0"
+	[ "$VARIANT" != eth ] &&
+		echo "file /lib/firmware/mrvl/usb8782_uapsta.bin $FW8782 0644 0 0"
+	[ -f "$IRFS/ethload" ] &&
+		echo "file /usr/bin/ethload $IRFS/ethload 0755 0 0"
+	[ -f "$IRFS/eth-pinmux.sh" ] &&
+		echo "file /etc/eth-pinmux.sh $IRFS/eth-pinmux.sh 0755 0 0"
+	[ -f "$IRFS/ethload.conf" ] &&
+		echo "file /etc/ethload.conf $IRFS/ethload.conf 0644 0 0"
 	[ -f "$IRFS/variant.sh" ] &&
 		echo "file /etc/m1-variant.sh $IRFS/variant.sh 0755 0 0"
 	for u in $USERSPACE; do
@@ -212,9 +239,9 @@ fi
 		wpa)	echo "file /usr/sbin/wpa_supplicant $WPA/wpa_supplicant 0755 0 0"
 			echo "file /usr/bin/wpa_passphrase $WPA/wpa_passphrase 0755 0 0"
 			echo "file /usr/bin/wifi-join $IRFS/wifi-join 0755 0 0"
-			echo "file /usr/bin/netload $IRFS/netload 0755 0 0"
-			echo "file /usr/share/udhcpc/default.script $IRFS/udhcpc.script 0755 0 0" ;;
-		kexec)	echo "file /usr/sbin/kexec $KX/build/sbin/kexec 0755 0 0" ;;
+			;;
+		kexec)	echo "file /usr/sbin/kexec $KX/build/sbin/kexec 0755 0 0"
+			echo "file /usr/bin/netload $IRFS/netload 0755 0 0" ;;
 		upctool) echo "file /usr/bin/upctool $WORK/upctool 0755 0 0" ;;
 		esac
 	done
@@ -229,6 +256,9 @@ mkdir -p "$KOUT"
 	tr -d '\r' < "$M1/m1.config"
 	if [ -f "$M1/variants/$VARIANT.config" ]; then
 		tr -d '\r' < "$M1/variants/$VARIANT.config"
+	fi
+	if [ "${THUMB2:-0}" = 1 ]; then
+		echo "CONFIG_THUMB2_KERNEL=y"
 	fi
 } | sed "s#@INITRAMFS_LIST@#$IRFS/initramfs.list#" > "$KOUT/m1.config"
 (cd "$KSRC" && ARCH=arm CROSS_COMPILE=$CROSS \
