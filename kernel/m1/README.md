@@ -139,6 +139,28 @@ Common to all: upload as usual (`tools/uboot_upload.py` to 0x02000000,
 then `bootm 0x02000000`). `reboot -f` returns to stock. A panic resets
 after 10 s. Back out any test by power-cycling.
 
+### eth: the Ethernet loader (cable plugged in)
+
+`m1-eth.uimg` (`VARIANT=eth`) is about 1.2 MB, roughly 11 min over serial.
+It's uniprocessor, with stmmac, IPv4, BusyBox and kexec only: no USB,
+Wi-Fi, media or panel. Its `/init` prints the MDIO PHY ID and GPIO 62's
+state, then waits.
+
+1. **Pin mux and PHY reset** (approved by the user; test 2 passed,
+   docs/kernel/m1_eth_test2.md). U-Boot sets neither. `ethload` runs
+   `/etc/eth-pinmux.sh` first: GPIO 48-61 and 63 to function 1 (0x1001, the
+   RGMII + MDC/MDIO pins from the vendor's gr_def_mpp_list), bank 3 to the
+   stock state, then GPIO 62 low for 125 ms, then it rebinds stmmac.
+2. On the PC, in `D:\DP200\kernel\out`: `python -m http.server 8000`.
+3. On the printer: `ethload <pc-address> m1-upc-zImage-dtb.bin`, or
+   `ethload dhcp <pc-address> <file>`. Static IP 10.10.0.250/24.
+4. **Success:** the MDIO PHY ID reads 0x01410dd1, eth0 gets a carrier,
+   wget fetches the file at Ethernet speed (about 10.5 MB/s in test 2), and the fetched kernel boots via
+   kexec.
+5. A size note: `THUMB2=1` builds `m1-eth-t2.uimg`. It's only about 1% smaller
+   (XZ's ARM filter already packs ARM code well), so it isn't worth the
+   risk.
+
 ### net: join Wi-Fi, then load kernels over the network
 
 1. Boot `m1-net.uimg` (uniprocessor; Wi-Fi as in boot 7).

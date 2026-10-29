@@ -1,0 +1,38 @@
+#!/bin/sh
+# ethload [dhcp] <pc-address> [file] [kernel args]
+#
+# Bring up eth0 (stmmac), then fetch a zImage with its DTB appended from the
+# PC over HTTP and kexec it (netload). Static 10.10.0.250/24 unless "dhcp".
+# On the PC, in D:\DP200\kernel\out:  python -m http.server 8000
+#
+# /etc/eth-pinmux.sh, if present, routes the Ethernet pins and releases
+# the PHY reset first (stock values, approved by the user).
+mode=static
+if [ "$1" = dhcp ]; then
+	mode=dhcp
+	shift
+fi
+if [ -z "$1" ]; then
+	echo "usage: ethload [dhcp] <pc-address> [file] [kernel args]"
+	exit 1
+fi
+
+[ -f /etc/eth-pinmux.sh ] && sh /etc/eth-pinmux.sh
+
+ifconfig eth0 up || exit 1
+i=0
+while [ "$(cat /sys/class/net/eth0/carrier 2>/dev/null)" != 1 ]; do
+	i=$((i + 1))
+	if [ $i -gt 15 ]; then
+		echo "ethload: no link after 15 s"
+		exit 1
+	fi
+	sleep 1
+done
+if [ $mode = dhcp ]; then
+	udhcpc -i eth0 -n -q -t 10 || exit 1
+else
+	ifconfig eth0 10.10.0.250 netmask 255.255.255.0 up
+fi
+ifconfig eth0
+exec netload "$@"
