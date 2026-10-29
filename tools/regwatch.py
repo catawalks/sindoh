@@ -2,9 +2,9 @@
 """Watch physical register words for changes (read only), to find an input.
 
 Usage: regwatch.py SECONDS LEARN_SECONDS BASE:LEN [BASE:LEN ...]
-Polls every 20 ms. Words that change during the first LEARN_SECONDS are
-treated as noise and ignored; after that every change of any other word is
-printed with a timestamp and the changed bits.
+Polls every 20 ms. Bits that change during the first LEARN_SECONDS are
+treated as noise and ignored (other bits of the same word are still
+watched); after that every other change is printed with a timestamp.
 """
 import mmap, os, struct, sys, time
 
@@ -29,18 +29,23 @@ def snap():
 
 t0 = time.time()
 prev = snap()
-noisy = set()
+noise = {}                     # address -> bits that changed while learning
 print('watching %d words; learning noise for %.0f s' % (len(prev), learn), flush=True)
+announced = False
 while time.time() - t0 < secs:
     time.sleep(0.02)
     cur = snap()
     t = time.time() - t0
     for a, v in cur.items():
-        if v != prev[a]:
+        bits = (v ^ prev[a]) & ~noise.get(a, 0)
+        if bits:
             if t < learn:
-                noisy.add(a)
-            elif a not in noisy:
-                print('%7.2f %08x: %08x -> %08x (bits %08x)' % (t, a, prev[a], v, prev[a] ^ v), flush=True)
-    if learn <= t < learn + 0.03:
-        print('learned %d noisy words; press now' % len(noisy), flush=True)
+                noise[a] = noise.get(a, 0) | bits
+            else:
+                print('%7.2f %08x: %08x -> %08x (bits %08x)' % (t, a, prev[a], v, bits), flush=True)
+    if t >= learn and not announced:
+        announced = True
+        for a in sorted(noise):
+            print('noisy %08x bits %08x (ignored)' % (a, noise[a]), flush=True)
+        print('learned noise in %d words; press now' % len(noise), flush=True)
     prev = cur
