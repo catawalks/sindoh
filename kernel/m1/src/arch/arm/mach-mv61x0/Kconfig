@@ -8,6 +8,7 @@ config ARCH_MV61X0
 	select HAVE_ARM_TWD if SMP
 	select MV61X0_SIC
 	select MV61X0_TIMER
+	select PHY_MV61X0_USB if USB_SUPPORT
 	help
 	  Support for the Marvell 88PA6170 SoC of the Sindoh DP200 3D
 	  printer: two PJ4B-MP cores with an A9-style SCU and GIC.
