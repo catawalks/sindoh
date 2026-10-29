@@ -74,6 +74,9 @@ BL_SCREWS = (('Left', 8, 8), ('Right', 202, 8))   # ~10 mm in from the front cor
 BL_PIVOT = (105, 196)                             # fixed back support (no screw)
 BL_PLATE = (-2, -2, 212, 205.5)                   # plate in printer coordinates
 BL_OK = 0.05                                      # mm: a screw closer than this is level
+# Measured 2026-10-28: 1/4 turn clockwise (seen from above) raised the left
+# front corner ~0.2 mm, so ~0.8 mm per turn (M4 would be 0.7) and CW = raise.
+BL_MM_PER_TURN = 0.8
 SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 = ([\d.]+) Hz')
 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
@@ -1263,13 +1266,18 @@ class UI:
         diffs = [(name, z(sx, sy) - ref) for name, sx, sy in BL_SCREWS]
         if all(abs(v) < BL_OK for _, v in diffs):
             d.text((250, 199), 'Level', font=font(20), fill=C_ON)
+        else:
+            d.text((230, 201), 'turns seen from above', font=font(18), fill=C_DIM)
         y = self.bl_view(d, 262, 250, False) + 26
         for name, v in diffs:
             if abs(v) < BL_OK:
                 msg, col = '%s screw: OK (%+.2f)' % (name, v), C_ON
             else:
                 # mesh z > 0 = bed higher than the reference: that corner comes down
-                msg, col = '%s screw: %s %.2f mm' % (name, 'lower' if v > 0 else 'raise', abs(v)), C_WARN
+                eighths = max(1, round(abs(v) / BL_MM_PER_TURN * 8))
+                turn = {1: '1/8', 2: '1/4', 3: '3/8', 4: '1/2', 5: '5/8', 6: '3/4', 7: '7/8'}.get(
+                    eighths, '%.1f' % (eighths / 8))
+                msg, col = '%s: %s turn %s (%.2f)' % (name, turn, 'CCW' if v > 0 else 'CW', abs(v)), C_WARN
             d.rounded_rectangle((20, y, PW - 20, y + 38), radius=10, fill=C_BAR)
             d.ellipse((32, y + 9, 52, y + 29), fill=col)
             d.text((64, y + 7), msg, font=font(21), fill=C_TXT)
