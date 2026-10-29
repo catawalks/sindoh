@@ -1,0 +1,78 @@
+--- a/drivers/net/wireless/marvell/mwifiex/usb.h
++++ b/drivers/net/wireless/marvell/mwifiex/usb.h
+@@ -13,6 +13,11 @@
+ 
+ #define USB8XXX_VID		0x1286
+ 
++/*
++ * 88W8782 (Sindoh DP200): one product ID before and after the firmware
++ * download, and no re-enumeration once the firmware runs.
++ */
++#define USB8782_PID		0x2040
+ #define USB8766_PID_1		0x2041
+ #define USB8766_PID_2		0x2042
+ #define USB8797_PID_1		0x2043
+@@ -32,6 +37,7 @@
+ #define MWIFIEX_RX_DATA_URB	6
+ #define MWIFIEX_USB_TIMEOUT	100
+ 
++#define USB8782_DEFAULT_FW_NAME	"mrvl/usb8782_uapsta.bin"
+ #define USB8766_DEFAULT_FW_NAME	"mrvl/usb8766_uapsta.bin"
+ #define USB8797_DEFAULT_FW_NAME	"mrvl/usb8797_uapsta.bin"
+ #define USB8801_DEFAULT_FW_NAME	"mrvl/usb8801_uapsta.bin"
+--- a/drivers/net/wireless/marvell/mwifiex/usb.c
++++ b/drivers/net/wireless/marvell/mwifiex/usb.c
+@@ -13,6 +13,8 @@
+ static const struct mwifiex_if_ops usb_ops;
+ 
+ static const struct usb_device_id mwifiex_usb_table[] = {
++	/* 8782 */
++	{USB_DEVICE(USB8XXX_VID, USB8782_PID)},
+ 	/* 8766 */
+ 	{USB_DEVICE(USB8XXX_VID, USB8766_PID_1)},
+ 	{USB_DEVICE_AND_INTERFACE_INFO(USB8XXX_VID, USB8766_PID_2,
+@@ -406,6 +408,7 @@
+ 
+ 	/* PID_1 is used for firmware downloading only */
+ 	switch (id_product) {
++	case USB8782_PID:
+ 	case USB8766_PID_1:
+ 	case USB8797_PID_1:
+ 	case USB8801_PID_1:
+@@ -1313,6 +1316,11 @@
+ 		strcpy(adapter->fw_name, USB8997_DEFAULT_FW_NAME);
+ 		adapter->ext_scan = true;
+ 		break;
++	case USB8782_PID:
++		adapter->tx_buf_size = MWIFIEX_TX_DATA_BUF_SIZE_2K;
++		strcpy(adapter->fw_name, USB8782_DEFAULT_FW_NAME);
++		adapter->ext_scan = false;
++		break;
+ 	case USB8766_PID_1:
+ 	case USB8766_PID_2:
+ 		adapter->tx_buf_size = MWIFIEX_TX_DATA_BUF_SIZE_2K;
+@@ -1519,6 +1527,16 @@
+ 		if (ret)
+ 			return -1;
+ 
++		/*
++		 * The 8782 does not re-enumerate: its firmware starts on
++		 * the same device, so carry on here.
++		 */
++		if (le16_to_cpu(card->udev->descriptor.idProduct) ==
++		    USB8782_PID) {
++			card->usb_boot_state = USB8XXX_FW_READY;
++			msleep(100);
++		}
++
+ 		/* Boot state changes after successful firmware download */
+ 		if (card->usb_boot_state == USB8XXX_FW_DNLD)
+ 			return -1;
+@@ -1607,6 +1625,7 @@
+ MODULE_DESCRIPTION("Marvell WiFi-Ex USB Driver version" USB_VERSION);
+ MODULE_VERSION(USB_VERSION);
+ MODULE_LICENSE("GPL v2");
++MODULE_FIRMWARE(USB8782_DEFAULT_FW_NAME);
+ MODULE_FIRMWARE(USB8766_DEFAULT_FW_NAME);
+ MODULE_FIRMWARE(USB8797_DEFAULT_FW_NAME);
+ MODULE_FIRMWARE(USB8801_DEFAULT_FW_NAME);

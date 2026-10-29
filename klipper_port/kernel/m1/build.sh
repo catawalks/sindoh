@@ -14,6 +14,8 @@ M1=$(cd "$(dirname "$0")" && pwd)
 KVER=6.18.59
 BBVER=1.38.0
 MUSLVER=1.2.6
+LIBNLVER=3.12.0
+IWVER=6.17
 DL=${DL:-/mnt/d/DP200/kernel/src}
 WORK=${WORK:-$HOME/dp200}
 OUT=${OUT:-/mnt/d/DP200/kernel/out}
@@ -35,6 +37,8 @@ check() { echo "$2  $1" | sha256sum -c --quiet; }
 check "$DL/linux-$KVER.tar.xz" 53a55ac9863a5547e292b8e381d4e4c2240dd1127d5428a7c44dbc550be23963
 check "$DL/busybox/busybox-$BBVER.tar.bz2" 34f9ea6ff8636f2c9241153b9114eefa9e65674a45318ae1ef95bb5f31c53bb2
 check "$DL/musl/musl-$MUSLVER.tar.gz" d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a
+check "$DL/libnl/libnl-$LIBNLVER.tar.gz" fc51ca7196f1a3f5fdf6ffd3864b50f4f9c02333be28be4eeca057e103c0dd18
+check "$DL/iw/iw-$IWVER.tar.xz" 7d182e498289ab39b257da6780d562e415377107f50358ee5b55b8cfe40b1e33
 
 # 1. Kernel tree: vanilla + our files + the Kconfig/Makefile/CPU hooks
 [ -d "$KSRC" ] || tar -C "$WORK" -xJf "$DL/linux-$KVER.tar.xz"
@@ -78,6 +82,33 @@ if [ ! -x "$BB/busybox" ] || [ "$M1/busybox.config" -nt "$BB/busybox" ]; then
 fi
 [ -f "$BB/busybox.links" ] || make -C "$BB" busybox.links > /dev/null
 
+# 3b. iw (static, on libnl) for Wi-Fi tests, and uvcgrab for the webcam
+LIBNL=$WORK/libnl-$LIBNLVER
+IW=$WORK/iw-$IWVER
+if [ ! -f "$SYSROOT/lib/libnl-genl-3.a" ]; then
+	rm -rf "$LIBNL"
+	tar -C "$WORK" -xzf "$DL/libnl/libnl-$LIBNLVER.tar.gz"
+	(cd "$LIBNL" &&
+	 ./configure --host=arm-linux-gnueabihf --prefix="$SYSROOT" \
+		--disable-shared --enable-static --disable-cli --disable-debug \
+		CC="$SYSROOT/bin/musl-gcc" > /dev/null &&
+	 make -j"$JOBS" > /dev/null && make install > /dev/null)
+fi
+if [ ! -x "$IW/iw" ]; then
+	rm -rf "$IW"
+	tar -C "$WORK" -xJf "$DL/iw/iw-$IWVER.tar.xz"
+	make -C "$IW" -j"$JOBS" CC="$SYSROOT/bin/musl-gcc" LDFLAGS=-static \
+		PKG_CONFIG="pkg-config --static" \
+		PKG_CONFIG_LIBDIR="$SYSROOT/lib/pkgconfig" > /dev/null
+	${CROSS}strip "$IW/iw"
+fi
+"$SYSROOT/bin/musl-gcc" -static -Os -Wall -o "$WORK/uvcgrab" "$M1/tools/uvcgrab.c"
+${CROSS}strip "$WORK/uvcgrab"
+
+# 3c. Wi-Fi firmware from the stock rootfs (a Marvell binary: never commit it)
+FW8782=${FW8782:-/mnt/d/DP200/backup/171114_4_open/lib/firmware/mrvl/usb8782_uapsta.bin}
+echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
+
 # 4. Initramfs list (gen_init_cpio format), applet links from busybox.links
 mkdir -p "$IRFS"
 tr -d '\r' < "$M1/initramfs/init" > "$IRFS/init"
@@ -92,6 +123,12 @@ tr -d '\r' < "$M1/initramfs/m1-checks.sh" > "$IRFS/m1-checks.sh"
 	echo "file /bin/busybox $BB/busybox 0755 0 0"
 	echo "file /init $IRFS/init 0755 0 0"
 	echo "file /etc/m1-checks.sh $IRFS/m1-checks.sh 0755 0 0"
+	echo "file /usr/sbin/iw $IW/iw 0755 0 0"
+	echo "file /usr/bin/uvcgrab $WORK/uvcgrab 0755 0 0"
+	for d in lib lib/firmware lib/firmware/mrvl; do
+		echo "dir /$d 0755 0 0"
+	done
+	echo "file /lib/firmware/mrvl/usb8782_uapsta.bin $FW8782 0644 0 0"
 	grep -v '^/bin/busybox$' "$BB/busybox.links" | sort -u |
 		while read -r l; do echo "slink $l /bin/busybox 0777 0 0"; done
 } > "$IRFS/initramfs.list"
