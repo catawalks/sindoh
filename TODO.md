@@ -26,13 +26,13 @@ written so they can be handed to another agent.
    tower changed little below 35 mm, so recheck with dry filament.
    Next: dry the filament (dryer test), reprint the cube (top face,
    letter blobs), then a retraction test with two towers.
-2. **Filament dryer: first run (user, heat + motion).** Code is on the
-   printer (FILAMENT_DRY / FILAMENT_DRY_STOP, screen FILAMENT -> DRYER).
-   Check: bed lowers + comes forward with the head parked off the bed, bed
-   holds temperature for hours (idle timeout raised), exhaust fan vents for
-   1 min every 15 min, flip reminder at halfway, lamp flashes at the end,
-   STOP DRYING, PRINT_START cancels drying. Sheet limit 70 C (test printer);
-   higher presets warn and need FORCE=1.
+2. **Filament dryer.** DONE 10-28, first run (screen FILAMENT -> DRYER,
+   PLA 4 h, 15:55-19:59): bed down + forward, head parked, extruder off;
+   bed 22 -> 50 C in 8 min, then 50.0 C for the whole 4 h at 18-46 %
+   power; idle timeout 15300 s during, 600 s after; vent 0.6 for 1 min at
+   15 min; halfway message at 17:57; "Drying finished" + bed off at 19:59.
+   Not tested yet: STOP DRYING, PRINT_START cancelling drying, FORCE=1
+   above the 70 C sheet limit.
 3. **Beeper (user):** dec_pwm block 10. Add `[output_pin beeper]
    pin: io:pwm10`, test a short beep, find a sensible PWM value. The dryer
    (_DRY_SIGNAL) uses it automatically once it exists. Then M300 for
