@@ -25,7 +25,7 @@
 	interrupt-parent = <&gic>;
 
 	chosen {
-		bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init";
+		bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init panic=10";
 		stdout-path = "serial0:115200n8";
 	};
 
@@ -118,9 +118,10 @@
 		};
 
 		/*
-		 * The vendor 8250 driver detects a 16550A here (no XScale UUE
-		 * bit). If CPR/UCV show a DesignWare UART, "snps,dw-apb-uart"
-		 * plus SERIAL_8250_DW is the better match.
+		 * A DesignWare APB UART 3.08* (CPR 0x80013532: 16-byte FIFOs,
+		 * AFCE, THRE, no shadow registers). The vendor runs it as a
+		 * plain 16550A and so does milestone 1; "snps,dw-apb-uart" with
+		 * SERIAL_8250_DW would add the busy-detect handling.
 		 */
 		uart0: serial@f8060000 {
 			compatible = "ns16550a";
