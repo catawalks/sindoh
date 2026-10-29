@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * DRAFT, not built or booted yet. Milestone 1 of the mainline route
- * (docs/no_gpl_plan.md): one CPU, GIC, SoC timer, UART0, initramfs.
+ * Sindoh DP200 3D printer, Marvell 88PA6170 SoC: milestone 1 of the
+ * mainline route (klipper_port/docs/no_gpl_plan.md). One CPU, GIC, SoC
+ * timer, UART0, built-in initramfs.
  *
- * Every address and IRQ here comes from the vendor kernel image
- * (tools/kernel_re/, docs/kernel/vendor_hwtables.txt) or the hardware
- * snapshot. The vendor kernel numbers IRQs as GIC IDs (gic_init with
- * irq_start 29 gives an offset of 0), so GIC_SPI n = vendor IRQ n - 32.
- * Open points are marked TODO and listed in no_gpl_plan.md, "Facts still
- * missing".
+ * Addresses and IRQs come from the vendor 3.2 kernel image
+ * (tools/kernel_re/, docs/kernel/vendor_hwtables.txt). The vendor kernel
+ * numbers IRQs as GIC IDs, so GIC_SPI n = vendor IRQ n - 32.
  *
- * Boot: zImage + this DTB appended (CONFIG_ARM_APPENDED_DTB,
- * CONFIG_ARM_ATAG_DTB_COMPAT), wrapped with mkimage for U-Boot 2011.09
- * "bootm" (no bootz, no fdt command in this U-Boot).
+ * Boot: zImage with this DTB appended (ARM_APPENDED_DTB +
+ * ARM_ATAG_DTB_COMPAT), wrapped by mkimage for "bootm" in U-Boot 2011.09.
+ * U-Boot's bootargs are appended to the bootargs below.
  */
 /dts-v1/;
 
@@ -27,7 +25,6 @@
 	interrupt-parent = <&gic>;
 
 	chosen {
-		/* earlycon needs no driver beyond 8250: the first sign of life */
 		bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init";
 		stdout-path = "serial0:115200n8";
 	};
@@ -38,14 +35,26 @@
 
 	memory@0 {
 		device_type = "memory";
-		reg = <0x00000000 0x20000000>;	/* 512 MB, ATAGS agree */
+		reg = <0x00000000 0x20000000>;	/* 512 MB; U-Boot's ATAG_MEM replaces it */
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		/* Boot-logo framebuffer set up by U-Boot, still scanned out */
+		framebuffer@18000000 {
+			reg = <0x18000000 0x000bc000>;
+			no-map;
+		};
 	};
 
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		/* PJ4B-MP, MIDR 0x562f5841: matches proc-v7.S __v7_pj4b_setup */
+		/* PJ4B-MP, MIDR 0x562f5841, MPIDR 0x80000000/1 */
 		cpu@0 {
 			device_type = "cpu";
 			compatible = "marvell,pj4b";
@@ -53,9 +62,9 @@
 		};
 
 		/*
-		 * Second CPU for later (milestone 1 runs maxcpus=1). Vendor
-		 * boot_secondary: write the physical address of
-		 * secondary_startup to 0xfa000000, then send an SGI.
+		 * Not started yet: no enable-method until the SMP code exists
+		 * (vendor boot_secondary: physical address of
+		 * secondary_startup to 0xfa000000, then an SGI).
 		 */
 		cpu@1 {
 			device_type = "cpu";
@@ -64,7 +73,7 @@
 		};
 	};
 
-	/* Timer input after the prescaler at 0xf8030000 (busfreq / 1 MHz) */
+	/* Timer tick after the prescaler: 198 MHz bus / 198 */
 	timer_clk: timer-clk {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
@@ -92,18 +101,10 @@
 		};
 
 		/*
-		 * TODO: if a TWD answers at 0xf8fe0600 (unknown, see the plan),
-		 * "arm,cortex-a9-twd-timer" would replace the new driver below
-		 * for the clockevent.
-		 */
-
-		/*
-		 * SoC timer block, needs a new ~150-line driver.
-		 * Per timer n (n = 0..3), base + 0x10*n: +0x04 load,
-		 * +0x08 control (bit0 enable, bit1 auto-reload), +0x0c count.
-		 * +0x10 IRQ status (bit n), +0x20 IRQ clear (write bit n).
-		 * Vendor: timer1 = clockevent (IRQ 53), timer2 = free-running
-		 * clocksource loaded with 0xffffffff (TODO: count direction).
+		 * Timers 0-3 (timer 0 is the vendor's watchdog). Timer 1 is the
+		 * clock event device, timer 2 the clocksource. The second range
+		 * is the prescaler, set to 198 like the vendor kernel does
+		 * (BUSFREQ=200000000, "dithered" to 198 MHz).
 		 */
 		timer@f8020000 {
 			compatible = "marvell,88pa6170-timer";
@@ -113,12 +114,17 @@
 				     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&timer_clk>;
+			marvell,prescale = <198>;
 		};
 
-		/* serial0_platform_data: uartclk 25 MHz, regshift 2, UPIO_MEM32 */
+		/*
+		 * The vendor 8250 driver detects a 16550A here (no XScale UUE
+		 * bit). If CPR/UCV show a DesignWare UART, "snps,dw-apb-uart"
+		 * plus SERIAL_8250_DW is the better match.
+		 */
 		uart0: serial@f8060000 {
 			compatible = "ns16550a";
-			reg = <0xf8060000 0x20>;
+			reg = <0xf8060000 0x100>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			clock-frequency = <25000000>;

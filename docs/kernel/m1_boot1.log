@@ -1,0 +1,142 @@
+
+>><<
+<INTERRUPT>
+# 
+>>md.l 1000000 1<<
+md.l 1000000 1
+>><<
+
+01000000: 00000000    ....
+# 
+>>iminfo 2000000<<
+iminfo 2000000
+>><<
+
+
+## Checking Image at 02000000 ...
+   Legacy image found
+   Image Name:   DP200 M1 linux-6.18.59
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    869953 Bytes = 849.6 KiB
+   Load Address: 00008000
+   Entry Point:  00008000
+   Verifying Checksum ... OK
+# 
+>>bootm 2000000<<
+bootm 2000000
+>><<
+
+## Booting kernel from Legacy Image at 02000000 ...
+   Image Name:   DP200 M1 linux-6.18.59
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    869953 Bytes = 849.6 KiB
+   Load Address: 00008000
+   Entry Point:  00008000
+   Verifying Checksum ... OK
+   Loading Kernel Image ... OK
+OK
+
+Starting kernel ...
+
+DTB:0x000DBF60 (0x000006E1)
+C:0x000080E0-0x000DC660->0x00576200-0x0064A780
+DTB:0x0064A080 (0x000006ED)
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 6.18.59 (user@DESKTOP-L41KPL5) (arm-linux-gnueabihf-gcc (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #2 SMP Thu Oct 29 01:03:00 EDT 2026
+[    0.000000] CPU: ARMv7 Processor [562f5841] revision 1 (ARMv7), cr=10c5387d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+[    0.000000] OF: fdt: Machine model: Sindoh DP200 (Marvell 88PA6170)
+[    0.000000] earlycon: uart8250 at MMIO32 0xf8060000 (options '')
+[    0.000000] printk: legacy bootconsole [uart8250] enabled
+[    0.000000] Memory policy: Data cache writealloc
+[    0.000000] Zone ranges:
+[    0.000000]   Normal   [mem 0x0000000000000000-0x000000001fffffff]
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000000000000-0x0000000017ffffff]
+[    0.000000]   node   0: [mem 0x0000000018000000-0x00000000180bbfff]
+[    0.000000]   node   0: [mem 0x00000000180bc000-0x000000001fffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000000000000-0x000000001fffffff]
+[    0.000000] OF: reserved mem: 0x18000000..0x180bbfff (752 KiB) nomap non-reusable framebuffer@18000000
+[    0.000000] percpu: Embedded 8 pages/cpu s11084 r0 d21684 u32768
+[    0.000000] Kernel command line: console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init console=ttyS0
+[    0.000000] printk: log buffer data + meta data: 131072 + 409600 = 540672 bytes
+[    0.000000] Dentry cache hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 32768 (order: 5, 131072 bytes, linear)
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 131072
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-1, MinObjects=0, CPUs=2, Nodes=1
+[    0.000000] rcu: Hierarchical RCU implementation.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 10 jiffies.
+[    0.000000] NR_IRQS: 16, nr_irqs: 16, preallocated irqs: 16
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+[    0.000000] mv61x0-timer: wdt 0000000f ctrl 00000000 00000003 00000000 00000000 prescale 198
+[    0.000000] mv61x0-timer: timer 2 counts up (00000000 -> 00000001), 1000000 Hz
+[    0.000000] clocksource: mv61x0_timer2: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275 ns
+[    0.000002] sched_clock: 32 bits at 1000kHz, resolution 1000ns, wraps every 2147483647500ns
+[    0.008991] Console: colour dummy device 80x30
+[    0.013725] Calibrating delay loop... 789.70 BogoMIPS (lpj=3948544)
+[    0.105487] CPU: Testing write buffer coherency: ok
+[    0.110704] pid_max: default: 32768 minimum: 301
+[    0.115680] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+[    0.123369] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+[    0.132662] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.141406] Setting up static identity map for 0x100000 - 0x10003c
+[    0.148379] rcu: Hierarchical SRCU implementation.
+[    0.153457] rcu: 	Max phase no-delay instances is 1000.
+[    0.160623] smp: Bringing up secondary CPUs ...
+[    0.165397] smp: Brought up 1 node, 1 CPU
+[    0.169607] SMP: Total of 1 processors activated (789.70 BogoMIPS).
+[    0.176229] CPU: All CPU(s) started in SVC mode.
+[    0.181456] Memory: 513624K/524288K available (2048K kernel code, 469K rwdata, 180K rodata, 1024K init, 162K bss, 10084K reserved, 0K cma-reserved)
+[    0.196371] devtmpfs: initialized
+[    0.202270] VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 6
+[    0.210740] futex hash table entries: 512 (32768 bytes on 1 NUMA nodes, total 32 KiB, linear).
+[    0.220253] DMA: preallocated 256 KiB pool for atomic coherent allocations
+[    0.232890] clocksource: Switched to clocksource mv61x0_timer2
+[    0.273235] workingset: timestamp_bits=30 max_order=17 bucket_order=0
+[    0.423904] Serial: 8250/16550 driver, 1 ports, IRQ sharing disabled
+[    0.432907] printk: legacy console [ttyS0] disabled
+[    0.438794] f8060000.serial: ttyS0 at MMIO 0xf8060000 (irq = 25, base_baud = 1562500) is a 16550A
+[    0.448275] printk: legacy console [ttyS0] enabled
+[    0.448275] printk: legacy console [ttyS0] enabled
+[    0.458304] printk: legacy bootconsole [uart8250] disabled
+[    0.458304] printk: legacy bootconsole [uart8250] disabled
+[    0.471705] Registering SWP/SWPB emulation handler
+[    0.484945] clk: Disabling unused clocks
+[    0.492389] Freeing unused kernel image (initmem) memory: 1024K
+[    0.499056] Run /init as init process
+
+=== DP200 milestone 1: Linux (none) 6.18.59 #2 SMP Thu Oct 29 01:03:00 EDT 2026 armv7l
+--- cmdline: console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 maxcpus=1 rdinit=/init console=ttyS0
+model name	: ARMv7 Processor rev 1 (v7l)
+Features	: half thumb fastmult vfp edsp vfpv3 tls idivt vfpd32 
+CPU implementer	: 0x56
+CPU variant	: 0x2
+CPU part	: 0x584
+CPU revision	: 1
+--- clocksource: mv61x0_timer2
+--- clockevent: dummy_timer
+--- /proc/interrupts, twice 1 s apart (the timer line must grow by ~100):
+           CPU0       
+ 24:         52 GIC-0  53 Level     mv61x0_timer1
+ 25:         15 GIC-0  32 Level     ttyS0
+IPI0:         0  CPU wakeup interrupts
+IPI1:         0  Timer broadcast interrupts
+IPI2:         0  Rescheduling interrupts
+IPI3:         0  Function call interrupts
+IPI4:         0  CPU stop interrupts
+IPI5:         0  IRQ work interrupts
+IPI6:         0  completion interrupts
+Err:          0
+ 24:         53 GIC-0  53 Level     mv61x0_timer1
+ 25:         19 GIC-0  32 Level     ttyS0
+--- uptime: 0.53 0.12
+=== shell on the console; type to test UART interrupts
+
+
+BusyBox v1.38.0 (2026-10-29 00:57:49 EDT) built-in shell (ash)
+
+# 
