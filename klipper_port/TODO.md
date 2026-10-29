@@ -81,10 +81,11 @@ written so they can be handed to another agent.
 
 ## Screen app
 
-10. **BED LEVEL page** (mockup done): probe, draw the mesh, per-screw hints
-    for the 2 front screws (fixed back support), learn the thread pitch
-    with one full turn + re-probe, confirm which way "raise" is. The probe
-    offset is fixed now, so this is unblocked.
+10. **BED LEVEL page** BUILT 10-28 (MOVE -> BED LEVEL): bed-empty confirm,
+    4x4 mesh (cold or 60 C) with the points filling in live, plane fit,
+    "raise/lower X mm" per front screw against the fixed back support.
+    Still to do: learn the screw pitch and turn direction (turn one screw a
+    known amount + re-probe) so it can say "turn 1/4 clockwise".
 11. Exclude-object (cancel one object) from the screen during a print.
 12. Screen app crash (once, 10-27): it now restarts itself and logs to
     /var/log/dp200_screen.log - look there if the screen freezes again.
