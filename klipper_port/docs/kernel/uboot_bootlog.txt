@@ -1,0 +1,66 @@
+sync; reboot
+# umount: can't remount /dev/mmcblk0p1 read-only
+umount: none busy - remounted read-only
+umount: mdev busy - remounted read-only
+umount: can't remount ubi0:filesystem read-only
+umount: can't remount rootfs read-only
+ifdown: interface eth0 not configured
+ifdown: interface mlan0 not configured
+ifdown: interface uap0 not configured
+The system is going down NOW!
+Sent SIGTERM to all processes
+Sent SIGKILL toRequesting system reboot
+Restarting system.
+
+AP°NnŒCŠ£¨Š¨ëÑï–é€UV’°ÌjÊ­N	²¹1€ÉïV…õºL&	‚Ñ¡—ÖKµ:L#!¥ýãÙ®ÎA³•åÂ0°	ÕóšÁ•åÒâ ÐªjI¤‚¸3º‚²ÌˆAµKÙ´š,ñ©ËÚÕc¬ÖÍ
+C1Ë%õá¶OË	‚LïXVËkY®©ˆL¯Xš½d¥Š‘d²2å2˜Â°lYëÑhŠÚ–¦’L+Ñ ìKÕ X–É T’
+ÅC£‚¬YkÑ¨¢2MÂŠÃ¬+‘ £‹• ¡V¦&IE¢•n–Á€R¬+‘A£‹•A¡A†¦³¢•n–Á SÓòŠÃŒ+‘A£‹•A¡A†¦‘µ&â•n§Ê’¡È½…d½‘e
+‘‘r2å’”Ú£â•Ù§Ê˜Rê+Ñ ìÕ XÉ 4ÒB²QìYkÑèŠê2ŠCê…ä½‘å
+‘‘ò2å’Êâ•n§Ò‘š²aø“WÉñ kA©›Õ Â¸T’Â°^H¨H¨Õ½½Ñ2011.09-svn22695 (Nov 23 2016 - 17:27:43)
+
+U-Boot code: F9280800 -> F92AD910  BSS: -> F92B19EC
+I2C:   ready
+eFuse Vtrim Settings = 4
+Set voltage to 1.0V
+DDR Freq = 1105788928, Using Card01 Mem Settings
+SDRAMTiming1 = 0x911500c0
+SDRAMTiming2 = 0x64660784
+SDRAMTiming5 = 0x000f7141
+DDR3_width == x32
+monitor len: 000311EC
+ramsize is 20000000(512MB)
+ramsize adjusted by CONFIG_SYS_MEM_TOP_HIDE is 20000000(512MB)
+starting addr=20000000
+TLB table at: 1fff0000
+Top of RAM usable for U-Boot at: 1fff0000
+Reserving 196k for U-Boot at: 1ffbe000
+Reserving 4104k for malloc() at: 1fbbc000
+Reserving 40 Bytes for Board Info at: 1fbbbfd8
+Reserving 120 Bytes for Global Data at: 1fbbbf60
+New Stack Pointer is: 1fbbbf50
+RAM Configuration:
+Bank #0: 00000000 0 Bytes
+Bank #1: 00000000 0 Bytes
+Bank #2: 00000000 512 MiB
+relocation Offset is: 26d3d800
+monitor flash len: 00032718
+LOR FW bits: 1
+Now running in RAM - U-Boot at: 1ffbe000
+NAND:  512 MiB
+MMC:   mvsdh0: 0, mvsdh1: 1
+Bad block table found at page 262080, version 0x01
+Bad block table found at page 262016, version 0x01
+nand_read_bbt: Bad block at 0x00001a980000
+Boot logo Phys Addr: 0x18000000
+LCD Freq remains same
+clk div: 28
+Setting up boot command...
+512 MiB
+lxkshim: bad magic in boot block 0
+No boot command found.  Using default.
+Net:   usb_ether
+
+	 RODIN-P 
+
+Hit any key to stop autoboot:  1  0 
+# 

@@ -1,0 +1,118 @@
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -411,6 +411,8 @@
+ 
+ source "arch/arm/mach-mstar/Kconfig"
+ 
++source "arch/arm/mach-mv61x0/Kconfig"
++
+ source "arch/arm/mach-mv78xx0/Kconfig"
+ 
+ source "arch/arm/mach-mvebu/Kconfig"
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -195,6 +195,7 @@
+ machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
+ machine-$(CONFIG_ARCH_MESON)		+= meson
+ machine-$(CONFIG_ARCH_MMP)		+= mmp
++machine-$(CONFIG_ARCH_MV61X0)		+= mv61x0
+ machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
+ machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
+ machine-$(CONFIG_ARCH_MXC)		+= imx
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -700,6 +700,15 @@
+ 	help
+ 	  Enables the support for Milbeaut timer driver.
+ 
++config MV61X0_TIMER
++	bool "Marvell 88PA61x0 timer" if COMPILE_TEST
++	depends on HAS_IOMEM
++	select TIMER_OF
++	select CLKSRC_MMIO
++	help
++	  Timer block of the Marvell 88PA61x0 printer SoCs (Sindoh DP200):
++	  clock event device and clocksource.
++
+ config MSC313E_TIMER
+ 	bool "MSC313E timer driver" if COMPILE_TEST
+ 	select TIMER_OF
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -89,6 +89,7 @@
+ obj-$(CONFIG_HYPERV_TIMER)		+= hyperv_timer.o
+ obj-$(CONFIG_MICROCHIP_PIT64B)		+= timer-microchip-pit64b.o
+ obj-$(CONFIG_MSC313E_TIMER)		+= timer-msc313e.o
++obj-$(CONFIG_MV61X0_TIMER)		+= timer-mv61x0.o
+ obj-$(CONFIG_GOLDFISH_TIMER)		+= timer-goldfish.o
+ obj-$(CONFIG_GXP_TIMER)			+= timer-gxp.o
+ obj-$(CONFIG_CLKSRC_LOONGSON1_PWM)	+= timer-loongson1-pwm.o
+--- a/arch/arm/boot/dts/marvell/Makefile
++++ b/arch/arm/boot/dts/marvell/Makefile
+@@ -5,6 +5,8 @@
+ 	mmp2-brownstone.dtb \
+ 	mmp2-olpc-xo-1-75.dtb \
+ 	mmp3-dell-ariel.dtb
++dtb-$(CONFIG_ARCH_MV61X0) += \
++	88pa6170-dp200.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += \
+ 	orion5x-kuroboxpro.dtb \
+ 	orion5x-lacie-d2-network.dtb \
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -431,6 +431,40 @@
+ #endif
+ 	b	__errata_finish
+ 
++#ifdef CONFIG_ARCH_MV61X0
++/*
++ * PJ4B-MP of the Marvell 88PA61x0 (A9-style SCU and GIC): the settings of
++ * the vendor 3.2 kernel's __v7_pj4bmp_setup, which differ from the
++ * Armada XP oriented __v7_pj4b_setup below.
++ */
++__v7_pj4bmp_setup:
++	mrc	p15, 1, r0, c15, c1, 0		@ Aux Debug Modes Control 0
++	orr	r0, r0, #(1 << 12)
++	mcr	p15, 1, r0, c15, c1, 0
++	mrc	p15, 1, r0, c15, c1, 2		@ Aux Debug Modes Control 2
++	orr	r0, r0, #(1 << 29)		@ no outstanding non-cacheable requests
++	bic	r0, r0, #(1 << 23)		@ fast LDR
++	mcr	p15, 1, r0, c15, c1, 2
++	mrc	p15, 1, r0, c15, c1, 1		@ Aux Debug Modes Control 1
++	bic	r0, r0, #(1 << 25)
++	mcr	p15, 1, r0, c15, c1, 1
++	mrc	p15, 1, r0, c15, c2, 0		@ Aux Functional Modes Control 0
++	bic	r0, r0, #(1 << 7)
++	mcr	p15, 1, r0, c15, c2, 0
++	dsb
++	isb
++#ifdef CONFIG_SMP
++	mrc	p15, 0, r0, c0, c1, 7		@ ID_MMFR3
++	and	r0, r0, #0xf000
++	cmp	r0, #0x2000			@ maintenance broadcast?
++	mrc	p15, 0, r0, c1, c0, 1		@ ACTLR
++	orreq	r0, r0, #(1 << 0)		@ FW
++	orr	r0, r0, #(1 << 6)		@ SMP
++	mcr	p15, 0, r0, c1, c0, 1
++#endif
++	b	__v7_setup
++#endif
++
+ __v7_pj4b_setup:
+ #ifdef CONFIG_CPU_PJ4B
+ 
+@@ -705,6 +739,14 @@
+ 	/*
+ 	 * Marvell PJ4B processor.
+ 	 */
++#ifdef CONFIG_ARCH_MV61X0
++	.type   __v7_pj4bmp_proc_info, #object
++__v7_pj4bmp_proc_info:
++	.long	0x560f5840
++	.long	0xff0ffff0
++	__v7_proc __v7_pj4bmp_proc_info, __v7_pj4bmp_setup, proc_fns = pj4b_processor_functions
++	.size	__v7_pj4bmp_proc_info, . - __v7_pj4bmp_proc_info
++#endif
+ #ifdef CONFIG_CPU_PJ4B
+ 	.type   __v7_pj4b_proc_info, #object
+ __v7_pj4b_proc_info:

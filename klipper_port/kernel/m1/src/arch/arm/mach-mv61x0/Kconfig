@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config ARCH_MV61X0
+	bool "Marvell 88PA61x0 printer SoCs"
+	depends on ARCH_MULTI_V7
+	select ARM_GIC
+	select CPU_PJ4B
+	select HAVE_ARM_SCU if SMP
+	select HAVE_ARM_TWD if SMP
+	select MV61X0_TIMER
+	help
+	  Support for the Marvell 88PA6170 SoC of the Sindoh DP200 3D
+	  printer: two PJ4B-MP cores with an A9-style SCU and GIC.

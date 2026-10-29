@@ -15,7 +15,7 @@ New files:
   kallsyms;
 - `docs/kernel/vendor_hwtables.txt`: the static I/O map, every platform
   MMIO/IRQ resource, and the machine record;
-- `docs/kernel/dp200-m1.dts`: draft device tree for milestone 1.
+- `kernel/m1/`: milestone 1 build (timer driver, device tree, config, build script).
 
 **Short version:**
 - **Modules (route A):** they cover the missing *drivers*: USB serial,
@@ -228,7 +228,7 @@ built-in initramfs. One CPU, no storage, no network.
   visible before the device tree is parsed;
 - an armhf BusyBox for the initramfs. It runs: a new kernel has Thumb.
 
-**Device tree:** `docs/kernel/dp200-m1.dts` (draft): memory 512 MB, CPU
+**Device tree:** `kernel/m1/src/arch/arm/boot/dts/marvell/88pa6170-dp200.dts`: memory 512 MB, CPU
 `marvell,pj4b`, GIC, the SoC timer, UART0 at 25 MHz, and
 `earlycon=uart8250,mmio32,0xf8060000 maxcpus=1`.
 

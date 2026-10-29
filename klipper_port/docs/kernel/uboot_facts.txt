@@ -1,0 +1,147 @@
+prompt check: 01000000: 00000000    ....
+### version
+
+U-Boot 2011.09-svn22695 (Nov 23 2016 - 17:27:43)
+arm-marvell-linux-gnueabi-gcc (Linaro GCC branch-4.6.4. Marvell GCC 201208-1593.24ba3e13) 4.6.4 20120630 (prerelease)
+GNU ld (Linaro GCC branch-4.6.4. Marvell GCC 201208-1593.24ba3e13) 2.22.0.20120719
+### bdinfo
+arch_number = 0x00002710
+boot_params = 0x00000100
+DRAM bank   = 0x00000000
+-> start    = 0x00000000
+-> size     = 0x00000000
+DRAM bank   = 0x00000001
+-> start    = 0x00000000
+-> size     = 0x00000000
+DRAM bank   = 0x00000002
+-> start    = 0x00000000
+-> size     = 0x20000000
+ethaddr     = 08:00:3e:26:0a:5b
+ip_addr     = 192.168.1.101
+baudrate    = 115200 bps
+TLB addr    = 0x1FFF0000
+relocaddr   = 0x1FFBE000
+reloc off   = 0x26D3D800
+irq_sp      = 0x1FBBBF60
+sp start    = 0x1FBBBF50
+FB base     = 0x00000000
+### coninfo
+Unknown command 'coninfo' - try 'help'
+### printenv
+ASICREV=C1
+BUSFREQ=200000000
+CARDREV=12f
+CARDTYPE=card01
+CPUMHZ=2211
+DRAM_CONFIG=0,0,512
+DRAM_SIZE=536870912
+ITCM0=0xf9210000
+ITCM1=0xf9200000
+NETWORK_DISABLED=1
+bar_color=0
+baudrate=38400
+boot_baudrate=115200
+boot_time=17
+bootargs=console=ttyS0
+bootargs_console=setenv console ttyS0,${boot_baudrate}n8
+bootargs_disk_parms=rootdelay=10 rootfstype=ext3 init=/lib/init
+bootargs_disk_sda1=root=/dev/sda1
+bootargs_disk_sdb1=root=/dev/sdb1
+bootargs_disk_sdc1=root=/dev/sdc1
+bootargs_mv61X0_other=BUSFREQ=200000000 ASICREV=C0 lxkearlycon=uart8250,mmio32,0xf8060000
+bootcmd=run bootcmd_select
+bootcmd_mmc=setenv bootargs mem=${mem_MiB} ${bootargs_console}; printenv; run mmc_load
+bootcmd_select=run mv61X0_nandboot
+bootcmd_spi_sda=setenv bootargs mem=${mem_MiB} ${bootargs_console} ${bootargs_disk_sda1} $(bootargs_disk_parms};printenv;run spi_load
+bootcmd_spi_sdb=setenv bootargs mem=${mem_MiB} ${bootargs_console} ${bootargs_disk_sdb1} $(bootargs_disk_parms};printenv;run spi_load
+bootcmd_spi_sdc=setenv bootargs mem=${mem_MiB} ${bootargs_console} ${bootargs_disk_sdc1} $(bootargs_disk_parms};printenv;run spi_load
+bootcmd_tftp=run setbootargs_mv61x0;tftp ${kernel_image_name};printenv bootargs;bootm ${downld_addr}
+bootdelay=1
+downld_addr=0x400000
+env_temp_addr=0x1f000000
+erase_Uboot=sf probe 0:1;sf erase 0x10000 0x10000;reset
+erase_eeprom_env=mw.l ${env_temp_addr} 0;eeprom write ${env_temp_addr} 0x20 1
+erase_mmc_env=mmc write 0 0x28000 1
+erase_mmc_uboot=mw.l 0 0;mmc write 0 0 0x90 1;mmc write 0 0 0x80 1;reset
+erase_nand_env=mw.l ${env_temp_addr} 0;nand write ${env_temp_addr} 0x800000 1
+erase_uboot=sf probe 0:1;sf erase 0x10000 0x10000;reset
+ethact=usb_ether
+ethaddr=08:00:3e:26:0a:5b
+ethaddr_sdh=00:18:21:50:10:13
+ipaddr=192.168.1.101
+kernel_image_name=uImage.mv61x0
+lcd_type=1
+load_mmc=mmcinfo; mmc read ${downld_addr} 0x210 0x3E00
+load_mmc_big=mmcinfo; mmc read ${downld_addr} 0x200 0xD000
+load_mmc_big_part=mmcinfo; mmc read ${downld_addr} 0x202 0xD000
+load_nand=nand info; nand read ${downld_addr} 0x40000 0x7C0000
+mem_MiB=512
+mmc_load=mmcinfo; mmc read 0 ${downld_addr} 0x210 0x3E00; bootz ${downld_addr}
+mtddevname=kernel
+mtddevnum=0
+mtdids=nand1=mv61x0_nand
+mtdparts=mtdparts=mv61x0_nand:0x800000(kernel),0x20000(u-boot-env),0x80000(bbt)ro,0x100000(boot-logo),0x800000(backup),0xC800000(recovery),-(filesystem)
+mv61X0_mmcboot=run setbootargs_mv61x0;run load_mmc_big_part;bootm ${downld_addr}
+mv61X0_nandboot=run setbootargs_nand;run load_nand;bootm ${downld_addr}
+netmask=255.255.255.0
+partition=nand1,0
+serverip=192.168.1.100
+setbootargs=setenv bootargs mem=${mem_MiB} ${bootargs_console}
+setbootargs_mv61x0=run bootargs_console;setenv bootargs console=${console} ${mtdparts} root=/dev/mmcblk0p2 rootfstype=ext2 ${bootargs_mv61X0_other} synopGMAC_Mem.ethaddr=${ethaddr_sdh} mv61fb.lcd_type=${lcd_type}
+setbootargs_nand=run bootargs_console;setenv bootargs console=${console} ${mtdparts} ubi.mtd=filesystem root=ubi0:filesystem rootfstype=ubifs ${bootargs_mv61X0_other} synopGMAC_Mem.ethaddr=${ethaddr_sdh} mv61tft.boot_time=${boot_time} mv61tft.bar_color=${bar_color}
+spi_load=sf probe 0:1;sf read 0x8000 0x40000 0x7C0000;bootz 0x8000
+stderr=serial
+stdin=serial
+stdout=serial
+
+Environment size: 3320/4092 bytes
+### help
+?       - alias for 'help'
+base    - print or set address offset
+bdinfo  - print Board Info structure
+bootm   - boot application image from memory
+bootp   - boot image via network using BOOTP/TFTP protocol
+chpart  - change active partition
+cmp     - memory compare
+cp      - memory copy
+cramfsload- load binary file from a filesystem image
+cramfsls- list files in a directory (default /)
+crc32   - checksum calculation
+dcache  - enable or disable data cache
+env     - environment handling commands
+exit    - exit script
+ext2load- load binary file from a Ext2 filesystem
+ext2ls  - list files in a directory (default /)
+false   - do nothing, unsuccessfully
+fsinfo  - print information about filesystems
+fsload  - load binary file from a filesystem image
+go      - start application at address 'addr'
+help    - print command description/usage
+i2c     - I2C sub-system
+icache  - enable or disable instruction cache
+iminfo  - print header information for application image
+loop    - infinite loop on address range
+ls      - list files in a directory (default /)
+md      - memory display
+mm      - memory modify (auto-incrementing address)
+mmc     - MMC sub system
+mmcinfo - display MMC info
+mtdparts- define flash/nand partitions
+mtest   - simple RAM read/write test
+mw      - memory write (fill)
+nand    - NAND sub-system
+nboot   - boot from NAND device
+nm      - memory modify (constant address)
+ping    - send ICMP ECHO_REQUEST to network host
+printenv- print environment variables
+reset   - Perform RESET of the CPU
+run     - run commands in an environment variable
+saveenv - save environment variables to persistent storage
+setenv  - set environment variables
+sha1verify- verify kernel code image
+showvar - print local hushshell variables
+source  - run script from memory
+test    - minimal test like /bin/sh
+tftpboot- boot image via network using TFTP protocol
+true    - do nothing, successfully
+version - print monitor, compiler and linker version
