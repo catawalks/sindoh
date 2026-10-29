@@ -68,6 +68,12 @@ NUMPY_LINK = '/usr/local/lib/dp200-numpy/numpy'   # install/input_shaping/setup_
 DRY_PRESETS = (('PLA', 50, 4), ('PETG', 65, 4), ('TPU', 50, 5),
                ('ABS', 80, 4), ('ASA', 80, 4), ('NYLON', 85, 8))
 DRY_HOURS = (2, 4, 6, 8, 12)
+# Bed level page: 4x4 probe grid, the two front screws and the fixed back support
+PROBE_RE = re.compile(r'probe: at ([\d.]+),([\d.]+) bed will contact at z=(-?[\d.]+)')
+BL_SCREWS = (('Left', 8, 8), ('Right', 202, 8))   # ~10 mm in from the front corners
+BL_PIVOT = (105, 196)                             # fixed back support (no screw)
+BL_PLATE = (-2, -2, 212, 205.5)                   # plate in printer coordinates
+BL_OK = 0.05                                      # mm: a screw closer than this is level
 SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 = ([\d.]+) Hz')
 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
@@ -288,6 +294,9 @@ class UI:
         self.shp = {'rev': 0, 'checked': 0.0, 'busy': False, 'res': {}}
         self.dry = {'mat': 'PLA', 'temp': 50, 'hours': 4}   # dryer page selection
         self.bed_answered = 0.0        # last BED_CLEAR answer (status lags behind it)
+        # bed level page: mode start/probing/result, live points {(col, row): z}
+        self.bl = {'rev': 0, 'mode': 'start', 'pts': {}, 'mesh': None, 'xs': None, 'ys': None,
+                   't0': 0.0, 'checked': 0.0, 'busy': False}
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
@@ -322,6 +331,8 @@ class UI:
             self.dry.update(mat=action[1], temp=action[2], hours=action[3])
         elif kind == 'dry_hours':
             self.dry['hours'] = action[1]
+        elif kind == 'bl_probe':
+            self.bl_probe(action[1])
         elif kind == 'adxl':
             self._bg('Sensor ' + ('on' if action[1] else 'off'), lambda: self.adxl_switch(action[1]))
         elif kind == 'power':
@@ -401,6 +412,68 @@ class UI:
                 pass
             finally:
                 s['busy'] = False
+        threading.Thread(target=work, daemon=True).start()
+
+    # ---- bed level ---------------------------------------------------------
+    def bl_probe(self, heat):
+        """Probe a 4x4 mesh (profile 'level'); the page fills in point by point."""
+        bl = self.bl
+        if self.busy:
+            self.flash('Busy: ' + self.busy)
+            return
+        bl.update(mode='probing', pts={}, mesh=None, t0=time.time(), checked=0.0)
+        bl['rev'] += 1
+        script = 'BED_CLEAR\n' + ('M190 S60\n' if heat else '') + \
+            'BED_MESH_CALIBRATE PROBE_COUNT=4,4 PROFILE=level'
+
+        def fn():
+            try:
+                if bl['xs'] is None:
+                    cfg = get('/printer/objects/query?configfile=settings')
+                    m = cfg['status']['configfile']['settings']['bed_mesh']
+                    lo, hi = [[float(v) for v in (x.split(',') if isinstance(x, str) else x)]
+                              for x in (m['mesh_min'], m['mesh_max'])]
+                    bl['xs'] = [lo[0] + (hi[0] - lo[0]) * i / 3 for i in range(4)]
+                    bl['ys'] = [lo[1] + (hi[1] - lo[1]) * i / 3 for i in range(4)]
+                post('/printer/gcode/script', {'script': script})
+                q = get('/printer/objects/query?bed_mesh')['status']['bed_mesh']
+                if len(q['probed_matrix']) != 4 or len(q['probed_matrix'][0]) != 4:
+                    raise ValueError('no 4x4 mesh came back')
+                bl['mesh'] = q['probed_matrix']
+                bl['mode'] = 'result'
+            except Exception:
+                bl['mode'] = 'start'
+                raise
+            finally:
+                bl['rev'] += 1
+        self._bg('Bed level probe', fn)
+
+    def bl_tick(self):
+        """While probing, pick up each finished point from the console (1 s)."""
+        bl = self.bl
+        if bl['mode'] != 'probing' or bl['busy'] or bl['xs'] is None \
+                or time.time() - bl['checked'] < 1:
+            return
+        bl['busy'], bl['checked'] = True, time.time()
+
+        def work():
+            try:
+                pts = {}
+                for m in get('/server/gcode_store?count=100')['gcode_store']:
+                    if m.get('time', 0) < bl['t0'] - 1:
+                        continue
+                    for x, y, z in PROBE_RE.findall(m.get('message', '')):
+                        c = min(range(4), key=lambda i: abs(bl['xs'][i] - float(x)))
+                        r = min(range(4), key=lambda i: abs(bl['ys'][i] - float(y)))
+                        if abs(bl['xs'][c] - float(x)) < 1 and abs(bl['ys'][r] - float(y)) < 1:
+                            pts[(c, r)] = float(z)   # reference point (not on the grid) skipped
+                if pts != bl['pts'] and bl['mode'] == 'probing':
+                    bl['pts'] = pts
+                    bl['rev'] += 1
+            except Exception:
+                pass
+            finally:
+                bl['busy'] = False
         threading.Thread(target=work, daemon=True).start()
 
     def flash(self, text, secs=6):
@@ -973,7 +1046,7 @@ class UI:
 
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
-              'calibrate': 'move', 'shaper': 'calibrate', 'dryer': 'filament',
+              'calibrate': 'move', 'shaper': 'calibrate', 'bedlevel': 'move', 'dryer': 'filament',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1122,7 +1195,87 @@ class UI:
             ('MOTORS OFF', ('gcode', 'M84', 'Motors off')),
             ('BIN EMPTIED', ('gcode', 'BIN_EMPTIED', 'Bin emptied'), C_BTN, 24),
             ('CALIBRATE', ('screen', 'calibrate'), C_BTN, 28, 'input shaping'),
-        ], top=240)
+            ('BED LEVEL', ('screen', 'bedlevel'), C_BTN, 28, 'probe + screws'),
+        ], top=240, rows_h=90)
+
+    def bl_view(self, d, top, w, live):
+        """Top-down plate (back at the top, door at the bottom) with the 16
+        probe points: an empty circle until probed, then the value."""
+        bl = self.bl
+        x0 = (PW - w) // 2
+        sc = w / (BL_PLATE[2] - BL_PLATE[0])
+        y1 = top + (BL_PLATE[3] - BL_PLATE[1]) * sc
+        px = lambda x: x0 + (x - BL_PLATE[0]) * sc
+        py = lambda y: y1 - (y - BL_PLATE[1]) * sc
+        d.rounded_rectangle((x0, top, x0 + w, y1), radius=8, fill=(44, 44, 54), outline=(90, 90, 100))
+        xs = bl['xs'] or [18 + 62 * i for i in range(4)]
+        ys = bl['ys'] or [30 + 140 * i / 3 for i in range(4)]
+        small = w < 250
+        for r in range(4):
+            for c in range(4):
+                cx, cy = px(xs[c]), py(ys[r])
+                z = bl['mesh'][r][c] if bl['mesh'] and not live else bl['pts'].get((c, r))
+                if z is None or small:
+                    d.ellipse((cx - 5, cy - 5, cx + 5, cy + 5), outline=C_DIM, width=2)
+                    continue
+                d.rounded_rectangle((cx - 31, cy - 15, cx + 31, cy + 15), radius=7, fill=bl_colour(z))
+                t = '%+.2f' % z
+                d.text((cx - d.textlength(t, font=font(16)) / 2, cy - 9), t, font=font(16), fill=(15, 15, 20))
+        for _, sx, sy in BL_SCREWS:
+            cx, cy = px(sx), py(sy)
+            d.ellipse((cx - 11, cy - 11, cx + 11, cy + 11), fill=(200, 200, 210))
+            d.line((cx - 7, cy, cx + 7, cy), fill=(40, 40, 40), width=3)
+        cx, cy = px(BL_PIVOT[0]), py(BL_PIVOT[1])
+        d.polygon(((cx, cy - 9), (cx - 10, cy + 8), (cx + 10, cy + 8)), fill=(200, 200, 210))
+        d.text((x0 + 6, y1 + 6), 'FRONT (door)', font=font(16), fill=C_DIM)
+        d.text((x0 + w - 6 - d.textlength('BACK', font=font(16)), top - 22), 'BACK', font=font(16), fill=C_DIM)
+        return y1
+
+    def page_bedlevel(self, d, st):
+        bl = self.bl
+        d.text((20, 156), 'Bed level', font=font(28), fill=C_TXT)
+        q = 'Is the bed EMPTY? Homes if needed, then probes 16 points (~3 min).'
+        if bl['mode'] == 'start':
+            for i, l in enumerate(['Probes the bed (16 points), shows how',
+                                   'far it is from level and which way to',
+                                   'turn the two front screws.', '',
+                                   'Bed 60 C first gives the truest result.']):
+                d.text((20, 210 + i * 30), l, font=font(20), fill=C_DIM)
+            self.bl_view(d, 400, 200, True)
+            self.button(d, (30, 620, 230, 705), 'PROBE', ('confirm', q, ('bl_probe', False)),
+                        C_ON, 30, 'bed cold')
+            self.button(d, (250, 620, 450, 705), 'PROBE', ('confirm', q, ('bl_probe', True)),
+                        C_BTN, 30, 'heat bed 60 C')
+            return
+        if bl['mode'] == 'probing':
+            n = len(bl['pts'])
+            d.text((20, 198), 'Probing point %d of 16...' % min(n + 1, 16) if n else 'Homing / starting...',
+                   font=font(22), fill=C_WARN)
+            self.bl_view(d, 262, 300, True)
+            d.text((20, 600), 'Screen and STOP keep working.', font=font(20), fill=C_DIM)
+            return
+        mesh = bl['mesh']
+        lo, hi = min(min(r) for r in mesh), max(max(r) for r in mesh)
+        d.text((20, 196), 'Range %.2f mm' % (hi - lo), font=font(22), fill=C_TXT)
+        a, b, c = plane_fit(bl['xs'], bl['ys'], mesh)
+        z = lambda x, y: a + b * x + c * y
+        ref = z(*BL_PIVOT)
+        diffs = [(name, z(sx, sy) - ref) for name, sx, sy in BL_SCREWS]
+        if all(abs(v) < BL_OK for _, v in diffs):
+            d.text((250, 199), 'Level', font=font(20), fill=C_ON)
+        y = self.bl_view(d, 262, 250, False) + 26
+        for name, v in diffs:
+            if abs(v) < BL_OK:
+                msg, col = '%s screw: OK (%+.2f)' % (name, v), C_ON
+            else:
+                # mesh z > 0 = bed higher than the reference: that corner comes down
+                msg, col = '%s screw: %s %.2f mm' % (name, 'lower' if v > 0 else 'raise', abs(v)), C_WARN
+            d.rounded_rectangle((20, y, PW - 20, y + 38), radius=10, fill=C_BAR)
+            d.ellipse((32, y + 9, 52, y + 29), fill=col)
+            d.text((64, y + 7), msg, font=font(21), fill=C_TXT)
+            y += 44
+        self.button(d, (30, 632, 230, 708), 'PROBE', ('confirm', q, ('bl_probe', False)), C_BTN, 30, 'again')
+        self.button(d, (250, 632, 450, 708), 'PROBE', ('confirm', q, ('bl_probe', True)), C_BTN, 30, 'bed 60 C')
 
     def page_dryer(self, d, st):
         dry = st.get('gcode_macro _DRY') or {}
@@ -1337,6 +1490,32 @@ class UI:
         self.button(d, (40, 440, 220, 530), 'YES', action, C_ON)
         self.button(d, (260, 440, PW - 40, 530), 'NO', no)
 
+def bl_colour(v, lo=-0.25, hi=0.25):
+    """Blue (low) - green (level) - red (high)."""
+    t = max(0.0, min(1.0, (v - lo) / (hi - lo)))
+    if t < 0.5:
+        u = t / 0.5
+        return (60, int(110 + 90 * u), int(220 - 130 * u))
+    u = (t - 0.5) / 0.5
+    return (int(60 + 170 * u), int(200 - 140 * u), int(90 - 30 * u))
+
+def plane_fit(xs, ys, mesh):
+    """Least-squares plane z = a + b*x + c*y through the mesh (Cramer's rule, no numpy)."""
+    pts = [(1.0, xs[c], ys[r], mesh[r][c]) for r in range(len(ys)) for c in range(len(xs))]
+    A = [[sum(p[i] * p[j] for p in pts) for j in range(3)] for i in range(3)]
+    B = [sum(p[i] * p[3] for p in pts) for i in range(3)]
+    det = lambda m: (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                     - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                     + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]))
+    D = det(A)
+    out = []
+    for k in range(3):
+        m = [row[:] for row in A]
+        for i in range(3):
+            m[i][k] = B[i]
+        out.append(det(m) / D)
+    return out
+
 def load_settings():
     try:
         with open(SETTINGS) as f:
@@ -1454,12 +1633,13 @@ def main():
         ui.wifi_tick()
         ui.net_tick()
         ui.shaper_tick()
+        ui.bl_tick()
         # Redraw only when something can have changed: new status, touch,
         # STOP being held, the clock minute, a message or busy state, dimming,
         # WiFi state (scan results, connect progress).
         key = (time.strftime('%H:%M'), ui.busy, ui.msg and time.time() < ui.msg[1],
                bool(ui.dimmed()), ui.screen, ui.confirm is not None, view_key(ui), ui.err,
-               ui.wf['rev'], ui.net['rev'], ui.shp['rev'])
+               ui.wf['rev'], ui.net['rev'], ui.shp['rev'], ui.bl['rev'])
         if events or ui.press or ui.key_down is not None or key != last_key:
             panel.show(ui.render())
             last_key = key

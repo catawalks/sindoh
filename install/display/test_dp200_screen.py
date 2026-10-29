@@ -165,6 +165,18 @@ for _ in range(4):
 step(); touch.lift(); step(); time.sleep(0.4); step()
 check('wake tap sends nothing', len(sent) == n and not ui.dimmed())
 
+# Bed level page: PROBE asks first (bed empty), YES confirms and meshes 4x4
+ui.screen, ui.confirm = 'move', None
+tap('BED LEVEL');          check('MOVE -> BED LEVEL page', ui.screen == 'bedlevel')
+n = len(sent)
+tap('PROBE');              check('PROBE asks to confirm', ui.confirm is not None and len(sent) == n)
+tap('NO');                 check('NO probes nothing', ui.confirm is None and len(sent) == n)
+tap('PROBE'); tap('YES')
+time.sleep(1.0)
+check('YES: BED_CLEAR + 4x4 mesh', len(sent) > n and sent[-1][1].startswith('BED_CLEAR\n')
+      and 'PROBE_COUNT=4,4' in sent[-1][1])
+ui.bl['mode'], ui.screen = 'start', 'home'
+
 # Bed-empty dialog: shown while BED_CLEAR.asking, YES / NO answer it
 ui.screen, ui.confirm = 'home', None
 ui.st = dict(ui.st, **{'gcode_macro BED_CLEAR': {'ok': 0, 'asking': 1}})
