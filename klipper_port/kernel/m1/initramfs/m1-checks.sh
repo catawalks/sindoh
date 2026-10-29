@@ -59,4 +59,7 @@ echo "--- webcam: $(ls /dev/video* 2>/dev/null)"
 if [ -e /dev/video0 ]; then
 	uvcgrab /dev/video0 /tmp/frame.jpg && hexdump -C /tmp/frame.jpg | head -n 2
 fi
+
+# Checks of the image variant (build.sh VARIANT=...), if any
+[ -f /etc/m1-variant.sh ] && sh /etc/m1-variant.sh
 echo "=== shell on the console; type to test UART interrupts"

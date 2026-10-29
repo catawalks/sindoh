@@ -1,0 +1,23 @@
+#!/bin/sh
+# udhcpc event script (/usr/share/udhcpc/default.script): apply the lease
+case "$1" in
+deconfig)
+	ifconfig "$interface" 0.0.0.0
+	;;
+bound|renew)
+	ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}"
+	if [ -n "$router" ]; then
+		while route del default dev "$interface" 2>/dev/null; do :; done
+		for r in $router; do
+			route add default gw "$r" dev "$interface"
+			break
+		done
+	fi
+	: > /etc/resolv.conf
+	[ -n "$domain" ] && echo "search $domain" >> /etc/resolv.conf
+	for d in $dns; do
+		echo "nameserver $d" >> /etc/resolv.conf
+	done
+	;;
+esac
+exit 0

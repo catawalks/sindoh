@@ -138,6 +138,108 @@
 		};
 
 		/*
+		 * GPIO banks A-H, 32 lines each (input +0, output +4,
+		 * direction +8, pin configuration +0x80). Disabled here; the
+		 * gpio variant enables them. Nothing is driven at probe.
+		 */
+		gpio0: gpio@f8040000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8040000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		gpio1: gpio@f8041000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8041000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		gpio2: gpio@f8042000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8042000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		gpio3: gpio@f8043000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8043000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		gpio4: gpio@f8044000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8044000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		gpio5: gpio@f8045000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8045000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		gpio6: gpio@f8046000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8046000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		gpio7: gpio@f8047000 {
+			compatible = "marvell,88pa6170-gpio";
+			reg = <0xf8047000 0x100>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			status = "disabled";
+		};
+
+		/*
+		 * SD socket (vendor mmc0; the second slot at 0xf9080200 shares
+		 * the interrupt and stays out). Card detect does not work
+		 * (vendor quirk), so the slot is polled. Disabled here; the sd
+		 * variant enables it.
+		 */
+		sdhci0: mmc@f9080000 {
+			compatible = "marvell,88pa6170-sdhci";
+			reg = <0xf9080000 0x100>;
+			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+			broken-cd;
+			bus-width = <4>;
+			status = "disabled";
+		};
+
+		/*
+		 * UPC coprocessors (the Klipper MCUs): ITCM 0 + XENA registers,
+		 * ITCM 1 + DTCM, the dec_pwm and stepper engine blocks the
+		 * driver forces off on probe, reboot and panic, and the APB
+		 * config word whose UPC clock field it sets like stock. Disabled here;
+		 * the upc variant enables it.
+		 */
+		upc: upc@f9200000 {
+			compatible = "marvell,88pa6170-upc";
+			reg = <0xf9200000 0x10000>, <0xf9210000 0xb0000>,
+			      <0xf9304000 0x2100>, <0xf8150000 0x5000>,
+			      <0xf8000180 0x4>;
+			reg-names = "upc0", "upc1", "pwm", "smot", "apb";
+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
+
+		/*
 		 * Timers 0-3 (timer 0 is the vendor's watchdog). Timer 1 is the
 		 * clock event device, timer 2 the clocksource. The second range
 		 * is the prescaler, set to 198 like the vendor kernel does

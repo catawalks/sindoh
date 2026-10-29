@@ -1,0 +1,34 @@
+#!/bin/sh
+# netload <pc-address> [file] [kernel args]
+#
+# Fetch a zImage with its DTB appended (build.sh's m1*-zImage-dtb.bin) from
+# the PC over HTTP and kexec it. On the PC, in D:\DP200\kernel\out:
+#   python -m http.server 8000
+# Like U-Boot, kexec passes the memory size and the extra kernel arguments
+# as ATAGs; the new kernel's DTB bootargs come first.
+if [ -z "$1" ]; then
+	echo "usage: netload <pc-address> [file] [kernel args]"
+	exit 1
+fi
+host=$1
+shift
+file=${1:-m1-zImage-dtb.bin}
+[ $# -gt 0 ] && shift
+args="$*"
+port=${PORT:-8000}
+
+rm -f /tmp/kernel.bin
+wget -O /tmp/kernel.bin "http://$host:$port/$file" || exit 1
+echo "$file: $(wc -c < /tmp/kernel.bin) bytes, md5 $(md5sum < /tmp/kernel.bin | cut -d' ' -f1)"
+
+kexec -l /tmp/kernel.bin --atags --command-line="$args" || exit 1
+
+# Stop the Wi-Fi driver first (its shutdown command to the firmware); the
+# 8782 keeps power, so the next kernel finds its firmware still running
+# (patch 0004 handles that; untested so far)
+for d in /sys/bus/usb/drivers/mwifiex_usb/*:*; do
+	[ -e "$d" ] && echo -n "${d##*/}" > /sys/bus/usb/drivers/mwifiex_usb/unbind
+done
+sync
+echo "netload: starting $file"
+kexec -e
