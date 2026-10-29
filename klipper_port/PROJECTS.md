@@ -81,6 +81,15 @@ CONTINUE / CANCEL. Camera looks down at the bed from close above
 (hardware_notes, 2026-10-27).
 **Needs the user for:** the pose that shows the whole plate, the reference,
 tests with real leftovers (thin first layers are the hard case).
+**Pose problem (2026-10-28):** the check must run BEFORE G28 - Z homes
+upward, so a tall leftover (or a spool left from the dryer) would be pushed
+into the head/gantry. So the bed can't be moved to a fixed pose first.
+Plan: PRINT_END, CANCEL_PRINT and the dryer end with the bed at the bottom
+(Z 190, fixed Y) and record that in save_variables; PRINT_START checks the
+picture at that pose before homing. Unknown pose (power cycle, manual move):
+find the plate's edges in the picture and compare in plate coordinates, or
+ask on the screen. A Z sweep (camera/bed_pose_sweep.sh) shows how the view
+changes with height.
 
 ## 5. Faster stepping in the UPC firmware
 
