@@ -37,6 +37,20 @@ def allowed(cmd):
     return True
 
 
+def allowed_sd(cmd):
+    """Read-only SD commands: probe/info/list, and ext2load into the upload window."""
+    argv = cmd.split()
+    if not argv or ';' in cmd or '$' in cmd:
+        return False
+    if argv[0] == 'mmc':
+        return len(argv) >= 2 and argv[1] in ('rescan', 'info', 'list', 'part')
+    if argv[0] in ('mmcinfo', 'ext2ls'):
+        return True
+    if argv[0] == 'ext2load' and len(argv) >= 4:
+        return 0x01000000 <= int(argv[3], 16) < 0x17F00000
+    return False
+
+
 def catch(port, log):
     import serial
     s = serial.Serial(port, 115200, timeout=0.01)
@@ -76,6 +90,14 @@ def main():
     try:
         con = Console(link)
         print('prompt check:', check_prompt(con))
+        if args == ['--pinmux-sd']:
+            # User-approved 2026-10-29: route the last two SD pins like stock
+            # Linux does (all six SD pin selects read 0x00001002 there; U-Boot
+            # leaves these two at 0x1001 / 0x0). RAM-only register state.
+            for addr in (0xf8041080, 0xf8041084):
+                con.command('mw.l %x 1002' % addr, timeout=5.0)
+            print(con.command('md.l f8041080 2', timeout=5.0).decode('latin1'))
+            return
         if args and args[0] == '--bootm':
             # bootm ADDR: only after iminfo verifies the image in RAM; then
             # record the console for SECS seconds (nothing more is sent).
@@ -106,7 +128,7 @@ def main():
             print('reset sent; send NOTHING on the port until Linux is up')
             return
         for cmd in args:
-            if not allowed(cmd):
+            if not (allowed(cmd) or allowed_sd(cmd)):
                 sys.exit('refused (not allow-listed): %r' % cmd)
         for cmd in args:
             out = con.command(cmd, timeout=10.0)
