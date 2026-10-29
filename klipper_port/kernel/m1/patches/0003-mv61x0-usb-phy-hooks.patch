@@ -1,0 +1,24 @@
+--- a/drivers/phy/marvell/Kconfig
++++ b/drivers/phy/marvell/Kconfig
+@@ -2,6 +2,14 @@
+ #
+ # Phy drivers for Marvell platforms
+ #
++config PHY_MV61X0_USB
++	bool "Marvell 88PA61x0 USB 2.0 PHY" if COMPILE_TEST
++	depends on OF && HAS_IOMEM
++	select GENERIC_PHY
++	help
++	  The USB 2.0 PHYs and their PLL on the Marvell 88PA61x0 printer
++	  SoCs (Sindoh DP200).
++
+ config ARMADA375_USBCLUSTER_PHY
+ 	bool "Armada 375 USB cluster PHY support" if COMPILE_TEST
+ 	default y if MACH_ARMADA_375
+--- a/drivers/phy/marvell/Makefile
++++ b/drivers/phy/marvell/Makefile
+@@ -13,3 +13,4 @@
+ obj-$(CONFIG_PHY_PXA_28NM_HSIC)		+= phy-pxa-28nm-hsic.o
+ obj-$(CONFIG_PHY_PXA_28NM_USB2)		+= phy-pxa-28nm-usb2.o
+ obj-$(CONFIG_PHY_PXA_USB)		+= phy-pxa-usb.o
++obj-$(CONFIG_PHY_MV61X0_USB)		+= phy-mv61x0-usb.o

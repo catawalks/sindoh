@@ -155,6 +155,63 @@
 		};
 
 		/*
+		 * Synopsys GMAC (vendor driver: synopGMAC), DMA at +0x1000.
+		 * Marvell 88E1510 RGMII PHY at MDIO address 0, held in reset
+		 * by GPIO 62 (bank B bit 30) until the vendor kernel releases
+		 * it (mach_phyHWInit); nothing here touches that GPIO. The
+		 * vendor runs MDIO with CR = 0 and never sets the PHY's RGMII
+		 * delays, so the PHY is bound to phylib's generic driver
+		 * (MARVELL_PHY off), which keeps the strap defaults.
+		 */
+		ethernet@f9050000 {
+			compatible = "snps,dwmac-3.70a", "snps,dwmac";
+			reg = <0xf9050000 0x1100>;
+			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "macirq";
+			phy-mode = "rgmii";
+			phy-handle = <&ethphy0>;
+			clk_csr = <0>;
+
+			mdio {
+				compatible = "snps,dwmac-mdio";
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				ethphy0: ethernet-phy@0 {
+					reg = <0>;
+				};
+			};
+		};
+
+		/* PHYs 0-2 serve the device, host and OTG controllers */
+		usbphy: phy@f904f000 {
+			compatible = "marvell,88pa6170-usb-phy";
+			reg = <0xf904f000 0x100>;
+			#phy-cells = <1>;
+		};
+
+		/*
+		 * ChipIdea controllers run as EHCI hosts, capability registers
+		 * at +0x100 (vendor: "Marvell mv61xx EHCI"). ehci.0 is the
+		 * host controller, ehci.1 the OTG controller in host mode.
+		 */
+		usb@f9041100 {
+			compatible = "generic-ehci";
+			reg = <0xf9041100 0x100>;
+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+			phys = <&usbphy 1>;
+			has-transaction-translator;
+		};
+
+		usb@f9048100 {
+			compatible = "generic-ehci";
+			reg = <0xf9048100 0x100>;
+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+			phys = <&usbphy 2>;
+			has-transaction-translator;
+		};
+
+		/*
 		 * A DesignWare APB UART 3.08* (CPR 0x80013532: 16-byte FIFOs,
 		 * AFCE, THRE, no shadow registers). The vendor runs it as a
 		 * plain 16550A and so does milestone 1; "snps,dw-apb-uart" with
