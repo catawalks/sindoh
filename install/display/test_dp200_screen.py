@@ -165,6 +165,18 @@ for _ in range(4):
 step(); touch.lift(); step(); time.sleep(0.4); step()
 check('wake tap sends nothing', len(sent) == n and not ui.dimmed())
 
+# Bed-empty dialog: shown while BED_CLEAR.asking, YES / NO answer it
+ui.screen, ui.confirm = 'home', None
+ui.st = dict(ui.st, **{'gcode_macro BED_CLEAR': {'ok': 0, 'asking': 1}})
+ui.render()
+check('bed-empty dialog pops up', ui.confirm is not None and 'EMPTY' in ui.confirm[0])
+tap('YES');                check('YES sends BED_CLEAR', sent[-1][1] == 'BED_CLEAR' and ui.confirm is None)
+ui.render();               check('no re-pop while status lags', ui.confirm is None)
+ui.bed_answered = 0.0
+tap('NO');                 check('NO sends BED_CLEAR CANCEL=1', sent[-1][1] == 'BED_CLEAR CANCEL=1')
+ui.st = dict(ui.st, **{'gcode_macro BED_CLEAR': {'ok': 0, 'asking': 0}})
+ui.confirm = None
+
 # Panel: partial updates must equal a full redraw
 tmp = tempfile.NamedTemporaryFile(delete=False)
 tmp.write(b'\0' * S.FB_W * S.FB_H * 4); tmp.close()

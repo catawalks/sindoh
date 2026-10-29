@@ -73,7 +73,7 @@ SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
            'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
-           'dp200_cartridge', 'gcode_macro _DRY')
+           'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -287,6 +287,7 @@ class UI:
         # input shaping page: last recommended shaper per axis from the console
         self.shp = {'rev': 0, 'checked': 0.0, 'busy': False, 'res': {}}
         self.dry = {'mat': 'PLA', 'temp': 50, 'hours': 4}   # dryer page selection
+        self.bed_answered = 0.0        # last BED_CLEAR answer (status lags behind it)
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
@@ -311,6 +312,8 @@ class UI:
         elif kind == 'cancel':
             self.confirm = None
         elif kind == 'gcode':
+            if action[1].startswith('BED_CLEAR'):
+                self.bed_answered = time.time()
             self._bg(action[2] if len(action) > 2 else action[1],
                      lambda: post('/printer/gcode/script', {'script': action[1]}))
         elif kind == 'post':
@@ -936,6 +939,13 @@ class UI:
             if pstate not in ('printing', 'paused') and self.screen == 'print':
                 self.screen = 'home'
             getattr(self, 'page_' + self.screen)(d, st)
+            # Z homing was refused until the bed is confirmed empty (BED_CLEAR)
+            if ((st.get('gcode_macro BED_CLEAR') or {}).get('asking') and not self.confirm
+                    and time.time() - self.bed_answered > 5):
+                self.confirm = ('Is the bed EMPTY? Homing raises it to the top and crushes '
+                                'anything on it.',
+                                ('gcode', 'BED_CLEAR', 'Bed empty'),
+                                ('gcode', 'BED_CLEAR CANCEL=1', 'Homing cancelled'))
         if self.confirm:
             self.overlay_confirm(d)
         self.footer(d)
@@ -1317,14 +1327,15 @@ class UI:
         ], top=500, rows_h=80)
 
     def overlay_confirm(self, d):
-        q, action = self.confirm
+        q, action = self.confirm[:2]
+        no = self.confirm[2] if len(self.confirm) > 2 else ('cancel',)
         self.buttons = [b for b in self.buttons if b[1] == ('estop',)]   # modal (STOP stays)
         d.rectangle((0, 64, PW, PH - 86), fill=(10, 10, 14))
         d.rounded_rectangle((20, 220, PW - 20, 560), radius=16, fill=C_BAR)
         for i, l in enumerate(wrap(d, q, font(28), PW - 80)[:4]):
             d.text((40, 250 + i * 38), l, font=font(28), fill=C_TXT)
         self.button(d, (40, 440, 220, 530), 'YES', action, C_ON)
-        self.button(d, (260, 440, PW - 40, 530), 'NO', ('cancel',))
+        self.button(d, (260, 440, PW - 40, 530), 'NO', no)
 
 def load_settings():
     try:
@@ -1375,7 +1386,8 @@ def view_key(ui):
             st.get('filament_motion_sensor filament_encoder', {}).get('enabled'), ui.ip,
             tuple(sorted((st.get('dp200_cartridge') or {}).items(), key=lambda kv: kv[0]))
             if st.get('dp200_cartridge') else None,
-            tuple(sorted((st.get('gcode_macro _DRY') or {}).items())), ui.dry['mat'], ui.dry['hours'])
+            tuple(sorted((st.get('gcode_macro _DRY') or {}).items())), ui.dry['mat'], ui.dry['hours'],
+            (st.get('gcode_macro BED_CLEAR') or {}).get('asking'))
 
 # ---------------------------------------------------------------------------
 def main():

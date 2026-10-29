@@ -24,8 +24,18 @@ written so they can be handed to another agent.
    (make_pa_tower.py): best corners ~15 mm, walls thin/split from 35-40 mm
    -> pressure_advance 0.30 in dp200_printer.cfg (live, verified). The
    tower changed little below 35 mm, so recheck with dry filament.
-   Next: dry the filament (dryer test), reprint the cube (top face,
-   letter blobs), then a retraction test with two towers.
+   Dryer done; cube reprinted 10-28 (z-hop + PA, user to measure... the
+   cube was then crushed: see the Z-homing incident below). Next: reprint
+   the cube, then a retraction test with two towers.
+1b. **Z-homing incident 10-28:** bed_pose_sweep.sh homed with the cube on
+   the bed (PRINT_END's M84 had dropped homing); Z homes UPWARD, so the
+   cube was crushed against the top until the user's emergency stop. User
+   found no damage. Fix: every Z homing now needs BED_CLEAR (homing_override
+   -> Mainsail prompt + screen YES/NO dialog, valid 5 min, one homing);
+   tested live (G28 refused, nothing moved; dialog on the panel). Cold 4x4
+   mesh after: front-left 0.23 mm lower and back-right 0.15 mm higher than
+   the 60 C mesh before the cube print (same grid) - recheck at 60 C
+   before reading it as a bed shift.
 2. **Filament dryer.** DONE 10-28, first run (screen FILAMENT -> DRYER,
    PLA 4 h, 15:55-19:59): bed down + forward, head parked, extruder off;
    bed 22 -> 50 C in 8 min, then 50.0 C for the whole 4 h at 18-46 %
