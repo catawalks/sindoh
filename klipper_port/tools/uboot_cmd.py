@@ -5,7 +5,8 @@ usage:
     uboot_cmd.py COMPORT CMD [CMD ...]               run allow-listed commands
     uboot_cmd.py COMPORT --reset                     'reset' back to stock boot
 
---catch: sends 'sync; reboot' to the Linux shell (stop Klipper first), waits
+--catch: sends 'sync; reboot' (reboot -f on a 6.x test kernel) to the Linux
+shell (stop Klipper first), waits
 for "Hit any key to stop autoboot" and only then sends ONE space, which
 U-Boot's getc() consumes. Nothing else is sent, so a missed window just boots
 Linux as normal.
@@ -55,7 +56,8 @@ def catch(port, log):
     import serial
     s = serial.Serial(port, 115200, timeout=0.01)
     s.reset_input_buffer()
-    s.write(b'sync; reboot\n')
+    # the m1 test kernels' /init ignores a plain reboot: force it there only
+    s.write(b'sync; case $(uname -r) in 6.*) reboot -f ;; *) reboot ;; esac\n')
     t0, buf = time.time(), b''
     while time.time() - t0 < 120:
         buf += s.read(4096)
