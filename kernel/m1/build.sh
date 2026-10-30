@@ -43,8 +43,9 @@ upc)	USERSPACE="iw uvcgrab upctool" ;;
 sd|gpio) USERSPACE="iw uvcgrab" ;;
 i2c)	USERSPACE="" ;;		# read-only bring-up images
 nand)	USERSPACE="mtdraw" ;;
+full)	USERSPACE="iw uvcgrab wpa upctool" ;;
 eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
-*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand eth)" >&2; exit 1 ;;
+*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand full eth)" >&2; exit 1 ;;
 esac
 if [ "$VARIANT" = base ]; then
 	NAME=m1
@@ -202,7 +203,7 @@ case $VARIANT in eth|i2c|nand) NOFW=1 ;; *) NOFW=0 ;; esac
 if [ $NOFW = 0 ]; then
 	echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
 fi
-if [ "$VARIANT" = upc ]; then
+if echo " $USERSPACE " | grep -q " upctool "; then
 	(cd "$M1/../../prebuilt" && md5sum -c --quiet) <<-EOF
 	96cddffd5fccf68ca6e742b8ee783708  probe_io.bin
 	1ec429d52b1a15dae194fbb8b579c1cc  probe_fm.bin
@@ -216,6 +217,9 @@ for f in init m1-checks.sh; do
 done
 tr -d '\r' < "$M1/initramfs/net/netload" > "$IRFS/netload"
 tr -d '\r' < "$M1/initramfs/net/udhcpc.script" > "$IRFS/udhcpc.script"
+case " $USERSPACE " in *" wpa "*)
+	tr -d '\r' < "$M1/initramfs/net/wifi-join" > "$IRFS/wifi-join" ;;
+esac
 if [ -d "$M1/initramfs/$VARIANT" ]; then
 	for f in "$M1/initramfs/$VARIANT"/*; do
 		tr -d '\r' < "$f" > "$IRFS/$(basename "$f")"

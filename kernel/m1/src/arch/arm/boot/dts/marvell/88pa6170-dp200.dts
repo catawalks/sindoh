@@ -215,6 +215,18 @@
 		 * GPIO); bus 3 the filament cartridge chip ("Smart-IC", 0x30),
 		 * which stays disabled.
 		 */
+		/*
+		 * RTC (vendor gogin-rtc, IRQ 64): a seconds counter at +0x0c.
+		 * rtc-mv61x0 only reads it; the vendor's setup sequence is a
+		 * proposal (docs/kernel/rtc_setup.md).
+		 */
+		rtc: rtc@f8100000 {
+			compatible = "marvell,88pa6170-rtc";
+			reg = <0xf8100000 0x30>;
+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
+
 		i2c2: i2c@f80a2000 {
 			compatible = "snps,designware-i2c";
 			reg = <0xf80a2000 0x100>;
