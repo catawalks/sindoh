@@ -69,3 +69,12 @@ The whole-mtd0 md5 is ce8823b9 (stock 298b7390). mtd3 in ECC mode: f8245f56,
 yet raw it is still exactly 8357ce02. So the BCH reads are mostly right; the
 failures are probably erased pages (blank pages report "failed" and may be
 mangled) or pages whose layout differs. Still read-only: no refusals.
+
+## NAND BCH read 2, 2026-10-30 (81bc615, erased-page fix)
+
+ECC statistics are now 11 corrected / 0 failed. Block 11 (which needs
+correction) matches stock exactly. But 8 blocks differ: 55-59 and 61-63, the
+erased tail of mtd0 (all 0xFF in the stock dump). Reading block 57 returns 0xFF
+for the first page, then "Timeout on CMDD (NDSR: 0x00001800)": runs of erased
+pages still time out. mtd0 ECC md5 945ecc0c, mtd3 ECC md5 992ee6ae (raw
+8357ce02 exact). Still no refusals and no writes.
