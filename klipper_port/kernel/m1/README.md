@@ -190,35 +190,34 @@ state, then waits.
    acts if it finds the watchdog armed; U-Boot leaves it off.
    `eth_kernel_boot.sh` refuses older images (checked in their vmlinux).
 
-### mcsync: the vendor's DDR write-buffer drain (A/B test)
+### The DDR write-buffer drain (on by default)
 
 There is no PL310 L2. The vendor's only real "outer cache" op writes
 0x01010101 to the DDR controller at 0xfa300530 on every mb()/wmb(), which
-includes every writel(). mach-mv61x0 does the same from `soc_mb` when the
-DT node `memory-controller@fa300000` is enabled. It is disabled in the
-normal images. For every variant except eth, build.sh also writes
-`m1-<v>-mcsync-zImage-dtb.bin` and `m1-<v>-mcsync.dtb`: the same kernel with
-the node enabled.
-
-1. `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-sd-mcsync-zImage-dtb.bin`.
-2. **Success:** dmesg shows "DDR write-buffer drain on mb()", the board boots
-   as far as m1-sd does, and SD, Ethernet (wget + md5) and USB still work.
-   If it hangs after time_init, the watchdog is already stopped: power-cycle.
-3. Then compare throughput (e.g. `dd` from the SD card, wget) with plain m1-sd.
-   If there's no regression, enable the node by default to match stock.
+includes every writel(). mach-mv61x0 does the same from `soc_mb`, because
+the DT node `memory-controller@fa300000` is enabled. The A/B test showed no
+measurable cost (docs/kernel/mcsync_ab_test.md). dmesg says "DDR
+write-buffer drain on mb()".
 
 ### net: join Wi-Fi, then load kernels over the network
 
-1. Boot `m1-net.uimg` (uniprocessor; Wi-Fi as in boot 7).
+1. Boot it through the fast path:
+   `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-net-zImage-dtb.bin`
+   (uniprocessor; Wi-Fi as in boot 7; eth0 also comes up, as 10.10.0.250).
+   The image contains the Marvell 8782 firmware. It's fine to serve it to
+   the printer on the LAN, but never publish it.
 2. At the shell, type `wifi-join`. It asks for the SSID and the passphrase
    (not echoed). Only the derived key lands in `/tmp`; nothing is stored in
    any image. The user types them; don't paste them into logs.
 3. **Success:** `iw dev mlan0 link` says "Connected", udhcpc prints a lease,
    and `ping <pc-address>` answers.
-4. On the PC, in `D:\DP200\kernel\out`: `python -m http.server 8000` (allow
-   it through the Windows firewall for the private network).
-5. On the printer: `netload <pc-address> m1-upc-zImage-dtb.bin` (any
-   `*-zImage-dtb.bin`; extra kernel arguments may follow).
+4. Optional, kexec over Wi-Fi: the fast path's server already serves
+   `D:\DP200\kernel\out` on port 8099, so on the printer type
+   `PORT=8099 netload <pc-address> m1-upc-zImage-dtb.bin`. netload fetches
+   the matching `.dtb` too. Kernels built since b1d198f are fine; the
+   watchdog is armed only by m1-eth's netload, not here.
+5. Leaving: `reboot -f` (or the next `tools/eth_kernel_boot.sh` run, whose
+   `--catch` does that) returns to U-Boot, then stock.
 6. **Success:** the new kernel's boot log on the serial console, in seconds
    instead of a 17-min upload.
 7. **Known risk, untested:** the 88W8782 keeps its firmware running across

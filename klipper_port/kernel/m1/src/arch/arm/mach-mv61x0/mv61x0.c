@@ -12,8 +12,8 @@
  * that block's chip-select address map at +0x100/+0x110/+0x130 and its
  * "MV" ID at +0x10), most likely a write-buffer drain for the controller's
  * ports. Mainline's place for that is soc_mb, run by mb()/wmb() and so by
- * every writel(), as on mach-mstar. It is installed only when the DT's
- * memory-controller node is enabled.
+ * every writel(), as on mach-mstar. It is installed when the DT's
+ * memory-controller node is enabled (it is, as in stock).
  */
 #include <linux/io.h>
 #include <linux/of.h>
