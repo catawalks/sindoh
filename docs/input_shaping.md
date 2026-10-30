@@ -82,3 +82,16 @@ dimension of the printer in them is a placeholder to be measured:
   edge, the free space under it, and how far the jaws may reach in.
 
 A mount must be stiff and tight: a loose mount measures its own wobble.
+
+## First hardware test, 2026-10-30 (Mellow FLY-ADXL345 USB)
+
+- The board arrived running only the **Katapult** bootloader: on the front
+  port (EHCI 1, `usb 1-1`) it shows as `1d50:6177`, "rp2040" / "katapult",
+  full speed. Klipper firmware (`1d50:614e`) still has to be flashed.
+- The generic usb-serial route doesn't work on 3.2: writing the ID to
+  `/sys/bus/usb-serial/drivers/generic/new_id` is accepted, but
+  `usbserial_generic` has no dynamic IDs at the USB level, so nothing binds.
+- **`cdc-acm.ko` works** (with the user's OK, runtime only): `insmod` rc 0, then "cdc_acm
+  1-1:1.0: ttyACM0: USB ACM device", and `/dev/ttyACM0` (major 166) exists.
+  So dp200-start.sh should insmod cdc-acm.ko instead of the new_id line, and
+  Klipper's `[mcu adxl]` uses `/dev/ttyACM0` (or the by-id path).
