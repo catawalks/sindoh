@@ -10,11 +10,12 @@
 # kernel args the DTB's own bootargs are used; with them, this kernel's
 # command line (minus ethload.*) plus the args replace them.
 #
-# KEXEC_WDT=SECONDS (proposed, off unless set; needs the user's OK): arm
-# the SoC watchdog right before kexec -e, so a kernel that hangs before its
-# timer driver starts resets the board instead of needing a power cycle.
-# The timer driver stops the watchdog at time_init. Kernels built before
-# that change would be reset after SECONDS.
+# KEXEC_WDT=SECONDS (user-approved 2026-10-29): arm the SoC watchdog right
+# before kexec -e, so a kernel that hangs before its timer driver starts
+# resets the board instead of needing a power cycle. The timer driver stops
+# it at time_init; kernels built before that change (b1d198f) would be
+# reset after SECONDS. Default: WDT in /etc/ethload.conf (m1-eth: 60), or
+# off where there is none; KEXEC_WDT=0 turns it off.
 if [ -z "$1" ]; then
 	echo "usage: netload <pc-address> [file] [kernel args]"
 	exit 1
@@ -36,6 +37,10 @@ wget -O /tmp/kernel.bin "http://$host:$port/$file" || exit 1
 wget -O /tmp/kernel.dtb "http://$host:$port/$dtb" || exit 1
 echo "$file: $(wc -c < /tmp/kernel.bin) bytes, md5 $(md5sum < /tmp/kernel.bin | cut -d' ' -f1)"
 echo "$dtb: $(wc -c < /tmp/kernel.dtb) bytes, md5 $(md5sum < /tmp/kernel.dtb | cut -d' ' -f1)"
+
+[ -z "$KEXEC_WDT" ] && [ -f /etc/ethload.conf ] &&
+	KEXEC_WDT=$(sed -n 's/^WDT=//p' /etc/ethload.conf)
+KEXEC_WDT=${KEXEC_WDT:-0}
 
 if [ -n "$args" ]; then
 	cmdline=
@@ -59,7 +64,7 @@ done
 ifconfig eth0 down 2>/dev/null
 sync
 
-if [ -n "$KEXEC_WDT" ]; then
+if [ "$KEXEC_WDT" -gt 0 ]; then
 	# U-Boot's reset_cpu sequence (timer-mv61x0.c mv61x0_restart) with a
 	# long count: timer 0 at 1 MHz (prescale 198), 0xf8020000 = control
 	T=0xf8020000
@@ -73,7 +78,7 @@ fi
 echo "netload: starting $file"
 kexec -e
 # only reached if kexec -e failed: disarm again
-if [ -n "$KEXEC_WDT" ]; then
+if [ "$KEXEC_WDT" -gt 0 ]; then
 	devmem 0xf8020008 32 0
 	devmem 0xf8020000 32 $(( ($(devmem 0xf8020000) ^ 0xf) & 0x7fffffff ))
 fi

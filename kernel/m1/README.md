@@ -180,14 +180,15 @@ state, then waits.
    so the appended DTB was dropped. netload now fetches `<name>.dtb`
    (`next.dtb` for the fast path) and runs `kexec --dtb`. eth0 goes down
    first because stmmac has no shutdown hook.
-5. Recovery (proposed, needs the user's OK; off by default): with
-   `ethload.wdt=SECONDS` on the loader's command line (or `KEXEC_WDT=SECONDS
-   netload ...`), netload arms the SoC watchdog right before `kexec -e`,
-   using U-Boot's reset sequence with a long count. A kernel that hangs
-   before its timer driver starts then resets the board after SECONDS. The
-   timer driver stops the watchdog at time_init, so it never fires on a good
-   boot. It disarms only if it finds the watchdog armed; U-Boot leaves it
-   off. Only kernels built from now on stop it.
+5. Recovery (approved by the user 2026-10-29; on by default): netload arms
+   the SoC watchdog (timer 0, U-Boot's reset sequence) with a 60 s count
+   right before `kexec -e`. The count comes from `WDT=60` in m1-eth's
+   `/etc/ethload.conf` (build.sh `ETHLOAD_WDT`). `ethload.wdt=N` on the
+   loader's command line or `KEXEC_WDT=N` overrides it, and 0 turns it off.
+   A kernel that hangs before its timer driver starts resets the board.
+   Every kernel built since b1d198f stops the watchdog at time_init. It only
+   acts if it finds the watchdog armed; U-Boot leaves it off.
+   `eth_kernel_boot.sh` refuses older images (checked in their vmlinux).
 
 ### net: join Wi-Fi, then load kernels over the network
 
