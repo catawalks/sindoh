@@ -21,3 +21,17 @@ nanddump on stock 3.2 (read-only), compared with nand_images/ (2026-10-26):
   flashed and read back"). The 10-26 dump has the stock Sindoh logo. So it's
   an earlier, intended change, not tonight's test. m1-nand's reference md5
   for mtd3 should be 8357ce02 while the test logo is installed.
+
+## NAND retry, 2026-10-30 (guard fixed, 85c52c4)
+
+The Ethernet fast path stopped working at about 02:00: stock's eth0 now gets
+192.168.1.164 from a DHCP server at 192.168.1.1, on another network from the
+PC (10.10.0.85). So the loader's static 10.10.0.250 reaches nothing (ARP gets
+no replies). It's a network-side change for the user to look at. m1-nand.uimg
+(4f465ecf) went in over the serial uploader instead: 15:54, crc32 verified.
+
+Result: the guard refused nothing. The chip ID is the same as before, then
+"nand_bbt: can't scan flash and build the RAM-based BBT", and the probe failed
+with -524 (ENOTSUPP). With NAND_ECC_ENGINE_TYPE_NONE this driver can't do the
+OOB reads that the bad-block scan needs. Back on stock afterwards: mtd0 md5 is
+298b7390 again (unchanged).
