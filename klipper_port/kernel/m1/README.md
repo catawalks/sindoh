@@ -302,6 +302,11 @@ with a plain read (`i2cdetect -y -r 2 0x40 0x40`).
 
 ### nand: whole chip read-only
 
+**Proven 2026-10-30 (BCH run 3, m1-nand dd98f738):** ECC-mode mtd0 equals the
+stock nanddump (298b7390, 64/64 blocks), mtd3 equals stock (8357ce02), 27 bits
+corrected, 0 failed, no timeouts, no guard refusals. Read-write NAND stays
+out of scope until the user decides.
+
 `m1-nand` binds marvell_nand to the PXA3xx-style controller at 0xf9082000,
 with patch 0006 (`CONFIG_MTD_RAW_NAND_READ_ONLY`):
 - the chip is registered as ROM, so MTD_WRITEABLE is clear and the mtd core refuses write, erase and markbad;
@@ -339,6 +344,18 @@ It also prints the raw md5 of mtd3 (stock ECC-corrected 8357ce02...).
 **Success:** COR on the clean blocks (the 24 without raw bitflips in the T48
 dump, including the erased blocks 55-63), and no "read-only: refused" line
 in dmesg.
+
+### ubi: the stock root UBI/UBIFS, read-only (built, not booted)
+
+`m1-ubi` is the proven nand image plus UBI and UBIFS. UBI runs in ro_mode
+by itself on an MTD without MTD_WRITEABLE (drivers/mtd/ubi/build.c), UBIFS is
+mounted `-o ro`, and there is no fastmap and no mtdblock. `/etc/m1-variant.sh`
+attaches mtd6 ("filesystem") and checks ubi0's ro_mode (must be 1). It then
+mounts ubi0:filesystem read-only on /mnt/ubi and compares four stock files
+(libc-2.15.so, app/upc.ko, bin/busybox, etc/inittab) with the rootfs dumps.
+Bad-block markers are not read (patch 0006), so the 5 bad PEBs may show up
+as "corrupted" in UBI's attach log. That is expected; UBI refuses only at
+10 or more.
 
 ### gpio: read-only bank access
 
