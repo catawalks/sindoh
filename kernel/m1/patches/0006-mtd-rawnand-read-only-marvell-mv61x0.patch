@@ -96,7 +96,85 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
  	dev_dbg(nfc->dev, "\nNDCR:  0x%08x\n"
  		"NDCB0: 0x%08x\nNDCB1: 0x%08x\nNDCB2: 0x%08x\nNDCB3: 0x%08x\n",
  		(u32)readl_relaxed(nfc->regs + NDCR), nfc_op->ndcb[0],
-@@ -2244,6 +2286,18 @@
+@@ -1144,6 +1186,77 @@
+ 						   true, page);
+ }
+ 
++/*
++ * bch_v1 (88PA6170): read one page with BCH in one monolithic command of
++ * three NDCB0 words, as the vendor driver does. On an uncorrectable page,
++ * erased pages included, this controller can end the job with UNCERR and
++ * never assert RDDREQ (NDSR 0x001f1810 seen: UNCERR, ERRCNT 31, RDY, no
++ * RDDREQ/CMDD). No data is transferred then and ND_RUN stays set. So:
++ * wait for RDDREQ or UNCERR; without data (or with an uncorrectable
++ * result) clear NDSR and ND_RUN, re-read the page raw into the caller's
++ * buffers, and let the erased-page check decide. Erased pages come back
++ * as 0xff (bitflips counted); others count as a failure, with the raw data.
++ */
++static int marvell_nfc_bch_v1_read_page(struct nand_chip *chip, u8 *buf,
++					int oob_required, int page)
++{
++	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
++	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
++	const struct marvell_hw_ecc_layout *lt = marvell_nand->layout;
++	struct marvell_nfc_op nfc_op = {
++		.ndcb[0] = NDCB0_CMD_TYPE(TYPE_READ) |
++			   NDCB0_ADDR_CYC(marvell_nand->addr_cyc) |
++			   NDCB0_DBC |
++			   NDCB0_CMD1(NAND_CMD_READ0) |
++			   NDCB0_CMD2(NAND_CMD_READSTART),
++		.ndcb[1] = NDCB1_ADDRS_PAGE(page),
++		.ndcb[2] = NDCB2_ADDR5_PAGE(page),
++	};
++	unsigned int max_bitflips = 0;
++	u32 ndsr;
++	int ret;
++
++	marvell_nfc_select_target(chip, chip->cur_cs);
++	marvell_nfc_enable_hw_ecc(chip);
++	ret = marvell_nfc_prepare_cmd(chip);
++	if (ret)
++		goto raw;
++	marvell_nfc_send_cmd(chip, &nfc_op);
++	ret = readl_relaxed_poll_timeout(nfc->regs + NDSR, ndsr,
++					 ndsr & (NDSR_RDDREQ | NDSR_UNCERR),
++					 POLL_PERIOD, POLL_TIMEOUT);
++	if (ret || !(ndsr & NDSR_RDDREQ))
++		goto raw;
++	writel_relaxed(NDSR_RDDREQ, nfc->regs + NDSR);
++	marvell_nfc_xfer_data_in_pio(nfc, buf, lt->data_bytes);
++	marvell_nfc_xfer_data_in_pio(nfc, chip->oob_poi, lt->spare_bytes);
++	ret = marvell_nfc_wait_cmdd(chip);
++	if (ret)
++		goto raw;
++	ret = marvell_nfc_hw_ecc_check_bitflips(chip, &max_bitflips);
++	if (!ret) {
++		marvell_nfc_disable_hw_ecc(chip);
++		return max_bitflips;
++	}
++
++raw:
++	/* No data, or uncorrectable: end this job, then read the page raw */
++	writel_relaxed(readl(nfc->regs + NDSR), nfc->regs + NDSR);
++	writel_relaxed(readl(nfc->regs + NDCR) & ~NDCR_ND_RUN,
++		       nfc->regs + NDCR);
++	marvell_nfc_disable_hw_ecc(chip);
++	ret = marvell_nfc_hw_ecc_hmg_do_read_page(chip, buf, chip->oob_poi,
++						  true, page);
++	if (ret)
++		return ret;
++	max_bitflips = 0;
++	marvell_nfc_check_empty_chunk(chip, buf, lt->data_bytes,
++				      chip->oob_poi, lt->spare_bytes,
++				      chip->oob_poi + lt->spare_bytes,
++				      lt->ecc_bytes, &max_bitflips);
++	return max_bitflips;
++}
++
+ /* Hamming write helpers */
+ static int marvell_nfc_hw_ecc_hmg_do_write_page(struct nand_chip *chip,
+ 						const u8 *data_buf,
+@@ -2244,6 +2357,18 @@
  	.free = marvell_nand_ooblayout_free,
  };
  
@@ -115,7 +193,7 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
  static int marvell_nand_hw_ecc_controller_init(struct mtd_info *mtd,
  					       struct nand_ecc_ctrl *ecc)
  {
-@@ -2271,7 +2325,9 @@
+@@ -2271,7 +2396,9 @@
  	}
  
  	if (!to_marvell_nand(chip)->layout ||
@@ -126,7 +204,7 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
  		dev_err(nfc->dev,
  			"ECC strength %d at page size %d is not supported\n",
  			ecc->strength, mtd->writesize);
-@@ -2292,7 +2348,27 @@
+@@ -2292,7 +2419,27 @@
  	ecc->steps = l->nchunks;
  	ecc->size = l->data_bytes;
  
@@ -144,7 +222,7 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
 +		chip->ecc.algo = NAND_ECC_ALGO_BCH;
 +		ecc->strength = 16;
 +		ecc->read_page_raw = marvell_nfc_hw_ecc_hmg_read_page_raw;
-+		ecc->read_page = marvell_nfc_hw_ecc_hmg_read_page;
++		ecc->read_page = marvell_nfc_bch_v1_read_page;
 +		ecc->read_oob_raw = marvell_nfc_hw_ecc_hmg_read_oob_raw;
 +		ecc->read_oob = ecc->read_oob_raw;
 +		ecc->write_page_raw = marvell_nfc_ro_write_page;
@@ -155,7 +233,7 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
  		chip->ecc.algo = NAND_ECC_ALGO_HAMMING;
  		ecc->read_page_raw = marvell_nfc_hw_ecc_hmg_read_page_raw;
  		ecc->read_page = marvell_nfc_hw_ecc_hmg_read_page;
-@@ -3113,6 +3189,12 @@
+@@ -3113,6 +3260,12 @@
  	.use_dma = true,
  };
  
@@ -168,7 +246,7 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
  static const struct marvell_nfc_caps marvell_armada_8k_nfc_legacy_caps = {
  	.max_cs_nb = 4,
  	.max_rb_nb = 2,
-@@ -3161,6 +3243,10 @@
+@@ -3161,6 +3314,10 @@
  		.compatible = "marvell,pxa3xx-nand-controller",
  		.data = &marvell_pxa3xx_nfc_caps,
  	},
