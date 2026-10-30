@@ -94,3 +94,12 @@ Nothing below is done; NAND and the U-Boot env stay untouched.
 
 Option 3 is the simplest real answer. Option 2 avoids touching U-Boot, at the
 cost of a kexec module.
+
+## Offline config check
+
+`tools/klippy_batch_check.sh DEPS` runs klippy in batch mode in WSL with our
+config and the UPC firmware's data dictionaries. On 2026-10-29 the full config
+(printer.cfg + dp200_printer.cfg + dp200_macros.cfg) loaded with no errors.
+A deliberately misspelled option was caught ("Config error ... is not valid").
+Batch mode can't get past homing (upc_clockcheck waits for real MCU clocks),
+so it checks config and macro syntax, not motion.
