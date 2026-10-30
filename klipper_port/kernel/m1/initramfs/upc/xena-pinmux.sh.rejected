@@ -1,0 +1,43 @@
+#!/bin/sh
+# xena-pinmux.sh (REJECTED: test 2b, 2026-10-30; the writes went in and XIRD stayed 0. Kept for the record.)
+#
+# UPC test 2 (docs/kernel/upc_test2.md): the probe firmware reads
+# XIRD = XIRD1 = 0 under mainline, while under stock it reads 0x10140000 at
+# rest with live endstop bits. Everything else matched stock, including the
+# UPC clock register 0xf8000180, and upc.ko touches no other Linux-side
+# register.
+#
+# The difference: the vendor kernel's gr_def_mpp_list (board_do_mpp_config,
+# every stock boot) sets 13 bank-4 pins to 0x00000000, and U-Boot (so
+# mainline) leaves them at 0x000c1000:
+#   bank 4 (GPIO 128-159, 0xf8044000) pins 1-3 and 10-19
+#   = GPIO 129-131 and 138-147
+# These are the only input-only entries in the vendor table (GPIO input,
+# no level). Pin-config bits from the vendor's gogin_gpio_extended and
+# configure_mpp printk: 2:0 function, 12 raw (1) / sync (0), 16 pull-up,
+# 17 pull-down, 19:18 slew. So U-Boot leaves them as raw (unsynchronised)
+# GPIO inputs with slew 3; stock makes them synchronised GPIO inputs with
+# slew 0. Most likely the XENA samples these pads only through the
+# synchroniser.
+#
+# Writes (the exact stock values from docs/kernel/stock_pinmux_eth.txt):
+#   0xf8044080 + 4 * n = 0x00000000 for n = 1 2 3 10..19
+# Nothing else: the function stays 0 (GPIO), the direction register is not
+# touched (these pins are inputs in U-Boot, mainline and stock alike: bank 4
+# dir 0x10000000 has only pin 28 as an output), no pulls are enabled and no
+# level is driven. Why it cannot drive printer hardware: an input pin's
+# synchroniser and slew setting change how the pad is sampled, not what
+# it outputs. The motor, heater and fan outputs (banks 5/6, bank 4 pins
+# 24/26) are left untouched (still GPIO inputs), so heat and motion stay
+# impossible.
+#
+# Test: with the probe firmware running, run this, then `upctool probe 2`.
+# XIRD should read about 0x10140000 at rest, and holding the Y endstop
+# should set XIRD1 bit 11.
+B4=0xf8044000
+
+echo "xena-pinmux: before: dir $(devmem $((B4 + 8))) sel1 $(devmem $((B4 + 0x84))) sel10 $(devmem $((B4 + 0xa8)))"
+for n in 1 2 3 10 11 12 13 14 15 16 17 18 19; do
+	devmem $((B4 + 0x80 + 4 * n)) 32 0x00000000
+done
+echo "xena-pinmux: after: dir $(devmem $((B4 + 8))) sel1 $(devmem $((B4 + 0x84))) sel10 $(devmem $((B4 + 0xa8))) sel19 $(devmem $((B4 + 0xcc)))"
