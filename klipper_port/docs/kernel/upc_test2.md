@@ -33,3 +33,12 @@ Under mainline nothing has ever run on the cores before the probe. To check,
 compare a read-only dump of the XENA register block under stock (with
 upc.ko and its firmware running) and under mainline, and find the stock firmware
 code that writes it.
+
+## XENA dump on stock (2026-10-29, read-only)
+
+Stock 3.2 from the 2 GB card: no Sindoh app, upc.ko loaded, CPUSoftReset = 0
+(cores held, no Sindoh firmware running). XIIC[0..63] = 0 and XIRW = 0, but
+XIRD = 0x3C040000 and XIRD1 = 0x00004000 (xena46 filament = 1, empty). So the
+inputs are live with no firmware init at all: the firmware-init hypothesis
+(xena-init.sh.proposed) is refuted. The gap is on the Linux side; the stock pin
+functions on banks 4/5 are the main suspect. Raw dump: xena_dump_stock.txt.
