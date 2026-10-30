@@ -15,6 +15,11 @@
  * output level is set before the direction, as the vendor does. Requesting
  * a line switches its pin to the GPIO function, again as the vendor
  * request hook does; that is the only pin-mux change this driver makes.
+ *
+ * With "marvell,read-only" the bank is for reading only: requesting a line
+ * whose pin has another function fails (-EBUSY) and leaves the pin mux
+ * alone, and setting an output level or direction fails (-EPERM). Inputs
+ * and the current direction and output levels can still be read.
  */
 #include <linux/bitops.h>
 #include <linux/gpio/driver.h>
@@ -35,6 +40,7 @@ struct mv61x0_gpio {
 	struct gpio_generic_chip chip;
 	void __iomem *base;
 	spinlock_t pincfg_lock;
+	bool read_only;
 };
 
 static int mv61x0_gpio_request(struct gpio_chip *gc, unsigned int offset)
@@ -46,6 +52,12 @@ static int mv61x0_gpio_request(struct gpio_chip *gc, unsigned int offset)
 
 	spin_lock_irqsave(&mg->pincfg_lock, flags);
 	cfg = readl(reg);
+	if ((cfg & MV61X0_PINCFG_SELECT) && mg->read_only) {
+		spin_unlock_irqrestore(&mg->pincfg_lock, flags);
+		dev_info(gc->parent, "line %u: pin function %lu, read-only bank: refused\n",
+			 offset, cfg & MV61X0_PINCFG_SELECT);
+		return -EBUSY;
+	}
 	if (cfg & MV61X0_PINCFG_SELECT) {
 		dev_info(gc->parent, "line %u: pin function %lu -> GPIO\n",
 			 offset, cfg & MV61X0_PINCFG_SELECT);
@@ -54,6 +66,18 @@ static int mv61x0_gpio_request(struct gpio_chip *gc, unsigned int offset)
 	spin_unlock_irqrestore(&mg->pincfg_lock, flags);
 
 	return 0;
+}
+
+static int mv61x0_gpio_ro_output(struct gpio_chip *gc, unsigned int offset,
+				 int value)
+{
+	return -EPERM;
+}
+
+static int mv61x0_gpio_ro_set_multiple(struct gpio_chip *gc,
+				       unsigned long *mask, unsigned long *bits)
+{
+	return -EPERM;
 }
 
 static int mv61x0_gpio_probe(struct platform_device *pdev)
@@ -83,6 +107,12 @@ static int mv61x0_gpio_probe(struct platform_device *pdev)
 		return ret;
 
 	mg->chip.gc.request = mv61x0_gpio_request;
+	mg->read_only = of_property_read_bool(dev->of_node, "marvell,read-only");
+	if (mg->read_only) {
+		mg->chip.gc.direction_output = mv61x0_gpio_ro_output;
+		mg->chip.gc.set = mv61x0_gpio_ro_output;
+		mg->chip.gc.set_multiple = mv61x0_gpio_ro_set_multiple;
+	}
 	mg->chip.gc.ngpio = 32;
 	mg->chip.gc.base = -1;
 	mg->chip.gc.label = dev_name(dev);
@@ -91,7 +121,8 @@ static int mv61x0_gpio_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	dev_info(dev, "32 lines: in %08x out %08x dir %08x (untouched)\n",
+	dev_info(dev, "32 lines%s: in %08x out %08x dir %08x (untouched)\n",
+		 mg->read_only ? " (read-only)" : "",
 		 readl(mg->base + MV61X0_GPIO_IN),
 		 readl(mg->base + MV61X0_GPIO_OUT),
 		 readl(mg->base + MV61X0_GPIO_DIR));

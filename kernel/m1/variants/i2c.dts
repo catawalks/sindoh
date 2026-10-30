@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
+/* i2c variant: the base board with I2C bus 2 (touch) enabled, bus 3 off */
+#include "88pa6170-dp200.dts"
+
+&i2c2 { status = "okay"; };

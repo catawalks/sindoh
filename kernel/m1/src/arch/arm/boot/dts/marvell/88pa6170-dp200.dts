@@ -50,6 +50,8 @@
 
 	aliases {
 		serial0 = &uart0;
+		i2c2 = &i2c2;
+		i2c3 = &i2c3;
 	};
 
 	memory@0 {
@@ -96,6 +98,24 @@
 		clock-frequency = <1000000>;
 	};
 
+	/* vendor i2c_clk2/i2c_clk3: 400 MHz */
+	i2c_clk: i2c-clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <400000000>;
+	};
+
+	/*
+	 * NAND controller clock: the bus clock. The NAND chip node keeps
+	 * U-Boot's timing registers (marvell,nand-keep-config), so the
+	 * driver never derives timings from this rate.
+	 */
+	nfc_clk: nfc-clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <200000000>;
+	};
+
 	soc {
 		compatible = "simple-bus";
 		#address-cells = <1>;
@@ -111,6 +131,103 @@
 		mc: memory-controller@fa300000 {
 			compatible = "marvell,88pa6170-ddr";
 			reg = <0xfa300000 0x1000>;
+		};
+
+		/*
+		 * PXA3xx-style NAND controller (vendor mv61x0_nand, IRQ 65)
+		 * with a Macronix MX30LF4G18AC (c2:dc, 512 MiB, 2 KiB pages).
+		 * The nand variant enables it with CONFIG_MTD_RAW_NAND_READ_ONLY
+		 * (patch 0006): the chip is registered as ROM, nand_base write,
+		 * erase and mark-bad paths return -EROFS, and the controller
+		 * driver refuses program/erase/SET_FEATURES commands. ECC is off
+		 * (raw page reads) until the vendor's ECC layout is known. No
+		 * on-flash BBT. Partitions as the stock mtdparts, all read-only.
+		 */
+		nand_controller: nand-controller@f9082000 {
+			compatible = "marvell,pxa3xx-nand-controller";
+			reg = <0xf9082000 0x200>;
+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&nfc_clk>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+
+			nand@0 {
+				reg = <0>;
+				nand-rb = <0>;
+				nand-ecc-mode = "none";
+				marvell,nand-keep-config;
+
+				partitions {
+					compatible = "fixed-partitions";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					partition@0 {
+						label = "kernel";
+						reg = <0x00000000 0x00800000>;
+						read-only;
+					};
+					partition@800000 {
+						label = "u-boot-env";
+						reg = <0x00800000 0x00020000>;
+						read-only;
+					};
+					partition@820000 {
+						label = "bbt";
+						reg = <0x00820000 0x00080000>;
+						read-only;
+					};
+					partition@8a0000 {
+						label = "boot-logo";
+						reg = <0x008a0000 0x00100000>;
+						read-only;
+					};
+					partition@9a0000 {
+						label = "backup";
+						reg = <0x009a0000 0x00800000>;
+						read-only;
+					};
+					partition@11a0000 {
+						label = "recovery";
+						reg = <0x011a0000 0x0c800000>;
+						read-only;
+					};
+					partition@d9a0000 {
+						label = "filesystem";
+						reg = <0x0d9a0000 0x12660000>;
+						read-only;
+					};
+				};
+			};
+		};
+
+		/*
+		 * DesignWare I2C (vendor i2c_designware.2/.3). Bus 2 carries
+		 * the touch controller (ROHM BU21029GUL, address 0x40, IRQ via
+		 * GPIO); bus 3 the filament cartridge chip ("Smart-IC", 0x30),
+		 * which stays disabled.
+		 */
+		i2c2: i2c@f80a2000 {
+			compatible = "snps,designware-i2c";
+			reg = <0xf80a2000 0x100>;
+			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&i2c_clk>;
+			clock-frequency = <100000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
+
+		i2c3: i2c@f80a3000 {
+			compatible = "snps,designware-i2c";
+			reg = <0xf80a3000 0x100>;
+			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&i2c_clk>;
+			clock-frequency = <100000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
 		};
 
 		/* A9-style private region: SCU +0, GIC CPU +0x100, GIC dist +0x1000 */
