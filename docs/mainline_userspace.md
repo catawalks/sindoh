@@ -43,8 +43,11 @@ Missing from the m1-* test images today:
 - `INPUT_EVDEV`, plus the touch controller driver (touch test pending).
 - `USB_ACM` (the Klipper accelerometer board for input shaping). Stock needed
   the `usb-serial generic` new_id trick because 3.2 had no CDC-ACM.
-- An RTC driver for the board's battery-backed clock (CR2032). dp200-start.sh
-  runs `hwclock -w` after NTP. Which chip it is (I2C?) is still to find.
+- An RTC driver. The clock is on the SoC: the vendor's `gogin-rtc` at
+  0xf8100000 (GIC SPI 32), not an I2C chip. Stock sets it to 1970 at every
+  boot, so it probably doesn't keep time over power-off (check whether the
+  CR2032 holder actually powers it). dp200-start.sh runs `hwclock -w` after
+  NTP; on mainline, NTP at boot is what matters.
 - `consoleblank=0` on the command line, which replaces the `setterm -blank 0`
   escape codes.
 - The Marvell 8782 firmware in `/lib/firmware/mrvl/` of the root. It's taken
