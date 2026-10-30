@@ -80,7 +80,7 @@ Traps found on the way, all fixed in `m1.config`/`busybox.config`:
 | 5 | **Ethernet: pin mux + PHY reset.** MDIO completes but reads ID 0, i.e. the line is held low. The stock board code sets 121 pin functions at boot (`set_pin_config` in the stock dmesg), and U-Boot, with no Ethernet driver, probably leaves the RGMII/MDIO pins unrouted. Then `reset-gpios` = GPIO 62 (low 125 ms, as the vendor does) and the PHY ID check | Recover the `set_pin_config` table from the vendor image (pin → function), then DT; after step 4 | Be present (pin mux = GPIO work); plug in a cable if a link test is wanted |
 | 6 | **I²C (DesignWare) + touch (bu21029) + backlight/PMIC** | DT, mainline drivers | Be present (the PMIC can switch power rails) |
 | 7 | **NAND** (`marvell_nand`, PXA3xx NFC at 0xf9082000), read-only partitions first | DT with every partition read-only | Approve. Never any write or erase |
-| 8 | **L2 cache (PL310)** | Find the base (vendor: virt 0xfee00000 = phys 0xfa300000), aux-control value | Nothing special (RAM boot) |
+| 8 | ~~L2 cache (PL310)~~ **DDR write-buffer drain** (2026-10-29): there is no PL310 (the vendor's l2x0_init reads the SCU and GIC). 0xfa300000 is the DDR controller (U-Boot reads its CS address map at +0x100/0x110/0x130, ID "MV" at +0x10). The vendor's only effective "cache" op writes 0x01010101 to +0x530 on every mb(). Mainline: `soc_mb` hook in mach-mv61x0, DT node `marvell,88pa6170-ddr` (disabled by default); build.sh emits `m1*-mcsync` images with it on | A/B test through the fast path (m1-sd vs m1-sd-mcsync) | Nothing special (RAM boot) |
 | 9 | **Persistent install** (kernel on SD or NAND) | Only after 1-8 | Explicit approval; it changes what the printer boots |
 
 ## 0. What the offline analysis found
