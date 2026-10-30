@@ -310,18 +310,26 @@ with patch 0006 (`CONFIG_MTD_RAW_NAND_READ_ONLY`):
 
 The rest of the configuration:
 - the partitions are the stock mtdparts, each `read-only`;
-- there is no on-flash BBT, no UBI and no mtdblock;
-- ECC is off (raw page reads), and U-Boot's timings are kept (`marvell,nand-keep-config`).
+- no BBT is built and no bad-block marker is read (NAND_SKIP_BBTSCAN,
+  NAND_NO_BBM_QUIRK), so probing needs no OOB access; there is no UBI and no
+  mtdblock;
+- ECC is off (raw page reads), and U-Boot's timings are kept
+  (`marvell,nand-keep-config`). Stock uses the controller's BCH (4 bits per
+  512 bytes, one 2 KiB chunk, ECC at OOB 32-61); mainline needs a
+  3-word-command variant for that (docs/kernel/nand_bch_plan.md).
+- the image is kept small for serial upload: no USB, Wi-Fi, media or
+  firmware.
 
-`/etc/m1-variant.sh` prints /proc/mtd, each partition's flags, and the md5 of
-the raw mtd0 (8 MiB) and mtd3 (1 MiB). Compare them with the stock dumps
-(`nanddump -o -b`, ECC-corrected; nand_images/md5sums.txt): mtd0 298b7390...,
-mtd3 e106bfe3....
-- **A match proves the read path.** If it doesn't match, wget the dump from the PC (copy
-  nand_images/mtd3.bin into D:\DP200\kernel\out) and count the differing
-  bytes (`cmp -l /tmp/m3 /tmp/ref | wc -l`). A handful of single-bit
-  differences is raw-read bitflips; whole pages different means a layout or
-  ECC question.
+`/etc/m1-variant.sh` prints /proc/mtd and each partition's flags, then
+grades each 128 KiB block of mtd0:
+- **COR:** equals the ECC-corrected stock dump;
+- **RAW:** equals the raw T48 dump's bitflips;
+- **diff:** neither.
+
+It also prints the raw md5 of mtd3 (stock ECC-corrected 8357ce02...).
+**Success:** COR on the clean blocks (the 24 without raw bitflips in the T48
+dump, including the erased blocks 55-63), and no "read-only: refused" line
+in dmesg.
 
 ### gpio: read-only bank access
 
