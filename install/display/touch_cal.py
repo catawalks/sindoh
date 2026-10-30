@@ -6,7 +6,8 @@ import fcntl, os, select, struct, sys, time
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 PW, PH = 480, 800          # portrait, as the user sees it
-FB, EV = '/dev/fb0', '/dev/event0'
+FB = '/dev/fb0'
+EV = next((p for p in ('/dev/event0', '/dev/input/event0') if os.path.exists(p)), '/dev/event0')
 INSET = 50
 TARGETS = [(INSET, INSET), (PW - INSET, INSET), (PW - INSET, PH - INSET), (INSET, PH - INSET)]
 NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
