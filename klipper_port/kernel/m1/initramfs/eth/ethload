@@ -30,7 +30,7 @@ while [ "$(cat /sys/class/net/eth0/carrier 2>/dev/null)" != 1 ]; do
 	sleep 1
 done
 if [ $mode = dhcp ]; then
-	udhcpc -i eth0 -n -q -t 10 || exit 1
+	udhcpc -i eth0 -n -q -t 10 -s /usr/share/udhcpc/default.script || exit 1
 else
 	ifconfig eth0 10.10.0.250 netmask 255.255.255.0 up
 fi

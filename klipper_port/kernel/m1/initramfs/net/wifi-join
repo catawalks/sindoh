@@ -44,7 +44,7 @@ while ! iw dev $IF link | grep -q '^Connected'; do
 done
 iw dev $IF link | grep -E 'Connected|SSID|freq|signal'
 
-udhcpc -i $IF -n -q -t 10 || exit 1
+udhcpc -i $IF -n -q -t 10 -s /usr/share/udhcpc/default.script || exit 1
 ifconfig $IF
 route -n
-echo "wifi-join: done. Next: netload <pc-address> [file] [kernel args]"
+echo "wifi-join: done"

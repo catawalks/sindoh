@@ -44,7 +44,7 @@ wsl -d Debian -- bash -c "VARIANT=upc bash /mnt/d/DP200/backup/klipper_port/kern
 | VARIANT | Output | Adds on top of the base image |
 |---|---|---|
 | `base` (default) | `m1.uimg` | Milestone 1 + SMP, panel, USB, Wi-Fi scan, webcam |
-| `net` | `m1-net.uimg` | Uniprocessor loader: `wifi-join` (wpa_supplicant, udhcpc) and `netload` (kexec-tools) |
+| `net` | `m1-net.uimg` | Wi-Fi (SMP): `wifi-join` (wpa_supplicant, udhcpc); loading kernels is m1-eth's job |
 | `upc` | `m1-upc.uimg` | `/dev/upc0`, `/dev/upc1` (`src/drivers/misc/mv61x0-upc.c`), PTYs, `upctool` |
 | `sd` | `m1-sd.uimg` | SD socket (`sdhci-mv61x0.c`), block layer, ext4/vfat, read-only use |
 | `gpio` | `m1-gpio.uimg` | GPIO banks A-H (`gpio-mv61x0.c`) registered, debugfs |
@@ -199,35 +199,33 @@ the DT node `memory-controller@fa300000` is enabled. The A/B test showed no
 measurable cost (docs/kernel/mcsync_ab_test.md). dmesg says "DDR
 write-buffer drain on mb()".
 
-### net: join Wi-Fi, then load kernels over the network
+### net: join Wi-Fi
+
+Passed in wifi_join_test1 (docs/kernel/wifi_join_test1.md, built as m1-net-smp).
 
 1. Boot it through the fast path:
    `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-net-zImage-dtb.bin`
-   (uniprocessor; Wi-Fi as in boot 7; eth0 also comes up, as 10.10.0.250).
-   The image contains the Marvell 8782 firmware. It's fine to serve it to
-   the printer on the LAN, but never publish it.
+   (SMP; eth0 also comes up, as 10.10.0.250). The image contains the
+   Marvell 8782 firmware. It's fine to serve it to the printer on the LAN,
+   but never publish it.
 2. At the shell, type `wifi-join`. It asks for the SSID and the passphrase
    (not echoed). Only the derived key lands in `/tmp`; nothing is stored in
    any image. The user types them; don't paste them into logs.
-3. **Success:** `iw dev mlan0 link` says "Connected", udhcpc prints a lease,
-   and `ping <pc-address>` answers.
-4. Optional, kexec over Wi-Fi: the fast path's server already serves
-   `D:\DP200\kernel\out` on port 8099, so on the printer type
-   `PORT=8099 netload <pc-address> m1-upc-zImage-dtb.bin`. netload fetches
-   the matching `.dtb` too. Kernels built since b1d198f are fine; the
-   watchdog is armed only by m1-eth's netload, not here.
-5. Leaving: `reboot -f` (or the next `tools/eth_kernel_boot.sh` run, whose
+3. **Success:** `iw dev mlan0 link` says "Connected", and udhcpc applies the
+   lease to mlan0 (address and default route; BusyBox's default script path
+   was empty before, test 1). With `ifconfig eth0 down`, ping the router and
+   wget a file from the PC.
+4. Leaving: `reboot -f` (or the next `tools/eth_kernel_boot.sh` run, whose
    `--catch` does that) returns to U-Boot, then stock.
-6. **Success:** the new kernel's boot log on the serial console, in seconds
-   instead of a 17-min upload.
-7. **Known risk, untested:** the 88W8782 keeps its firmware running across
-   kexec. Patch 0004 then skips the download ("no boot ROM answer, assuming
-   the firmware runs"). If Wi-Fi fails in the kexec'd kernel, power-cycle
-   before the next Wi-Fi test.
+5. Why SMP and no netload here: the uniprocessor build (m1-net 68a96768)
+   loaded the firmware, but its first command (0xa9) timed out. Every SMP
+   build works. ARM kexec needs CPU hotplug on SMP, so kernels are loaded by
+   the Ethernet loader only. The UP failure itself is not understood yet.
 
 ### upc: the UPC driver (Klipper MCUs)
 
-1. Boot `m1-upc.uimg`, or `netload` it.
+1. Boot it through the fast path:
+   `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-upc-zImage-dtb.bin`.
 2. Automatic checks (`/etc/m1-variant.sh`) read back CPUSoftReset (must be
    0 = held), the first PWM CTRL words (bits 0 and 2 clear), the stepper
    CFG words (bit 0 set = driver off), and the UPC clock register 0xf8000180.
