@@ -59,3 +59,13 @@ corrects (the earlier raw T48 dump had 73 flips in 40 blocks), but the bytes
 weren't counted. All partitions stay read-only (flags 0x0). Next for NAND: BCH
 4-bit ECC to match stock's corrected reads (docs/kernel/nand_bch_plan.md), and
 a reviewed controller variant first.
+
+## NAND BCH read, 2026-10-30 afternoon (5cb7a42, fast path; the LAN is back on 10.10.0.x)
+
+ECC-mode (BCH 4/512) reads of mtd0: 62 of 64 blocks match the stock
+ECC-corrected dump. The 6 raw-diff blocks (11, 20, 21, 31, 52, 54) are now
+corrected; blocks 55 and 56 differ. ECC statistics: 11 corrected, 116 failed.
+The whole-mtd0 md5 is ce8823b9 (stock 298b7390). mtd3 in ECC mode: f8245f56,
+yet raw it is still exactly 8357ce02. So the BCH reads are mostly right; the
+failures are probably erased pages (blank pages report "failed" and may be
+mangled) or pages whose layout differs. Still read-only: no refusals.
