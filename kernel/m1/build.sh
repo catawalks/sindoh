@@ -38,7 +38,7 @@ JOBS=${JOBS:-$(nproc)}
 
 case $VARIANT in
 base)	USERSPACE="iw uvcgrab" ;;
-net)	USERSPACE="iw uvcgrab wpa kexec" ;;
+net)	USERSPACE="iw uvcgrab wpa" ;;
 upc)	USERSPACE="iw uvcgrab upctool" ;;
 sd|gpio) USERSPACE="iw uvcgrab" ;;
 eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
