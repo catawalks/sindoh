@@ -21,6 +21,12 @@ case $img in *.uimg) img=${img%.uimg}-zImage-dtb.bin ;; esac
 [ -f "$img" ] || { echo "$img: not found"; exit 1; }
 out=$(cd "$(dirname "$img")" && pwd)
 here=$(dirname "$0")
+# The loader arms a 60 s watchdog before kexec; kernels from before b1d198f
+# don't stop it and would be reset mid-test. Their vmlinux lacks this string.
+vml=${img%-zImage-dtb.bin}-vmlinux
+if [ -f "$vml" ] && ! grep -aq "stopped the watchdog the loader armed" "$vml"; then
+	echo "$(basename "$img") predates the watchdog stop: rebuild it"; exit 1
+fi
 loader=$out/m1-eth.uimg
 [ -f "$loader" ] || { echo "$loader: not found (VARIANT=eth build.sh)"; exit 1; }
 

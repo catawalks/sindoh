@@ -1,10 +1,12 @@
 #!/bin/sh
 # Ethernet loader checks (replaces the full m1-checks.sh in this variant),
 # then the fast path: unless stopped, run ethload with the defaults from
-# /etc/ethload.conf (build.sh: ETHLOAD_PC, ETHLOAD_PORT, ETHLOAD_FILE) to
+# /etc/ethload.conf (build.sh: ETHLOAD_PC, ETHLOAD_PORT, ETHLOAD_FILE,
+# ETHLOAD_WDT) to
 # kexec the kernel the PC serves. Kernel arguments override them:
 # ethload.pc=ADDR ethload.port=N ethload.file=NAME, ethload.off skips it.
-# ethload.wdt=SECONDS sets netload's KEXEC_WDT (proposed; off by default).
+# ethload.wdt=SECONDS overrides the kexec watchdog (conf WDT, default 60;
+# 0 turns it off).
 echo
 echo "=== DP200 eth loader: $(uname -a)"
 echo "--- cmdline: $(cat /proc/cmdline)"
@@ -12,7 +14,6 @@ echo "--- MDIO PHYs: $(for p in /sys/bus/mdio_bus/devices/*:*; do echo "$p $(cat
 echo "--- PHY reset GPIO 62 (bank B bit 30): in $(devmem 0xf8041000) out $(devmem 0xf8041004) dir $(devmem 0xf8041008) pincfg $(devmem 0xf80410f8)"
 
 PC= PORT=8000 FILE= AUTO=1
-unset KEXEC_WDT
 [ -f /etc/ethload.conf ] && . /etc/ethload.conf
 for a in $(cat /proc/cmdline); do
 	case $a in

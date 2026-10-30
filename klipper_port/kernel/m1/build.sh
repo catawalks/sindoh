@@ -202,12 +202,13 @@ if [ -d "$M1/initramfs/$VARIANT" ]; then
 		tr -d '\r' < "$f" > "$IRFS/$(basename "$f")"
 	done
 fi
-# eth: the fast path's defaults (the PC's HTTP server and the file name
-# tools/eth_kernel_boot.sh publishes the next test kernel under)
+# eth: the fast path's defaults (the PC's HTTP server, the file name
+# tools/eth_kernel_boot.sh publishes the next test kernel under, and the
+# kexec watchdog in seconds: user-approved 2026-10-29, 0 turns it off)
 if [ "$VARIANT" = eth ]; then
-	printf 'PC=%s\nPORT=%s\nFILE=%s\n' "${ETHLOAD_PC:-10.10.0.85}" \
+	printf 'PC=%s\nPORT=%s\nFILE=%s\nWDT=%s\n' "${ETHLOAD_PC:-10.10.0.85}" \
 		"${ETHLOAD_PORT:-8099}" "${ETHLOAD_FILE:-next-zImage-dtb.bin}" \
-		> "$IRFS/ethload.conf"
+		"${ETHLOAD_WDT:-60}" > "$IRFS/ethload.conf"
 fi
 {
 	echo "dir /dev 0755 0 0"
