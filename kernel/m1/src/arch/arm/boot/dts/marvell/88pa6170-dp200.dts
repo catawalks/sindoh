@@ -141,15 +141,13 @@
 		 * erase and mark-bad paths return -EROFS, and the controller
 		 * driver refuses program/erase/SET_FEATURES commands. No BBT,
 		 * no bad-block markers read. Partitions as the stock mtdparts,
-		 * all read-only. ECC: the on-host Hamming engine (1 bit per
-		 * 512 bytes, the NFCv1 layout), used only for its raw read path
-		 * (mtdraw, MTD_FILE_MODE_RAW): stock wrote the pages with BCH
-		 * 4/512 (docs/kernel/nand_bch_plan.md), so ECC-mode reads
-		 * report uncorrectable errors. With ECC "none", marvell_nand on
-		 * NFCv1 cannot read pages at all.
+		 * all read-only. ECC: the controller's BCH as stock uses it, 4
+		 * bits per 512 bytes in one 2048-byte chunk (32 spare + 30 ECC
+		 * bytes), read with 3-word commands (patch 0006, bch_v1;
+		 * docs/kernel/nand_bch_plan.md). Raw reads: mtdraw.
 		 */
 		nand_controller: nand-controller@f9082000 {
-			compatible = "marvell,pxa3xx-nand-controller";
+			compatible = "marvell,88pa6170-nand-controller";
 			reg = <0xf9082000 0x200>;
 			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&nfc_clk>;
@@ -161,7 +159,7 @@
 				reg = <0>;
 				nand-rb = <0>;
 				nand-ecc-mode = "hw";
-				nand-ecc-strength = <1>;
+				nand-ecc-strength = <4>;
 				nand-ecc-step-size = <512>;
 				marvell,nand-keep-config;
 

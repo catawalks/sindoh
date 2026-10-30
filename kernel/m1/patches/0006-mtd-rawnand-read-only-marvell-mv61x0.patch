@@ -27,7 +27,27 @@ diff -ru a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
 diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
 --- a/drivers/mtd/nand/raw/marvell_nand.c
 +++ b/drivers/mtd/nand/raw/marvell_nand.c
-@@ -639,12 +639,48 @@
+@@ -377,6 +377,11 @@
+  *			NDCB3 register has been added
+  * @use_dma:		Use dma for data transfers
+  * @max_mode_number:	Maximum timing mode supported by the controller
++ * @bch_v1:		NFCv1 command handling (three NDCB0 words, no
++ *			LEN_OVRD) with a BCH engine, as on the Marvell
++ *			88PA6170: BCH is allowed for the 2048 B / 4-bit per
++ *			512 B layout only, read through the monolithic
++ *			Hamming helpers, and never written
+  */
+ struct marvell_nfc_caps {
+ 	unsigned int max_cs_nb;
+@@ -386,6 +391,7 @@
+ 	bool is_nfcv2;
+ 	bool use_dma;
+ 	unsigned int max_mode_number;
++	bool bch_v1;
+ };
+ 
+ /**
+@@ -639,12 +645,48 @@
  	return 0;
  }
  
@@ -76,6 +96,89 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
  	dev_dbg(nfc->dev, "\nNDCR:  0x%08x\n"
  		"NDCB0: 0x%08x\nNDCB1: 0x%08x\nNDCB2: 0x%08x\nNDCB3: 0x%08x\n",
  		(u32)readl_relaxed(nfc->regs + NDCR), nfc_op->ndcb[0],
+@@ -2244,6 +2286,18 @@
+ 	.free = marvell_nand_ooblayout_free,
+ };
+ 
++/* bch_v1 controllers are read-only */
++static int marvell_nfc_ro_write_page(struct nand_chip *chip, const u8 *buf,
++				     int oob_required, int page)
++{
++	return -EROFS;
++}
++
++static int marvell_nfc_ro_write_oob(struct nand_chip *chip, int page)
++{
++	return -EROFS;
++}
++
+ static int marvell_nand_hw_ecc_controller_init(struct mtd_info *mtd,
+ 					       struct nand_ecc_ctrl *ecc)
+ {
+@@ -2271,7 +2325,9 @@
+ 	}
+ 
+ 	if (!to_marvell_nand(chip)->layout ||
+-	    (!nfc->caps->is_nfcv2 && ecc->strength > 1)) {
++	    (!nfc->caps->is_nfcv2 && ecc->strength > 1 &&
++	     !(nfc->caps->bch_v1 && l->writesize == 2048 &&
++	       l->strength == 4 && l->nchunks == 1))) {
+ 		dev_err(nfc->dev,
+ 			"ECC strength %d at page size %d is not supported\n",
+ 			ecc->strength, mtd->writesize);
+@@ -2292,7 +2348,27 @@
+ 	ecc->steps = l->nchunks;
+ 	ecc->size = l->data_bytes;
+ 
+-	if (ecc->strength == 1) {
++	if (nfc->caps->bch_v1 && ecc->strength == 4) {
++		/*
++		 * 88PA6170: the BCH engine (NDECCCTRL_BCH_EN) with the
++		 * one-chunk 2048 B layout (32 spare + 30 ECC bytes). A page is
++		 * read the way the vendor driver does: one monolithic command,
++		 * three NDCB0 words, 2048 + 32 bytes with ECC on (+ 30 raw).
++		 * That is the Hamming helpers' transfer. The BCH chunk helpers
++		 * would need LEN_OVRD, which this controller does not have.
++		 * Read-only: the write hooks only return -EROFS.
++		 */
++		chip->ecc.algo = NAND_ECC_ALGO_BCH;
++		ecc->strength = 16;
++		ecc->read_page_raw = marvell_nfc_hw_ecc_hmg_read_page_raw;
++		ecc->read_page = marvell_nfc_hw_ecc_hmg_read_page;
++		ecc->read_oob_raw = marvell_nfc_hw_ecc_hmg_read_oob_raw;
++		ecc->read_oob = ecc->read_oob_raw;
++		ecc->write_page_raw = marvell_nfc_ro_write_page;
++		ecc->write_page = marvell_nfc_ro_write_page;
++		ecc->write_oob_raw = marvell_nfc_ro_write_oob;
++		ecc->write_oob = marvell_nfc_ro_write_oob;
++	} else if (ecc->strength == 1) {
+ 		chip->ecc.algo = NAND_ECC_ALGO_HAMMING;
+ 		ecc->read_page_raw = marvell_nfc_hw_ecc_hmg_read_page_raw;
+ 		ecc->read_page = marvell_nfc_hw_ecc_hmg_read_page;
+@@ -3113,6 +3189,12 @@
+ 	.use_dma = true,
+ };
+ 
++static const struct marvell_nfc_caps marvell_88pa6170_nfc_caps = {
++	.max_cs_nb = 2,
++	.max_rb_nb = 1,
++	.bch_v1 = true,
++};
++
+ static const struct marvell_nfc_caps marvell_armada_8k_nfc_legacy_caps = {
+ 	.max_cs_nb = 4,
+ 	.max_rb_nb = 2,
+@@ -3161,6 +3243,10 @@
+ 		.compatible = "marvell,pxa3xx-nand-controller",
+ 		.data = &marvell_pxa3xx_nfc_caps,
+ 	},
++	{
++		.compatible = "marvell,88pa6170-nand-controller",
++		.data = &marvell_88pa6170_nfc_caps,
++	},
+ 	/* Support for old/deprecated bindings: */
+ 	{
+ 		.compatible = "marvell,armada-8k-nand",
 diff -ru a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
 --- a/drivers/mtd/nand/raw/nand_base.c
 +++ b/drivers/mtd/nand/raw/nand_base.c

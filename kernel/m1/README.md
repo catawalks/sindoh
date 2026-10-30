@@ -313,19 +313,24 @@ The rest of the configuration:
 - no BBT is built and no bad-block marker is read (NAND_SKIP_BBTSCAN,
   NAND_NO_BBM_QUIRK), so probing needs no OOB access; there is no UBI and no
   mtdblock;
-- ECC: the on-host Hamming engine (1 bit per 512 bytes), the only one NFCv1
-  offers. With ECC "none", marvell_nand on NFCv1 cannot read pages at all
-  (retry 2: -ENOTSUPP). It is used for its raw read path only: `mtdraw`
-  (MTD_FILE_MODE_RAW, as `nanddump --noecc`). Stock wrote the pages with the
-  controller's BCH (4 bits per 512 bytes, one 2 KiB chunk, ECC at OOB 32-61),
-  so ECC-mode reads report uncorrectable errors (harmless, reads only).
-  Matching BCH needs a 3-word-command variant (docs/kernel/nand_bch_plan.md).
-  U-Boot's timings are kept (`marvell,nand-keep-config`).
+- ECC: the controller's BCH as stock uses it: 4 bits per 512 bytes in one
+  2048-byte chunk, with 32 spare and 30 ECC bytes (patch 0006 `bch_v1`,
+  compatible `marvell,88pa6170-nand-controller`).
+  - Pages are read the way the vendor driver reads them: one monolithic
+    command of three NDCB0 words, 2048 + 32 bytes. These are marvell_nand's
+    Hamming read helpers; the BCH chunk path needs a fourth word, which this
+    controller lacks.
+  - The write hooks return -EROFS.
+  - Raw reads go through `mtdraw` (MTD_FILE_MODE_RAW).
+  - U-Boot's timings are kept (`marvell,nand-keep-config`).
+  - Hamming raw reads (retry 3) gave mtd3 = 8357ce02 and 58 of 64 mtd0
+    blocks equal to stock.
 - the image is kept small for serial upload: no USB, Wi-Fi, media or
   firmware.
 
 `/etc/m1-variant.sh` prints /proc/mtd and each partition's flags, then
-grades each 128 KiB block of mtd0, read raw with `mtdraw`:
+grades each 128 KiB block of mtd0 in ECC mode (goal: all COR, whole-mtd0 md5
+298b7390...), then again raw with `mtdraw`:
 - **COR:** equals the ECC-corrected stock dump;
 - **RAW:** equals the raw T48 dump's bitflips;
 - **diff:** neither.
