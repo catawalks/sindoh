@@ -78,3 +78,12 @@ erased tail of mtd0 (all 0xFF in the stock dump). Reading block 57 returns 0xFF
 for the first page, then "Timeout on CMDD (NDSR: 0x00001800)": runs of erased
 pages still time out. mtd0 ECC md5 945ecc0c, mtd3 ECC md5 992ee6ae (raw
 8357ce02 exact). Still no refusals and no writes.
+
+## NAND BCH read 3, 2026-10-30: matches stock exactly (3bb33e7)
+
+Erased pages are now detected from a raw read and never sent through the BCH
+engine (which locked up after one). Fast-path run of zImage dd98f738:
+**mtd0 ECC-mode md5 298b7390 = stock nanddump**, all 64 blocks COR, and **mtd3
+8357ce02 = stock**. ECC statistics: 27 corrected, 0 failed. No refusals, no
+timeouts, nothing written. Mainline reads the DP200's NAND with stock's own
+BCH 4-bit/512 ECC.
