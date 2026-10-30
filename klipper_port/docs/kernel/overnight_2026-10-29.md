@@ -47,3 +47,15 @@ show "diff" and mtd3 hashes as the empty md5. With NAND_ECC_ENGINE_TYPE_NONE,
 marvell_nand on this NFCv1 can't run page reads at all. Next: the on-host
 Hamming engine (NFCv1 has it) with raw reads, to compare against the raw T48
 dump.
+
+## NAND retry 3, 2026-10-30 (6dac283: Hamming engine for the raw path + mtdraw)
+
+Serial upload of c78fbb91 (crc verified). **The read path works**: mtd3
+(boot-logo), read raw, md5 8357ce02 = stock's ECC-corrected dump exactly.
+58 of mtd0's 64 blocks are byte-identical to the ECC-corrected stock dump, and
+its first page matches (c1 de ed 1c ...). The other 6 blocks (11, 20, 21, 31,
+52, 54) match neither dump. Most likely they're raw bitflips that only ECC
+corrects (the earlier raw T48 dump had 73 flips in 40 blocks), but the bytes
+weren't counted. All partitions stay read-only (flags 0x0). Next for NAND: BCH
+4-bit ECC to match stock's corrected reads (docs/kernel/nand_bch_plan.md), and
+a reviewed controller variant first.

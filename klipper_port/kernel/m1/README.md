@@ -313,15 +313,19 @@ The rest of the configuration:
 - no BBT is built and no bad-block marker is read (NAND_SKIP_BBTSCAN,
   NAND_NO_BBM_QUIRK), so probing needs no OOB access; there is no UBI and no
   mtdblock;
-- ECC is off (raw page reads), and U-Boot's timings are kept
-  (`marvell,nand-keep-config`). Stock uses the controller's BCH (4 bits per
-  512 bytes, one 2 KiB chunk, ECC at OOB 32-61); mainline needs a
-  3-word-command variant for that (docs/kernel/nand_bch_plan.md).
+- ECC: the on-host Hamming engine (1 bit per 512 bytes), the only one NFCv1
+  offers. With ECC "none", marvell_nand on NFCv1 cannot read pages at all
+  (retry 2: -ENOTSUPP). It is used for its raw read path only: `mtdraw`
+  (MTD_FILE_MODE_RAW, as `nanddump --noecc`). Stock wrote the pages with the
+  controller's BCH (4 bits per 512 bytes, one 2 KiB chunk, ECC at OOB 32-61),
+  so ECC-mode reads report uncorrectable errors (harmless, reads only).
+  Matching BCH needs a 3-word-command variant (docs/kernel/nand_bch_plan.md).
+  U-Boot's timings are kept (`marvell,nand-keep-config`).
 - the image is kept small for serial upload: no USB, Wi-Fi, media or
   firmware.
 
 `/etc/m1-variant.sh` prints /proc/mtd and each partition's flags, then
-grades each 128 KiB block of mtd0:
+grades each 128 KiB block of mtd0, read raw with `mtdraw`:
 - **COR:** equals the ECC-corrected stock dump;
 - **RAW:** equals the raw T48 dump's bitflips;
 - **diff:** neither.
