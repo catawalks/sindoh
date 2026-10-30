@@ -26,8 +26,10 @@ except ImportError:
     net = None
 
 PW, PH = 480, 800                     # portrait, as mounted
-FB_W, FB_H = 800, 480                 # fb0 geometry (two pages: 800x960 virtual)
-FB, EV = '/dev/fb0', '/dev/event0'
+FB_W, FB_H = 800, 480                 # fb0 geometry (stock: two pages, 800x960 virtual)
+# Stock kernel 3.2 names the touch device /dev/event0; mainline uses /dev/input/event0
+FB = '/dev/fb0'
+EV = next((p for p in ('/dev/event0', '/dev/input/event0') if os.path.exists(p)), '/dev/event0')
 API = 'http://127.0.0.1:7125'
 FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
@@ -117,10 +119,24 @@ def rgb565(im):
     lo = ImageChops.add(g.point(_LUT[2]), b.point(_LUT[3]))
     return Image.merge('LA', (lo, hi)).tobytes()
 
+def fb_pages(path):
+    """Row offsets of the fb's pages: stock 3.2 has two (800x960 virtual),
+    mainline simplefb only one (800x480), and writing past its end fails."""
+    try:
+        with open('/sys/class/graphics/%s/virtual_size' % os.path.basename(path)) as f:
+            vh = int(f.read().split(',')[1])
+    except (OSError, ValueError, IndexError):
+        try:                                    # a plain file (tests): its size
+            vh = os.path.getsize(path) // (FB_W * 2)
+        except OSError:
+            vh = FB_H
+    return tuple(range(0, max(vh // FB_H, 1) * FB_H, FB_H))
+
 class Panel:
     def __init__(self, path=FB):
         self.f = open(path, 'r+b', buffering=0)
         self.prev = None
+        self.pages = fb_pages(path)
 
     def show(self, im):
         if self.prev is None:
@@ -135,7 +151,7 @@ class Panel:
         raw = rgb565(part)
         # portrait (u, v) -> fb (x = 799 - v, y = u)
         x0, w = FB_W - v1, v1 - v0
-        for page in (0, FB_H):                       # write both pages
+        for page in self.pages:                      # every page the fb has
             for row in range(u1 - u0):
                 self.f.seek(((page + u0 + row) * FB_W + x0) * 2)
                 self.f.write(raw[row * w * 2:(row + 1) * w * 2])

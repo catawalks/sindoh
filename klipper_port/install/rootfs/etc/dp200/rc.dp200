@@ -50,6 +50,8 @@ start_moonraker() {
 # Webcam: ustreamer passes the camera's own MJPEG through (no re-encoding).
 # Measured 2026-10-20: 640x480@15 costs ~8 % of one core; software JPEG
 # from YUYV (what the stock mjpg_streamer -y does) costs ~92 %.
+# (Kept on mainline too: built with COMPAT_32BIT_TIME, it still takes the
+# time32 ioctls, and the frame repair below is needed on any kernel.)
 # v4l2_time32_shim.so: Debian trixie is time64, kernel 3.2 only knows the
 # time32 v4l2_buffer layout. --device-timeout 5: the camera needs > 1 s to
 # deliver its first frame. Settings: /etc/dp200/webcam.conf.
@@ -82,7 +84,8 @@ start_webcam() {
 SCREEN_ENABLED=1
 [ -f /etc/dp200/screen.conf ] && . /etc/dp200/screen.conf
 start_screen() {
-    [ "$SCREEN_ENABLED" = 1 ] && [ -e /dev/fb0 ] && [ -e /dev/event0 ] || return 0
+    # touch: /dev/event0 on the vendor kernel, /dev/input/event0 on mainline
+    [ "$SCREEN_ENABLED" = 1 ] && [ -e /dev/fb0 ] && { [ -e /dev/event0 ] || [ -e /dev/input/event0 ]; } || return 0
     $SSD --start --background --make-pidfile --pidfile $RUN/screen.pid \
         --exec /bin/sh -- /etc/dp200/rc.dp200 screen-loop
 }
