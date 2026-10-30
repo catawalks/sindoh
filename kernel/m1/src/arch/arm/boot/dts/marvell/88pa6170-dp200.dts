@@ -243,8 +243,17 @@
 			compatible = "marvell,88pa6170-upc";
 			reg = <0xf9200000 0x10000>, <0xf9210000 0xb0000>,
 			      <0xf9304000 0x2100>, <0xf8150000 0x5000>,
-			      <0xf8000180 0x4>;
-			reg-names = "upc0", "upc1", "pwm", "smot", "apb";
+			      <0xf8000180 0x4>, <0xf80450d0 0x14>;
+			reg-names = "upc0", "upc1", "pwm", "smot", "apb",
+				    "xena-pads";
+			/*
+			 * xena-pads: GPIO bank 5 pin selects 20-24, the X, Y
+			 * (Z) endstop and cartridge-lever pads. Function 3
+			 * routes them to the XENA inputs (user-approved,
+			 * UPC test 2c); the driver sets them only with the
+			 * cores held and every output off.
+			 */
+			marvell,xena-pad-config = <0x00001003>;
 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
