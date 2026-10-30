@@ -59,6 +59,12 @@ if [ "${THUMB2:-0}" = 1 ]; then
 	NAME=$NAME-t2
 	KOUT=$KOUT-t2
 fi
+# SMP=1: SMP even for the uniprocessor variants (net, eth), e.g. to tell a
+# UP-only bug from a variant bug. No kexec then (ARM needs CPU hotplug).
+if [ "${SMP:-0}" = 1 ]; then
+	NAME=$NAME-smp
+	KOUT=$KOUT-smp
+fi
 
 KSRC=$WORK/linux-$KVER
 SYSROOT=$WORK/sysroot
@@ -260,6 +266,11 @@ mkdir -p "$KOUT"
 	fi
 	if [ "${THUMB2:-0}" = 1 ]; then
 		echo "CONFIG_THUMB2_KERNEL=y"
+	fi
+	if [ "${SMP:-0}" = 1 ]; then
+		echo "CONFIG_SMP=y"
+		echo "CONFIG_NR_CPUS=2"
+		echo "# CONFIG_KEXEC is not set"
 	fi
 } | sed "s#@INITRAMFS_LIST@#$IRFS/initramfs.list#" > "$KOUT/m1.config"
 (cd "$KSRC" && ARCH=arm CROSS_COMPILE=$CROSS \
