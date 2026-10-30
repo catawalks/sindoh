@@ -190,6 +190,23 @@ state, then waits.
    acts if it finds the watchdog armed; U-Boot leaves it off.
    `eth_kernel_boot.sh` refuses older images (checked in their vmlinux).
 
+### mcsync: the vendor's DDR write-buffer drain (A/B test)
+
+There is no PL310 L2. The vendor's only real "outer cache" op writes
+0x01010101 to the DDR controller at 0xfa300530 on every mb()/wmb(), which
+includes every writel(). mach-mv61x0 does the same from `soc_mb` when the
+DT node `memory-controller@fa300000` is enabled. It is disabled in the
+normal images. For every variant except eth, build.sh also writes
+`m1-<v>-mcsync-zImage-dtb.bin` and `m1-<v>-mcsync.dtb`: the same kernel with
+the node enabled.
+
+1. `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-sd-mcsync-zImage-dtb.bin`.
+2. **Success:** dmesg shows "DDR write-buffer drain on mb()", the board boots
+   as far as m1-sd does, and SD, Ethernet (wget + md5) and USB still work.
+   If it hangs after time_init, the watchdog is already stopped: power-cycle.
+3. Then compare throughput (e.g. `dd` from the SD card, wget) with plain m1-sd.
+   If there's no regression, enable the node by default to match stock.
+
 ### net: join Wi-Fi, then load kernels over the network
 
 1. Boot `m1-net.uimg` (uniprocessor; Wi-Fi as in boot 7).

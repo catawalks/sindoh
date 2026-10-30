@@ -102,6 +102,18 @@
 		#size-cells = <1>;
 		ranges;
 
+		/*
+		 * DDR controller. The vendor kernel writes 0x01010101 to +0x530
+		 * on every mb() (its "outer cache sync"); mv61x0.c does the same
+		 * from soc_mb when this node is enabled. Off until tested
+		 * (build.sh also emits m1*-mcsync images with it on).
+		 */
+		mc: memory-controller@fa300000 {
+			compatible = "marvell,88pa6170-ddr";
+			reg = <0xfa300000 0x1000>;
+			status = "disabled";
+		};
+
 		/* A9-style private region: SCU +0, GIC CPU +0x100, GIC dist +0x1000 */
 		scu@f8fe0000 {
 			compatible = "arm,cortex-a9-scu";

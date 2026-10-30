@@ -3,6 +3,7 @@ config ARCH_MV61X0
 	bool "Marvell 88PA61x0 printer SoCs"
 	depends on ARCH_MULTI_V7
 	select ARM_GIC
+	select ARM_HEAVY_MB
 	select CPU_PJ4B
 	select HAVE_ARM_SCU if SMP
 	select HAVE_ARM_TWD if SMP
