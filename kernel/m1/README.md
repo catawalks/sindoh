@@ -345,6 +345,18 @@ It also prints the raw md5 of mtd3 (stock ECC-corrected 8357ce02...).
 dump, including the erased blocks 55-63), and no "read-only: refused" line
 in dmesg.
 
+### ubi: the stock root UBI/UBIFS, read-only (built, not booted)
+
+`m1-ubi` is the proven nand image plus UBI and UBIFS. UBI runs in ro_mode
+by itself on an MTD without MTD_WRITEABLE (drivers/mtd/ubi/build.c), UBIFS is
+mounted `-o ro`, and there is no fastmap and no mtdblock. `/etc/m1-variant.sh`
+attaches mtd6 ("filesystem") and checks ubi0's ro_mode (must be 1). It then
+mounts ubi0:filesystem read-only on /mnt/ubi and compares four stock files
+(libc-2.15.so, app/upc.ko, bin/busybox, etc/inittab) with the rootfs dumps.
+Bad-block markers are not read (patch 0006), so the 5 bad PEBs may show up
+as "corrupted" in UBI's attach log. That is expected; UBI refuses only at
+10 or more.
+
 ### gpio: read-only bank access
 
 `m1-gpio` registers banks A-H with `marvell,read-only`:

@@ -42,10 +42,10 @@ net)	USERSPACE="iw uvcgrab wpa" ;;
 upc)	USERSPACE="iw uvcgrab upctool" ;;
 sd|gpio) USERSPACE="iw uvcgrab" ;;
 i2c)	USERSPACE="" ;;		# read-only bring-up images
-nand)	USERSPACE="mtdraw" ;;
+nand|ubi) USERSPACE="mtdraw" ;;
 full)	USERSPACE="iw uvcgrab wpa upctool" ;;
 eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
-*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand full eth)" >&2; exit 1 ;;
+*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand ubi full eth)" >&2; exit 1 ;;
 esac
 if [ "$VARIANT" = base ]; then
 	NAME=m1
@@ -199,7 +199,7 @@ for u in $USERSPACE; do "build_$u"; done
 # 5. Wi-Fi firmware from the stock rootfs (a Marvell binary: never commit
 #    it, and don't publish the images that contain it)
 FW8782=${FW8782:-/mnt/d/DP200/backup/171114_4_open/lib/firmware/mrvl/usb8782_uapsta.bin}
-case $VARIANT in eth|i2c|nand) NOFW=1 ;; *) NOFW=0 ;; esac
+case $VARIANT in eth|i2c|nand|ubi) NOFW=1 ;; *) NOFW=0 ;; esac
 if [ $NOFW = 0 ]; then
 	echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
 fi
