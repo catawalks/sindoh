@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * full variant: SD, UPC, GPIO (read-only), I2C bus 2 and the RTC
- * (read-only) enabled; consoleblank=0 for the panel console.
+ * full variant: SD, UPC, GPIO (read-only), I2C bus 2, the RTC (read-only)
+ * and the NAND (read-only) enabled; consoleblank=0 for the panel console.
  */
 #include "88pa6170-dp200.dts"
 
@@ -13,6 +13,7 @@
 &upc { status = "okay"; };
 &i2c2 { status = "okay"; };
 &rtc { status = "okay"; };
+&nand_controller { status = "okay"; };
 &gpio0 { status = "okay"; marvell,read-only; };
 &gpio1 { status = "okay"; marvell,read-only; };
 &gpio2 { status = "okay"; marvell,read-only; };
