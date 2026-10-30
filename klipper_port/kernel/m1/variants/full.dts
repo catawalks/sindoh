@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * full variant: SD, UPC, GPIO (read-only), I2C bus 2 and the RTC
+ * (read-only) enabled; consoleblank=0 for the panel console.
+ */
+#include "88pa6170-dp200.dts"
+
+&{/chosen} {
+	bootargs = "console=tty0 console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 rdinit=/init panic=10 consoleblank=0";
+};
+
+&sdhci0 { status = "okay"; };
+&upc { status = "okay"; };
+&i2c2 { status = "okay"; };
+&rtc { status = "okay"; };
+&gpio0 { status = "okay"; marvell,read-only; };
+&gpio1 { status = "okay"; marvell,read-only; };
+&gpio2 { status = "okay"; marvell,read-only; };
+&gpio3 { status = "okay"; marvell,read-only; };
+&gpio4 { status = "okay"; marvell,read-only; };
+&gpio5 { status = "okay"; marvell,read-only; };
+&gpio6 { status = "okay"; marvell,read-only; };
+&gpio7 { status = "okay"; marvell,read-only; };

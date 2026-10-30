@@ -1,0 +1,29 @@
+diff -ru a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1685,6 +1685,14 @@
+ 	  This driver can also be built as a module. If so, the module
+ 	  will be called rtc-mv.
+ 
++config RTC_DRV_MV61X0
++	tristate "Marvell 88PA61x0 RTC (read-only)"
++	depends on ARCH_MV61X0 || COMPILE_TEST
++	depends on OF && HAS_IOMEM
++	help
++	  The seconds counter of the Marvell 88PA61x0 printer SoCs (Sindoh
++	  DP200), read-only: the time can be read, never set.
++
+ config RTC_DRV_ARMADA38X
+ 	tristate "Armada 38x Marvell SoC RTC"
+ 	depends on ARCH_MVEBU || COMPILE_TEST
+diff -ru a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -115,6 +115,7 @@
+ obj-$(CONFIG_RTC_DRV_MT6397)	+= rtc-mt6397.o
+ obj-$(CONFIG_RTC_DRV_MT7622)	+= rtc-mt7622.o
+ obj-$(CONFIG_RTC_DRV_MV)	+= rtc-mv.o
++obj-$(CONFIG_RTC_DRV_MV61X0)	+= rtc-mv61x0.o
+ obj-$(CONFIG_RTC_DRV_MXC)	+= rtc-mxc.o
+ obj-$(CONFIG_RTC_DRV_MXC_V2)	+= rtc-mxc_v2.o
+ obj-$(CONFIG_RTC_DRV_GAMECUBE)	+= rtc-gamecube.o

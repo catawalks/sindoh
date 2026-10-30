@@ -343,6 +343,24 @@ in dmesg.
 
 `/etc/m1-variant.sh` exports and reads bank 4 lines 1 and 10 and the X endstop pad (bank 5 line 20) through /sys/class/gpio, comparing each with the input register. It shows that an Ethernet RGMII pad (bank 1 line 16) is refused, and that `echo out > direction` is refused with the direction register unchanged.
 
+### full: the proven pieces together (built, not booted)
+
+`m1-full` (SMP) combines the proven variants, towards booting the Debian root
+(docs/mainline_userspace.md):
+- the SD socket with ext4 and vfat;
+- the UPC driver, with the XENA input pads;
+- GPIO, read-only;
+- I2C bus 2, with no touchscreen driver yet;
+- Wi-Fi with wifi-join;
+- the RTC (rtc-mv61x0, read-only);
+- evdev and USB CDC-ACM;
+- `consoleblank=0`.
+
+UBI/UBIFS come later. The RTC driver only reads the seconds counter at
+0xf8100000 + 0x0c and logs whether it is counting. The vendor's setup
+sequence is a proposal (docs/kernel/rtc_setup.md). `/etc/m1-variant.sh`
+prints one line per block. Check each against that variant's own card.
+
 ### sd: the SD socket, read-only
 
 0. Pre-check, read-only, before spending a boot: at the U-Boot prompt
