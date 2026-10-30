@@ -41,8 +41,9 @@ base)	USERSPACE="iw uvcgrab" ;;
 net)	USERSPACE="iw uvcgrab wpa" ;;
 upc)	USERSPACE="iw uvcgrab upctool" ;;
 sd|gpio) USERSPACE="iw uvcgrab" ;;
+i2c|nand) USERSPACE="" ;;	# read-only bring-up images
 eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
-*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio eth)" >&2; exit 1 ;;
+*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand eth)" >&2; exit 1 ;;
 esac
 if [ "$VARIANT" = base ]; then
 	NAME=m1

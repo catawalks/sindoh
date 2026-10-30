@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
+/* nand variant: the base board with the NAND controller, read-only */
+#include "88pa6170-dp200.dts"
+
+&nand_controller { status = "okay"; };

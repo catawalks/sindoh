@@ -287,6 +287,50 @@ future request.
    `upctool bridge`, then heaters and motion
    (`docs/kernel/upc_mainline_design.md`, bring-up order).
 
+### i2c: touch controller, read-only
+
+`m1-i2c` registers DesignWare I2C bus 2 (0xf80a2000, vendor
+i2c_designware.2, 400 MHz input clock, 100 kHz). The touch controller is a
+ROHM BU21029GUL at 0x40. Bus 3 (the filament cartridge chip "Smart-IC" at
+0x30) stays disabled. No touchscreen driver is built: bu21029_ts writes the
+chip's configuration at probe. `/etc/m1-variant.sh` shows the controller's
+registers and the touch reset line (GPIO 66, bank 2 bit 2), then probes 0x40
+with a plain read (`i2cdetect -y -r 2 0x40 0x40`).
+- **Success:** the address answers (40). No answer most likely means the chip is held in
+  reset: stock drives GPIO 66 high (rohm_ts_probe), while U-Boot leaves that
+  pad in function 1. Driving it is a new pin write, so it needs a proposal.
+
+### nand: whole chip read-only
+
+`m1-nand` binds marvell_nand to the PXA3xx-style controller at 0xf9082000,
+with patch 0006 (`CONFIG_MTD_RAW_NAND_READ_ONLY`):
+- the chip is registered as ROM, so MTD_WRITEABLE is clear and the mtd core refuses write, erase and markbad;
+- nand_erase_nand, nand_do_write_ops, nand_do_write_oob, nand_block_markbad_lowlevel and panic_nand_write return -EROFS;
+- marvell_nfc_send_cmd() refuses, before it touches NDCB0, every program or erase command type and any SEQIN, PAGEPROG, CACHEDPROG, ERASE1/2, RNDIN or SET_FEATURES command byte.
+
+The rest of the configuration:
+- the partitions are the stock mtdparts, each `read-only`;
+- there is no on-flash BBT, no UBI and no mtdblock;
+- ECC is off (raw page reads), and U-Boot's timings are kept (`marvell,nand-keep-config`).
+
+`/etc/m1-variant.sh` prints /proc/mtd, each partition's flags, and the md5 of
+the raw mtd0 (8 MiB) and mtd3 (1 MiB). Compare them with the stock dumps
+(`nanddump -o -b`, ECC-corrected; nand_images/md5sums.txt): mtd0 298b7390...,
+mtd3 e106bfe3....
+- **A match proves the read path.** If it doesn't match, wget the dump from the PC (copy
+  nand_images/mtd3.bin into D:\DP200\kernel\out) and count the differing
+  bytes (`cmp -l /tmp/m3 /tmp/ref | wc -l`). A handful of single-bit
+  differences is raw-read bitflips; whole pages different means a layout or
+  ECC question.
+
+### gpio: read-only bank access
+
+`m1-gpio` registers banks A-H with `marvell,read-only`:
+- requesting a line whose pin has another function fails (-EBUSY), so the pin mux is untouched;
+- direction-out and set fail (-EPERM).
+
+`/etc/m1-variant.sh` exports and reads bank 4 lines 1 and 10 and the X endstop pad (bank 5 line 20) through /sys/class/gpio, comparing each with the input register. It shows that an Ethernet RGMII pad (bank 1 line 16) is refused, and that `echo out > direction` is refused with the direction register unchanged.
+
 ### sd: the SD socket, read-only
 
 0. Pre-check, read-only, before spending a boot: at the U-Boot prompt

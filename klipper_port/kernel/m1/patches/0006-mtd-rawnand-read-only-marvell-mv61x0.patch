@@ -1,0 +1,137 @@
+diff -ru a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
+--- a/drivers/mtd/nand/raw/Kconfig
++++ b/drivers/mtd/nand/raw/Kconfig
+@@ -124,9 +124,20 @@
+ 	  No board specific support is done by this driver, each board
+ 	  must advertise a platform_device for the driver to attach.
+ 
++config MTD_RAW_NAND_READ_ONLY
++	bool "Never program or erase raw NAND (bring-up)"
++	help
++	  Make every raw NAND chip read-only, whatever the device tree and
++	  user space ask for: the chip is registered as ROM (no
++	  MTD_WRITEABLE), the nand_base write, OOB write, erase and
++	  mark-bad paths return -EROFS, and controller drivers that check
++	  this option refuse program and erase commands at the hardware.
++	  For bringing up a controller on a board whose NAND holds the only
++	  copy of its firmware.
++
+ config MTD_NAND_MARVELL
+ 	tristate "Marvell EBU NAND controller"
+-	depends on PXA3xx || ARCH_MMP || PLAT_ORION || ARCH_MVEBU || \
++	depends on PXA3xx || ARCH_MMP || PLAT_ORION || ARCH_MVEBU || ARCH_MV61X0 || \
+ 		   COMPILE_TEST
+ 	depends on HAS_IOMEM
+ 	help
+diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -639,12 +639,45 @@
+ 	return 0;
+ }
+ 
++/*
++ * CONFIG_MTD_RAW_NAND_READ_ONLY: true for any command that could change
++ * the flash. Program and erase cycles, page loads (SEQIN, RNDIN) and
++ * SET_FEATURES, whether sent as monolithic program/erase types or as
++ * naked commands.
++ */
++static bool marvell_nfc_cmd_may_write(u32 ndcb0)
++{
++	static const u8 cmds[] = { NAND_CMD_SEQIN, NAND_CMD_PAGEPROG,
++				   NAND_CMD_CACHEDPROG, NAND_CMD_ERASE1,
++				   NAND_CMD_ERASE2, NAND_CMD_RNDIN,
++				   NAND_CMD_SET_FEATURES };
++	u32 type = (ndcb0 >> 21) & TYPE_MASK;
++	unsigned int i;
++
++	if (type == TYPE_WRITE || type == TYPE_ERASE)
++		return true;
++	for (i = 0; i < ARRAY_SIZE(cmds); i++)
++		if ((ndcb0 & 0xff) == cmds[i] ||
++		    ((ndcb0 & NDCB0_DBC) && ((ndcb0 >> 8) & 0xff) == cmds[i]))
++			return true;
++	return false;
++}
++
+ static void marvell_nfc_send_cmd(struct nand_chip *chip,
+ 				 struct marvell_nfc_op *nfc_op)
+ {
+ 	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
+ 	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
+ 
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY) &&
++	    marvell_nfc_cmd_may_write(nfc_op->ndcb[0])) {
++		dev_err_ratelimited(nfc->dev,
++				    "read-only: refused NDCB0 0x%08x\n",
++				    nfc_op->ndcb[0]);
++		WARN_ON_ONCE(1);
++		return;
++	}
++
+ 	dev_dbg(nfc->dev, "\nNDCR:  0x%08x\n"
+ 		"NDCB0: 0x%08x\nNDCB1: 0x%08x\nNDCB2: 0x%08x\nNDCB3: 0x%08x\n",
+ 		(u32)readl_relaxed(nfc->regs + NDCR), nfc_op->ndcb[0],
+diff -ru a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+--- a/drivers/mtd/nand/raw/nand_base.c
++++ b/drivers/mtd/nand/raw/nand_base.c
+@@ -430,6 +430,9 @@
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	int chipnr, page, status, len, ret;
+ 
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
++		return -EROFS;
++
+ 	pr_debug("%s: to = 0x%08x, len = %i\n",
+ 			 __func__, (unsigned int)to, (int)ops->ooblen);
+ 
+@@ -570,6 +573,9 @@
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	int res, ret = 0;
+ 
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
++		return -EROFS;
++
+ 	if (!(chip->bbt_options & NAND_BBT_NO_OOB_BBM)) {
+ 		struct erase_info einfo;
+ 
+@@ -4319,6 +4325,9 @@
+ 	int ret;
+ 	int oob_required = oob ? 1 : 0;
+ 
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
++		return -EROFS;
++
+ 	ops->retlen = 0;
+ 	if (!writelen)
+ 		return 0;
+@@ -4448,6 +4457,9 @@
+ 	struct mtd_oob_ops ops;
+ 	int ret;
+ 
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
++		return -EROFS;
++
+ 	nand_select_target(chip, chipnr);
+ 
+ 	/* Wait for the device to get ready */
+@@ -4526,6 +4538,9 @@
+ 	int page, pages_per_block, ret, chipnr;
+ 	loff_t len;
+ 
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
++		return -EROFS;
++
+ 	pr_debug("%s: start = 0x%012llx, len = %llu\n",
+ 			__func__, (unsigned long long)instr->addr,
+ 			(unsigned long long)instr->len);
+@@ -6418,6 +6433,9 @@
+ 	if (ret)
+ 		goto err_nand_manuf_cleanup;
+ 
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
++		chip->options |= NAND_ROM;
++
+ 	/* Adjust the MTD_CAP_ flags when NAND_ROM is set. */
+ 	if (chip->options & NAND_ROM)
+ 		mtd->flags = MTD_CAP_ROM;
