@@ -139,9 +139,14 @@
 		 * The nand variant enables it with CONFIG_MTD_RAW_NAND_READ_ONLY
 		 * (patch 0006): the chip is registered as ROM, nand_base write,
 		 * erase and mark-bad paths return -EROFS, and the controller
-		 * driver refuses program/erase/SET_FEATURES commands. ECC is off
-		 * (raw page reads) until the vendor's ECC layout is known. No
-		 * on-flash BBT. Partitions as the stock mtdparts, all read-only.
+		 * driver refuses program/erase/SET_FEATURES commands. No BBT,
+		 * no bad-block markers read. Partitions as the stock mtdparts,
+		 * all read-only. ECC: the on-host Hamming engine (1 bit per
+		 * 512 bytes, the NFCv1 layout), used only for its raw read path
+		 * (mtdraw, MTD_FILE_MODE_RAW): stock wrote the pages with BCH
+		 * 4/512 (docs/kernel/nand_bch_plan.md), so ECC-mode reads
+		 * report uncorrectable errors. With ECC "none", marvell_nand on
+		 * NFCv1 cannot read pages at all.
 		 */
 		nand_controller: nand-controller@f9082000 {
 			compatible = "marvell,pxa3xx-nand-controller";
@@ -155,7 +160,9 @@
 			nand@0 {
 				reg = <0>;
 				nand-rb = <0>;
-				nand-ecc-mode = "none";
+				nand-ecc-mode = "hw";
+				nand-ecc-strength = <1>;
+				nand-ecc-step-size = <512>;
 				marvell,nand-keep-config;
 
 				partitions {

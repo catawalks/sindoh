@@ -41,7 +41,8 @@ base)	USERSPACE="iw uvcgrab" ;;
 net)	USERSPACE="iw uvcgrab wpa" ;;
 upc)	USERSPACE="iw uvcgrab upctool" ;;
 sd|gpio) USERSPACE="iw uvcgrab" ;;
-i2c|nand) USERSPACE="" ;;	# read-only bring-up images
+i2c)	USERSPACE="" ;;		# read-only bring-up images
+nand)	USERSPACE="mtdraw" ;;
 eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
 *)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand eth)" >&2; exit 1 ;;
 esac
@@ -188,6 +189,10 @@ build_upctool() {	# host/upctool, the stock-compatible UPC tool
 		"$M1/../../host/upctool.c"
 	${CROSS}strip "$WORK/upctool"
 }
+build_mtdraw() {	# raw (no-ECC) reads of /dev/mtdN, as nanddump --noecc
+	"$MUSLCC" -static -Os -Wall -o "$WORK/mtdraw" "$M1/tools/mtdraw.c"
+	${CROSS}strip "$WORK/mtdraw"
+}
 for u in $USERSPACE; do "build_$u"; done
 
 # 5. Wi-Fi firmware from the stock rootfs (a Marvell binary: never commit
@@ -255,6 +260,7 @@ fi
 		case $u in
 		iw)	echo "file /usr/sbin/iw $IW/iw 0755 0 0" ;;
 		uvcgrab) echo "file /usr/bin/uvcgrab $WORK/uvcgrab 0755 0 0" ;;
+		mtdraw)	echo "file /usr/bin/mtdraw $WORK/mtdraw 0755 0 0" ;;
 		wpa)	echo "file /usr/sbin/wpa_supplicant $WPA/wpa_supplicant 0755 0 0"
 			echo "file /usr/bin/wpa_passphrase $WPA/wpa_passphrase 0755 0 0"
 			echo "file /usr/bin/wifi-join $IRFS/wifi-join 0755 0 0"
