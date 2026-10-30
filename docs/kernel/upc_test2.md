@@ -42,3 +42,26 @@ XIRD = 0x3C040000 and XIRD1 = 0x00004000 (xena46 filament = 1, empty). So the
 inputs are live with no firmware init at all: the firmware-init hypothesis
 (xena-init.sh.proposed) is refuted. The gap is on the Linux side; the stock pin
 functions on banks 4/5 are the main suspect. Raw dump: xena_dump_stock.txt.
+
+## Test 2c (2026-10-29): endstop inputs fixed with 5 pad functions
+
+Pad map (read-only, cores held, the user blocking the optical sensors; GPIO
+bank 5 input register 0xf8045000): X sensor = bank 5 pin 20, Y = pin 21
+(both 0 -> 1 when blocked), cartridge sensor = pin 23 (1 -> 0 when lifted).
+Pin 22 is almost certainly Z (couldn't be reached past the bed). The bank 1/2
+bits flicker constantly from Ethernet/LCD traffic.
+
+The user approved: bank 5 pins 20-24 select 0x000C1000 -> 0x00001003 (the stock function 3),
+written only after the safety check (CPUSoftReset 0, PWM run/level 0, stepper
+CFG bit 0 = 1), and the check passed again afterwards. Direction register untouched
+(0x80000000).
+
+Result, with the cores held and no firmware: XIRD1 = 0x00004000 at rest (= stock).
+X blocked -> 0x00004400 (bit 10, xena42), Y blocked -> 0x00004800 (bit 11,
+xena43), cartridge lifted -> 0x00000000 (bit 14, xena46). These match the stock
+mapping in docs/hardware_notes.md. XIRD stays 0 (stock 0x3c040000: other
+inputs on other pads, not needed for homing).
+
+Next: make these 5 writes part of the m1-upc boot (driver or init script),
+check the Z pad when the bed is out of the way, and then decide on the
+remaining stock pad functions one group at a time.
