@@ -195,6 +195,12 @@ FW8782=${FW8782:-/mnt/d/DP200/backup/171114_4_open/lib/firmware/mrvl/usb8782_uap
 if [ "$VARIANT" != eth ]; then
 	echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
 fi
+if [ "$VARIANT" = upc ]; then
+	(cd "$M1/../../prebuilt" && md5sum -c --quiet) <<-EOF
+	96cddffd5fccf68ca6e742b8ee783708  probe_io.bin
+	1ec429d52b1a15dae194fbb8b579c1cc  probe_fm.bin
+	EOF
+fi
 
 # 6. Initramfs list (gen_init_cpio format), applet links from busybox.links
 rm -rf "$IRFS" && mkdir -p "$IRFS"
@@ -249,7 +255,13 @@ fi
 			;;
 		kexec)	echo "file /usr/sbin/kexec $KX/build/sbin/kexec 0755 0 0"
 			echo "file /usr/bin/netload $IRFS/netload 0755 0 0" ;;
-		upctool) echo "file /usr/bin/upctool $WORK/upctool 0755 0 0" ;;
+		upctool) echo "file /usr/bin/upctool $WORK/upctool 0755 0 0"
+			# the passive probe firmware (upc_fw/probe, prebuilt), for
+			# upctool load; md5 checked like the Wi-Fi firmware
+			echo "dir /lib/firmware/upc 0755 0 0"
+			for c in io fm; do
+				echo "file /lib/firmware/upc/probe_$c.bin $M1/../../prebuilt/probe_$c.bin 0644 0 0"
+			done ;;
 		esac
 	done
 	grep -v '^/bin/busybox$' "$BB/busybox.links" | sort -u |

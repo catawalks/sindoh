@@ -224,24 +224,50 @@ Passed in wifi_join_test1 (docs/kernel/wifi_join_test1.md, built as m1-net-smp).
 
 ### upc: the UPC driver (Klipper MCUs)
 
+Test 1 (probe, hold, safe, reboot and panic paths) passed:
+docs/kernel/upc_test1.md.
+
 1. Boot it through the fast path:
    `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-upc-zImage-dtb.bin`.
-2. Automatic checks (`/etc/m1-variant.sh`) read back CPUSoftReset (must be
-   0 = held), the first PWM CTRL words (bits 0 and 2 clear), the stepper
-   CFG words (bit 0 set = driver off), and the UPC clock register 0xf8000180.
-   Like stock `upc.ko` at load, the driver sets its bits 7:5 to 3 and logs
-   "APB config old -> new". Compare with stock (`devmem 0xf8000180` there).
+2. Automatic checks (`/etc/m1-variant.sh`, re-runnable) read back
+   CPUSoftReset (0 = held), every PWM block 1-32 with bit 0 (run) or bit 2
+   (level) set (must be none), the stepper CFG words (bit 0 set = driver
+   off), and the UPC clock register 0xf8000180 (driver: "APB config old ->
+   new", stock 0x01dde26d).
 3. The user runs `upctool info` (reads only), then `upctool safe`.
-4. Only then, with the user watching, try the passive probe firmware
-   (`upc_fw/probe`). Klipper firmware, heaters and motion come later, one at
-   a time (`docs/kernel/upc_mainline_design.md`, bring-up order).
-5. **Success:** `/dev/upc0` and `/dev/upc1` exist, the dmesg line reads
-   "cores held, outputs safe", and upctool sees the DTCM nonce.
-6. Safety paths: `reboot -f` logs "reboot: cores held, outputs off";
-   `echo c > /proc/sysrq-trigger` forces a panic, which must print
-   "mv61x0-upc: panic: cores held, outputs off" before the 10 s reset.
-   Repeat both later while the probe firmware runs, to prove the outputs
-   really go off.
+4. **Test 2, passive probe firmware** (the user watching). The images are
+   in the initramfs: `/lib/firmware/upc/probe_io.bin` (1876 B, md5
+   96cddffd...) and `probe_fm.bin` (1560 B, md5 1ec429d5...), built from
+   `upc_fw/probe/probe.c`. They already ran on this printer under stock
+   (2026-10-17, docs/hardware_notes.md).
+   - What it does: each core first forces its outputs off. The IO core
+     clears run and level in PWM blocks 1-32 (heaters, fans, clutch,
+     motor current). The FM core aborts all 5 stepper engines and sets
+     CFG bit 0 (A4982 drivers off). Then it only reads: CP15 ID, a Thumb
+     test, XENA counters and the input pins (XIRD/XIRD1), and the nozzle
+     and bed thermistor ADC. It reports into its DTCM block and prints
+     "[UPC probe] IO/FM core alive" and step tokens on ttyS0. The only
+     other writes are loading XENA timers 1 and 2 (FM) and configuring the
+     ADC sampler (IO). It never sets a PWM run/level bit, never clears a
+     stepper CFG bit 0, and never touches GPIO. The two probes that once
+     froze the SoC (TCM size reads, executing from DTCM) are compiled out.
+   - Run: `upctool load /lib/firmware/upc/probe_io.bin
+     /lib/firmware/upc/probe_fm.bin` (holds the cores, clears the TCMs,
+     loads, releases: "cores started"). Then `upctool probe 2`: heartbeats
+     rise, FM timer 1 runs at ~396 MHz, ADC codes are plausible for room
+     temperature. Repeat while pressing an endstop to see XIRD change.
+   - Outputs while it runs: `sh /etc/m1-variant.sh` must show CPUSoftReset
+     1, "PWM blocks ... none" and every stepper CFG with bit 0 set.
+   - Safety paths while it runs, one boot each (reload the probe after each
+     fast-path boot):
+     a. `upctool stop`: CPUSoftReset 0, outputs still off; `upctool probe`
+        heartbeats stop.
+     b. `reboot -f`: "reboot: cores held, outputs off" before U-Boot.
+     c. `echo c > /proc/sysrq-trigger`: "mv61x0-upc: panic: cores held,
+        outputs off", then the reset to stock after 10 s.
+5. Later, one at a time with the user present: Klipper firmware plus
+   `upctool bridge`, then heaters and motion
+   (`docs/kernel/upc_mainline_design.md`, bring-up order).
 
 ### sd: the SD socket, read-only
 
