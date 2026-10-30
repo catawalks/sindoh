@@ -19,3 +19,17 @@ the same images that ran under stock on 2026-10-17. No heat and no motion.
 
 Every safety path works with firmware running. One gap remains before Klipper
 can home under mainline: the endstop and filament inputs read 0.
+
+## Test 2b (2026-10-29): bank-4 input pins at stock values, still no inputs
+
+The user approved the 13 bank-4 writes from xena-pinmux.sh.proposed (GPIO 129-131 and 138-147
+select = 0x00000000), applied by hand with the probe firmware running. They read
+back 0x00000000 (dir is still 0x10000000). XIRD and XIRD1 still read 0 on both
+cores (seen-high 0). Not the cause.
+
+Next hypothesis: under stock, the probe ran after Sindoh's UPC firmware, which
+probably configured the XENA input sampler, so the probe inherited that state.
+Under mainline nothing has ever run on the cores before the probe. To check,
+compare a read-only dump of the XENA register block under stock (with
+upc.ko and its firmware running) and under mainline, and find the stock firmware
+code that writes it.
