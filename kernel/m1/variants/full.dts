@@ -16,7 +16,18 @@
 &nand_controller { status = "okay"; };
 &gpio0 { status = "okay"; marvell,read-only; };
 &gpio1 { status = "okay"; marvell,read-only; };
-&gpio2 { status = "okay"; marvell,read-only; };
+/*
+ * Touch controller (BU21029, I2C bus 2 at 0x40): GPIO 67 (bank 2 line 3) is
+ * its reset/enable, driven high as stock (gr_def_mpp_list); GPIO 66 (line 2)
+ * is its interrupt input. Pin selects as stock (0x300, 0x320). User-approved
+ * (touch-pins test). The bank stays read-only at runtime.
+ */
+&gpio2 {
+	status = "okay";
+	marvell,read-only;
+	marvell,init-output-high = <3>;
+	marvell,pin-config = <3 0x00000300>, <2 0x00000320>;
+};
 &gpio3 { status = "okay"; marvell,read-only; };
 &gpio4 { status = "okay"; marvell,read-only; };
 &gpio5 { status = "okay"; marvell,read-only; };

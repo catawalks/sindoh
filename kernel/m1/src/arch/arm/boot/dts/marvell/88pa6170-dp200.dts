@@ -215,12 +215,14 @@
 		 */
 		/*
 		 * RTC (vendor gogin-rtc, IRQ 64): a seconds counter at +0x0c.
-		 * rtc-mv61x0 only reads it; the vendor's setup sequence is a
-		 * proposal (docs/kernel/rtc_setup.md).
+		 * "apb" is the APB configuration word whose bit 30 the vendor
+		 * setup clears. rtc-mv61x0 runs the vendor setup only with
+		 * marvell,vendor-setup (docs/kernel/rtc_setup.md).
 		 */
 		rtc: rtc@f8100000 {
 			compatible = "marvell,88pa6170-rtc";
-			reg = <0xf8100000 0x30>;
+			reg = <0xf8100000 0x30>, <0xf8000200 0x4>;
+			reg-names = "rtc", "apb";
 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
@@ -377,17 +379,29 @@
 			compatible = "marvell,88pa6170-upc";
 			reg = <0xf9200000 0x10000>, <0xf9210000 0xb0000>,
 			      <0xf9304000 0x2100>, <0xf8150000 0x5000>,
-			      <0xf8000180 0x4>, <0xf80450d0 0x14>;
+			      <0xf8000180 0x4>, <0xf8044000 0x3000>;
 			reg-names = "upc0", "upc1", "pwm", "smot", "apb",
-				    "xena-pads";
+				    "pads";
 			/*
-			 * xena-pads: GPIO bank 5 pin selects 20-24, the X, Y
-			 * (Z) endstop and cartridge-lever pads. Function 3
-			 * routes them to the XENA inputs (user-approved,
-			 * UPC test 2c); the driver sets them only with the
-			 * cores held and every output off.
+			 * pads: GPIO banks 4-6. marvell,pads = <bank pin
+			 * select> as the vendor's gr_def_mpp_list sets them at
+			 * every stock boot: the XENA inputs (bank 5 pins 20-24:
+			 * X/Y/Z endstops, cartridge lever) and the UPC output
+			 * pads (steppers, PWM). User-approved, UPC tests 2c and
+			 * 3 (XIRD 0x3c040000 = stock). The driver writes them
+			 * only with the cores held and every output off.
 			 */
-			marvell,xena-pad-config = <0x00001003>;
+			marvell,pads = <
+				4 24 0x1003 4 26 0x1003 5 0 0x1003 5 1 0x1003
+				5 2 0x1003 5 3 0x1003 5 6 0x1001 5 7 0x1001
+				5 8 0x1001 5 9 0x1001 5 10 0x1001 5 11 0x1001
+				5 12 0x1001 5 13 0x1001 5 14 0x1001 5 16 0x1002
+				5 17 0x1002 5 18 0x1002 5 19 0x1002 5 20 0x1003
+				5 21 0x1003 5 22 0x1003 5 23 0x1003 5 24 0x1003
+				5 25 0x1002 5 26 0x1002 5 27 0x1002 5 28 0x1002
+				5 29 0x1001 5 30 0x1001 5 31 0x1001 6 0 0x1001
+				6 2 0x1001 6 3 0x1001 6 4 0x1001
+			>;
 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
