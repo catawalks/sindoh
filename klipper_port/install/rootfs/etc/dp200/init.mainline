@@ -1,0 +1,78 @@
+#!/bin/sh
+# DRAFT (2026-10-30), not used yet: PID 1 for booting our Debian root directly
+# on the mainline kernel (docs/mainline_userspace.md), with
+#   root=/dev/mmcblk0p1 rootwait init=/etc/dp200/init.mainline consoleblank=0
+# On stock 3.2 nothing changes: there, /dp200/dp200-start.sh enters this root
+# as a chroot and runs rc.dp200 itself.
+#
+# It does what the stock BusyBox side does today, then runs rc.dp200 start:
+#   - API filesystems (proc, sys, devtmpfs, devpts, tmpfs /run /tmp)
+#   - remount / read-write, hostname, loopback
+#   - Debian's wpa_supplicant on mlan0 (nl80211, the mwifiex driver), with
+#     our config, plus the dp200 Wi-Fi/network/power-key helpers, run with
+#     ROOT=/ (they take the root as their argument)
+#   - one-shot NTP: the SoC RTC doesn't keep time over power-off
+# Then it reaps orphans forever. On a reboot or poweroff request it stops
+# the stack first (rc.dp200 stop holds the UPC cores: heaters and motors off).
+# Needs in the root: busybox (udhcpc, ifconfig, route used by the helpers),
+# wpasupplicant, and the 8782 firmware in /lib/firmware/mrvl/ (from the
+# printer at install time; never published).
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LOG=/var/log/dp200-init.log
+
+mnt() { grep -q " $2 " /proc/mounts 2>/dev/null || mount -t "$1" -o "$3" "$1" "$2"; }
+
+mount -t proc proc /proc 2>/dev/null
+mnt sysfs /sys nosuid,nodev,noexec
+mnt devtmpfs /dev mode=755
+mkdir -p /dev/pts /dev/shm
+mnt devpts /dev/pts gid=5,mode=620,ptmxmode=666
+mnt tmpfs /run mode=755,size=16m
+mnt tmpfs /tmp mode=1777,size=64m
+mount -o remount,rw /
+mkdir -p /run/dp200 /run/wpa_supplicant /var/log
+exec >> $LOG 2>&1 </dev/null
+echo "==== dp200 init $(date) kernel $(uname -r)"
+
+hostname -F /etc/hostname 2>/dev/null || hostname dp200
+ifconfig lo 127.0.0.1 up
+
+# Stock names the touch device /dev/event0; mainline makes /dev/input/event0
+# (dp200_screen.py and rc.dp200 accept either).
+
+# Wi-Fi: on stock, the BusyBox side starts wpa_supplicant; here Debian's does
+CONF=/etc/dp200/wpa_supplicant.conf
+[ -f $CONF ] || { umask 077; printf 'ctrl_interface=/var/run/wpa_supplicant\nupdate_config=1\n' > $CONF; umask 022; }
+i=0
+while [ ! -e /sys/class/net/mlan0 ] && [ $i -lt 20 ]; do sleep 1; i=$((i + 1)); done
+[ -e /sys/class/net/mlan0 ] && wpa_supplicant -B -D nl80211 -i mlan0 -c $CONF -P /run/wpa_supplicant.pid
+
+# The helpers dp200-start.sh runs today, with ROOT=/
+sh /dp200/dp200-wifi.sh / &
+sh /dp200/dp200-netd.sh / >> /var/log/dp200-netd.log 2>&1 &
+sh /dp200/dp200-powerkey.sh / >> /var/log/dp200-powerkey.log 2>&1 &
+( sleep 20; ntpd -n -q -p pool.ntp.org 2>/dev/null || busybox ntpd -n -q -p pool.ntp.org ) &
+
+/etc/dp200/rc.dp200 start
+
+stop_all() {
+    /etc/dp200/rc.dp200 stop
+    sync
+    mount -o remount,ro / 2>/dev/null
+    [ "$1" = reboot ] && reboot -f
+    poweroff -f
+}
+# BusyBox reboot/halt/poweroff signal PID 1 with TERM/USR1/USR2 (the power
+# key script calls them); halt is treated as poweroff (nothing cuts power:
+# the user holds the button, see dp200-powerkey.sh)
+trap 'stop_all reboot' TERM INT
+trap 'stop_all poweroff' USR1 USR2
+
+# PID 1 must never exit: reap orphans (wait returns when a child exits or
+# a trapped signal arrives)
+while :; do
+    wait
+    sleep 1
+done

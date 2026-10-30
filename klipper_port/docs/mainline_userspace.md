@@ -106,3 +106,14 @@ config and the UPC firmware's data dictionaries. On 2026-10-29 the full config
 A deliberately misspelled option was caught ("Config error ... is not valid").
 Batch mode can't get past homing (upc_clockcheck waits for real MCU clocks),
 so it checks config and macro syntax, not motion.
+
+## Draft init (2026-10-30)
+
+`install/rootfs/etc/dp200/init.mainline` is a draft PID 1 for booting the
+Debian root directly (`init=/etc/dp200/init.mainline`). It isn't used yet. It
+mounts the API filesystems, starts Debian's wpa_supplicant on mlan0 (nl80211),
+runs the existing dp200-wifi/netd/powerkey helpers with ROOT=/, does a one-shot
+NTP, then `rc.dp200 start`. It handles the BusyBox reboot/poweroff signals by
+running `rc.dp200 stop` (UPC cores held) first. The root also needs the busybox
+package (udhcpc, ifconfig and route for the helpers), wpasupplicant, and the
+8782 firmware.
