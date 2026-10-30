@@ -95,3 +95,22 @@ A mount must be stiff and tight: a loose mount measures its own wobble.
   1-1:1.0: ttyACM0: USB ACM device", and `/dev/ttyACM0` (major 166) exists.
   So dp200-start.sh should insmod cdc-acm.ko instead of the new_id line, and
   Klipper's `[mcu adxl]` uses `/dev/ttyACM0` (or the by-id path).
+
+### Klipper flashed and the sensor read (2026-10-30)
+
+- **Firmware:** Klipper a223dabc (the fork) for the RP2040, Katapult offset
+  (16 KiB, application at 0x10004000), USB serial, ID 1d50:614e. Built with Arm
+  GNU Toolchain 14.2.Rel1 in WSL. klipper.bin is 45,196 B, md5 6c85cb24...
+  (kept in D:\DP200\kernel\out\adxl\, not in the repo).
+- **Flashing:** from the PC (the board on COM5, WSL1 /dev/ttyS5, run as root)
+  with `lib/katapult/flashtool.py`. Katapult v0.0.1-74 reported application
+  start 0x10004000. 177 pages written and verified (SHA 73414EF1...). Katapult
+  stays on the board.
+- **Check on the PC:** klippy with only this board as `[mcu]` and the pins in
+  dp200_adxl.cfg.off. The ADXL345 ID check passed, and `ACCELEROMETER_QUERY`
+  gave x 740, y -1776, z -9806 mm/s^2 (1.0 g, the board slightly tilted). The
+  firmware has config_spi, spi_send, config_adxl345 and query_adxl345.
+- **Printer side changed:** dp200-start.sh insmods cdc-acm.ko (from the port
+  sources in the root) instead of the new_id line; dp200-mounts.sh creates
+  ttyACM0-3 (major 166) in the chroot; dp200_adxl.cfg.off uses /dev/ttyACM0.
+  Not yet run on the 4 GB card.

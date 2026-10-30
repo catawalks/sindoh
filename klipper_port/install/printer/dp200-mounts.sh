@@ -38,9 +38,12 @@ dp200_mount_root() {
         # USB serial (major 188; accelerometer board, docs/input_shaping.md):
         # nothing adds nodes to this /dev later, so create them now, group
         # klipper. Opening one with no board plugged in just fails.
+        # CDC-ACM (major 166) is what Klipper's USB boards use with
+        # cdc-acm.ko loaded (dp200-start.sh); ttyUSB stays for other adapters
         for n in 0 1 2 3; do
             mknod -m 660 $ROOT/dev/ttyUSB$n c 188 $n
-            chown 0:$(grep '^klipper:' $ROOT/etc/group | cut -d: -f3) $ROOT/dev/ttyUSB$n
+            mknod -m 660 $ROOT/dev/ttyACM$n c 166 $n
+            chown 0:$(grep '^klipper:' $ROOT/etc/group | cut -d: -f3) $ROOT/dev/ttyUSB$n $ROOT/dev/ttyACM$n
         done
         # webcam (uvcvideo): group "video" (gid 44 in the Debian root) so
         # ustreamer runs as the klipper user

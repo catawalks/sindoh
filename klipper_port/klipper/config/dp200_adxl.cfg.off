@@ -7,13 +7,15 @@
 #
 # The board must run Klipper firmware (RP2040 boards such as the BTT ADXL345
 # V2.0 or Mellow Fly-ADXL345 USB, or a Pico + ADXL345). The printer's kernel
-# has no USB CDC-ACM driver; dp200-start.sh hands Klipper's USB ID 1d50:614e
-# to the generic USB serial driver instead, so the board is /dev/ttyUSB0.
+# has no USB CDC-ACM driver; dp200-start.sh loads our cdc-acm.ko (built for
+# the vendor kernel), so the board is /dev/ttyACM0.
 
 [mcu adxl]
-serial: /dev/ttyUSB0
+serial: /dev/ttyACM0
 
-# Pins for the BTT ADXL345 V2.0. Other boards: use the pins from the board's
+# Pins for the BTT ADXL345 V2.0 and the Mellow FLY-ADXL345 USB (the same
+# pins; the FLY was read with these on 2026-10-30: ID check OK, 1 g at
+# rest). Other boards: use the pins from the board's
 # own Klipper example (Pico + ADXL345 module per Klipper's Measuring
 # Resonances guide: cs_pin: adxl:gpio1, spi_bus: spi0a).
 [adxl345]
