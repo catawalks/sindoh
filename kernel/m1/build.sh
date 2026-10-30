@@ -289,19 +289,6 @@ cp "$KOUT/vmlinux" "$OUT/$NAME-vmlinux"
 cp "$KOUT/System.map" "$OUT/$NAME-System.map"
 cp "$KOUT/.config" "$OUT/$NAME-full.config"
 cp "$DTB" "$OUT/$NAME.dtb"
-
-# 10. The same kernel with the DDR write-buffer drain on (mc node enabled),
-#     for an A/B test through the fast path: $NAME-mcsync-zImage-dtb.bin
-#     and $NAME-mcsync.dtb (eth_kernel_boot.sh finds the vmlinux by name)
-if [ "$VARIANT" != eth ]; then
-	{
-		"$KOUT/scripts/dtc/dtc" -q -I dtb -O dts "$DTB"
-		echo '&{/soc/memory-controller@fa300000} { status = "okay"; };'
-	} | "$KOUT/scripts/dtc/dtc" -q -I dts -O dtb -o "$OUT/$NAME-mcsync.dtb" -
-	cat "$KOUT/arch/arm/boot/zImage" "$OUT/$NAME-mcsync.dtb" \
-		> "$OUT/$NAME-mcsync-zImage-dtb.bin"
-	cp "$KOUT/vmlinux" "$OUT/$NAME-mcsync-vmlinux"
-fi
 (cd "$OUT" && {
 	echo "built $(date -u +%Y-%m-%dT%H:%MZ) $NAME linux-$KVER"
 	stat -c '%n %s bytes' "$NAME.uimg" "$NAME-zImage-dtb.bin" "$NAME.dtb"
