@@ -1,0 +1,45 @@
+#!/bin/sh
+# xena-init.sh (REJECTED 2026-10-30: stock reads live inputs with the cores held and XIIC/XIRW all 0, so firmware init is not the cause. Kept for the record.)
+#
+# UPC test 2/2b: XIRD = XIRD1 = 0 under mainline. Under stock, Sindoh's FM
+# microcode (fm_0c00, its init; RE snapshot out/fm.bin, emulated with
+# tools/fmprobe.py) runs before anything else and writes:
+#   XIIC[42] XIIC[43] XIIC[44] XIIC[46] = 0     (0x08001310/14/18/20)
+#   XIIC[20] = 0x40000149                       (0x080012b8)
+#   XIRW |= 0x00100000 (bit 20)                 (0x08001650)
+#   + its own interrupt enables (not needed by the probe)
+# The probe firmware and Klipper never do this; under stock they ran after
+# Sindoh's firmware and inherited it. XIIC looks like one config word per
+# XENA pin (base 0x1268, 4 bytes per pin): 42/43/44/46 are exactly the
+# X/Y/Z endstops and the cartridge lever (docs/hardware_notes.md). Pin 20
+# reads high at rest under stock (XIRD 0x10140000 = xena18/20/28), so
+# 0x40000149 plus XIRW bit 20 most likely makes xena20 an output driven high.
+#
+# From Linux, phys = 0xf9208000 + offset. Run xena-dump.sh on stock and on
+# mainline first: if the stock dump shows these values and mainline does
+# not, that confirms it.
+#
+# Stage A (inputs only, nothing driven): XIIC[42,43,44,46] = 0.
+# Stage B (only if A alone leaves XIRD at 0): XIIC[20] = 0x40000149 and
+# XIRW bit 20 = 1. This probably DRIVES XENA pin 20 high, as stock does at
+# every boot. What pin 20 is wired to is unknown (a buffer or sensor-supply
+# enable is likely, since every input reads 0 without it). It is not a
+# heater, fan or stepper output: those are the PWM blocks and the SMOT
+# engines, which stay off. Needs its own OK.
+#
+# usage: sh xena-init.sh A    or    sh xena-init.sh B
+X=0xf9209000
+case $1 in
+A)
+	for n in 42 43 44 46; do
+		devmem $((X + 0x268 + 4 * n)) 32 0
+	done
+	;;
+B)
+	devmem $((X + 0x268 + 4 * 20)) 32 0x40000149
+	devmem $((X + 0x650)) 32 $(( $(devmem $((X + 0x650))) | 0x100000 ))
+	;;
+*)
+	echo "usage: xena-init.sh A|B"; exit 1 ;;
+esac
+echo "XIIC[20]=$(devmem $((X + 0x2b8))) XIIC[42..46]=$(devmem $((X + 0x310))) $(devmem $((X + 0x314))) $(devmem $((X + 0x318))) $(devmem $((X + 0x31c))) $(devmem $((X + 0x320))) XIRW=$(devmem $((X + 0x650))) XIRD=$(devmem $((X + 0x658))) XIRD1=$(devmem $((X + 0x65c)))"

@@ -247,6 +247,8 @@ fi
 		echo "file /etc/m1-variant.sh $IRFS/variant.sh 0755 0 0"
 	[ -f "$IRFS/xena-dump.sh" ] &&
 		echo "file /usr/bin/xena-dump $IRFS/xena-dump.sh 0755 0 0"
+	[ -f "$IRFS/xena-padmap.sh" ] &&
+		echo "file /usr/bin/xena-padmap $IRFS/xena-padmap.sh 0755 0 0"
 	for u in $USERSPACE; do
 		case $u in
 		iw)	echo "file /usr/sbin/iw $IW/iw 0755 0 0" ;;
