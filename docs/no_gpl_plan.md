@@ -39,7 +39,7 @@ New files:
 
 ---
 
-## Status 2026-10-29: what works on the printer (RAM boot only)
+## Status 2026-10-30: what works on the printer (RAM boot only)
 
 The images are built by `kernel/m1/build.sh`; the boot history is in
 `kernel/m1/README.md` and the logs are `docs/kernel/m1_boot1.log` ..
@@ -61,7 +61,16 @@ is written to NAND or to the U-Boot environment. `reboot` and a panic
 | USB host | Both EHCI controllers (ChipIdea, vendor PHY init); hub 1a40:0101, Wi-Fi, webcam at 480 Mb/s | boot 6 |
 | Wi-Fi | mwifiex + 88W8782 patch (0004) loads the stock firmware 14.69.12.p50. A passive scan sees 15 BSS (2.4 GHz and 5 GHz) | boot 7 |
 | Webcam | UVC, one 640×480 MJPEG frame grabbed | boot 7 |
-| Ethernet | stmmac probes (DWMAC1000, core 3.6), but the PHY at MDIO address 0 reads ID 0. Most likely it is still held in reset: the vendor kernel releases GPIO 62 at boot (`mach_phyHWInit`), and m1 does not. No cable is plugged in anyway | boot 6 |
+| Ethernet | stmmac, PHY 88E1510 (0x01410dd1) after the user-approved pin setup (bank 1 GPIO 48-61/63 = RGMII + MDC/MDIO, PHY reset GPIO 62): 100/Full, wget at ~10.5 MB/s | m1-eth test 2 |
+| Fast path | m1-eth on the 2 GB card kexecs test kernels fetched over Ethernet (`kexec --dtb`), with a 60 s watchdog (user-approved) that every newer kernel stops at time_init. `tools/eth_kernel_boot.sh` | kexec test 2 |
+| SD | sdhci-mv61x0 on the 2 GB rescue card, read-only, after the two SD pin selects | sd test |
+| DDR write-buffer drain | The vendor's only real "outer cache" op (0x01010101 to 0xfa300530 on every mb), as `soc_mb`; on by default, no measurable cost. There is no PL310 | mcsync A/B |
+| Wi-Fi join | m1-net (SMP): wpa_supplicant + udhcpc, associated at -22 dBm, wget OK. The uniprocessor build times out on the 8782's first command (open) | wifi_join_test1 |
+| UPC | mv61x0-upc: cores held and outputs forced off at probe, reboot and panic; APB clock bits as stock; the passive probe firmware runs on both cores (396 MHz counter, ADC) | UPC tests 1/2 |
+| XENA inputs | X/Y endstops and the cartridge lever in XIRD1 after bank 5 pins 20-24 = 0x1003 (user-approved), set by the UPC driver with the outputs safe. XIRD (pins 0-31) and every output pad are still unrouted | UPC test 2c |
+| GPIO | gpio-mv61x0, read-only mode: exports and reads; non-GPIO pins and output changes refused | overnight gpio |
+| NAND | **Read-only, exact.** marvell_nand with the stock BCH (4 bits/512 B, one 2 KiB chunk, 3-word commands: `bch_v1`, patch 0006), three write locks (ROM, -EROFS, command-byte guard), erased pages detected from a raw read. mtd0 = nanddump 298b7390 (64/64 blocks), mtd3 = 8357ce02, 27 bits corrected, 0 failed | BCH run 3 |
+| I2C | DesignWare bus 2 registers; the touch controller (0x40) does not answer yet: its reset GPIO 67 is not driven (proposal) | overnight i2c |
 
 Traps found on the way, all fixed in `m1.config`/`busybox.config`:
 - tinyconfig turns the MMU off on ARM;
@@ -79,7 +88,7 @@ Traps found on the way, all fixed in `m1.config`/`busybox.config`:
 | 4 | **GPIO** (8 banks × 32 at 0xf8040000: input +0, output +4, direction +8, plus the vendor's pin-select) | Driver; no pin driven at probe | Be present; approve each output pin by name (the first is GPIO 62, Ethernet PHY reset) |
 | 5 | **Ethernet: pin mux + PHY reset.** MDIO completes but reads ID 0, i.e. the line is held low. The stock board code sets 121 pin functions at boot (`set_pin_config` in the stock dmesg), and U-Boot, with no Ethernet driver, probably leaves the RGMII/MDIO pins unrouted. Then `reset-gpios` = GPIO 62 (low 125 ms, as the vendor does) and the PHY ID check | Recover the `set_pin_config` table from the vendor image (pin → function), then DT; after step 4 | Be present (pin mux = GPIO work); plug in a cable if a link test is wanted |
 | 6 | **I²C (DesignWare) + touch (bu21029) + backlight/PMIC** | DT, mainline drivers | Be present (the PMIC can switch power rails) |
-| 7 | **NAND** (`marvell_nand`, PXA3xx NFC at 0xf9082000), read-only partitions first | DT with every partition read-only | Approve. Never any write or erase |
+| 7 | **NAND** (`marvell_nand`, PXA3xx NFC at 0xf9082000), read-only partitions first | **Read-only proven 2026-10-30** (BCH run 3: mtd0/mtd3 equal the stock dumps). Next, read-only too: UBI attach `--readonly` | Read-write stays out of scope until the user decides |
 | 8 | ~~L2 cache (PL310)~~ **DDR write-buffer drain** (2026-10-29): there is no PL310 (the vendor's l2x0_init reads the SCU and GIC). 0xfa300000 is the DDR controller (U-Boot reads its CS address map at +0x100/0x110/0x130, ID "MV" at +0x10). The vendor's only effective "cache" op writes 0x01010101 to +0x530 on every mb(). Mainline: `soc_mb` hook in mach-mv61x0, DT node `marvell,88pa6170-ddr`, **on by default** since the A/B test (no measurable cost, docs/kernel/mcsync_ab_test.md) | done | — |
 | 9 | **Persistent install** (kernel on SD or NAND) | Only after 1-8 | Explicit approval; it changes what the printer boots |
 
@@ -201,7 +210,7 @@ So the device tree is new, but nearly every building block has a model.
 | I²C ×2 | 0xf80a2000/3000, SPI 40/41 | `snps,designware-i2c` (clock 400 MHz) | none | high |
 | SPI ×3 | 0xf8070000.., SPI 59-61 | `snps,dw-apb-ssi` (200 MHz) | none | high |
 | SD/MMC ×2 | 0xf9080000/0200, SPI 34 | `sdhci-pltfm` glue (`mrvl,pxav3-mmc` worth trying; `sdhci-caps-mask` covers the cleared 3.0 V bit) | small glue for host version = v1.0 and card power (the board doesn't use the SDHCI power bit) | medium |
-| NAND | 0xf9082000, SPI 33 | `marvell,pxa3xx-nand-controller` (marvell_nand) | none expected; the ECC mode and BBT layout must match the stock UBI | medium (read-only first) |
+| NAND | 0xf9082000, SPI 33 | `marvell,88pa6170-nand-controller` (marvell_nand + patch 0006 `bch_v1`) | BCH 4/512 in one 2 KiB chunk with 3-word commands; erased pages from a raw read; vendor on-flash BBT not read (custom descriptor) | **read-only proven** (exact md5s); writes not planned |
 | USB host ×2 | 0xf9041000/8000 (caps +0x100), SPI 66/67 | `chipidea,usb2` host mode (`ci_hdrc_usb2`) + a PHY | ~100-line generic-PHY driver replaying `usb_phy_init` (registers 0xf904f004/008, per-port +0xc bit 15) | medium |
 | USB device | 0xf9040000, SPI 65 | ChipIdea UDC (same core, `dr_mode = "peripheral"`) | none beyond the PHY | medium |
 | Ethernet | 0xf9050000, SPI 64, 88E1510 | `stmmac` (`snps,dwmac-3.x`?) + `marvell` PHY driver | none expected; check the GMAC version register | medium-high |

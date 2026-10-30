@@ -302,6 +302,11 @@ with a plain read (`i2cdetect -y -r 2 0x40 0x40`).
 
 ### nand: whole chip read-only
 
+**Proven 2026-10-30 (BCH run 3, m1-nand dd98f738):** ECC-mode mtd0 equals the
+stock nanddump (298b7390, 64/64 blocks), mtd3 equals stock (8357ce02), 27 bits
+corrected, 0 failed, no timeouts, no guard refusals. Read-write NAND stays
+out of scope until the user decides.
+
 `m1-nand` binds marvell_nand to the PXA3xx-style controller at 0xf9082000,
 with patch 0006 (`CONFIG_MTD_RAW_NAND_READ_ONLY`):
 - the chip is registered as ROM, so MTD_WRITEABLE is clear and the mtd core refuses write, erase and markbad;
