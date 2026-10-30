@@ -163,6 +163,11 @@ state, then waits.
 
 ### Fast path: test kernels over Ethernet (the default loop)
 
+For monitor-style steps (anything that prints over time, like
+`xena-padmap`), capture with `tools/serial_watch.py COM3 SECONDS 'command'`
+(fixed duration). `serial_cmd.ps1` can stop early when its wrapped echo
+shows the end marker.
+
 1. Once: put the loader on the 2 GB card with
    `tools/sd_kernel_boot.sh D:/DP200/kernel/out/m1-eth.uimg`. Repeat after
    every m1-eth rebuild; the tool below refuses a stale copy (CRC check).
@@ -225,7 +230,20 @@ Passed in wifi_join_test1 (docs/kernel/wifi_join_test1.md, built as m1-net-smp).
 ### upc: the UPC driver (Klipper MCUs)
 
 Test 1 (probe, hold, safe, reboot and panic paths) passed:
-docs/kernel/upc_test1.md.
+docs/kernel/upc_test1.md. Test 2 (probe firmware, safety paths) and 2c
+(XENA inputs) passed: docs/kernel/upc_test2.md.
+
+XENA inputs: the endstop and cartridge-lever pads are bank 5 pins 20-24
+(X = 20 -> XIRD1 bit 10, Y = 21 -> bit 11, 22 probably Z, lever = 23 ->
+bit 14). They need function 3 (0x1003), which the vendor's board code sets
+and U-Boot does not. The driver now sets them at probe from the DT
+"xena-pads" range and `marvell,xena-pad-config` (user-approved), only after
+it has held the cores and found every output off. dmesg shows "XENA input
+pad 0..4: 000c1000 -> 00001003". Read-only helpers: `xena-dump` (XIIC,
+XIRW, XIRD) and `xena-padmap` (GPIO levels of banks 4-6 next to XIRD).
+XIRD (pins 0-31; stock reads 0x3c040000) still reads 0: its pads are in the
+rest of the stock UPC set, `upc-pinmux.sh.proposed` stage "all", a separate
+future request.
 
 1. Boot it through the fast path:
    `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-upc-zImage-dtb.bin`.
