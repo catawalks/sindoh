@@ -10,4 +10,4 @@ echo "--- md5 of the small partitions (raw reads, ECC off):"
 for n in 0 3; do
 	echo "  mtd$n $(dd if=/dev/mtd$n bs=131072 2>/dev/null | md5sum | cut -d' ' -f1)"
 done
-echo "    stock dumps (ECC-corrected): mtd0 298b7390ccb500998661949c02ea68f8, mtd3 e106bfe3be8f2e08044222c71a982c28"
+echo "    stock dumps (ECC-corrected): mtd0 298b7390ccb500998661949c02ea68f8, mtd3 8357ce02... (the Klipper test boot logo flashed 2026-10-27; the old dump e106bfe3 predates it)"

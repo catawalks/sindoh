@@ -26,15 +26,21 @@ diff -ru a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
 diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
 --- a/drivers/mtd/nand/raw/marvell_nand.c
 +++ b/drivers/mtd/nand/raw/marvell_nand.c
-@@ -639,12 +639,45 @@
+@@ -639,12 +639,48 @@
  	return 0;
  }
  
 +/*
 + * CONFIG_MTD_RAW_NAND_READ_ONLY: true for any command that could change
-+ * the flash. Program and erase cycles, page loads (SEQIN, RNDIN) and
-+ * SET_FEATURES, whether sent as monolithic program/erase types or as
-+ * naked commands.
++ * the flash. The decision is on the command bytes the chip will see: a
++ * NAND chip only programs on PAGEPROG/CACHEDPROG, erases on ERASE2 and
++ * changes settings on SET_FEATURES, and every one of them has to go out
++ * as CMD1 or CMD2 of some NDCB0. Page loads (SEQIN, RNDIN) and ERASE1 are
++ * refused too, since no read needs them. Both fields are checked on every
++ * command, whatever DBC says. The command type is not used: this driver
++ * runs plain CMD-ADDR-CMD-WAITRDY reads (READ0/READSTART) through
++ * marvell_nfc_erase_cmd_type_exec, i.e. with TYPE_ERASE as a sequencing
++ * mode, and the chip still only sees a read.
 + */
 +static bool marvell_nfc_cmd_may_write(u32 ndcb0)
 +{
@@ -42,14 +48,11 @@ diff -ru a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_na
 +				   NAND_CMD_CACHEDPROG, NAND_CMD_ERASE1,
 +				   NAND_CMD_ERASE2, NAND_CMD_RNDIN,
 +				   NAND_CMD_SET_FEATURES };
-+	u32 type = (ndcb0 >> 21) & TYPE_MASK;
++	u8 cmd1 = ndcb0 & 0xff, cmd2 = (ndcb0 >> 8) & 0xff;
 +	unsigned int i;
 +
-+	if (type == TYPE_WRITE || type == TYPE_ERASE)
-+		return true;
 +	for (i = 0; i < ARRAY_SIZE(cmds); i++)
-+		if ((ndcb0 & 0xff) == cmds[i] ||
-+		    ((ndcb0 & NDCB0_DBC) && ((ndcb0 >> 8) & 0xff) == cmds[i]))
++		if (cmd1 == cmds[i] || cmd2 == cmds[i])
 +			return true;
 +	return false;
 +}
