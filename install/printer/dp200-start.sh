@@ -90,10 +90,12 @@ fi
 killall mjpg_streamer 2>/dev/null
 # upc.ko is loaded by the stock /app/module_load.sh
 grep -q '^upc ' /proc/modules || insmod /app/upc.ko
-# USB accelerometer on the front port (docs/input_shaping.md): the kernel has
-# no CDC-ACM driver, so give Klipper's USB ID to the built-in generic USB
-# serial driver; a Klipper board then shows up as /dev/ttyUSB0.
-echo 1d50 614e > /sys/bus/usb-serial/drivers/generic/new_id 2>/dev/null
+# USB accelerometer on the front port (docs/input_shaping.md): the vendor
+# kernel has no CDC-ACM driver, so load ours (built for 3.2.0-g67a8e16, tested
+# 2026-10-30 with a FLY-ADXL345); a Klipper board then shows up as
+# /dev/ttyACM0. The generic usb-serial new_id route doesn't bind on 3.2.
+grep -q '^cdc_acm ' /proc/modules || \
+    insmod $ROOT/usr/src/dp200/klipper_port/install/kernel_modules/cdc-acm.ko 2>/dev/null
 
 # The kernel's text console blanks the panel after 600 s without keyboard
 # input (consoleblank, read-only here) and touches don't count. The stock app
