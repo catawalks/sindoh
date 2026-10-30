@@ -193,7 +193,8 @@ for u in $USERSPACE; do "build_$u"; done
 # 5. Wi-Fi firmware from the stock rootfs (a Marvell binary: never commit
 #    it, and don't publish the images that contain it)
 FW8782=${FW8782:-/mnt/d/DP200/backup/171114_4_open/lib/firmware/mrvl/usb8782_uapsta.bin}
-if [ "$VARIANT" != eth ]; then
+case $VARIANT in eth|i2c|nand) NOFW=1 ;; *) NOFW=0 ;; esac
+if [ $NOFW = 0 ]; then
 	echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
 fi
 if [ "$VARIANT" = upc ]; then
@@ -236,7 +237,7 @@ fi
 	echo "file /init $IRFS/init 0755 0 0"
 	echo "file /etc/m1-checks.sh $IRFS/m1-checks.sh 0755 0 0"
 	echo "file /usr/share/udhcpc/default.script $IRFS/udhcpc.script 0755 0 0"
-	[ "$VARIANT" != eth ] &&
+	[ $NOFW = 0 ] &&
 		echo "file /lib/firmware/mrvl/usb8782_uapsta.bin $FW8782 0644 0 0"
 	[ -f "$IRFS/ethload" ] &&
 		echo "file /usr/bin/ethload $IRFS/ethload 0755 0 0"

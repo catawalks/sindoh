@@ -1,7 +1,7 @@
 diff -ru a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
 --- a/drivers/mtd/nand/raw/Kconfig
 +++ b/drivers/mtd/nand/raw/Kconfig
-@@ -124,9 +124,20 @@
+@@ -124,9 +124,21 @@
  	  No board specific support is done by this driver, each board
  	  must advertise a platform_device for the driver to attach.
  
@@ -13,8 +13,9 @@ diff -ru a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
 +	  MTD_WRITEABLE), the nand_base write, OOB write, erase and
 +	  mark-bad paths return -EROFS, and controller drivers that check
 +	  this option refuse program and erase commands at the hardware.
-+	  For bringing up a controller on a board whose NAND holds the only
-+	  copy of its firmware.
++	  No BBT is built and no bad-block marker is read: every block reads
++	  as good. For bringing up a controller on a board whose NAND holds
++	  the only copy of its firmware.
 +
  config MTD_NAND_MARVELL
  	tristate "Marvell EBU NAND controller"
@@ -128,12 +129,17 @@ diff -ru a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
  	pr_debug("%s: start = 0x%012llx, len = %llu\n",
  			__func__, (unsigned long long)instr->addr,
  			(unsigned long long)instr->len);
-@@ -6418,6 +6433,9 @@
+@@ -6418,6 +6433,14 @@
  	if (ret)
  		goto err_nand_manuf_cleanup;
  
++	/*
++	 * Read-only bring-up: register the chip as ROM, and neither build a
++	 * BBT nor read bad-block markers (every block reads as good), so
++	 * that probing needs no OOB access.
++	 */
 +	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
-+		chip->options |= NAND_ROM;
++		chip->options |= NAND_ROM | NAND_SKIP_BBTSCAN | NAND_NO_BBM_QUIRK;
 +
  	/* Adjust the MTD_CAP_ flags when NAND_ROM is set. */
  	if (chip->options & NAND_ROM)
