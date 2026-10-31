@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * full variant: SD, UPC, GPIO (read-only), I2C bus 2, the RTC (read-only)
- * and the NAND (read-only) enabled; consoleblank=0 for the panel console.
+ * and the NAND (read-only) enabled. No console on the panel (no
+ * console=tty0, and no fbcon in full.config): U-Boot's boot logo stays up
+ * until the screen app draws, as on stock.
  */
 #include "88pa6170-dp200.dts"
 
 &{/chosen} {
-	bootargs = "console=tty0 console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 rdinit=/init panic=10 consoleblank=0";
+	bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 rdinit=/init panic=10";
 };
 
 &sdhci0 { status = "okay"; };

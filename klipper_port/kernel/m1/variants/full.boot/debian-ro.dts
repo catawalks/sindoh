@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * m1-debian-ro: the Debian root read-only (no journal replay) with a shell
+ * as init and nothing started (docs/kernel/debian_root_boot.md, step D1)
+ */
+#include "../full.dts"
+
+&{/chosen} {
+	bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 root=/dev/mmcblk0p1 rootwait ro rootflags=noload rdinit=/nonexistent init=/bin/sh panic=10";
+};
