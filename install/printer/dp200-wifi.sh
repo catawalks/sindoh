@@ -45,7 +45,7 @@ import_stock() {
     log "created $CONF with $(grep -c '^network=' $CONF) network(s) from the stock settings"
 }
 
-[ -d /proc/mwlan ] || { log "no WiFi module"; }
+[ -d /proc/mwlan ] || [ -e /sys/class/net/$IF ] || log "no WiFi module"
 # the network the radio is on right now (if any) gets the top priority
 CUR=$(wpa_cli -i $IF status 2>/dev/null | sed -n 's/^ssid=//p' | sed "s/'/''/g")
 [ -f $CONF ] || import_stock
@@ -58,9 +58,16 @@ CUR=$(wpa_cli -i $IF status 2>/dev/null | sed -n 's/^ssid=//p' | sed "s/'/''/g")
 if ! { pidof wpa_supplicant >/dev/null 2>&1 || ps | grep -q '[w]pa_supplicant'; }; then
     log "no wpa_supplicant running - starting it like the stock boot"
     mkdir -p /var/run/wpa_supplicant
-    iwpriv $IF regioncode 48 2>/dev/null
-    wpa_supplicant -Dwext -P /var/run/wpa_supplicant.$IF.pid -O /var/run/wpa_supplicant \
-        -i$IF -c/etc/wpa_supplicant.conf -B
+    if [ "$ROOT" = / ]; then
+        # mainline (mwifiex): nl80211 and this root's own config; the stock
+        # /etc/wpa_supplicant.conf only exists on the stock side
+        [ -e /sys/class/net/$IF ] && wpa_supplicant -Dnl80211 -P /var/run/wpa_supplicant.$IF.pid \
+            -i$IF -c$CONF -B
+    else
+        iwpriv $IF regioncode 48 2>/dev/null
+        wpa_supplicant -Dwext -P /var/run/wpa_supplicant.$IF.pid -O /var/run/wpa_supplicant \
+            -i$IF -c/etc/wpa_supplicant.conf -B
+    fi
 fi
 { ps -ef 2>/dev/null || ps; } | grep -q '[w]pa_cli.*-a' || wpa_cli -B -i $IF -a $ACTION || log "wpa_cli action daemon failed"
 
