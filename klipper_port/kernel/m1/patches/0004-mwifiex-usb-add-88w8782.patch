@@ -71,7 +71,7 @@
 +		if (le16_to_cpu(card->udev->descriptor.idProduct) ==
 +		    USB8782_PID) {
 +			card->usb_boot_state = USB8XXX_FW_READY;
-+			msleep(100);
++			msleep(500);
 +		}
 +
  		/* Boot state changes after successful firmware download */

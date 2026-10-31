@@ -294,6 +294,10 @@
 			reg = <0xf8040000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 38 */
+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 
@@ -302,6 +306,10 @@
 			reg = <0xf8041000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 39 */
+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 
@@ -310,6 +318,10 @@
 			reg = <0xf8042000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 40 */
+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 
@@ -318,6 +330,10 @@
 			reg = <0xf8043000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 41 */
+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 
@@ -326,6 +342,10 @@
 			reg = <0xf8044000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 42 */
+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 
@@ -334,6 +354,10 @@
 			reg = <0xf8045000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 43 */
+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 
@@ -342,6 +366,10 @@
 			reg = <0xf8046000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 44 */
+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 
@@ -350,6 +378,10 @@
 			reg = <0xf8047000 0x100>;
 			gpio-controller;
 			#gpio-cells = <2>;
+			/* vendor IRQ 45 */
+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 			status = "disabled";
 		};
 

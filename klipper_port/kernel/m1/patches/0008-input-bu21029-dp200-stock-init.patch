@@ -1,0 +1,119 @@
+diff -ru a/drivers/input/touchscreen/bu21029_ts.c b/drivers/input/touchscreen/bu21029_ts.c
+--- a/drivers/input/touchscreen/bu21029_ts.c
++++ b/drivers/input/touchscreen/bu21029_ts.c
+@@ -14,6 +14,7 @@
+ #include <linux/i2c.h>
+ #include <linux/input.h>
+ #include <linux/input/touchscreen.h>
++#include <linux/input/mt.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/module.h>
+@@ -160,8 +161,28 @@
+ 	struct gpio_desc		*reset_gpios;
+ 	u32				x_plate_ohms;
+ 	struct touchscreen_properties	prop;
++	bool				dp200;
+ };
+ 
++/*
++ * rohm,dp200-stock (Sindoh DP200): the register init of the printer's
++ * vendor driver (rohm_ts, kernel 3.2), with CFR0 CALIB set and the LDO
++ * left at its reset value, and the stock event codes: ABS_MT_POSITION_X/Y
++ * with the vendor's raw ranges, which the printer's screen software expects.
++ */
++static const struct {
++	u8 reg;
++	u8 value;
++} bu21029_dp200_init[] = {
++	{ 0x00, 0x20 }, { 0x08, 0xa6 }, { 0x10, 0x59 }, { 0x18, 0xad },
++	{ 0x20, 0x74 }, { 0x28, 0x50 }, { 0x48, 0x0f }, { 0x50, 0x0f },
++	{ 0x58, 0x72 }, { 0x60, 0x00 }, { 0xa8, 0x00 },
++};
++#define DP200_MIN_X	0xbe
++#define DP200_MAX_X	0xf5a
++#define DP200_MIN_Y	0x186
++#define DP200_MAX_Y	0xe7e
++
+ static void bu21029_touch_report(struct bu21029_ts_data *bu21029, const u8 *buf)
+ {
+ 	u16 x, y, z1, z2;
+@@ -183,6 +204,20 @@
+ 	z1 = (buf[4] << 4) | (buf[5] >> 4);
+ 	z2 = (buf[6] << 4) | (buf[7] >> 4);
+ 
++	if (bu21029->dp200) {
++		/* the vendor driver reports every sample with the pen down */
++		if (!z1)
++			return;
++		input_report_abs(bu21029->in_dev, ABS_MT_POSITION_X, x);
++		input_report_abs(bu21029->in_dev, ABS_MT_POSITION_Y, y);
++		input_mt_sync(bu21029->in_dev);
++		touchscreen_report_pos(bu21029->in_dev, &bu21029->prop,
++				       x, y, false);
++		input_report_key(bu21029->in_dev, BTN_TOUCH, 1);
++		input_sync(bu21029->in_dev);
++		return;
++	}
++
+ 	if (z1 && z2) {
+ 		/*
+ 		 * calculate Rz (pressure resistance value) by equation:
+@@ -212,7 +247,10 @@
+ 	struct bu21029_ts_data *bu21029 = timer_container_of(bu21029, t,
+ 							     timer);
+ 
+-	input_report_abs(bu21029->in_dev, ABS_PRESSURE, 0);
++	if (bu21029->dp200)
++		input_mt_sync(bu21029->in_dev);
++	else
++		input_report_abs(bu21029->in_dev, ABS_PRESSURE, 0);
+ 	input_report_key(bu21029->in_dev, BTN_TOUCH, 0);
+ 	input_sync(bu21029->in_dev);
+ }
+@@ -293,6 +331,30 @@
+ 		goto err_out;
+ 	}
+ 
++	if (bu21029->dp200) {
++		for (i = 0; i < ARRAY_SIZE(bu21029_dp200_init); ++i) {
++			error = i2c_smbus_write_byte_data(i2c,
++					bu21029_dp200_init[i].reg,
++					bu21029_dp200_init[i].value);
++			if (error < 0) {
++				dev_err(&i2c->dev,
++					"failed to write %#02x to %#02x: %d\n",
++					bu21029_dp200_init[i].value,
++					bu21029_dp200_init[i].reg, error);
++				goto err_out;
++			}
++		}
++		usleep_range(500, 1000);
++		/* the vendor starts the autoscan with a data byte of 0 */
++		error = i2c_smbus_write_byte_data(i2c, BU21029_AUTOSCAN, 0);
++		if (error < 0) {
++			dev_err(&i2c->dev, "failed to start autoscan\n");
++			goto err_out;
++		}
++		enable_irq(bu21029->client->irq);
++		return 0;
++	}
++
+ 	for (i = 0; i < ARRAY_SIZE(init_table); ++i) {
+ 		error = i2c_smbus_write_byte_data(i2c,
+ 						  init_table[i].reg,
+@@ -382,6 +444,14 @@
+ 	in_dev->open		= bu21029_start_chip;
+ 	in_dev->close		= bu21029_stop_chip;
+ 
++	bu21029->dp200 = device_property_read_bool(dev, "rohm,dp200-stock");
++	if (bu21029->dp200) {
++		input_set_abs_params(in_dev, ABS_MT_POSITION_X,
++				     DP200_MIN_X, DP200_MAX_X, 0, 0);
++		input_set_abs_params(in_dev, ABS_MT_POSITION_Y,
++				     DP200_MIN_Y, DP200_MAX_Y, 0, 0);
++	}
++
+ 	input_set_capability(in_dev, EV_KEY, BTN_TOUCH);
+ 	input_set_abs_params(in_dev, ABS_X, 0, MAX_12BIT, 0, 0);
+ 	input_set_abs_params(in_dev, ABS_Y, 0, MAX_12BIT, 0, 0);

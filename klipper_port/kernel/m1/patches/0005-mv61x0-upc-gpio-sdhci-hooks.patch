@@ -26,7 +26,7 @@
 +obj-$(CONFIG_MV61X0_UPC)	+= mv61x0-upc.o
 --- a/drivers/gpio/Kconfig
 +++ b/drivers/gpio/Kconfig
-@@ -506,6 +506,15 @@
+@@ -506,6 +506,16 @@
  	help
  	  Say yes here to support the Mediatek MT7621 SoC GPIO device.
  
@@ -35,6 +35,7 @@
 +	depends on ARCH_MV61X0 || COMPILE_TEST
 +	depends on OF
 +	select GPIO_GENERIC
++	select GPIOLIB_IRQCHIP
 +	help
 +	  The eight 32-line GPIO banks of the Marvell 88PA61x0 printer
 +	  SoCs (Sindoh DP200). Nothing is driven at probe.
