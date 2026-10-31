@@ -65,3 +65,16 @@ A final frame equals the frame before the moves. Afterwards: IO reset (lamp
 off), `upctool stop` (CPUSoftReset 0), and reboot logged "cores held, outputs
 off". **Klipper drives all three axes on the mainline kernel**, with the
 directions recorded on stock. No heat, no homing.
+
+## m1-full built-ins, and the RTC with the corrected setup (the user approved, 2026-10-30)
+
+- **m1-full 6336b183** (pads, touch pins, NAND/UBI read-only, RTC read-only)
+  applies everything at boot: XIRD 0x3C040000 (= stock), "cores held, outputs
+  safe", and the touch controller answers at 0x40 with no manual step.
+- **m1-full-rtcsetup 940c97cc**, with the user's OK for the corrected values:
+  "setup: APB c0000080 -> 80000080", "vendor setup done", control 0xfc,
+  +0x20 0x00ffffff (= stock). The counter is **clean seconds** (+3 in 3 s;
+  +2 in 2.1 s). The stored time survived the setup, and the kernel set the
+  system clock from it ("setting system clock to 2026-10-31T02:16:48 UTC").
+  That's about 1 h 38 min ahead of real UTC, as stock left it; NTP at boot
+  corrects it. The RTC keeps time across reboots.
