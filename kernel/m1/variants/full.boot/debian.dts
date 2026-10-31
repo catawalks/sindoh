@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * m1-debian: the full kernel booting the Debian root on the SD card with
+ * init.mainline (docs/kernel/debian_root_boot.md, step D2)
+ */
+#include "../full.dts"
+
+&{/chosen} {
+	bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 root=/dev/mmcblk0p1 rootwait ro rdinit=/nonexistent init=/etc/dp200/init.mainline panic=10";
+};

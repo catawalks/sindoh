@@ -32,6 +32,7 @@ FB = '/dev/fb0'
 EV = next((p for p in ('/dev/event0', '/dev/input/event0') if os.path.exists(p)), '/dev/event0')
 API = 'http://127.0.0.1:7125'
 FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+MONO = '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf'
 
 # Touch calibration (4-corner test 2026-10-20): axes swapped, raw x inverted
 CAL_U = (0.14471, -66.6)              # u = a * raw_y + b
@@ -99,13 +100,13 @@ C_BED = (110, 180, 255)
 
 _fonts = {}
 
-def font(size):
-    if size not in _fonts:
+def font(size, path=FONT):
+    if (size, path) not in _fonts:
         try:
-            _fonts[size] = ImageFont.truetype(FONT, size)
+            _fonts[size, path] = ImageFont.truetype(path, size)
         except OSError:
-            _fonts[size] = ImageFont.load_default()
-    return _fonts[size]
+            _fonts[size, path] = font(size) if path != FONT else ImageFont.load_default()
+    return _fonts[size, path]
 
 # ---------------------------------------------------------------------------
 # Framebuffer output: RGB565 LE, only the changed region is converted/written
@@ -316,6 +317,8 @@ class UI:
         # bed level page: mode start/probing/result, live points {(col, row): z}
         self.bl = {'rev': 0, 'mode': 'start', 'pts': {}, 'mesh': None, 'xs': None, 'ys': None,
                    't0': 0.0, 'checked': 0.0, 'busy': False}
+        # console page: the kernel log, refreshed while shown
+        self.con = {'rev': 0, 'checked': 0.0, 'busy': False, 'lines': []}
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
@@ -326,6 +329,8 @@ class UI:
                 self.wifi_refresh()
             if self.screen == 'network':
                 self.net['checked'] = 0
+            if self.screen == 'console':
+                self.con['checked'] = 0
         elif kind.startswith('wifi') or kind.startswith('kb'):
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
@@ -466,6 +471,35 @@ class UI:
             finally:
                 bl['rev'] += 1
         self._bg('Bed level probe', fn)
+
+    # ---- console page (kernel log) -------------------------------------
+    def console_tick(self):
+        """While the console page is shown, read the kernel log (1 s).
+        dmesg -S uses syslog(2): stock 3.2 has no readable /dev/kmsg."""
+        c = self.con
+        if self.screen != 'console' or c['busy'] or time.time() - c['checked'] < 1:
+            return
+        c['busy'], c['checked'] = True, time.time()
+
+        def work():
+            import subprocess
+            try:
+                out = ''
+                for cmd in (['dmesg', '-S'], ['dmesg']):
+                    try:
+                        out = subprocess.run(cmd, capture_output=True, text=True, errors='replace',
+                                             timeout=5).stdout
+                    except (OSError, subprocess.SubprocessError):
+                        continue
+                    if out:
+                        break
+                lines = out.splitlines()[-200:] or ['(no kernel log: dmesg failed)']
+                if lines != c['lines']:
+                    c['lines'] = lines
+                    c['rev'] += 1
+            finally:
+                c['busy'] = False
+        threading.Thread(target=work, daemon=True).start()
 
     def bl_tick(self):
         """While probing, pick up each finished point from the console (1 s)."""
@@ -998,6 +1032,9 @@ class UI:
         if self.key_down is not None and time.time() - self.key_down >= HOLD_WARN:
             self.page_key_held(d)
             return im
+        if self.screen == 'console':
+            self.page_console(d)
+            return im
         if self.dimmed():
             return Image.new('RGB', (PW, PH), (0, 0, 0))
         if self.screen in self.NO_KLIPPER:
@@ -1048,7 +1085,8 @@ class UI:
             and not self.busy and self.st['extruder']['target'] == 0 \
             and self.st['heater_bed']['target'] == 0
         t = self.settings.get('timeout', DIM_AFTER)
-        return idle and t and time.time() - self.last_touch > t
+        # the console page stays up until it is tapped
+        return idle and t and time.time() - self.last_touch > t and self.screen != 'console'
 
     def header(self, d, st):
         d.rectangle((0, 0, PW, 64), fill=C_BAR)
@@ -1427,7 +1465,24 @@ class UI:
         d.text((20, 230), 'and wakes on the first tap.', font=font(18), fill=C_DIM)
         self.grid(d, [
             ('TIMEOUT', ('screen', 'timeout'), C_BTN, 28, fmt_timeout(t)),
+            ('CONSOLE', ('screen', 'console'), C_BTN, 28, 'tap to close'),
         ], top=280)
+
+    def page_console(self, d):
+        """The kernel log, newest at the bottom, full screen (like the text
+        console, which isn't drawn on the panel). Any tap closes it."""
+        f = font(14, MONO)
+        lh = 17
+        cols = max(10, int((PW - 12) // d.textlength('M', font=f)))    # monospace
+        rows = []
+        for l in self.con['lines']:
+            l = l.expandtabs(8)
+            rows.extend(l[i:i + cols] for i in range(0, max(len(l), 1), cols))
+        rows = rows[-((PH - 8) // lh):]
+        d.rectangle((0, 0, PW, PH), fill=(0, 0, 0))
+        for i, r in enumerate(rows):
+            d.text((6, 4 + i * lh), r, font=f, fill=(200, 200, 200))
+        self.buttons.append(((0, 0, PW, PH), ('screen', 'display')))
 
     def page_timeout(self, d, st):
         cur = self.settings.get('timeout', DIM_AFTER)
@@ -1659,12 +1714,13 @@ def main():
         ui.net_tick()
         ui.shaper_tick()
         ui.bl_tick()
+        ui.console_tick()
         # Redraw only when something can have changed: new status, touch,
         # STOP being held, the clock minute, a message or busy state, dimming,
         # WiFi state (scan results, connect progress).
         key = (time.strftime('%H:%M'), ui.busy, ui.msg and time.time() < ui.msg[1],
                bool(ui.dimmed()), ui.screen, ui.confirm is not None, view_key(ui), ui.err,
-               ui.wf['rev'], ui.net['rev'], ui.shp['rev'], ui.bl['rev'])
+               ui.wf['rev'], ui.net['rev'], ui.shp['rev'], ui.bl['rev'], ui.con['rev'])
         if events or ui.press or ui.key_down is not None or key != last_key:
             panel.show(ui.render())
             last_key = key

@@ -57,7 +57,8 @@ def catch(port, log):
     s = serial.Serial(port, 115200, timeout=0.01)
     s.reset_input_buffer()
     # the m1 test kernels' /init ignores a plain reboot: force it there only
-    s.write(b'sync; case $(uname -r) in 6.*) reboot -f ;; *) reboot ;; esac\n')
+    # (the Debian root on mainline has no /sbin/reboot: BusyBox's then)
+    s.write(b'sync; case $(uname -r) in 6.*) reboot -f || busybox reboot -f ;; *) reboot ;; esac\n')
     t0, buf = time.time(), b''
     while time.time() - t0 < 120:
         buf += s.read(4096)

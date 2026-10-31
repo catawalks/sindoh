@@ -328,6 +328,19 @@ cat "$KOUT/arch/arm/boot/zImage" "$DTB" > "$OUT/$NAME-zImage-dtb.bin"
 mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 \
 	-n "DP200 $NAME linux-$KVER" -d "$OUT/$NAME-zImage-dtb.bin" \
 	"$OUT/$NAME.uimg" > /dev/null
+
+# 9b. Boot setups of the same kernel: variants/<v>.boot/<b>.dts (the
+# variant's DTS with other bootargs) gives $OUT/m1-<b>-zImage-dtb.bin, e.g.
+# full.boot/debian.dts -> m1-debian (docs/kernel/debian_root_boot.md)
+for BDTS in "$M1/variants/$VARIANT.boot"/*.dts; do
+	[ -f "$BDTS" ] || continue
+	B=m1-$(basename "$BDTS" .dts)
+	cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp 		-I "$KSRC/include" -I "$KSRC/scripts/dtc/include-prefixes" 		-I "$KSRC/arch/arm/boot/dts/marvell" -I "$M1/variants" 		"$BDTS" |
+		"$KOUT/scripts/dtc/dtc" -q -I dts -O dtb -o "$OUT/$B.dtb" -
+	cat "$KOUT/arch/arm/boot/zImage" "$OUT/$B.dtb" > "$OUT/$B-zImage-dtb.bin"
+	cp "$KOUT/vmlinux" "$OUT/$B-vmlinux"
+	(cd "$OUT" && md5sum "$B-zImage-dtb.bin")
+done
 cp "$KOUT/vmlinux" "$OUT/$NAME-vmlinux"
 cp "$KOUT/System.map" "$OUT/$NAME-System.map"
 cp "$KOUT/.config" "$OUT/$NAME-full.config"

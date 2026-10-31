@@ -156,3 +156,22 @@ groups, the serial root shell and nl80211 Wi-Fi.
   - 66.6, v = -0.22272*x + 856.2) they map to (80, 81), (408, 90), (391, 718)
   and (68, 735) on the 480x800 portrait screen: the right corners. The mainline
   driver's raw values match stock's, and the screen app needs no change.
+
+## No console on the panel (2026-10-31)
+
+The stock kernel never drew a text console on the panel: U-Boot's boot logo
+stayed up until the screen app drew. The m1-full kernel had fbcon and
+`console=tty0`, so the logo was wiped when simplefb registered, kernel
+messages scrolled over the panel during boot, and later over the screen app
+(the stopgap: init.mainline unbinds fbcon).
+- **Kernel:** `variants/full.config` turns `CONFIG_FRAMEBUFFER_CONSOLE` off.
+  simplefb keeps /dev/fb0 for the screen app and never touches the buffer,
+  so the logo stays. The serial console (ttyS0) is unchanged.
+- **Bootargs:** no `console=tty0` (and no `consoleblank`) in full.dts or the
+  boot DTS files.
+- **m1-debian / m1-debian-ro** now come from `variants/full.boot/*.dts`
+  (build.sh step 9b), built with `VARIANT=full`; they were hand-made DTBs
+  before.
+- **Console on request:** the screen app's Display page has CONSOLE, which
+  shows the kernel log (`dmesg -S`, which also works on stock 3.2) full screen
+  until the panel is tapped.
