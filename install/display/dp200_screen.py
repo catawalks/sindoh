@@ -56,6 +56,7 @@ HW_CUT = 2.0                          # measured roughly: "2 s hold" switched it
 HOLD_WARN = 0.4                       # s held before the warning appears
 LONG_POWER = 5.0
 POWER_REQ = '/run/dp200/power'        # "reboot" / "poweroff" for dp200-powerkey.sh
+BOOTBAR_STOP = '/sys/module/dp200_bootbar/parameters/stop'
 
 # Preheat presets (nozzle, bed); bed max_temp is 100, nozzle 260
 PRESETS = (('PLA', 200, 60), ('ABS', 240, 90))
@@ -1680,6 +1681,13 @@ def main():
                 pass
         ui.render().save(out)
         return
+    # Mainline: end the kernel's boot progress bar (dp200-bootbar) before the
+    # first frame, so it can't draw over this app. Not there on stock.
+    try:
+        with open(BOOTBAR_STOP, 'w') as f:
+            f.write('1')
+    except OSError:
+        pass
     panel, touch, pkey = Panel(), Touch(), PowerKey()
     unblank()
     unblanked = time.time()

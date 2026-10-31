@@ -1,0 +1,28 @@
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -1797,6 +1797,15 @@
+ 	  Configuration re: surface address, size, and format must be provided
+ 	  through device tree, or plain old platform data.
+ 
++config DP200_BOOTBAR
++	bool "Sindoh DP200 boot progress bar"
++	depends on ARCH_MV61X0 || COMPILE_TEST
++	depends on OF && HAS_IOMEM && MTD
++	help
++	  The progress bar the vendor kernel draws over U-Boot's boot logo
++	  (bar_color and boot_time from the U-Boot environment). Writes
++	  only into the simple-framebuffer memory.
++
+ config FB_SSD1307
+ 	tristate "Solomon SSD1307 framebuffer support"
+ 	depends on FB && I2C
+--- a/drivers/video/fbdev/Makefile
++++ b/drivers/video/fbdev/Makefile
+@@ -123,6 +123,7 @@
+ obj-$(CONFIG_FB_OF)               += offb.o
+ obj-$(CONFIG_FB_SSD1307)	  += ssd1307fb.o
+ obj-$(CONFIG_FB_SIMPLE)           += simplefb.o
++obj-$(CONFIG_DP200_BOOTBAR)       += dp200-bootbar.o
+ 
+ # the test framebuffer is last
+ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
