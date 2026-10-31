@@ -11,14 +11,32 @@
 
 &sdhci0 { status = "okay"; };
 &upc { status = "okay"; };
-&i2c2 { status = "okay"; };
 /*
- * RTC: the vendor setup (user-approved 2026-10-30, corrected +0x20 values).
- * set_time (marvell,set-time) stays off until the user OKs it.
+ * Touch controller: ROHM BU21029GUL at 0x40, interrupt GPIO 66 (bank 2
+ * line 2, falling edge as the stock pin configuration 0x320), reset/enable
+ * GPIO 67 held high by gpio2's board setup (so no reset-gpios here: the bank
+ * is read-only). rohm,dp200-stock: the vendor rohm_ts register init, and
+ * ABS_MT_POSITION_X/Y with the stock raw ranges (patch 0008).
+ */
+&i2c2 {
+	status = "okay";
+
+	touchscreen@40 {
+		compatible = "rohm,bu21029";
+		reg = <0x40>;
+		interrupt-parent = <&gpio2>;
+		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+		rohm,x-plate-ohms = <600>;
+		rohm,dp200-stock;
+	};
+};
+/*
+ * RTC: the vendor setup and set_time, both user-approved 2026-10-30.
  */
 &rtc {
 	status = "okay";
 	marvell,vendor-setup;
+	marvell,set-time;	/* user-approved 2026-10-30: hwclock -w */
 };
 &nand_controller { status = "okay"; };
 &gpio0 { status = "okay"; marvell,read-only; };

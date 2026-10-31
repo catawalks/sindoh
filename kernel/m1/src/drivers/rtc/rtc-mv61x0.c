@@ -154,7 +154,7 @@ static int mv61x0_rtc_probe(struct platform_device *pdev)
 	}
 
 	t0 = readl(mr->base + MV61X0_RTC_TIME);
-	mdelay(2100);
+	msleep(2100);
 	t1 = readl(mr->base + MV61X0_RTC_TIME);
 	dev_info(dev, "control %08x, time %08x -> %08x over 2.1 s%s\n",
 		 readl(mr->base + MV61X0_RTC_CTRL), t0, t1,
@@ -185,6 +185,8 @@ static struct platform_driver mv61x0_rtc_driver = {
 	.driver	= {
 		.name		= "mv61x0-rtc",
 		.of_match_table	= mv61x0_rtc_of_match,
+		/* the setup sleeps ~0.5 s and the probe 2.1 s: keep them off the boot path */
+		.probe_type	= PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
 module_platform_driver(mv61x0_rtc_driver);

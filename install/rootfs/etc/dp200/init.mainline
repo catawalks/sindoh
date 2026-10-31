@@ -1,10 +1,10 @@
 #!/bin/sh
 # DRAFT (2026-10-30), not used yet: PID 1 for booting our Debian root directly
 # on the mainline kernel (docs/mainline_userspace.md), with
-#   root=/dev/mmcblk0p1 rootwait ro ubi.mtd=filesystem rdinit=/nonexistent
+#   root=/dev/mmcblk0p1 rootwait ro rdinit=/nonexistent
 #   init=/etc/dp200/init.mainline consoleblank=0
 # (the m1-debian DTB; rdinit=/nonexistent skips the kernel's built-in
-# initramfs, ubi.mtd attaches the stock NAND root read-only)
+# initramfs)
 # On stock 3.2 nothing changes: there, /dp200/dp200-start.sh enters this root
 # as a chroot and runs rc.dp200 itself.
 #
@@ -44,8 +44,18 @@ hostname -F /etc/hostname 2>/dev/null || hostname dp200
 # The 8782 firmware: dp200-start.sh copies it into this root at each stock
 # boot. A root that never ran under stock takes it from the stock NAND root,
 # read-only (NAND and UBI are read-only on mainline), and then the 8782 is
-# re-enumerated so that mwifiex retries the download it failed at boot.
+# re-enumerated so that mwifiex retries the download it failed at boot. The
+# UBI attach is done here, only when needed: at boot (ubi.mtd=) its NAND
+# reads kept the kernel busy just when the 8782 firmware came up.
 FW=/lib/firmware/mrvl/usb8782_uapsta.bin
+if [ ! -f $FW ] && [ ! -e /dev/ubi0 ]; then
+    if command -v ubiattach >/dev/null; then
+        ubiattach -m 6 /dev/ubi_ctrl || ubiattach /dev/ubi_ctrl -m 6
+    else
+        busybox ubiattach -m 6 /dev/ubi_ctrl 2>/dev/null ||
+            echo "no ubiattach (mtd-utils or BusyBox): 8782 firmware not copied"
+    fi
+fi
 if [ ! -f $FW ] && [ -e /dev/ubi0 ]; then
     mkdir -p /run/stockroot
     if mount -t ubifs -o ro ubi0:filesystem /run/stockroot; then
