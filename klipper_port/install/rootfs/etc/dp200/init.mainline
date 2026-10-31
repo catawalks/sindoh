@@ -85,6 +85,13 @@ for d in /dev/ttyACM* /dev/ttyUSB* /dev/i2c-3; do
     [ -e "$d" ] && chgrp klipper "$d" && chmod 660 "$d"
 done
 
+# The panel belongs to the screen app: mainline binds the text console
+# (fbcon) to simplefb, which keeps drawing kernel messages and a cursor over
+# the app. Unbind it (the vendor kernel had no fbcon on the panel).
+for v in /sys/class/vtconsole/vtcon*; do
+    grep -q "frame buffer" $v/name 2>/dev/null && echo 0 > $v/bind
+done
+
 # Bring-up aid: a root shell on the serial console (physical access only),
 # since this init runs no getty and the root has no ssh
 setsid sh -c 'exec /bin/sh -i </dev/ttyS0 >/dev/ttyS0 2>&1' &
