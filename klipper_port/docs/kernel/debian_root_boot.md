@@ -149,7 +149,7 @@ groups, the serial root shell and nl80211 Wi-Fi.
 - **RTC:** vendor setup, "set_time enabled", system clock set from the RTC
   (2026-10-31T03:01:44Z); /sys/class/rtc/rtc0 counts. (The user approved set_time.)
 - **Accelerometer:** /dev/ttyACM0 root:klipper 660.
-- **Still open:** NTP (Debian's busybox has no ntpd applet), real touch taps.
+- **Still open:** NTP (Debian's busybox has no ntpd applet; done, see "Clock sync on mainline"), real touch taps.
 - **Touch taps (the user at the panel):** raw ABS_MT X/Y from /dev/input/event0 at the
   four corners: TL (3480, 1010), TR (3440, 3280), BR (620, 3165),
   BL (545, 930). Through dp200_screen.py's stock calibration (u = 0.14471*y
@@ -175,3 +175,13 @@ messages scrolled over the panel during boot, and later over the screen app
 - **Console on request:** the screen app's Display page has CONSOLE, which
   shows the kernel log (`dmesg -S`, which also works on stock 3.2) full screen
   until the panel is tapped.
+
+## Clock sync on mainline (2026-10-31)
+
+Debian's busybox has no ntpd applet, so init.mainline's one-shot NTP did
+nothing ("ntpd: applet not found"). It now runs `/dp200/dp200-sntp.py`
+(install/printer): SNTP in Python's standard library, so no new packages. It
+retries for up to 120 s while the network comes up, sets the clock, and saves
+it to the RTC with `busybox hwclock -w -u`. Tested on the printer: the clock
+was 629 s fast (RTC drift since the last set). After the sync, the system
+clock and /sys/class/rtc/rtc0 agree with the PC.
