@@ -150,3 +150,9 @@ groups, the serial root shell and nl80211 Wi-Fi.
   (2026-10-31T03:01:44Z); /sys/class/rtc/rtc0 counts. (The user approved set_time.)
 - **Accelerometer:** /dev/ttyACM0 root:klipper 660.
 - **Still open:** NTP (Debian's busybox has no ntpd applet), real touch taps.
+- **Touch taps (the user at the panel):** raw ABS_MT X/Y from /dev/input/event0 at the
+  four corners: TL (3480, 1010), TR (3440, 3280), BR (620, 3165),
+  BL (545, 930). Through dp200_screen.py's stock calibration (u = 0.14471*y
+  - 66.6, v = -0.22272*x + 856.2) they map to (80, 81), (408, 90), (391, 718)
+  and (68, 735) on the 480x800 portrait screen: the right corners. The mainline
+  driver's raw values match stock's, and the screen app needs no change.
