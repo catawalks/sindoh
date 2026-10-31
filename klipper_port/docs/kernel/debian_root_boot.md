@@ -41,3 +41,25 @@ Things to settle first:
 - **The touch device** is `/dev/input/event0`, and the touchscreen driver itself is still pending (docs/kernel/touch_bu21029.md).
 - **Power-off:** `rc.dp200 stop` must hold the UPC cores before reboot or poweroff, as init.mainline's traps do.
 - **The RTC** keeps time across reboots on mainline now (vendor setup on). `hwclock -w` needs `marvell,set-time`, which is off until the user OKs it.
+
+## Step D1 result (2026-10-30 evening): the Debian root runs on mainline, read-only
+
+The user lifted the card rule for this read-only test and swapped in the 4 GB card.
+- **U-Boot can't load from the 4 GB card:** its ext4 uses extents, which U-Boot
+  2011's ext2 reader can't follow ("File not found" for a file that exists).
+  The SD fast path only works with the 2 GB card. With the 4 GB card in, the
+  m1-eth loader goes in over the serial uploader (10:45), followed by
+  `uboot_cmd.py --pinmux-sd`.
+  Forgetting --pinmux-sd once left the kernel at "Waiting for root device"
+  (no card detected). A serial BREAK + SysRq `b` rebooted it.
+- **With the pads:** the loader fetched m1-debian-ro (21c8d519) and kexec'd it.
+  "mmcblk0: mmc0:59b4 SD 3.68 GiB", "mounted filesystem ... ro without
+  journal", "VFS: Mounted root (ext4 filesystem) readonly", "Run /bin/sh as
+  init process".
+- **Read-only checks:** Debian GNU/Linux 13 (trixie) on 6.18.59, Python
+  3.13.5, and /home/klipper has klipper, klippy-env, moonraker, moonraker-env,
+  mainsail and printer_data. **/lib/firmware/mrvl is missing**: the 8782
+  firmware has to be added to the root for mainline Wi-Fi (Wi-Fi failed to
+  start in this boot: cmd 0xa9 timeout).
+- Left with SysRq `b`. Nothing on the card was written by mainline; the only
+  write was the loader copy in /kernels from stock, which was removed again.
