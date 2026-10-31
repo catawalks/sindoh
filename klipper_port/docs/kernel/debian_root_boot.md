@@ -197,3 +197,27 @@ is not drawn by U-Boot, so mainline needs its own bar. Not done yet.
 The screen app's waiting page showed `[Errno 111] Connection refused` until
 Moonraker listened. It now reads "Moonraker is starting (not answering
 yet)" (err_text).
+
+## Boot progress bar on mainline (2026-10-31)
+
+`src/drivers/video/fbdev/dp200-bootbar.c` (CONFIG_DP200_BOOTBAR, patch 0009)
+draws the bar the vendor's `rodin_progress_bar` (mv61tft) draws:
+- **Look:** a 14 x 280 px rounded outline, filled one line at a time over
+  `boot_time` s. It stays full at the end. White for `bar_color=0`, black
+  for 1.
+- **Settings:** `bar_color`, `boot_time`, `bar_shift_x` and `bar_shift_y`
+  come from the U-Boot env (MTD u-boot-env, read-only; the CRC'd env is
+  4 KB). The kernel command line can override them as
+  `dp200_bootbar.{bar_color,boot_time,shift_x,shift_y}`.
+- **Position:** the vendor's bar is not centered. It spans screen x 90-369 of
+  480, so 90 px on the left and 110 px on the right, at y 480-493 of 800. The
+  default `bar_shift_x` is +10, which centers it. 0/0 is the stock spot; the
+  stock kernel ignores both variables.
+- **End:** the screen app writes 1 to
+  /sys/module/dp200_bootbar/parameters/stop before its first frame. That
+  waits for the thread, so the bar never draws over the app.
+- **Tested** (m1-debian ed50a2af, before the shift): "white bar, 17 s" at
+  1.3 s, stopped at 23 s. The owner saw the bar on the panel.
+
+init.mainline's reboot/power-off path called `reboot -f` / `poweroff -f`,
+which the Debian root doesn't have; it now uses BusyBox's.

@@ -118,8 +118,9 @@ stop_all() {
     /etc/dp200/rc.dp200 stop
     sync
     mount -o remount,ro / 2>/dev/null
-    [ "$1" = reboot ] && reboot -f
-    poweroff -f
+    # BusyBox's: the Debian root has no /sbin/reboot or poweroff (no systemd)
+    [ "$1" = reboot ] && busybox reboot -f
+    busybox poweroff -f
 }
 # BusyBox reboot/halt/poweroff signal PID 1 with TERM/USR1/USR2 (the power
 # key script calls them); halt is treated as poweroff (nothing cuts power:
