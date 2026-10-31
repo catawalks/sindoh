@@ -85,7 +85,9 @@ fi
 install -d /etc/dp200 /dp200 $KHOME/printer_data/config $KHOME/printer_data/gcodes $KHOME/printer_data/logs
 install -m 755 $PORT/install/rootfs/etc/dp200/rc.dp200 /etc/dp200/rc.dp200
 install -m 755 $PORT/install/display/dp200_screen.py $PORT/install/display/dp200_wifi.py $PORT/install/display/dp200_net.py /usr/local/bin/
-install -m 755 $PORT/install/printer/*.sh /dp200/
+install -m 755 $PORT/install/printer/*.sh $PORT/install/printer/*.py /dp200/
+# PID 1 for a mainline boot of this root (unused on stock)
+install -m 755 $PORT/install/rootfs/etc/dp200/init.mainline /etc/dp200/init.mainline
 cp -n $PORT/install/rootfs/home/klipper/printer_data/config/moonraker.conf $KHOME/printer_data/config/ || true
 # dp200_*.cfg belong to this port (replaced on every build/update);
 # printer.cfg is the user's file (only created if missing)
