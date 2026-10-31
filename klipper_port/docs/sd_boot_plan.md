@@ -236,3 +236,14 @@ its own command.
 4. Then try way C. Write U-Boot to the card, and compare with the boot ROM
    header seen at NAND offset 0 to learn the format. **Experimental; only
    with the user present.**
+
+**Open lead (2026-10-31): the SD pads in boot ROM mode 6.** Found after the
+DIP tests: with U-Boot from NAND, the SD clock/command pads (GPIO1 pins 0-1)
+aren't set up for SD (0x1001 / 0). The data pads (GPIO0 3-6) read 0x41002.
+U-Boot's `mmc` only works after pins 0/1 are set to 0x1002
+(`uboot_cmd.py --pinmux-sd`). In DIP-SD mode the ROM sets the pins itself,
+before U-Boot. If it writes only the function bits and not what 0x1002 /
+0x41002 add (bit 12, bit 18: likely pull-up or drive), the card may never
+answer the ROM. That would fit the silent hang. Checkable offline: the
+values the ROM dump writes to 0xf8041080/84 and 0xf804008c-98 in mode 6. The
+file system (ext2/ext4) plays no part there: the ROM reads raw sectors 0-19.

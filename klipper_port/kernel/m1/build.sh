@@ -338,6 +338,10 @@ for BDTS in "$M1/variants/$VARIANT.boot"/*.dts; do
 	cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp 		-I "$KSRC/include" -I "$KSRC/scripts/dtc/include-prefixes" 		-I "$KSRC/arch/arm/boot/dts/marvell" -I "$M1/variants" 		"$BDTS" |
 		"$KOUT/scripts/dtc/dtc" -q -I dts -O dtb -o "$OUT/$B.dtb" -
 	cat "$KOUT/arch/arm/boot/zImage" "$OUT/$B.dtb" > "$OUT/$B-zImage-dtb.bin"
+	# for bootm straight from U-Boot (e.g. raw on the SD card: tools/sd_raw_boot.sh)
+	mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 \
+		-n "DP200 $B linux-$KVER" -d "$OUT/$B-zImage-dtb.bin" \
+		"$OUT/$B.uimg" > /dev/null
 	cp "$KOUT/vmlinux" "$OUT/$B-vmlinux"
 	(cd "$OUT" && md5sum "$B-zImage-dtb.bin")
 done

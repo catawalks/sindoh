@@ -14,7 +14,8 @@ Linux as normal.
 Commands go through uboot_upload.Console: typed without the terminator, the
 echo must match exactly, then ONE '\\r' (never an empty line: hush repeats the
 last command on one). Only read-only commands are allowed; 'reset' only via
---reset. setenv/saveenv/nand/mmc/i2c/run/mw/bootm/go are refused here.
+--reset. setenv/saveenv/nand/i2c/run/mw/bootm/go and mmc writes are refused here
+(mmc read only into the upload window).
 """
 import re
 import sys
@@ -44,6 +45,12 @@ def allowed_sd(cmd):
     if not argv or ';' in cmd or '$' in cmd:
         return False
     if argv[0] == 'mmc':
+        if len(argv) == 5 and argv[1] == 'read':           # mmc read ADDR BLK CNT (hex)
+            try:
+                addr, cnt = int(argv[2], 16), int(argv[4], 16)
+            except ValueError:
+                return False
+            return 0x01000000 <= addr and addr + cnt * 512 <= 0x17F00000
         return len(argv) >= 2 and argv[1] in ('rescan', 'info', 'list', 'part')
     if argv[0] in ('mmcinfo', 'ext2ls'):
         return True

@@ -221,3 +221,32 @@ draws the bar the vendor's `rodin_progress_bar` (mv61tft) draws:
 
 init.mainline's reboot/power-off path called `reboot -f` / `poweroff -f`,
 which the Debian root doesn't have; it now uses BusyBox's.
+
+## Fast boot from raw SD sectors (2026-10-31, the owner approved the write)
+
+U-Boot 2011 can't `ext2load` from the 4 GB card's ext4, but it can
+`mmc read` raw blocks. The card has one partition, starting at sector 8192.
+So the gap in front of it now holds `m1-debian.uimg` (build.sh makes a
+.uimg for each boot DTS), from **sector 64** (5986 sectors, about 1 MB
+spare).
+- **The gap wasn't empty:** sectors from about 4033 held leftover data
+  (incrementing 32-bit words, from an earlier formatting; no partition uses
+  it). All of sectors 1-8191 were saved first to
+  `/var/backups/sd_gap_sectors_1-8191.bin` on the card's root (md5 84e3ceea).
+- **Install:** `tools/sd_raw_install.sh [IMAGE]`, from either kernel. It
+  refuses if the image would reach partition 1, and reads the image back to
+  compare the md5.
+- **Boot:** `tools/sd_raw_boot.sh`. It stops the stack, catches U-Boot, sets
+  the SD pins (`--pinmux-sd`, RAM only), runs `mmcinfo` and
+  `mmc read 2000000 40 <blocks>`, compares the CRC with the local build,
+  then `bootm`. uboot_cmd.py allows `mmc read` only into the upload window.
+- **First boot:** the image was read and its CRC matched (c1088c1c). Init
+  ran at 5.3 s and the screen app at 23 s; Klipper was ready, and NTP set the
+  clock (it was 18.8 s off). About 1 minute from Linux to Linux, instead of
+  about 13 with the serial loader.
+- **Unclean stock reboot:** stock's catch reboot leaves the ext4 unclean, so
+  mainline replays the journal ("recovery complete"). The stock-side tool
+  now stops the stack first; the card stays mounted, though.
+- **Not automatic yet:** U-Boot still needs the commands typed each boot.
+  Making it the default boot is the owner's saveenv decision
+  (docs/printer_checks.md).
