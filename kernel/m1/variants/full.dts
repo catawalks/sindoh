@@ -22,7 +22,23 @@
 };
 &nand_controller { status = "okay"; };
 &gpio0 { status = "okay"; marvell,read-only; };
-&gpio1 { status = "okay"; marvell,read-only; };
+/*
+ * Bank 1 board setup, user-approved values only, so that a boot straight
+ * from U-Boot needs neither --pinmux-sd nor the eth loader's script:
+ * SD pins 0/1 = 0x1002 (the two selects U-Boot leaves different from
+ * stock), the Ethernet RGMII + MDC/MDIO pads 16-29 and 31 = 0x1001
+ * (eth-pinmux rev 2), and GPIO 62 (line 30, the PHY reset) driven high.
+ */
+&gpio1 {
+	status = "okay";
+	marvell,read-only;
+	marvell,init-output-high = <30>;
+	marvell,pin-config = <0 0x1002>, <1 0x1002>,
+		<16 0x1001>, <17 0x1001>, <18 0x1001>, <19 0x1001>,
+		<20 0x1001>, <21 0x1001>, <22 0x1001>, <23 0x1001>,
+		<24 0x1001>, <25 0x1001>, <26 0x1001>, <27 0x1001>,
+		<28 0x1001>, <29 0x1001>, <31 0x1001>;
+};
 /*
  * Touch controller (BU21029, I2C bus 2 at 0x40): GPIO 67 (bank 2 line 3) is
  * its reset/enable, driven high as stock (gr_def_mpp_list); GPIO 66 (line 2)

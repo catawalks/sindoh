@@ -1,7 +1,10 @@
 #!/bin/sh
 # DRAFT (2026-10-30), not used yet: PID 1 for booting our Debian root directly
 # on the mainline kernel (docs/mainline_userspace.md), with
-#   root=/dev/mmcblk0p1 rootwait init=/etc/dp200/init.mainline consoleblank=0
+#   root=/dev/mmcblk0p1 rootwait ro ubi.mtd=filesystem rdinit=/nonexistent
+#   init=/etc/dp200/init.mainline consoleblank=0
+# (the m1-debian DTB; rdinit=/nonexistent skips the kernel's built-in
+# initramfs, ubi.mtd attaches the stock NAND root read-only)
 # On stock 3.2 nothing changes: there, /dp200/dp200-start.sh enters this root
 # as a chroot and runs rc.dp200 itself.
 #
@@ -37,6 +40,27 @@ exec >> $LOG 2>&1 </dev/null
 echo "==== dp200 init $(date) kernel $(uname -r)"
 
 hostname -F /etc/hostname 2>/dev/null || hostname dp200
+
+# The 8782 firmware: dp200-start.sh copies it into this root at each stock
+# boot. A root that never ran under stock takes it from the stock NAND root,
+# read-only (NAND and UBI are read-only on mainline), and then the 8782 is
+# re-enumerated so that mwifiex retries the download it failed at boot.
+FW=/lib/firmware/mrvl/usb8782_uapsta.bin
+if [ ! -f $FW ] && [ -e /dev/ubi0 ]; then
+    mkdir -p /run/stockroot
+    if mount -t ubifs -o ro ubi0:filesystem /run/stockroot; then
+        if [ -f /run/stockroot$FW ]; then
+            mkdir -p /lib/firmware/mrvl && cp /run/stockroot$FW $FW &&
+                echo "8782 firmware copied from the stock NAND root"
+        fi
+        umount /run/stockroot
+    fi
+    for d in /sys/bus/usb/devices/*; do
+        [ "$(cat $d/idVendor 2>/dev/null):$(cat $d/idProduct 2>/dev/null)" = 1286:2040 ] || continue
+        echo 0 > $d/authorized; sleep 1; echo 1 > $d/authorized
+        echo "8782 re-enumerated ($d)"
+    done
+fi
 ifconfig lo 127.0.0.1 up
 
 # Stock names the touch device /dev/event0; mainline makes /dev/input/event0
