@@ -66,11 +66,25 @@ ifconfig lo 127.0.0.1 up
 # Stock names the touch device /dev/event0; mainline makes /dev/input/event0
 # (dp200_screen.py and rc.dp200 accept either).
 
+# No udev here: devtmpfs nodes are root-only. Give the services what
+# dp200-mounts.sh gives them in the stock-side chroot: the webcam to group
+# video (ustreamer runs as klipper), USB serial (accelerometer) and the
+# cartridge I2C bus to group klipper.
+chgrp video /dev/video* 2>/dev/null && chmod 660 /dev/video*
+for d in /dev/ttyACM* /dev/ttyUSB* /dev/i2c-3; do
+    [ -e "$d" ] && chgrp klipper "$d" && chmod 660 "$d"
+done
+
+# Bring-up aid: a root shell on the serial console (physical access only),
+# since this init runs no getty and the root has no ssh
+setsid sh -c 'exec /bin/sh -i </dev/ttyS0 >/dev/ttyS0 2>&1' &
+
 # Wi-Fi: on stock, the BusyBox side starts wpa_supplicant; here Debian's does
 CONF=/etc/dp200/wpa_supplicant.conf
 [ -f $CONF ] || { umask 077; printf 'ctrl_interface=/var/run/wpa_supplicant\nupdate_config=1\n' > $CONF; umask 022; }
 i=0
-while [ ! -e /sys/class/net/mlan0 ] && [ $i -lt 20 ]; do sleep 1; i=$((i + 1)); done
+while [ ! -e /sys/class/net/mlan0 ] && [ $i -lt 45 ]; do sleep 1; i=$((i + 1)); done
+[ -e /sys/class/net/mlan0 ] || echo "no mlan0 after ${i} s: Wi-Fi not started"
 [ -e /sys/class/net/mlan0 ] && wpa_supplicant -B -D nl80211 -i mlan0 -c $CONF -P /run/wpa_supplicant.pid
 
 # The helpers dp200-start.sh runs today, with ROOT=/
