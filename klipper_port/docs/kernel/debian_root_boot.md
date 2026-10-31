@@ -63,3 +63,71 @@ The user lifted the card rule for this read-only test and swapped in the 4 GB ca
   start in this boot: cmd 0xa9 timeout).
 - Left with SysRq `b`. Nothing on the card was written by mainline; the only
   write was the loader copy in /kernels from stock, which was removed again.
+
+## D2 preparation (offline, 2026-10-30 night)
+
+### Images, all with the same m1-full kernel
+
+| Image | bootargs (beyond the console) | Use |
+|---|---|---|
+| `m1-debian-ro` | `root=/dev/mmcblk0p1 rootwait ro rootflags=noload ubi.mtd=filesystem rdinit=/nonexistent init=/bin/sh` | D1 again, read-only |
+| `m1-debian` | `root=/dev/mmcblk0p1 rootwait ro ubi.mtd=filesystem rdinit=/nonexistent init=/etc/dp200/init.mainline` | **D2: read-write root plus rc.dp200 (Klipper, heaters, motors). Only with the user present and their OK** |
+
+The m1-full kernel now sets the SD and Ethernet pads itself, through gpio1's
+board setup with the user-approved values: SD pins 0/1 = 0x1002, RGMII +
+MDC/MDIO pins 16-29 and 31 = 0x1001, and GPIO 62 (PHY reset) high. A boot
+straight from U-Boot therefore no longer needs `--pinmux-sd` or the eth
+loader's script. `ubi.mtd=filesystem` attaches the stock NAND root at boot.
+It is read-only, since the MTD has no MTD_WRITEABLE.
+
+### 8782 firmware into the root (never published)
+
+- **Stock side:** `install/printer/dp200-start.sh` now copies
+  /lib/firmware/mrvl/usb8782_uapsta.bin into the Debian root when it is
+  missing or different. It runs at every stock boot, next to the existing
+  mlanutl copy.
+- **Mainline side:** `init.mainline`, when the file is missing, mounts the
+  stock UBIFS read-only (ubi0:filesystem, attached by the kernel), copies the
+  file, unmounts, and re-enumerates the 8782 (USB `authorized` 0/1). mwifiex
+  then retries the download it failed at boot.
+
+### init.mainline / helpers review (fixed)
+
+| Finding | Fix |
+|---|---|
+| `dp200-wifi.sh` checks for a running supplicant with `ps \| grep`. Debian's procps `ps` only lists the current terminal's processes, so it would start a second, `-Dwext` supplicant next to init.mainline's nl80211 one | `pidof` first (stock BusyBox has it too), `ps` as the fallback; `ps -ef` for the wpa_cli check |
+| `dp200-powerkey.sh` shuts down with the stock-side `dp200-start.sh stop`, which unmounts the chroot's mounts. With ROOT=/ that would hit the real root | With ROOT=/ it signals PID 1 instead (TERM = reboot, USR2 = poweroff). init.mainline's traps run `rc.dp200 stop` (UPC cores held), remount / read-only and reboot or power off |
+| The power key reads GPIO 187 (0xf8045000 bit 27) with `devmem` | Works on mainline (the input register shows the pad level whatever its function). Needs BusyBox `devmem` in the root, which init.mainline already lists |
+| cdc-acm | Built into m1-full: nothing to insmod. rc.dp200 has no insmod |
+| upctool | /usr/local/bin/upctool with /dev/upc0/1 and /dev/mem for DTCM. All present on mainline (test 1/2 and the motion test used the same) |
+| `iwpriv regioncode` in dp200-wifi.sh | wext-only; it fails quietly on mwifiex (stderr to /dev/null), harmless |
+| Stock Wi-Fi import (/app/nvram/karas.db) | Only when wpa_supplicant.conf is missing; on mainline the conf written under stock is used |
+| `mount -o remount,rw /` | Works with `m1-debian` (root `ro` without noload). With `m1-debian-ro` (noload) it would fail, as intended |
+
+Still open for D2:
+- the touchscreen driver (docs/kernel/touch_bu21029.md) and GPIO interrupts;
+- RTC set_time (`marvell,set-time`);
+- the UPC output pads are applied by the kernel, but heat and motion stay the user's call at each step.
+
+## Step D2 (2026-10-30 night, the user approved): the full Klipper stack runs on mainline
+
+- **Card prep from stock:** updated init.mainline, rc.dp200, dp200-start/
+  mounts/wifi/powerkey.sh, dp200_screen.py and cdc-acm.ko deployed, with a
+  `.bak` of each old file. The 8782 firmware was copied from stock's
+  /lib/firmware/mrvl into the root.
+- **First D2 boot:** init.mainline ran, the UPC firmware loaded and "started:
+  web UI on port 80, moonraker on 7125". But there was no network: the root
+  had no `ifconfig`, `busybox`, `wpa_supplicant` or `wpa_cli` (the stock side
+  always provided them). Left with SysRq s/u/b.
+- **Fix (the user approved):** `apt-get install --no-install-recommends busybox
+  wpasupplicant` in the root (Debian trixie armel, from stock with internet);
+  symlinks /usr/local/bin/{ifconfig,route,udhcpc,ntpd} -> busybox (Debian's
+  busybox package installs no applet links); the m1 udhcpc event script as
+  /etc/udhcpc/default.script and /usr/share/udhcpc/default.script.
+- **Second D2 boot (loader by serial, m1-debian 7533df00):** eth0 DHCP 10.10.0.9.
+  **Moonraker** API 1.5.0, klippy_connected, no failed components. **Klipper
+  "Printer is ready"** (software 9cb9975-dirty, 2-core ARMv7, as user klipper):
+  extruder 26.49 °C / target 0, bed 19.27 °C / target 0, no axes homed.
+  **Mainsail** on port 80: HTTP 200. **Webcam** snapshot: 200, 13.8 KB.
+- **Not yet:** Wi-Fi (mlan0 has no address; to check in dp200-init.log), the
+  touchscreen driver (BU21029, pending), and RTC set_time (off).

@@ -128,5 +128,12 @@ grep -q " $ROOT/run/wpa_supplicant " /proc/mounts || \
 # Marvell's mlanutl (stock firmware) for scans that keep the association;
 # runs fine in the chroot. Copied at boot, not shipped in our payload.
 cp /lib/modules/8782/mlanutl $ROOT/run/mlanutl 2>/dev/null
+# The 8782 firmware for a mainline boot of this root (mwifiex loads it from
+# /lib/firmware/mrvl). Copied from the stock root when missing or different;
+# a Marvell binary, never shipped in our payload.
+FW=/lib/firmware/mrvl/usb8782_uapsta.bin
+if [ -f $FW ] && ! cmp -s $FW $ROOT$FW 2>/dev/null; then
+    mkdir -p $ROOT/lib/firmware/mrvl && cp $FW $ROOT$FW
+fi
 
 in_root /etc/dp200/rc.dp200 start

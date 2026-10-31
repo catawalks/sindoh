@@ -33,6 +33,13 @@ pressed() { [ $(( $(devmem $KEY_REG 32) & KEY_BIT )) -ne 0 ]; }
 
 shutdown_now() {        # $1 = reboot | poweroff
     echo "dp200-powerkey: $1 $(date)"
+    # Mainline boot of the root itself (ROOT=/, PID 1 = init.mainline): its
+    # traps run rc.dp200 stop (UPC cores held), remount / read-only and then
+    # reboot (TERM) or power off (USR2)
+    if [ "$ROOT" = / ]; then
+        [ "$1" = reboot ] && kill -TERM 1 || kill -USR2 1
+        exit 0
+    fi
     # stop Klipper & co (holds the UPC cores: heaters/motors off), at most 30 s
     sh $ROOT/dp200/dp200-start.sh stop &
     s=$!

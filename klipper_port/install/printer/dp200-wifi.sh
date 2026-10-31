@@ -53,14 +53,16 @@ CUR=$(wpa_cli -i $IF status 2>/dev/null | sed -n 's/^ssid=//p' | sed "s/'/''/g")
 # The stock wpa_supplicant keeps running: restarting it leaves the Marvell
 # driver unable to scan for a while. The saved networks are loaded into it by
 # "dp200_wifi.py apply" (rc.dp200, inside the chroot, over the control socket).
-if ! ps | grep -q '[w]pa_supplicant'; then
+# pidof first: under Debian (a mainline boot, ROOT=/), procps' bare "ps"
+# only lists processes on the current terminal
+if ! { pidof wpa_supplicant >/dev/null 2>&1 || ps | grep -q '[w]pa_supplicant'; }; then
     log "no wpa_supplicant running - starting it like the stock boot"
     mkdir -p /var/run/wpa_supplicant
     iwpriv $IF regioncode 48 2>/dev/null
     wpa_supplicant -Dwext -P /var/run/wpa_supplicant.$IF.pid -O /var/run/wpa_supplicant \
         -i$IF -c/etc/wpa_supplicant.conf -B
 fi
-ps | grep -q '[w]pa_cli.*-a' || wpa_cli -B -i $IF -a $ACTION || log "wpa_cli action daemon failed"
+{ ps -ef 2>/dev/null || ps; } | grep -q '[w]pa_cli.*-a' || wpa_cli -B -i $IF -a $ACTION || log "wpa_cli action daemon failed"
 
 # Ethernet, if a cable is plugged in
 if [ "$(cat /sys/class/net/eth0/carrier 2>/dev/null)" = 1 ]; then
