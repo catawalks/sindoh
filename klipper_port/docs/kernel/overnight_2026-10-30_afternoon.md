@@ -39,3 +39,29 @@
   values (banks 4, 5, 6), with the safety check passing before and after (cores
   held, PWM run/level 0, stepper drivers off). **XIRD = 0x3C040000 = stock**,
   XIRD1 0x00004000. Reboot logged "cores held, outputs off".
+
+## First motion on mainline (2026-10-30 evening, the user approved: "Ok to test all moves")
+
+The user wasn't at the printer; the internal webcam watched. m1-full through
+the fast path, the approved UPC pads (upc-pinmux.sh all: safety check passed,
+XIRD 0x3C040000), then `upctool load klipper_io.bin klipper_fm.bin` (the
+prebuilt UPC Klipper firmware, md5-checked after wget) and `upctool bridge
+-f tcp:9100 -i tcp:9101`. The PC drove it over Ethernet with the khost test
+client.
+
+- **Lamp:** IO core `config_digital_out pin=pwm7 value=1` lights the
+  print-head LED. Before that, the camera frame was black.
+- **Moves:** a copy of tools/ktest_xyz.py with a 5 s hold at the far end and a
+  camera frame there. Each axis went 5 mm away from home at 4 mm/s, then back.
+  Stepper REF current via the hardware PWM as before.
+
+| Axis | Steps | DIR first | Endstop before/out/end | Position after | Shutdown | Camera |
+|---|---|---|---|---|---|---|
+| Y | 400 | 1 (bed forward) | 0/0/0 | 0 | 0 | bed shifted ~10 px left (camera left = printer front) |
+| X | 400 | 0 (carriage left) | 0/0/0 | 0 | 0 | the head is not in view |
+| Z | 16000 | 1 (bed down) | 0/0/0 | 0 | 0 | view and lamp lighting change (bed 5 mm further from the head) |
+
+A final frame equals the frame before the moves. Afterwards: IO reset (lamp
+off), `upctool stop` (CPUSoftReset 0), and reboot logged "cores held, outputs
+off". **Klipper drives all three axes on the mainline kernel**, with the
+directions recorded on stock. No heat, no homing.

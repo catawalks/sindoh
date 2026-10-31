@@ -34,13 +34,14 @@
  * are idle anyway. Like the vendor module at load, probe also sets the UPC
  * clock field of the APB configuration (optional "apb" range).
  *
- * XENA inputs: the endstops and the cartridge lever reach the XENA input
- * register (XIRD1) only when their SoC pads have the function the vendor's
- * board code gives them. U-Boot leaves them GPIO. With the optional
- * "xena-pads" range (consecutive pin-select registers) and
- * "marvell,xena-pad-config", probe sets them, but only after it has held
- * the cores and found every output off (user-approved: bank 5 pins 20-24
- * = 0x1003, UPC test 2c).
+ * UPC pads: the XENA inputs (endstops, cartridge lever, XIRD/XIRD1) and the
+ * UPC outputs (stepper and PWM pads) work only when their SoC pads have the
+ * function the vendor's board code (gr_def_mpp_list) gives them; U-Boot
+ * leaves them GPIO. With the optional "pads" range (GPIO banks 4-6 at
+ * 0xf8044000) and "marvell,pads" (<bank pin value> triples), probe sets
+ * them, but only after it has held the cores and found every output off,
+ * and checks the outputs again afterwards (user-approved stock values: UPC
+ * tests 2c and 3, 35 pads).
  *
  * Differences from stock that upctool does not notice: one mailbox
  * write-and-wait at a time but without blocking UPC_IOC_HOLD; the
@@ -128,8 +129,7 @@ struct mv61x0_upc {
 	void __iomem *pwm;
 	void __iomem *smot;
 	void __iomem *apb;			/* optional: APB config, UPC clock */
-	void __iomem *pads;			/* optional: XENA input pad selects */
-	resource_size_t pads_size;
+	void __iomem *pads;			/* optional: GPIO banks 4-6 */
 	struct mutex lock;
 	struct mutex mbox_lock;			/* one mailbox write-and-wait */
 	struct completion gp[UPC_NR_CORES];	/* GPStatus bit n, core n IRQ */
@@ -195,36 +195,59 @@ static bool upc_outputs_safe(struct mv61x0_upc *upc)
 }
 
 /*
- * Give the XENA input pads their UPC function, as the vendor's
+ * Give the UPC pads their stock function, as the vendor's
  * board_do_mpp_config does at every stock boot. Only with the cores held
- * and every output off, so that a pad that turns out to be an output can
- * only show its peripheral's idle level.
+ * and every output off, so that an output pad can only show its
+ * peripheral's idle level: PWM low, stepper drivers disabled.
  */
-static void upc_setup_input_pads(struct mv61x0_upc *upc)
+#define UPC_PAD_SELECT(bank, pin)	(0x1000 * ((bank) - 4) + 0x80 + 4 * (pin))
+
+static void upc_setup_pads(struct mv61x0_upc *upc)
 {
-	resource_size_t off;
-	u32 val;
+	struct device_node *np = upc->dev->of_node;
+	unsigned int i, n, changed = 0;
+	u32 t[3];
+	int len;
 
 	if (!upc->pads)
 		return;
-	if (of_property_read_u32(upc->dev->of_node, "marvell,xena-pad-config",
-				 &val)) {
-		dev_warn(upc->dev, "xena-pads without marvell,xena-pad-config\n");
+	len = of_property_count_u32_elems(np, "marvell,pads");
+	if (len <= 0 || len % 3) {
+		dev_warn(upc->dev, "pads without a valid marvell,pads list\n");
 		return;
+	}
+	n = len / 3;
+	for (i = 0; i < n; i++) {
+		if (of_property_read_u32_index(np, "marvell,pads", 3 * i, &t[0]) ||
+		    of_property_read_u32_index(np, "marvell,pads", 3 * i + 1, &t[1]) ||
+		    t[0] < 4 || t[0] > 6 || t[1] > 31) {
+			dev_err(upc->dev, "marvell,pads entry %u invalid: pads left alone\n", i);
+			return;
+		}
 	}
 	if (!upc_outputs_safe(upc)) {
-		dev_err(upc->dev, "outputs not safe: XENA input pads left alone\n");
+		dev_err(upc->dev, "outputs not safe: UPC pads left alone\n");
 		return;
 	}
-	for (off = 0; off + 4 <= upc->pads_size; off += 4) {
-		u32 old = readl(upc->pads + off);
+	for (i = 0; i < n; i++) {
+		void __iomem *reg;
+		u32 old;
 
-		writel(val, upc->pads + off);
-		dev_info(upc->dev, "XENA input pad %u: %08x -> %08x\n",
-			 (unsigned int)(off / 4), old, readl(upc->pads + off));
+		of_property_read_u32_index(np, "marvell,pads", 3 * i, &t[0]);
+		of_property_read_u32_index(np, "marvell,pads", 3 * i + 1, &t[1]);
+		of_property_read_u32_index(np, "marvell,pads", 3 * i + 2, &t[2]);
+		reg = upc->pads + UPC_PAD_SELECT(t[0], t[1]);
+		old = readl(reg);
+		if (old != t[2]) {
+			writel(t[2], reg);
+			changed++;
+		}
 	}
-	if (!upc_outputs_safe(upc))
-		dev_err(upc->dev, "outputs not safe after the pad setup\n");
+	dev_info(upc->dev, "UPC pads: %u set, %u changed\n", n, changed);
+	if (!upc_outputs_safe(upc)) {
+		upc_hold_and_safe(upc);
+		dev_err(upc->dev, "outputs not safe after the pad setup: forced off again\n");
+	}
 }
 
 static void __iomem *upc_mbox_reg(struct mv61x0_upc *upc, u32 box)
@@ -532,11 +555,8 @@ static int mv61x0_upc_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	upc->pads = upc_map(pdev, "xena-pads", 4);
-	if (upc->pads)
-		upc->pads_size = resource_size(platform_get_resource_byname(pdev,
-					IORESOURCE_MEM, "xena-pads"));
-	upc_setup_input_pads(upc);
+	upc->pads = upc_map(pdev, "pads", UPC_PAD_SELECT(6, 31) + 4);
+	upc_setup_pads(upc);
 
 	for (i = 0; i < UPC_NR_CORES; i++) {
 		irq = platform_get_irq(pdev, i);

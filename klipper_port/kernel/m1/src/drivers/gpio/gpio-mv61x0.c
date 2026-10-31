@@ -20,6 +20,12 @@
  * whose pin has another function fails (-EBUSY) and leaves the pin mux
  * alone, and setting an output level or direction fails (-EPERM). Inputs
  * and the current direction and output levels can still be read.
+ *
+ * Board setup at probe, from the DT, whatever the read-only mode (for pins
+ * the board needs set before any driver asks, user-approved values only):
+ * "marvell,init-output-high" lists lines driven high (output level first,
+ * then the direction, as the vendor does), then "marvell,pin-config" gives
+ * <line value> pairs for the pin-configuration registers.
  */
 #include <linux/bitops.h>
 #include <linux/gpio/driver.h>
@@ -80,6 +86,38 @@ static int mv61x0_gpio_ro_set_multiple(struct gpio_chip *gc,
 	return -EPERM;
 }
 
+static void mv61x0_gpio_board_setup(struct device *dev,
+				    struct mv61x0_gpio *mg)
+{
+	struct device_node *np = dev->of_node;
+	u32 line, val;
+	int i, n;
+
+	n = of_property_count_u32_elems(np, "marvell,init-output-high");
+	for (i = 0; i < n; i++) {
+		if (of_property_read_u32_index(np, "marvell,init-output-high",
+					       i, &line) || line > 31)
+			continue;
+		writel(readl(mg->base + MV61X0_GPIO_OUT) | BIT(line),
+		       mg->base + MV61X0_GPIO_OUT);
+		writel(readl(mg->base + MV61X0_GPIO_DIR) | BIT(line),
+		       mg->base + MV61X0_GPIO_DIR);
+		dev_info(dev, "line %u: output high (board setup)\n", line);
+	}
+
+	n = of_property_count_u32_elems(np, "marvell,pin-config");
+	for (i = 0; i + 1 < n; i += 2) {
+		if (of_property_read_u32_index(np, "marvell,pin-config", i,
+					       &line) ||
+		    of_property_read_u32_index(np, "marvell,pin-config", i + 1,
+					       &val) || line > 31)
+			continue;
+		dev_info(dev, "line %u: pin config %08x -> %08x (board setup)\n",
+			 line, readl(mg->base + MV61X0_GPIO_PINCFG(line)), val);
+		writel(val, mg->base + MV61X0_GPIO_PINCFG(line));
+	}
+}
+
 static int mv61x0_gpio_probe(struct platform_device *pdev)
 {
 	struct gpio_generic_chip_config config = { };
@@ -95,6 +133,9 @@ static int mv61x0_gpio_probe(struct platform_device *pdev)
 	mg->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(mg->base))
 		return PTR_ERR(mg->base);
+
+	/* Before the generic chip reads the output/direction shadows */
+	mv61x0_gpio_board_setup(dev, mg);
 
 	config.dev = dev;
 	config.sz = 4;

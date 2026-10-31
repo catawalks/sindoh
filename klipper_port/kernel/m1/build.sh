@@ -43,7 +43,7 @@ upc)	USERSPACE="iw uvcgrab upctool" ;;
 sd|gpio) USERSPACE="iw uvcgrab" ;;
 i2c)	USERSPACE="" ;;		# read-only bring-up images
 nand|ubi) USERSPACE="mtdraw" ;;
-full)	USERSPACE="iw uvcgrab wpa upctool" ;;
+full)	USERSPACE="iw uvcgrab wpa upctool mtdraw" ;;
 eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
 *)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand ubi full eth)" >&2; exit 1 ;;
 esac
@@ -258,6 +258,10 @@ fi
 		echo "file /etc/m1-variant.sh $IRFS/variant.sh 0755 0 0"
 	[ -f "$IRFS/xena-dump.sh" ] &&
 		echo "file /usr/bin/xena-dump $IRFS/xena-dump.sh 0755 0 0"
+	[ -f "$IRFS/ubi-ro.sh" ] &&
+		echo "file /usr/bin/ubi-ro $IRFS/ubi-ro.sh 0755 0 0"
+	[ -f "$IRFS/sdroot-test.sh" ] &&
+		echo "file /usr/bin/sdroot-test $IRFS/sdroot-test.sh 0755 0 0"
 	[ -f "$IRFS/xena-padmap.sh" ] &&
 		echo "file /usr/bin/xena-padmap $IRFS/xena-padmap.sh 0755 0 0"
 	for u in $USERSPACE; do
