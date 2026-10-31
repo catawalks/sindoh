@@ -8,3 +8,20 @@
 &{/chosen} {
 	bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xf8060000 root=/dev/mmcblk0p1 rootwait ro rdinit=/nonexistent init=/etc/dp200/init.mainline panic=10";
 };
+
+#ifdef DP200_NANDW
+/*
+ * NANDW=1 test images only: mtd6 "filesystem" writable. The driver's write
+ * window (patch 0010, empty by default) still decides block by block, and
+ * mtd0-mtd5 stay read-only here as well.
+ */
+&nand_controller {
+	nand@0 {
+		partitions {
+			partition@d9a0000 {
+				/delete-property/ read-only;
+			};
+		};
+	};
+};
+#endif
