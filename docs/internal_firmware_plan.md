@@ -4,6 +4,67 @@ User requirement (2026-10-18): stock DP200s have no usable microSD card, so
 the installable firmware must live entirely on the internal NAND, and be
 installed from a USB stick (see usb_installer.md).
 
+## The plan (agreed 2026-10-31): our system in the stock system's place
+
+**Goal (the owner's words, summarized):**
+- a full replacement of the running OS: kernel, drivers and the touchscreen front end;
+- Sindoh's recovery and update scripts keep working, so owners can go back to stock or use recovery mode;
+- everything on the internal NAND: no added hardware, no opening the printer;
+- Klipper, so owners can extend the printer easily.
+
+**Layout:** the same partition boundaries as stock. They are U-Boot's
+`mtdparts`, and our device tree has the same ones. Only two partitions get new
+content.
+
+| mtd | Name | Size | Stock content | Ours |
+|---|---|---|---|---|
+| 0 | kernel | 8 MB | U-Boot boot block + stock kernel (6.9 MB, incl. initramfs) | U-Boot boot block untouched + **our kernel** (~3 MB) at 0x40000 |
+| 1 | u-boot-env | 128 KB | settings | unchanged (only bar_* variables from the boot-logo app) |
+| 2 | bbt | 512 KB | bad-block table | unchanged |
+| 3 | boot-logo | 1 MB | logo | logo (boot-logo app) |
+| 4 | backup | 8 MB | Sindoh /backup (~5 MB) | unchanged |
+| 5 | recovery | 200 MB | **factory recovery set** (149 MB, see the correction below) | **unchanged** |
+| 6 | filesystem | 294 MB | stock root + apps (264 MB) | **our root**: Debian + Klipper + Moonraker + Mainsail + screen app (~160-175 MB est.; ~265 MB usable, ~90 MB for G-codes/logs) |
+
+**Why this layout:**
+- **U-Boot is unchanged.** It still reads 0x7C0000 bytes from mtd0+0x40000
+  and runs `bootm`. The stock bootargs it passes (`ubi.mtd=filesystem
+  root=ubi0:filesystem rootfstype=ubifs`, `mtdparts`) are right for our
+  root as well.
+- **Back to stock = Sindoh's own recovery.** /etc/system_recovery.sh
+  rewrites mtd0, mtd3 and mtd6 from mtd5 and extracts the apps. Because
+  mtd5 stays intact, our system can run that same sequence and the printer
+  is factory stock again. Sindoh's updates then work normally.
+
+**To build:**
+1. **NAND write support in the mainline driver** (BCH write path, erase, bad
+   blocks). Needed for a read-write UBIFS root, for updates and for running
+   recovery. The critical path. Test only on NAND areas the owner approves.
+2. **Installer stick** (stock firmware's auto_update.sh runs it):
+   - check the hardware (board, NAND layout, Wi-Fi chip) and refuse anything
+     unknown;
+   - check that mtd5 holds the recovery set;
+   - save the user's settings from the stock root (Wi-Fi networks, ...) to
+     the new root;
+   - write mtd6 (ubiupdatevol), verify it, then mtd0 last (the kernel
+     only, never the U-Boot block), and verify that too.
+3. **Recovery compatibility in our system:**
+   - automatic recovery when the root is broken (the rcS behavior);
+   - a revert stick that runs the recovery from mtd5;
+   - a Sindoh `update.she` on a stick: offer to go back to stock first, so
+     the stock updater can run it.
+4. **Size budget** of the trimmed runtime, now with numpy, busybox,
+   wpasupplicant and the firmware.
+5. **Tests** on more printers and boards before release.
+
+**Risk:** with our kernel in mtd0, a kernel that doesn't boot on some board
+has no automatic fallback. That's the same exposure as a Sindoh firmware
+update. Mitigations: the hardware check in the installer, writing mtd0
+last, and testing on more boards.
+
+The sections below (written 2026-10-18) put Klipper in mtd5 under the stock
+kernel. **That design is superseded:** mtd5 holds the factory recovery set.
+
 ## Internal NAND (measured on RODIN_200730_2)
 
 | mtd | size | name | content / use |
