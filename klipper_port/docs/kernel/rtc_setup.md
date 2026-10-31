@@ -63,3 +63,15 @@ None of these registers drives a pin. The RTC is internal to the SoC.
   (an RC oscillator, or a divider of another clock). +0x20 (0x0008ac1c, then
   0x00ffffff in the vendor setup) may be a prescaler or trim. Not tested:
   writing it needs the owner's OK.
+
+### Same on the stock kernel (2026-10-31)
+
+The stock 3.2 kernel was measured the same way: /sys/class/rtc/rtc0/since_epoch
+against the PC, three readings 183 s apart. The RTC gained 187 s and 188 s,
+which is +2.1% and +2.6% (1 s resolution). The system clock kept time. The
+stock registers after its setup are +0x00 0xfc, +0x04 0xc0, +0x08 0xc0,
++0x10 0, +0x14 0, +0x18 0x762e, +0x1c 0, +0x20 0x00ffffff, and APB 0xf8000200
+= 0x80000080. These are the vendor setup values the mainline driver also
+writes. So the drift comes from the hardware (and Sindoh's setup), not from
+mainline. +0x18 (0x762e, not written by the setup) may be a counter or a
+calibration value; unknown.
