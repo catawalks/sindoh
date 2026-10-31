@@ -47,3 +47,19 @@ rtc-mv61x0 runs exactly this sequence when the DT node has
 - **`m1-full-rtcsetup`:** with it. Same kernel. **Needs the user's OK for the corrected +0x20 values (0x0008ac1c, then 0x00ffffff)**, because they differ from the approved list.
 
 None of these registers drives a pin. The RTC is internal to the SoC.
+
+## The RTC runs about 2% fast (measured 2026-10-31)
+
+- **On mainline, against the PC:** the RTC counter gained 126 s in 123.3 s,
+  while the system clock (the arch timer) kept the PC's time within the
+  serial jitter.
+- **Earlier readings agree:** +629 s in about 9 h, about +5 min in about 4 h
+  (seen by the stock kernel at boot), and +16 s in 13 min.
+- **What it means:** while Linux runs, the time is right. Only the RTC drifts,
+  so after a power-off the clock is off by about 30 min per day until NTP
+  runs. Both kernels set the clock from the RTC at boot and then by NTP
+  (stock: BusyBox ntpd in dp200-start.sh; mainline: dp200-sntp.py).
+- **Likely cause:** the RTC's clock source is not an accurate 32 kHz crystal
+  (an RC oscillator, or a divider of another clock). +0x20 (0x0008ac1c, then
+  0x00ffffff in the vendor setup) may be a prescaler or trim. Not tested:
+  writing it needs the owner's OK.

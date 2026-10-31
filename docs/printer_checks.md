@@ -8,7 +8,6 @@ once it's done, with its result in the matching doc.
 
 | Added | Check | How | Context |
 |---|---|---|---|
-| 2026-10-31 | **The boot logo stays up during a mainline boot**, with no text on the panel until the screen app draws (like stock) | Watch the panel through a mainline Debian boot (m1-debian 695966b6 or later). 2026-10-31: the owner saw the logo and a working loading bar, but on a stock boot (the printer had been restarted into stock), so the mainline boot is still unchecked | The kernel has no fbcon and no `console=tty0` any more. The boot log shows only the dummy console. docs/kernel/debian_root_boot.md, "No console on the panel" |
 | 2026-10-30 | **Input shaping test** with the FLY-ADXL345 | Needs motion: someone present, and an OK for each move | docs/input_shaping.md |
 
 ## Decisions (not checks)
@@ -18,3 +17,4 @@ once it's done, with its result in the matching doc.
 ## Done
 
 - 2026-10-31: **CONSOLE in the screen app** works on the panel. It shows the kernel log, and a tap closes it (the owner, on mainline).
+- 2026-10-31: **The boot logo on a mainline boot** stays up, with no text until the screen app (the owner). No loading bar yet: only the vendor kernel draws it.

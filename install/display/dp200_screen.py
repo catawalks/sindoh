@@ -13,7 +13,7 @@ Run as root inside the Debian chroot with Debian's python3-pil:
 Anything that moves or heats asks for confirmation first. STOP (bottom
 right on every screen) is an emergency stop: hold it for 1 second.
 """
-import json, os, re, select, socket, struct, sys, threading, time, urllib.parse, urllib.request
+import json, os, re, select, socket, struct, sys, threading, time, urllib.error, urllib.parse, urllib.request
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -241,6 +241,17 @@ def query():
     q = '&'.join(urllib.parse.quote(o) for o in OBJECTS)
     with urllib.request.urlopen(API + '/printer/objects/query?' + q, timeout=3) as r:
         return json.load(r)['result']['status']
+
+def err_text(e):
+    """A query() failure as the waiting page shows it (not '[Errno 111] ...')."""
+    r = getattr(e, 'reason', e)
+    if isinstance(r, ConnectionRefusedError):
+        return 'Moonraker is starting (not answering yet)'
+    if isinstance(r, (TimeoutError, socket.timeout)):
+        return 'Moonraker is not answering (busy or starting)'
+    if isinstance(e, urllib.error.HTTPError):
+        return 'Moonraker: Klipper not connected yet (HTTP %d)' % e.code
+    return str(r)
 
 def get(path):
     with urllib.request.urlopen(API + path, timeout=5) as r:
@@ -1693,7 +1704,7 @@ def main():
                 ui.st, ui.err = query(), None
                 ui.ip = my_ip()
             except Exception as e:
-                ui.st, ui.err = None, str(getattr(e, 'reason', e))
+                ui.st, ui.err = None, err_text(e)
             busy = ui.st and (ui.st['print_stats']['state'] in ('printing', 'paused')
                               or ui.st['extruder']['target'] or ui.st['heater_bed']['target'])
             next_poll = now + (REFRESH_BUSY if busy or ui.busy else
