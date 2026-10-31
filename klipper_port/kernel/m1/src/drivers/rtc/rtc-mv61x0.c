@@ -6,8 +6,8 @@
  *   +0x00   control: 3 written at setup, reads 0xfc once it runs
  *   +0x04   cleared at setup, reads 0xc0
  *   +0x08   cleared at setup, reads 0xc0
- *   +0x0c   time: seconds counter, read as one 32-bit word (written twice,
- *           125 us apart, to set it; not done here)
+ *   +0x0c   time: seconds counter, read as one 32-bit word; written twice,
+ *           125 us apart, to set it (gogin_rtc_set_time)
  *   +0x10   alarm (seconds), cleared at setup
  *   +0x14   cleared at setup
  *   +0x1c   cleared at setup (then 500 ms)
@@ -16,8 +16,8 @@
  *   U-Boot 0xc0000080)
  *
  * The setup only runs with "marvell,vendor-setup" in the DT (and the "apb"
- * range); without it the driver only reads. Times are read-only either way:
- * no set_time, no alarm, no interrupt.
+ * range); set_time only exists with "marvell,set-time". No alarm, no
+ * interrupt.
  */
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -25,6 +25,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/rtc.h>
+#include <linux/spinlock.h>
 
 #define MV61X0_RTC_CTRL		0x00
 #define MV61X0_RTC_R04		0x04
@@ -41,6 +42,7 @@
 struct mv61x0_rtc {
 	void __iomem *base;
 	struct rtc_device *rtc;
+	spinlock_t lock;
 };
 
 /* The vendor's write: a barrier, the write, then __const_udelay(0x83126) */
@@ -106,8 +108,28 @@ static int mv61x0_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	return 0;
 }
 
+/* gogin_rtc_set_time: the seconds value written twice, 125 us apart */
+static int mv61x0_rtc_set_time(struct device *dev, struct rtc_time *tm)
+{
+	struct mv61x0_rtc *mr = dev_get_drvdata(dev);
+	time64_t t = rtc_tm_to_time64(tm);
+
+	if (t < 0 || t > U32_MAX)
+		return -ERANGE;
+	spin_lock_irq(&mr->lock);
+	mv61x0_rtc_wr(mr, MV61X0_RTC_TIME, t);
+	mv61x0_rtc_wr(mr, MV61X0_RTC_TIME, t);
+	spin_unlock_irq(&mr->lock);
+	return 0;
+}
+
 static const struct rtc_class_ops mv61x0_rtc_ops = {
 	.read_time	= mv61x0_rtc_read_time,
+};
+
+static const struct rtc_class_ops mv61x0_rtc_rw_ops = {
+	.read_time	= mv61x0_rtc_read_time,
+	.set_time	= mv61x0_rtc_set_time,
 };
 
 static int mv61x0_rtc_probe(struct platform_device *pdev)
@@ -124,6 +146,7 @@ static int mv61x0_rtc_probe(struct platform_device *pdev)
 	if (IS_ERR(mr->base))
 		return PTR_ERR(mr->base);
 	platform_set_drvdata(pdev, mr);
+	spin_lock_init(&mr->lock);
 
 	if (of_property_read_bool(dev->of_node, "marvell,vendor-setup")) {
 		ret = mv61x0_rtc_setup(dev, mr);
@@ -140,7 +163,12 @@ static int mv61x0_rtc_probe(struct platform_device *pdev)
 	mr->rtc = devm_rtc_allocate_device(dev);
 	if (IS_ERR(mr->rtc))
 		return PTR_ERR(mr->rtc);
-	mr->rtc->ops = &mv61x0_rtc_ops;
+	if (of_property_read_bool(dev->of_node, "marvell,set-time")) {
+		mr->rtc->ops = &mv61x0_rtc_rw_ops;
+		dev_info(dev, "set_time enabled\n");
+	} else {
+		mr->rtc->ops = &mv61x0_rtc_ops;
+	}
 	mr->rtc->range_max = U32_MAX;
 
 	return devm_rtc_register_device(mr->rtc);
@@ -161,5 +189,5 @@ static struct platform_driver mv61x0_rtc_driver = {
 };
 module_platform_driver(mv61x0_rtc_driver);
 
-MODULE_DESCRIPTION("Marvell 88PA61x0 RTC (read-only times)");
+MODULE_DESCRIPTION("Marvell 88PA61x0 RTC");
 MODULE_LICENSE("GPL");

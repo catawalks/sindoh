@@ -12,7 +12,14 @@
 &sdhci0 { status = "okay"; };
 &upc { status = "okay"; };
 &i2c2 { status = "okay"; };
-&rtc { status = "okay"; };
+/*
+ * RTC: the vendor setup (user-approved 2026-10-30, corrected +0x20 values).
+ * set_time (marvell,set-time) stays off until the user OKs it.
+ */
+&rtc {
+	status = "okay";
+	marvell,vendor-setup;
+};
 &nand_controller { status = "okay"; };
 &gpio0 { status = "okay"; marvell,read-only; };
 &gpio1 { status = "okay"; marvell,read-only; };
