@@ -185,3 +185,15 @@ retries for up to 120 s while the network comes up, sets the clock, and saves
 it to the RTC with `busybox hwclock -w -u`. Tested on the printer: the clock
 was 629 s fast (RTC drift since the last set). After the sync, the system
 clock and /sys/class/rtc/rtc0 agree with the PC.
+
+## Boot logo on mainline: confirmed (2026-10-31)
+
+The owner watched a mainline boot (m1-debian 695966b6, loader by serial).
+The logo stayed up with no text, but with **no loading bar**. The bar is
+drawn by the vendor kernel's panel driver: `mv61tft.boot_time=17` and
+`mv61tft.bar_color=${bar_color}` in the stock bootargs (uboot_facts.txt). It
+is not drawn by U-Boot, so mainline needs its own bar. Not done yet.
+
+The screen app's waiting page showed `[Errno 111] Connection refused` until
+Moonraker listened. It now reads "Moonraker is starting (not answering
+yet)" (err_text).
