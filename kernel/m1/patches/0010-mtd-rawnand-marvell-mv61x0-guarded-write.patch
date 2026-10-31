@@ -1,0 +1,255 @@
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -428,6 +428,9 @@
+ 	bool use_dma;
+ 	struct dma_chan *dma_chan;
+ 	u8 *dma_buf;
++
++	/* bch_v1: program/erase refused (e.g. no vendor BBT found) */
++	bool no_write;
+ };
+ 
+ static inline struct marvell_nfc *to_marvell_nfc(struct nand_controller *ctrl)
+@@ -672,17 +675,107 @@
+ 	return false;
+ }
+ 
++/*
++ * bch_v1 (88PA6170) program/erase window, in erase blocks of the chip.
++ * Empty by default: nothing is programmed or erased until it is set, e.g.
++ *   echo 4000,4000 > /sys/module/marvell_nand/parameters/write_window
++ * It never reaches outside BCH_V1_FIRST_WRITABLE..(last block - 4): the
++ * stock layout puts U-Boot, the kernel, the U-Boot env, the vendor BBT
++ * partition, the logo, /backup and the factory recovery set (mtd0-mtd5)
++ * below 0xd9a0000, and the vendor BBT (main + mirror + 2 spare blocks) in
++ * the last 4 blocks of the chip.
++ */
++#define BCH_V1_FIRST_WRITABLE	(0xd9a0000 / SZ_128K)	/* mtd6 "filesystem" */
++#define BCH_V1_BBT_BLOCKS	4
++#define BCH_V1_PAGES_PER_BLOCK	64
++
++static int bch_v1_win_first = -1, bch_v1_win_last = -1;
++
++static int bch_v1_win_set(const char *val, const struct kernel_param *kp)
++{
++	int first, last;
++
++	if (sysfs_streq(val, "none") || sysfs_streq(val, "")) {
++		WRITE_ONCE(bch_v1_win_first, -1);
++		WRITE_ONCE(bch_v1_win_last, -1);
++		return 0;
++	}
++	if (sscanf(val, "%d,%d", &first, &last) != 2 || first < 0 ||
++	    last < first)
++		return -EINVAL;
++	WRITE_ONCE(bch_v1_win_first, -1);
++	WRITE_ONCE(bch_v1_win_last, last);
++	WRITE_ONCE(bch_v1_win_first, first);
++	pr_warn("marvell_nand: program/erase window blocks %d-%d\n", first,
++		last);
++	return 0;
++}
++
++static int bch_v1_win_get(char *buf, const struct kernel_param *kp)
++{
++	if (READ_ONCE(bch_v1_win_first) < 0)
++		return sysfs_emit(buf, "none\n");
++	return sysfs_emit(buf, "%d,%d\n", READ_ONCE(bch_v1_win_first),
++			  READ_ONCE(bch_v1_win_last));
++}
++
++static const struct kernel_param_ops bch_v1_win_ops = {
++	.set = bch_v1_win_set,
++	.get = bch_v1_win_get,
++};
++module_param_cb(write_window, &bch_v1_win_ops, NULL, 0644);
++MODULE_PARM_DESC(write_window,
++		 "88PA6170: erase blocks FIRST,LAST that may be programmed or erased (default none)");
++
++/*
++ * May this flash-changing command go out? Only on bch_v1, only a complete
++ * program (SEQIN + 5 address cycles + PAGEPROG) or erase (ERASE1 + 3 row
++ * cycles + ERASE2) in one command, and only on a block inside the window
++ * and the fixed limits. Everything else that can change the flash (page
++ * loads without PAGEPROG, RNDIN, SET_FEATURES, ...) is refused.
++ */
++static bool marvell_nfc_write_allowed(struct nand_chip *chip,
++				      const struct marvell_nfc_op *op)
++{
++	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
++	u32 ndcb0 = op->ndcb[0];
++	u8 cmd1 = ndcb0 & 0xff, cmd2 = (ndcb0 >> 8) & 0xff;
++	unsigned int cyc = (ndcb0 >> 16) & 0x7;
++	int first = READ_ONCE(bch_v1_win_first);
++	int last = READ_ONCE(bch_v1_win_last);
++	int nblocks, block;
++	u32 row;
++
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY) || !nfc->caps->bch_v1 ||
++	    nfc->no_write || first < 0 || !(ndcb0 & NDCB0_DBC))
++		return false;
++	if (cmd1 == NAND_CMD_SEQIN && cmd2 == NAND_CMD_PAGEPROG && cyc == 5)
++		row = (op->ndcb[1] >> 16) | ((op->ndcb[2] & 0xff) << 16);
++	else if (cmd1 == NAND_CMD_ERASE1 && cmd2 == NAND_CMD_ERASE2 && cyc == 3)
++		row = op->ndcb[1] & 0xffffff;
++	else
++		return false;
++
++	block = row / BCH_V1_PAGES_PER_BLOCK;
++	nblocks = nanddev_target_size(&chip->base) >> chip->phys_erase_shift;
++	return block >= first && block <= last &&
++	       block >= BCH_V1_FIRST_WRITABLE &&
++	       block < nblocks - BCH_V1_BBT_BLOCKS;
++}
++
+ static void marvell_nfc_send_cmd(struct nand_chip *chip,
+ 				 struct marvell_nfc_op *nfc_op)
+ {
+ 	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
+ 	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
+ 
+-	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY) &&
+-	    marvell_nfc_cmd_may_write(nfc_op->ndcb[0])) {
++	if ((IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY) || nfc->caps->bch_v1) &&
++	    marvell_nfc_cmd_may_write(nfc_op->ndcb[0]) &&
++	    !marvell_nfc_write_allowed(chip, nfc_op)) {
+ 		dev_err_ratelimited(nfc->dev,
+-				    "read-only: refused NDCB0 0x%08x\n",
+-				    nfc_op->ndcb[0]);
++				    "refused NDCB0 0x%08x NDCB1 0x%08x NDCB2 0x%08x\n",
++				    nfc_op->ndcb[0], nfc_op->ndcb[1],
++				    nfc_op->ndcb[2]);
+ 		WARN_ON_ONCE(1);
+ 		return;
+ 	}
+@@ -2414,13 +2507,36 @@
+ 	.free = marvell_nand_ooblayout_free,
+ };
+ 
+-/* bch_v1 controllers are read-only */
++/* bch_v1 raw and OOB-only writes: never (the stock format has no use) */
+ static int marvell_nfc_ro_write_page(struct nand_chip *chip, const u8 *buf,
+ 				     int oob_required, int page)
+ {
+ 	return -EROFS;
+ }
+ 
++/*
++ * bch_v1 page program, in the format of the vendor kernel and U-Boot: BCH
++ * on (one 2048 B chunk, the engine adds the 30 ECC bytes), spare bytes
++ * 0-23 as given (0xff from nand_base without OOB data) and "programz" at
++ * 24-31, which both vendor drivers write into every ECC page they program.
++ * Only reaches the flash through the write window (marvell_nfc_send_cmd).
++ */
++static int marvell_nfc_bch_v1_write_page(struct nand_chip *chip, const u8 *buf,
++					 int oob_required, int page)
++{
++	int ret;
++
++	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY))
++		return -EROFS;
++	memcpy(chip->oob_poi + 24, "programz", 8);
++	marvell_nfc_select_target(chip, chip->cur_cs);
++	marvell_nfc_enable_hw_ecc(chip);
++	ret = marvell_nfc_hw_ecc_hmg_do_write_page(chip, buf, chip->oob_poi,
++						   false, page);
++	marvell_nfc_disable_hw_ecc(chip);
++	return ret;
++}
++
+ static int marvell_nfc_ro_write_oob(struct nand_chip *chip, int page)
+ {
+ 	return -EROFS;
+@@ -2484,7 +2600,8 @@
+ 		 * three NDCB0 words, 2048 + 32 bytes with ECC on (+ 30 raw).
+ 		 * That is the Hamming helpers' transfer. The BCH chunk helpers
+ 		 * would need LEN_OVRD, which this controller does not have.
+-		 * Read-only: the write hooks only return -EROFS.
++		 * Pages are programmed the same way (bch_v1_write_page);
++		 * raw and OOB-only writes are refused.
+ 		 */
+ 		chip->ecc.algo = NAND_ECC_ALGO_BCH;
+ 		ecc->strength = 16;
+@@ -2493,7 +2610,7 @@
+ 		ecc->read_oob_raw = marvell_nfc_hw_ecc_hmg_read_oob_raw;
+ 		ecc->read_oob = ecc->read_oob_raw;
+ 		ecc->write_page_raw = marvell_nfc_ro_write_page;
+-		ecc->write_page = marvell_nfc_ro_write_page;
++		ecc->write_page = marvell_nfc_bch_v1_write_page;
+ 		ecc->write_oob_raw = marvell_nfc_ro_write_oob;
+ 		ecc->write_oob = marvell_nfc_ro_write_oob;
+ 	} else if (ecc->strength == 1) {
+@@ -2590,6 +2707,36 @@
+ 	.pattern = bbt_mirror_pattern
+ };
+ 
++/*
++ * 88PA6170 (bch_v1): the vendor BBT, as the 3.2 driver's bbt_main_descr /
++ * bbt_mirror_descr describe it (and U-Boot uses): 2 bits per block, the
++ * last 4 blocks, "Bbt"/"tbB" at OOB offset 20, version at 23. Read only:
++ * no CREATE or WRITE, so this driver never writes it and new bad blocks
++ * are only kept in RAM.
++ */
++static u8 bch_v1_bbt_pattern[] = { 'B', 'b', 't' };
++static u8 bch_v1_bbt_mirror_pattern[] = { 't', 'b', 'B' };
++
++static struct nand_bbt_descr bch_v1_bbt_main_descr = {
++	.options = NAND_BBT_LASTBLOCK | NAND_BBT_2BIT | NAND_BBT_VERSION |
++		   NAND_BBT_PERCHIP,
++	.offs = 20,
++	.len = 3,
++	.veroffs = 23,
++	.maxblocks = 4,
++	.pattern = bch_v1_bbt_pattern,
++};
++
++static struct nand_bbt_descr bch_v1_bbt_mirror_descr = {
++	.options = NAND_BBT_LASTBLOCK | NAND_BBT_2BIT | NAND_BBT_VERSION |
++		   NAND_BBT_PERCHIP,
++	.offs = 20,
++	.len = 3,
++	.veroffs = 23,
++	.maxblocks = 4,
++	.pattern = bch_v1_bbt_mirror_pattern,
++};
++
+ static int marvell_nfc_setup_interface(struct nand_chip *chip, int chipnr,
+ 				       const struct nand_interface_config *conf)
+ {
+@@ -2718,6 +2865,13 @@
+ 		chip->bbt_md = &bbt_mirror_descr;
+ 	}
+ 
++	if (nfc->caps->bch_v1) {
++		/* the vendor's own BBT, never written (see above) */
++		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB_BBM;
++		chip->bbt_td = &bch_v1_bbt_main_descr;
++		chip->bbt_md = &bch_v1_bbt_mirror_descr;
++	}
++
+ 	/* Save the chip-specific fields of NDCR */
+ 	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
+ 	if (chip->options & NAND_BUSWIDTH_16)
+@@ -2944,6 +3098,22 @@
+ 		return ret;
+ 	}
+ 
++	/*
++	 * bch_v1 writes need the vendor BBT (bad and BBT blocks): without
++	 * it, register the chip read-only and refuse program/erase.
++	 */
++	if (nfc->caps->bch_v1 && !IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY)) {
++		if (chip->bbt_td && chip->bbt_td->pages[0] >= 0) {
++			dev_info(dev, "vendor BBT at page %d (mirror %d)\n",
++				 chip->bbt_td->pages[0],
++				 chip->bbt_md ? chip->bbt_md->pages[0] : -1);
++		} else {
++			dev_err(dev, "no vendor BBT found: read-only\n");
++			nfc->no_write = true;
++			mtd->flags &= ~MTD_WRITEABLE;
++		}
++	}
++
+ 	if (pdata)
+ 		/* Legacy bindings support only one chip */
+ 		ret = mtd_device_register(mtd, pdata->parts, pdata->nr_parts);

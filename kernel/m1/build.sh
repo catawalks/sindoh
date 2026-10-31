@@ -57,6 +57,7 @@ else
 	IRFS=$WORK/initramfs-m1-$VARIANT
 fi
 
+NAME0=$NAME		# without the -t2/-smp/-nandw suffixes below
 # THUMB2=1: Thumb-2 kernel (smaller; not yet proven on the PJ4B-MP)
 if [ "${THUMB2:-0}" = 1 ]; then
 	NAME=$NAME-t2
@@ -68,6 +69,14 @@ if [ "${SMP:-0}" = 1 ]; then
 	NAME=$NAME-smp
 	KOUT=$KOUT-smp
 fi
+# NANDW=1: NAND program/erase compiled in (patch 0010: a write window that
+# is empty by default, inside mtd6 only) instead of
+# CONFIG_MTD_RAW_NAND_READ_ONLY. Test images only, e.g. m1-debian-nandw.
+if [ "${NANDW:-0}" = 1 ]; then
+	NAME=$NAME-nandw
+	KOUT=$KOUT-nandw
+fi
+SUFFIX=${NAME#"$NAME0"}
 
 KSRC=$WORK/linux-$KVER
 SYSROOT=$WORK/sysroot
@@ -89,13 +98,36 @@ check "$DL/iw/iw-$IWVER.tar.xz" 7d182e498289ab39b257da6780d562e415377107f50358ee
 check "$DL/wpa/wpa_supplicant-$WPAVER.tar.gz" 08e23937e16d0155e55cab2b51f51fbe10d80a1aa91c4e15442645059b737ef6
 check "$DL/kexec/kexec-tools-$KEXECVER.tar.xz" 8f81422a5fd2362cf6cb001b511e535565ed0f32c2f4451fb5eb68fed6710a5d
 
-# 1. Kernel tree: vanilla + our files + the Kconfig/Makefile/CPU hooks
+# 1. Kernel tree: vanilla + our files + the Kconfig/Makefile/CPU hooks.
+# The patches are applied in order to vanilla copies of the files they
+# touch ($WORK/pristine, from the tarball) in a scratch tree, and a file is
+# copied into the kernel tree only when its content changed. So patches
+# that touch the same file (0006 and 0010) always apply cleanly, and
+# unchanged files keep their timestamps (no needless rebuilds).
 [ -d "$KSRC" ] || tar -C "$WORK" -xJf "$DL/linux-$KVER.tar.xz"
 cp -r "$M1/src/." "$KSRC/"
+PRISTINE=$WORK/pristine/linux-$KVER
+PATCHED=$WORK/patched
+PFILES=$(awk '/^\+\+\+ b\// { sub(/^\+\+\+ b\//, ""); print $1 }' "$M1"/patches/*.patch | sort -u)
+missing=""
+for f in $PFILES; do
+	[ -f "$PRISTINE/$f" ] || missing="$missing linux-$KVER/$f"
+done
+if [ -n "$missing" ]; then
+	mkdir -p "$WORK/pristine"
+	# shellcheck disable=SC2086
+	tar -C "$WORK/pristine" -xJf "$DL/linux-$KVER.tar.xz" $missing
+fi
+rm -rf "$PATCHED"
+for f in $PFILES; do
+	mkdir -p "$PATCHED/$(dirname "$f")"
+	cp "$PRISTINE/$f" "$PATCHED/$f"
+done
 for p in "$M1"/patches/*.patch; do
-	if ! patch -d "$KSRC" -p1 -R -s -f --dry-run < "$p" > /dev/null 2>&1; then
-		patch -d "$KSRC" -p1 -N -s < "$p"
-	fi
+	patch -d "$PATCHED" -p1 -s --no-backup-if-mismatch < "$p"
+done
+for f in $PFILES; do
+	cmp -s "$PATCHED/$f" "$KSRC/$f" || cp "$PATCHED/$f" "$KSRC/$f"
 done
 
 # 2. musl for armhf, plus the kernel UAPI headers the userspace needs
@@ -304,6 +336,9 @@ mkdir -p "$KOUT"
 		echo "CONFIG_NR_CPUS=2"
 		echo "# CONFIG_KEXEC is not set"
 	fi
+	if [ "${NANDW:-0}" = 1 ]; then
+		echo "# CONFIG_MTD_RAW_NAND_READ_ONLY is not set"
+	fi
 } | sed "s#@INITRAMFS_LIST@#$IRFS/initramfs.list#" > "$KOUT/m1.config"
 (cd "$KSRC" && ARCH=arm CROSS_COMPILE=$CROSS \
 	scripts/kconfig/merge_config.sh -m -O "$KOUT" "$KOUT/.config" \
@@ -334,7 +369,7 @@ mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 \
 # full.boot/debian.dts -> m1-debian (docs/kernel/debian_root_boot.md)
 for BDTS in "$M1/variants/$VARIANT.boot"/*.dts; do
 	[ -f "$BDTS" ] || continue
-	B=m1-$(basename "$BDTS" .dts)
+	B=m1-$(basename "$BDTS" .dts)$SUFFIX
 	cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp 		-I "$KSRC/include" -I "$KSRC/scripts/dtc/include-prefixes" 		-I "$KSRC/arch/arm/boot/dts/marvell" -I "$M1/variants" 		"$BDTS" |
 		"$KOUT/scripts/dtc/dtc" -q -I dts -O dtb -o "$OUT/$B.dtb" -
 	cat "$KOUT/arch/arm/boot/zImage" "$OUT/$B.dtb" > "$OUT/$B-zImage-dtb.bin"
