@@ -78,3 +78,34 @@ Further trims if needed: git, perl, apt/dpkg, unused shared libraries.
 3. Port dp200-start.sh / the hook to ROOT=/klipper; test boot from NAND
    without the SD card.
 4. Fold it into the USB installer, then test end to end on a printer.
+
+## Correction (2026-10-31): mtd5 holds the factory recovery set
+
+"Not used by the boot path" was true only for a normal boot. Read-only from
+the mainline kernel (UBI attached through the ioctl, on read-only MTD),
+this printer's mtd5 has the UBI volume `recovery`: 1580 PEBs reserved
+(~191 MB). Its files, 149 MB in all:
+
+| File | Size | Restores |
+|---|---|---|
+| pa6170_rodin_nand.bin | 6.9 MB | mtd0: U-Boot + stock kernel |
+| boot-logo_rodin.bin | 750 KB | mtd3 |
+| nandrootfs.ubifs | 36 MB | mtd6, the stock root |
+| update.tar.bz2 | 103 MB | /app and the rest of the apps |
+| u-boot-env.bin, nand_write.sh | small | the env; Sindoh's restore script |
+
+Who uses it:
+- **Automatic:** rcS, from the stock kernel's built-in initramfs (root_fs),
+  runs /etc/system_recovery.sh when the root is broken (no /etc/profile).
+  That script mounts ubi2:recovery and rewrites mtd0, mtd3, mtd6 and the
+  apps from it.
+- **Manual:** `rodin_util.sh --system-recovery` (a service function) erases
+  mtd6, so that the next boot recovers.
+- **Firmware updates:** an update with a `recovery/` folder copies it into
+  ubi2:recovery (3DWOX 1 update.sh; the DP200's 2020 update ships none).
+
+So a Klipper root in mtd5 removes the printer's self-recovery for as long as
+it is installed. Any update that refreshes recovery/ would then fail at
+that step. The installer's mtd5 backup on the stick (nanddump) and the
+remove stick's restore keep the set, but only on the stick. ~42 MB of the
+volume is free.
