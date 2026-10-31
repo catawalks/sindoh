@@ -132,3 +132,41 @@ Mainline nand_bbt reads these descriptors as they are.
    back identical to the saved copy. That includes the ECC bytes, which
    proves our pages match the stock format;
 6. close the window.
+
+## Stage 3: the first writes (2026-10-31, the owner approved block 4084)
+
+Test image m1-debian-nandw: patch 0010, plus the "filesystem" partition
+without `read-only` (debian.dts with -DDP200_NANDW; mtd0-mtd5 stay
+read-only in the device tree as well). `tools/nand_write_test.py 4084`, on
+a free UBI PEB of the stock root (EC header only):
+
+| Step | Result |
+|---|---|
+| Save the block (ECC data, raw data, raw OOB per page) | /var/backups/nand_block4084.bin on the card |
+| Window closed, erase 4084 | refused at the hardware ("refused NDCB0 0x004bd060 NDCB1 0x0003fd00"), block unchanged |
+| Window 4084,4084, erase 4083 | refused (NDCB1 0x0003fcc0 = block 4083), unchanged |
+| Erase 4084 | reads 0xff (ECC, raw, OOB) |
+| Program pages 0, 1, 31, 63 | ECC read equal, 0 raw bitflips, OOB: 0xff x24, "programz", 30 ECC bytes |
+| Erase, program the saved EC header page back | **identical to the stock-written page, ECC bytes included**: our BCH output equals the vendor driver's |
+| `--verify` | block 4084 equals the saved copy; window none |
+
+Two controller details found on the way, now in patch 0010:
+- **AUTO_RS (NDCB0 bit 25) on page programs**, as the vendor sets it
+  (prepare_read_prog_cmd |= 0x2200000).
+- **No STATUS command after a program.** The program itself ends with CMDD
+  after ~7.6 ms (NDSR 0x1d00). A separate STATUS command (mainline's
+  nand_status_op) is then never answered, which is what timed out
+  ("Timeout on CMDD"). With AUTO_RS the controller has already read the
+  status: a failed program sets BBD (NDSR bit 6). So bch_v1 waits for
+  CMDD/BBD (200 ms, the vendor's timeout) and stops there.
+
+Other notes:
+- The raw OOB read fills 62 bytes (32 spare + 30 ECC). Bytes 62-63 are
+  whatever the buffer held, so comparisons stop at 61.
+- A refused command leaves the controller waiting for command words. The
+  next command recovers it ("Timeout on CMDD" once, then normal).
+- `kernel/m1/tools/regen_0010.sh` rebuilds patch 0010 from
+  `tools/nandw_edit.py` (vanilla + 0006 + the edits).
+- **Not yet tested:** UBI/UBIFS writing through this path (many pages,
+  erase counters, wear leveling), and the first write of a whole partition.
+  Both come before an installer.

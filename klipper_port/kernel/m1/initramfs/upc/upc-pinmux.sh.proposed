@@ -1,0 +1,99 @@
+#!/bin/sh
+# upc-pinmux.sh (stage "in": APPROVED and done, UPC test 2c; stage "all":
+# still PROPOSED, a separate future request; build.sh ignores *.proposed)
+#
+# Stage "in" = bank 5 pins 20-24 = 0x1003: X endstop pin 20 (XIRD1 bit 10),
+# Y pin 21 (bit 11), pin 22 probably Z, cartridge lever pin 23 (bit 14), pin
+# 24. The mv61x0-upc driver now does it at probe (DT "xena-pads"), after
+# holding the cores and checking every output is off. This script is only
+# for manual use on an older image. Stage "all" (the rest of the stock UPC
+# pads, needed for XIRD and later for the outputs) needs its own OK.
+#
+# Why: on stock with NO Sindoh firmware run (cores held, XIIC/XIRW all 0),
+# XENA reads live inputs (XIRD 0x3c040000, XIRD1 0x00004000). Under mainline
+# it reads 0. upc.ko's only clock/reset register, 0xf8000180, already
+# matches stock (0x01dde26d), and the firmware-init idea is refuted. What's
+# left is the SoC pad functions: the vendor's gr_def_mpp_list
+# (board_do_mpp_config, at every stock boot, before upc.ko or the app)
+# gives these pads UPC-side functions, while U-Boot (so mainline) leaves
+# them GPIO inputs at 0x000c1000. Values are the exact stock readings
+# (docs/kernel/stock_pinmux_eth.txt) and match the vendor table:
+#   bank 4 (0xf8044000) pins 24 26             -> 0x00001003 (function 3)
+#   bank 5 (0xf8045000) pins 0-3               -> 0x00001003
+#                       pins 6-14              -> 0x00001001 (function 1)
+#                       pins 16-19             -> 0x00001002 (function 2)
+#                       pins 20-24             -> 0x00001003
+#                       pins 25-28             -> 0x00001002
+#                       pins 29-31             -> 0x00001001
+#   bank 6 (0xf8046000) pins 0 2 3 4           -> 0x00001001
+# Not touched: bank 5 pin 15 (0x000c1001 in that stock dump but not in the
+# vendor table: set later by something else), banks 0/1/2/3 (NAND, Ethernet,
+# touch and I2C, LCD), bank 4 pins 1-3 and 10-19 (test 2b), and every
+# direction register.
+#
+# Some of these pads are UPC OUTPUTS (stepper step/dir/enable, PWM for the
+# heaters, fans and motor current). Which pad is which is not known yet:
+# xena-padmap.sh (read-only) finds the input pads first. Hence two stages:
+#   in   only the pads listed in IN_PADS below (fill from xena-padmap.sh);
+#   all  the whole stock set above.
+# Why the outputs stay safe in either stage:
+#  - This is exactly the pad state of a stock printer from board init until
+#    the app starts, which you just observed on the 2 GB card (no app, cores
+#    held): nothing moved or heated.
+#  - The script refuses to write unless CPUSoftReset (0xf9208154) = 0
+#    (both UPC cores held), no PWM block 1-32 has run (bit 0) or level
+#    (bit 2) set, and every stepper CFG (0xf815000c + 0x1000*n) has bit 0
+#    set (A4982 drivers off). The mainline UPC driver forces exactly that at
+#    probe (test 1). So once a pad switches to its UPC function, the
+#    peripheral behind it drives its idle level: PWM low (heaters and fans
+#    off), stepper drivers disabled. Nothing else can start them while the
+#    cores are held.
+#  - It re-checks those registers afterwards and prints them.
+# Test (no firmware needed: XIRD is readable with the cores held, as on
+# stock): run xena-dump, then this, then xena-dump again. XIRD should read
+# about 0x3c040000 and XIRD1 bit 14 should follow the cartridge lever.
+#
+# usage: sh upc-pinmux.sh in|all
+IN_PADS="5:20:0x1003 5:21:0x1003 5:22:0x1003 5:23:0x1003 5:24:0x1003"
+ALL_PADS="4:24:0x1003 4:26:0x1003
+5:0:0x1003 5:1:0x1003 5:2:0x1003 5:3:0x1003
+5:6:0x1001 5:7:0x1001 5:8:0x1001 5:9:0x1001 5:10:0x1001 5:11:0x1001 5:12:0x1001 5:13:0x1001 5:14:0x1001
+5:16:0x1002 5:17:0x1002 5:18:0x1002 5:19:0x1002
+5:20:0x1003 5:21:0x1003 5:22:0x1003 5:23:0x1003 5:24:0x1003
+5:25:0x1002 5:26:0x1002 5:27:0x1002 5:28:0x1002
+5:29:0x1001 5:30:0x1001 5:31:0x1001
+6:0:0x1001 6:2:0x1001 6:3:0x1001 6:4:0x1001"
+
+safe() {
+	ok=1
+	[ "$(devmem 0xf9208154)" = 0x00000000 ] || { echo "upc-pinmux: cores not held (CPUSoftReset $(devmem 0xf9208154))"; ok=0; }
+	n=1
+	while [ $n -le 32 ]; do
+		c=$(devmem $((0xf9304000 + 0x100 * n)))
+		[ $((c & 5)) -ne 0 ] && { echo "upc-pinmux: pwm$n CTRL $c has run/level set"; ok=0; }
+		n=$((n + 1))
+	done
+	for n in 0 1 2 3 4; do
+		c=$(devmem $((0xf815000c + 0x1000 * n)))
+		[ $((c & 1)) -eq 1 ] || { echo "upc-pinmux: stepper $n CFG $c has the driver enabled"; ok=0; }
+	done
+	[ $ok = 1 ]
+}
+
+case $1 in
+in)	pads=$IN_PADS ;;
+all)	pads=$ALL_PADS ;;
+*)	echo "usage: upc-pinmux.sh in|all"; exit 1 ;;
+esac
+[ -n "$pads" ] || { echo "upc-pinmux: IN_PADS is empty; run xena-padmap.sh first"; exit 1; }
+safe || { echo "upc-pinmux: not safe, nothing written"; exit 1; }
+
+for p in $pads; do
+	b=${p%%:*}; r=${p#*:}; pin=${r%%:*}; v=${r#*:}
+	a=$((0xf8040000 + 0x1000 * b + 0x80 + 4 * pin))
+	printf 'bank%s pin%s %#x: %s -> ' $b $pin $a "$(devmem $a)"
+	devmem $a 32 $v
+	devmem $a
+done
+safe && echo "upc-pinmux: outputs still safe, cores held"
+echo "XIRD=$(devmem 0xf9209658) XIRD1=$(devmem 0xf920965c)"

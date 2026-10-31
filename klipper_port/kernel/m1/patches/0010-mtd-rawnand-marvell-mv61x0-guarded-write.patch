@@ -1,6 +1,14 @@
 --- a/drivers/mtd/nand/raw/marvell_nand.c
 +++ b/drivers/mtd/nand/raw/marvell_nand.c
-@@ -428,6 +428,9 @@
+@@ -192,6 +192,7 @@
+ #define NDCB0_CSEL		BIT(24)
+ #define NDCB0_RDY_BYP		BIT(27)
+ #define NDCB0_LEN_OVRD		BIT(28)
++#define NDCB0_AUTO_RS		BIT(25)
+ #define NDCB0_CMD_XTYPE(x)	((x & 0x7) << 29)
+ 
+ /* NAND controller command buffer 1 register */
+@@ -428,6 +429,9 @@
  	bool use_dma;
  	struct dma_chan *dma_chan;
  	u8 *dma_buf;
@@ -10,7 +18,7 @@
  };
  
  static inline struct marvell_nfc *to_marvell_nfc(struct nand_controller *ctrl)
-@@ -672,17 +675,107 @@
+@@ -672,17 +676,107 @@
  	return false;
  }
  
@@ -122,7 +130,61 @@
  		WARN_ON_ONCE(1);
  		return;
  	}
-@@ -2414,13 +2507,36 @@
+@@ -1315,6 +1409,33 @@
+ }
+ 
+ /* Hamming write helpers */
++/*
++ * bch_v1: end of a page program (AUTO_RS). Wait up to 200 ms, the vendor
++ * driver's timeout, for CMDD (done) or BBD (the automatic status read saw
++ * the program fail).
++ */
++static int marvell_nfc_bch_v1_wait_prog(struct nand_chip *chip)
++{
++	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
++	u32 cmdd = NDSR_CMDD(to_nand_sel(to_marvell_nand(chip))->ndcb0_csel);
++	u32 bbd = BIT(6);	/* CS0 bad block detect */
++	u32 st;
++	int ret;
++
++	ret = readl_relaxed_poll_timeout(nfc->regs + NDSR, st,
++					 st & (cmdd | bbd), 100, 200000);
++	if (ret) {
++		dev_err(nfc->dev, "program: no CMDD (NDSR 0x%08x)\n", st);
++		return -ETIMEDOUT;
++	}
++	writel_relaxed(st & (cmdd | bbd), nfc->regs + NDSR);
++	if (st & bbd) {
++		dev_err(nfc->dev, "program failed (NDSR 0x%08x)\n", st);
++		return -EIO;
++	}
++	return 0;
++}
++
+ static int marvell_nfc_hw_ecc_hmg_do_write_page(struct nand_chip *chip,
+ 						const u8 *data_buf,
+ 						const u8 *oob_buf, bool raw,
+@@ -1341,6 +1462,9 @@
+ 	/* NFCv2 needs more information about the operation being executed */
+ 	if (nfc->caps->is_nfcv2)
+ 		nfc_op.ndcb[0] |= NDCB0_CMD_XTYPE(XTYPE_MONOLITHIC_RW);
++	/* 88PA6170: no CMDD after a program without the automatic status read */
++	if (nfc->caps->bch_v1)
++		nfc_op.ndcb[0] |= NDCB0_AUTO_RS;
+ 
+ 	ret = marvell_nfc_prepare_cmd(chip);
+ 	if (ret)
+@@ -1363,6 +1487,9 @@
+ 		marvell_nfc_xfer_data_out_pio(nfc, oob_buf, oob_bytes);
+ 	}
+ 
++	if (nfc->caps->bch_v1)
++		return marvell_nfc_bch_v1_wait_prog(chip);
++
+ 	ret = marvell_nfc_wait_cmdd(chip);
+ 	if (ret)
+ 		return ret;
+@@ -2414,13 +2541,36 @@
  	.free = marvell_nand_ooblayout_free,
  };
  
@@ -160,7 +222,7 @@
  static int marvell_nfc_ro_write_oob(struct nand_chip *chip, int page)
  {
  	return -EROFS;
-@@ -2484,7 +2600,8 @@
+@@ -2484,7 +2634,8 @@
  		 * three NDCB0 words, 2048 + 32 bytes with ECC on (+ 30 raw).
  		 * That is the Hamming helpers' transfer. The BCH chunk helpers
  		 * would need LEN_OVRD, which this controller does not have.
@@ -170,7 +232,7 @@
  		 */
  		chip->ecc.algo = NAND_ECC_ALGO_BCH;
  		ecc->strength = 16;
-@@ -2493,7 +2610,7 @@
+@@ -2493,7 +2644,7 @@
  		ecc->read_oob_raw = marvell_nfc_hw_ecc_hmg_read_oob_raw;
  		ecc->read_oob = ecc->read_oob_raw;
  		ecc->write_page_raw = marvell_nfc_ro_write_page;
@@ -179,7 +241,7 @@
  		ecc->write_oob_raw = marvell_nfc_ro_write_oob;
  		ecc->write_oob = marvell_nfc_ro_write_oob;
  	} else if (ecc->strength == 1) {
-@@ -2590,6 +2707,36 @@
+@@ -2590,6 +2741,36 @@
  	.pattern = bbt_mirror_pattern
  };
  
@@ -216,7 +278,7 @@
  static int marvell_nfc_setup_interface(struct nand_chip *chip, int chipnr,
  				       const struct nand_interface_config *conf)
  {
-@@ -2718,6 +2865,13 @@
+@@ -2718,6 +2899,13 @@
  		chip->bbt_md = &bbt_mirror_descr;
  	}
  
@@ -230,7 +292,7 @@
  	/* Save the chip-specific fields of NDCR */
  	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
  	if (chip->options & NAND_BUSWIDTH_16)
-@@ -2944,6 +3098,22 @@
+@@ -2944,6 +3132,22 @@
  		return ret;
  	}
  

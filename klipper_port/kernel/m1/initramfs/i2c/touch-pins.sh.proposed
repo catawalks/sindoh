@@ -1,0 +1,40 @@
+#!/bin/sh
+# touch-pins.sh (PROPOSED: needs the user's OK; build.sh ignores *.proposed)
+#
+# Overnight test: the BU21029 touch controller (I2C bus 2, 0x40) does not
+# answer under mainline. Most likely it is held in reset.
+#
+# Which line is which (vendor kernel, 3.2):
+#  - GPIO 67 (bank 2 bit 3): gr_def_mpp_list entry "00 00 00 00 00 00 01" =
+#    GPIO function, output, level 1, set at every stock boot by
+#    board_do_mpp_config. Stock dump: out bit 3 = 1, dir bit 3 = 1. This is
+#    the touch controller's reset/enable, held high.
+#  - GPIO 66 (bank 2 bit 2): rohm_ts_probe requests it, briefly drives it,
+#    then uses it as the touch interrupt (Linux IRQ 275, "rohm-i2c").
+#    Stock dump: dir bit 2 = 0, input.
+# U-Boot (so mainline) leaves both pads in function 1 (0x000c0301), so
+# nothing drives GPIO 67.
+#
+# Writes (stock values, docs/kernel/stock_pinmux_eth.txt, bank 2 =
+# 0xf8042000):
+#   1. out bit 3 = 1 (read-modify-write of 0xf8042004), before the
+#      direction, as the vendor does
+#   2. dir bit 3 = 1 (0xf8042008), so GPIO 67 drives high
+#   3. pin select 3 (0xf804208c) = 0x00000300 (GPIO; stock value)
+#   4. pin select 2 (0xf8042088) = 0x00000320 (GPIO input; stock value)
+# Why it is safe: GPIO 67 goes only to the touch controller's reset input
+# and is driven high in stock from board init onwards. GPIO 66 stays an
+# input. No heater, motor or power rail is involved, and the other bank-2
+# pins (I2C SDA/SCL on 0/1 and 4/5) are not touched.
+#
+# Test: run this, wait 100 ms, then `i2cdetect -y -r 2 0x40 0x40` should
+# show 40. Only then, read-only, look at what a plain read returns.
+B=0xf8042000
+echo "before: out $(devmem $((B + 4))) dir $(devmem $((B + 8))) sel2 $(devmem $((B + 0x88))) sel3 $(devmem $((B + 0x8c)))"
+devmem $((B + 4)) 32 $(( $(devmem $((B + 4))) | 0x8 ))
+devmem $((B + 8)) 32 $(( $(devmem $((B + 8))) | 0x8 ))
+devmem $((B + 0x8c)) 32 0x00000300
+devmem $((B + 0x88)) 32 0x00000320
+echo "after:  out $(devmem $((B + 4))) dir $(devmem $((B + 8))) sel2 $(devmem $((B + 0x88))) sel3 $(devmem $((B + 0x8c)))"
+usleep 100000
+i2cdetect -y -r 2 0x40 0x40
