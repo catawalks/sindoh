@@ -108,3 +108,26 @@ Still open for D2:
 - the touchscreen driver (docs/kernel/touch_bu21029.md) and GPIO interrupts;
 - RTC set_time (`marvell,set-time`);
 - the UPC output pads are applied by the kernel, but heat and motion stay the user's call at each step.
+
+## Step D2 (2026-10-30 night, the user approved): the full Klipper stack runs on mainline
+
+- **Card prep from stock:** updated init.mainline, rc.dp200, dp200-start/
+  mounts/wifi/powerkey.sh, dp200_screen.py and cdc-acm.ko deployed, with a
+  `.bak` of each old file. The 8782 firmware was copied from stock's
+  /lib/firmware/mrvl into the root.
+- **First D2 boot:** init.mainline ran, the UPC firmware loaded and "started:
+  web UI on port 80, moonraker on 7125". But there was no network: the root
+  had no `ifconfig`, `busybox`, `wpa_supplicant` or `wpa_cli` (the stock side
+  always provided them). Left with SysRq s/u/b.
+- **Fix (the user approved):** `apt-get install --no-install-recommends busybox
+  wpasupplicant` in the root (Debian trixie armel, from stock with internet);
+  symlinks /usr/local/bin/{ifconfig,route,udhcpc,ntpd} -> busybox (Debian's
+  busybox package installs no applet links); the m1 udhcpc event script as
+  /etc/udhcpc/default.script and /usr/share/udhcpc/default.script.
+- **Second D2 boot (loader by serial, m1-debian 7533df00):** eth0 DHCP 10.10.0.9.
+  **Moonraker** API 1.5.0, klippy_connected, no failed components. **Klipper
+  "Printer is ready"** (software 9cb9975-dirty, 2-core ARMv7, as user klipper):
+  extruder 26.49 °C / target 0, bed 19.27 °C / target 0, no axes homed.
+  **Mainsail** on port 80: HTTP 200. **Webcam** snapshot: 200, 13.8 KB.
+- **Not yet:** Wi-Fi (mlan0 has no address; to check in dp200-init.log), the
+  touchscreen driver (BU21029, pending), and RTC set_time (off).
