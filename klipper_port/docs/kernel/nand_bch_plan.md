@@ -73,3 +73,62 @@ A variant of marvell_nand for this controller (an `mv61x0` caps entry):
 - the read-only guard extended to every word written to NDCB0.
 
 Then the md5s compare directly against `nanddump`. Reading the vendor's BBT (read-only) needs custom descriptors and is optional, since mtd0/mtd3 have no bad blocks.
+
+## Write path, stage 1 and 2 (2026-10-31)
+
+**The format the stock chain uses.** Both the 3.2 kernel and U-Boot write
+every ECC page the same way:
+- BCH on, the same layout as reads;
+- spare bytes 0-23 left 0xff;
+- the marker "programz" at spare 24-31 (mv61x0_nand_cmdfunc copies it in
+  at PAGEPROG, buffer offsets 0x818/0x81c). No read path checks it, but we
+  write it anyway so our pages are byte-identical to stock ones.
+
+**The vendor BBT** is the 3.2 driver's own bbt_main_descr / bbt_mirror_descr
+(not the generic nand_bbt defaults), and U-Boot has the same patterns:
+- options 0x2392: 2 bits per block, LASTBLOCK, PERCHIP, VERSION, CREATE, WRITE;
+- pattern "Bbt" (mirror "tbB") at OOB offset 20, version at 23;
+- maxblocks 4: main in block 4095, mirror in 4094, with 4092-4093 spare.
+
+Mainline nand_bbt reads these descriptors as they are.
+
+**Patch 0010** (marvell_nand.c, on top of 0006):
+- **The guard.** On bch_v1, every flash-changing command is decoded. Only a
+  complete program (SEQIN + 5 address cycles + PAGEPROG) or erase (ERASE1 +
+  3 row cycles + ERASE2) goes out, and only when its block is inside the
+  write window (`/sys/module/marvell_nand/parameters/write_window`,
+  "FIRST,LAST" erase blocks, default none). The window itself is limited
+  to mtd6 without the last 4 blocks: mtd0-mtd5 can never be programmed or
+  erased.
+- **Page program** in the stock format (BCH, "programz"). Raw and OOB-only
+  writes are refused.
+- **The vendor BBT** is read with the vendor descriptors, without CREATE or
+  WRITE: we never write it, and new bad blocks are kept in RAM. If it is not
+  found, the chip is registered read-only.
+- **Builds:** the normal image keeps CONFIG_MTD_RAW_NAND_READ_ONLY.
+  `NANDW=1 build.sh` makes the test images (m1-debian-nandw).
+
+**Stage 2 (read-only, m1-debian-nandw, window closed):**
+- "Bad block table found at page 262080 / 262016, version 0x01".
+- The one bad block is 0x1a980000 = **block 3404**. It carries the factory
+  marker (00 00 in pages 0 and 1) and is in both tables (raw and ECC reads
+  agree; `tools/nand_bbt_check.py`).
+- Block 3497 is clean on this chip. The raw T48 dump marks 3497 instead,
+  in its marker and in its own table, so **the T48 dump comes from another
+  chip/board**, not this printer.
+- **The stock root's UBI on mtd6:** 2245 PEBs used, 105 free (EC header only;
+  VID header at 2048). The free ones near the end are 4006, 4008, 4053,
+  4081, 4084.
+
+**Stage 3 (needs the owner's OK): one test block, 4084** (a free UBI PEB):
+1. save it (all pages, ECC and raw with OOB) to the card;
+2. with the window closed, try an erase: it must be refused, and the block
+   must stay unchanged;
+3. open the window on 4084 only, and try an erase of 4083: it must be
+   refused;
+4. erase 4084, check it is all 0xff, program test pages, read them back with
+   ECC and raw ("programz", ECC bytes present);
+5. erase it again and program its saved EC header page back, so it reads
+   back identical to the saved copy. That includes the ECC bytes, which
+   proves our pages match the stock format;
+6. close the window.
