@@ -131,3 +131,22 @@ Still open for D2:
   **Mainsail** on port 80: HTTP 200. **Webcam** snapshot: 200, 13.8 KB.
 - **Not yet:** Wi-Fi (mlan0 has no address; to check in dp200-init.log), the
   touchscreen driver (BU21029, pending), and RTC set_time (off).
+
+## D2 round 2 (2026-10-31 ~03:00 UTC): Wi-Fi, webcam, touch device and RTC set_time
+
+m1-debian 6a60c25f (909c509), loader by serial, init.mainline with the device
+groups, the serial root shell and nl80211 Wi-Fi.
+
+- **Wi-Fi works:** "WLAN FW is active", no 0xa9 timeout. mlan0 joined the
+  user's saved network (wpa_state COMPLETED, IP 10.10.0.21, the same address
+  as on stock). eth0 10.10.0.144. **Klipper is "ready" over Wi-Fi.**
+- **Webcam works:** /dev/video0 root:video 660, ustreamer online at 15 fps,
+  and a snapshot (71.7 KB) shows the bed with the head lamp on (the earlier
+  NO SIGNAL came from root-only devtmpfs nodes).
+- **Touch:** "input: bu21029 as .../i2c-2/2-0040/input/input0"; the screen
+  app (dp200_screen.py) runs as root on /dev/input/event0. Real taps not yet
+  tested (needs the user at the panel).
+- **RTC:** vendor setup, "set_time enabled", system clock set from the RTC
+  (2026-10-31T03:01:44Z); /sys/class/rtc/rtc0 counts. (The user approved set_time.)
+- **Accelerometer:** /dev/ttyACM0 root:klipper 660.
+- **Still open:** NTP (Debian's busybox has no ntpd applet), real touch taps.
