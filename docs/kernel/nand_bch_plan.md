@@ -170,3 +170,43 @@ Other notes:
 - **Not yet tested:** UBI/UBIFS writing through this path (many pages,
   erase counters, wear leveling), and the first write of a whole partition.
   Both come before an installer.
+
+## Step 2: UBI + UBIFS writes on the stock root (2026-10-31, the owner approved)
+
+`tools/ubi_write_test.sh` on m1-debian-nandw: window 1741-4091 (all of mtd6
+except the BBT blocks), attach mtd6 read-write as ubi1, mount
+ubi1:filesystem, write a 16 MB random file, sync, unmount, remount, check
+the md5, delete the file, unmount, detach.
+
+**Run 1:** UBI tried to erase PEB 2351 = chip block 4092, a spare BBT block.
+The guard refused it, and UBI went read-only. Nothing was written. Cause: the
+vendor kernel reserves the whole BBT area (blocks 4092-4095, as its
+descriptor has NAND_BBT_WRITE), so stock UBI counts 5 bad PEBs. Mainline's
+nand_bbt without NAND_BBT_WRITE reserves only the 2 blocks that hold a
+table. Fix (patch 0010): after the scan, all 4 are reserved in the in-RAM
+BBT (nothing written). Then 3404 and 4092-4095 read as bad, 5 bad PEBs as on
+stock.
+
+**Run 2:** the test itself passed. Attached with 2350 PEBs and 5 bad,
+mounted read-write, 16 MB written, md5 equal after the remount, deleted
+(free space back to 53772 KB from 53780 KB), detached. But while attached,
+UBI logged 312 "fixable bit-flip" reports and scrubbed 189 PEBs, some
+back and forth (LEB 0:917 between PEB 232 and 1706). The window was closed
+by hand, UBI went read-only, and UBIFS logged one EROFS write at unmount.
+Cause: mainline's BCH bitflip count is NDSR ERRCNT (bits 16-20) on
+CORERR. On this controller that field reads 16 even when idle, which is
+above UBI's scrub threshold (12 for strength 16). Fix (patch 0010): bch_v1
+counts the corrected bits itself, as the difference between its raw read
+and the BCH read (data + spare).
+
+**The stock root after it:**
+- the 3.2 kernel attached mtd6 with 5 bad PEBs and 0 corrupted;
+- UBIFS "recovery needed / recovery completed" (the unclean unmount), mounted;
+- every file read back: 2974 of 2975, the 1 being /app/nvram/PJL, a temp
+  file the stock app deleted during the check;
+- no UBI/UBIFS errors.
+
+The UBI moves are CRC-checked, and they kept the data intact.
+
+**Next:** rerun with the bitflip fix. The test now has a watchdog that closes
+the window after more than 20 scrubs.
