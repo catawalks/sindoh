@@ -210,3 +210,15 @@ The UBI moves are CRC-checked, and they kept the data intact.
 
 **Next:** rerun with the bitflip fix. The test now has a watchdog that closes
 the window after more than 20 scrubs.
+
+**Run 3 (with the bitflip fix):**
+- Attached with 2350 PEBs and 5 bad.
+- 16 MB written; md5 equal after the remount; deleted; free 53972 KB after.
+- **0 scrubs, 0 "fixable bit-flip" reports** (the watchdog had nothing to do).
+- On the 3.2 kernel afterwards: mounted with no recovery needed (our
+  kernel unmounted cleanly). 5 bad PEBs, 0 corrupted, no UBI/UBIFS errors.
+  Every file read (the one miss is the same temp file, /app/nvram/PJL).
+
+**So the mainline write path works for UBI/UBIFS on the stock root**, and
+the stock kernel reads what it wrote. The card's boot slot holds the normal
+read-only m1-debian again (with the bitflip fix).
