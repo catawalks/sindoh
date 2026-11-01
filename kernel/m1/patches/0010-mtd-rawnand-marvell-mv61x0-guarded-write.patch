@@ -18,7 +18,7 @@
  };
  
  static inline struct marvell_nfc *to_marvell_nfc(struct nand_controller *ctrl)
-@@ -672,17 +676,127 @@
+@@ -672,17 +676,129 @@
  	return false;
  }
  
@@ -39,6 +39,8 @@
 +#define BCH_V1_FIRST_WRITABLE	(0xd9a0000 / SZ_128K)	/* mtd6 "filesystem" */
 +#define BCH_V1_BBT_BLOCKS	4
 +#define BCH_V1_PAGES_PER_BLOCK	64
++#define BCH_V1_NDCR_PG_PER_BLK	BIT(14)
++#define BCH_V1_NDCR_SEQ_DIS	BIT(23)
 +
 +/* section 9: BCH reads per page before UNCERR / no data counts as failed */
 +#define BCH_V1_READ_TRIES	4
@@ -150,7 +152,7 @@
  		WARN_ON_ONCE(1);
  		return;
  	}
-@@ -1068,6 +1182,10 @@
+@@ -1068,6 +1184,10 @@
  			bf = 1;
  	}
  
@@ -161,7 +163,7 @@
  	/* Update the stats and max_bitflips */
  	mtd->ecc_stats.corrected += bf;
  	*max_bitflips = max_t(unsigned int, *max_bitflips, bf);
-@@ -1095,6 +1213,10 @@
+@@ -1095,6 +1215,10 @@
  	unsigned int oob_bytes = lt->spare_bytes + (raw ? lt->ecc_bytes : 0);
  	int ret;
  
@@ -172,7 +174,7 @@
  	/* NFCv2 needs more information about the operation being executed */
  	if (nfc->caps->is_nfcv2)
  		nfc_op.ndcb[0] |= NDCB0_CMD_XTYPE(XTYPE_MONOLITHIC_RW);
-@@ -1187,21 +1309,59 @@
+@@ -1187,21 +1311,90 @@
  }
  
  /*
@@ -217,18 +219,49 @@
 + * NDECCCTRL 0xf21 (BCH_EN, threshold 16, 30 in bits 7-14) and NDCR bits 14
 + * (64 pages per block) and 23 (SEQ_DIS) set. Switches to test them:
 + *   eccctrl   NDECCCTRL value for BCH reads (0: mainline's BCH_EN only)
-+ *   ndcr_set  bits ORed into NDCR before each page read
++ *   ndcr_set  NDCR bits 14/23 for page reads (0x4000, 0x800000; default 0)
++ * (The vendor writes NDECCCTRL 0x21 per command; 0xf00 reads back as status.)
   */
 +static uint bch_v1_eccctrl;
 +module_param_named(eccctrl, bch_v1_eccctrl, uint, 0644);
 +static uint bch_v1_ndcr_set;
 +module_param_named(ndcr_set, bch_v1_ndcr_set, uint, 0644);
++/*
++ * drain: after a BCH read, the controller can still offer data (NDSR
++ * RDDREQ set, 2026-11-01), and the next command's data then started with
++ * those stale bytes ("ramz", the tail of the previous page's "programz").
++ *   0: leave it (old behaviour)   1: count and drain it (up to 128 bytes)
++ * stats extra_reads / extra_bytes count what was found.
++ */
++static uint bch_v1_drain;
++module_param_named(drain, bch_v1_drain, uint, 0644);
 +enum { ST_CLEAN, ST_COR, ST_ERASED, ST_RETRY, ST_FAILED, ST_TIMEOUT,
-+       ST_EARLY_UNC, ST_EARLY_COR, ST_RDD_UNC, ST_END_UNC, ST_N };
++       ST_EARLY_UNC, ST_EARLY_COR, ST_RDD_UNC, ST_END_UNC, ST_EXTRA_READS,
++       ST_EXTRA_BYTES, ST_N };
 +static uint bch_v1_st[ST_N];
 +static int bch_v1_st_n = ST_N;
 +module_param_array_named(stats, bch_v1_st, uint, &bch_v1_st_n, 0644);
-+MODULE_PARM_DESC(stats, "88PA6170 reads: clean corrected erased retried failed timeouts early_unc early_cor rdd_unc end_unc");
++MODULE_PARM_DESC(stats, "88PA6170 reads: clean corrected erased retried failed timeouts early_unc early_cor rdd_unc end_unc extra_reads extra_bytes");
++
++/* data still offered after a read: count it, and drain it if asked */
++static void bch_v1_leftover(struct marvell_nfc *nfc)
++{
++	u32 ndsr = readl_relaxed(nfc->regs + NDSR);
++	unsigned int n = 0;
++	u8 tmp[FIFO_DEPTH];
++
++	if (!(ndsr & NDSR_RDDREQ))
++		return;
++	bch_v1_st[ST_EXTRA_READS]++;
++	if (!bch_v1_drain)
++		return;
++	while ((readl_relaxed(nfc->regs + NDSR) & NDSR_RDDREQ) && n < 128) {
++		writel_relaxed(NDSR_RDDREQ, nfc->regs + NDSR);
++		ioread32_rep(nfc->regs + NDDB, tmp, FIFO_REP(FIFO_DEPTH));
++		n += FIFO_DEPTH;
++	}
++	bch_v1_st[ST_EXTRA_BYTES] += n;
++}
 +
 +#define F_EARLY_UNC	BIT(0)
 +#define F_EARLY_COR	BIT(1)
@@ -245,7 +278,7 @@
  {
  	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
  	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
-@@ -1215,35 +1375,76 @@
+@@ -1215,35 +1408,77 @@
  		.ndcb[1] = NDCB1_ADDRS_PAGE(page),
  		.ndcb[2] = NDCB2_ADDR5_PAGE(page),
  	};
@@ -324,6 +357,7 @@
 +	if (ndsr & (NDSR_UNCERR | NDSR_CORERR))
 +		writel_relaxed(ndsr & (NDSR_UNCERR | NDSR_CORERR),
 +			       nfc->regs + NDSR);
++	bch_v1_leftover(nfc);
 +	if (*flags & F_RDD_UNC)
 +		bch_v1_st[ST_RDD_UNC]++;
 +	if (*flags & F_END_UNC)
@@ -333,7 +367,7 @@
  
  out:
  	if (ret) {
-@@ -1256,6 +1457,31 @@
+@@ -1256,6 +1491,31 @@
  	return ret;
  }
  
@@ -365,7 +399,7 @@
  static int marvell_nfc_bch_v1_read_page(struct nand_chip *chip, u8 *buf,
  					int oob_required, int page)
  {
-@@ -1263,58 +1489,146 @@
+@@ -1263,58 +1523,154 @@
  	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
  	const struct marvell_hw_ecc_layout *lt = marvell_nand->layout;
  	struct mtd_info *mtd = nand_to_mtd(chip);
@@ -394,8 +428,16 @@
 -	}
 -
 -	/* A programmed page: BCH into a bounce buffer, the raw copy stays */
++	/*
++	 * test switch: NDCR bits 14/23 as ndcr_set has them. Only written when
++	 * set: an unconditional NDCR rewrite here broke raw-then-BCH reads
++	 * (stale FIFO bytes at the start of the data, 2026-11-01).
++	 */
 +	if (bch_v1_ndcr_set)
-+		writel_relaxed(readl_relaxed(nfc->regs + NDCR) | bch_v1_ndcr_set,
++		writel_relaxed((readl_relaxed(nfc->regs + NDCR) &
++				~(BCH_V1_NDCR_PG_PER_BLK | BCH_V1_NDCR_SEQ_DIS)) |
++			       (bch_v1_ndcr_set & (BCH_V1_NDCR_PG_PER_BLK |
++						   BCH_V1_NDCR_SEQ_DIS)),
 +			       nfc->regs + NDCR);
  	ecc_buf = kmalloc(lt->data_bytes + lt->spare_bytes, GFP_KERNEL);
  	if (!ecc_buf)
@@ -548,7 +590,7 @@
  static int marvell_nfc_hw_ecc_hmg_do_write_page(struct nand_chip *chip,
  						const u8 *data_buf,
  						const u8 *oob_buf, bool raw,
-@@ -1341,6 +1655,9 @@
+@@ -1341,6 +1697,9 @@
  	/* NFCv2 needs more information about the operation being executed */
  	if (nfc->caps->is_nfcv2)
  		nfc_op.ndcb[0] |= NDCB0_CMD_XTYPE(XTYPE_MONOLITHIC_RW);
@@ -558,7 +600,7 @@
  
  	ret = marvell_nfc_prepare_cmd(chip);
  	if (ret)
-@@ -1363,6 +1680,9 @@
+@@ -1363,6 +1722,9 @@
  		marvell_nfc_xfer_data_out_pio(nfc, oob_buf, oob_bytes);
  	}
  
@@ -568,7 +610,7 @@
  	ret = marvell_nfc_wait_cmdd(chip);
  	if (ret)
  		return ret;
-@@ -2414,13 +2734,36 @@
+@@ -2414,13 +2776,36 @@
  	.free = marvell_nand_ooblayout_free,
  };
  
@@ -606,7 +648,7 @@
  static int marvell_nfc_ro_write_oob(struct nand_chip *chip, int page)
  {
  	return -EROFS;
-@@ -2484,7 +2827,8 @@
+@@ -2484,7 +2869,8 @@
  		 * three NDCB0 words, 2048 + 32 bytes with ECC on (+ 30 raw).
  		 * That is the Hamming helpers' transfer. The BCH chunk helpers
  		 * would need LEN_OVRD, which this controller does not have.
@@ -616,7 +658,7 @@
  		 */
  		chip->ecc.algo = NAND_ECC_ALGO_BCH;
  		ecc->strength = 16;
-@@ -2493,7 +2837,7 @@
+@@ -2493,7 +2879,7 @@
  		ecc->read_oob_raw = marvell_nfc_hw_ecc_hmg_read_oob_raw;
  		ecc->read_oob = ecc->read_oob_raw;
  		ecc->write_page_raw = marvell_nfc_ro_write_page;
@@ -625,7 +667,7 @@
  		ecc->write_oob_raw = marvell_nfc_ro_write_oob;
  		ecc->write_oob = marvell_nfc_ro_write_oob;
  	} else if (ecc->strength == 1) {
-@@ -2590,6 +2934,36 @@
+@@ -2590,6 +2976,36 @@
  	.pattern = bbt_mirror_pattern
  };
  
@@ -662,7 +704,7 @@
  static int marvell_nfc_setup_interface(struct nand_chip *chip, int chipnr,
  				       const struct nand_interface_config *conf)
  {
-@@ -2718,6 +3092,13 @@
+@@ -2718,6 +3134,13 @@
  		chip->bbt_md = &bbt_mirror_descr;
  	}
  
@@ -676,7 +718,7 @@
  	/* Save the chip-specific fields of NDCR */
  	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
  	if (chip->options & NAND_BUSWIDTH_16)
-@@ -2944,6 +3325,39 @@
+@@ -2944,6 +3367,39 @@
  		return ret;
  	}
  
@@ -716,3 +758,31 @@
  	if (pdata)
  		/* Legacy bindings support only one chip */
  		ret = mtd_device_register(mtd, pdata->parts, pdata->nr_parts);
+@@ -3392,6 +3848,19 @@
+ };
+ MODULE_DEVICE_TABLE(of, marvell_nfc_of_ids);
+ 
++/* bch_v1: hand the controller over idle and clean (reboot, kexec, halt) */
++static void marvell_nfc_shutdown(struct platform_device *pdev)
++{
++	struct marvell_nfc *nfc = platform_get_drvdata(pdev);
++
++	if (!nfc || !nfc->caps->bch_v1)
++		return;
++	writel_relaxed(readl_relaxed(nfc->regs + NDCR) &
++		       ~(NDCR_ND_RUN | NDCR_ECC_EN), nfc->regs + NDCR);
++	writel_relaxed(0, nfc->regs + NDECCCTRL);
++	writel_relaxed(0xFFFFFFFF, nfc->regs + NDSR);
++}
++
+ static struct platform_driver marvell_nfc_driver = {
+ 	.driver	= {
+ 		.name		= "marvell-nfc",
+@@ -3401,6 +3870,7 @@
+ 	.id_table = marvell_nfc_platform_ids,
+ 	.probe = marvell_nfc_probe,
+ 	.remove = marvell_nfc_remove,
++	.shutdown = marvell_nfc_shutdown,
+ };
+ module_platform_driver(marvell_nfc_driver);
+ 
