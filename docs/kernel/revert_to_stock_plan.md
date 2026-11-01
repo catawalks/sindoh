@@ -174,3 +174,41 @@ m1-debian and m1-debian-nandw. See nand_bch_plan.md, "Early UNCERR".
 **Not done yet:**
 - the initramfs (needed for 3e, not for 3c/3d);
 - 3c and 3d, which need the owner's OK.
+
+## 3c-0: mtd3 rewrite with its own content (2026-11-01, owner-approved)
+
+This tests the guard's new areas, and that a partition U-Boot reads comes
+out the same, before mtd0 is touched. Written from m1-debian-nandw
+(md5 63023028).
+
+**Before:**
+- **mtd3 content:** the owner's custom logo (768000 bytes, md5 aed9faa1; the
+  whole partition corrected: 8357ce02).
+- **Pages:** 375 programmed (0-374, "programz"), 137 erased, no bad blocks.
+- **Our raw read:** equal to the stock nanddump baseline in data and OOB
+  bytes 0-61. Our driver doesn't fill OOB bytes 62-63 (stale buffer), so
+  those aren't compared.
+
+**Write:**
+- window 69,76;
+- `flash_erase /dev/mtd3 0 0`;
+- `nandwrite /dev/mtd3` with the 768000 bytes. Only the programmed pages
+  are written, so the erased pages stay erased;
+- window none.
+- Nothing was refused, and nothing was logged.
+
+**After:**
+
+| Check | Result |
+|---|---|
+| Corrected read | 8357ce02, as before |
+| ecc_failures / corrected bits | 0 / 0 |
+| Pages | 375 programmed, 137 erased, as before |
+| Raw data + OOB 0-61 against the stock baseline | **0 bits different** in all 512 pages |
+
+Copies on the 4 GB card in /var/backups:
+- mtd3_corrected_before.bin, mtd3_logo_768000.bin;
+- nand_raw_oob_mtd3_after.bin.
+
+**Still to check:** the owner power-cycles and confirms that stock U-Boot
+shows the logo.
