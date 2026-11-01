@@ -141,3 +141,36 @@ initramfs, including a power cut during the mtd6 part.
 - Sindoh's eFuse step: never.
 - The DIP-switch SD boot. It isn't needed for any of this: the fallback is
   U-Boot's serial and SD path.
+
+## Results, 3a and 3b (2026-11-01, m1-debian-nandw from the SD card)
+
+**Guard v2** (patch 0010):
+- **Hard-allowed blocks:** mtd0 2-63, mtd3 69-76, mtd6 1741-4091.
+- **NANDW device tree:** mtd0, mtd3 and mtd6 are writable at the MTD layer;
+  mtd1, mtd2, mtd4 and mtd5 stay read-only.
+- The write window stayed `none` through every test.
+
+**3a, read-only checks** (`install/nand/dp200-revert.sh --check`): all pass.
+
+| Check | Result |
+|---|---|
+| Recovery set in mtd5 | `install/nand/recovery.md5`, all 4 files match |
+| update.tar.bz2 | bzip2 test OK: the flash copy is good |
+| mtd0 | equals pa6170_rodin_nand.bin, U-Boot block included |
+| mtd6 | VID header offset 2048, data offset 4096; 2355 blocks, 1 bad (3404) |
+| Raw baselines (data + OOB, stock nanddump -n) | on the 4 GB card in /var/backups/: nand_raw_oob_mtd0.bin `ba163ead`, nand_raw_oob_mtd3.bin `dfcd63a1`. Two raw reads of mtd0 were identical. |
+
+**3b, dry run** (`--dry-run --with-logo`): it prints exactly the operations
+in the table above, with the window closed:
+- **Root:** window 1741,4091; `ubiformat -O 2048`; `ubimkvol`;
+  `ubiupdatevol`; untar the apps.
+- **Logo:** window 69,76; `flash_erase` and `nandwrite -p` on mtd3.
+- **Kernel:** window 2,63; `flash_erase /dev/mtd0 0x40000 62`;
+  `nandwrite -s 0x40000`.
+
+**A read bug found on the way.** The fix (patch 0010, section 9) is in both
+m1-debian and m1-debian-nandw. See nand_bch_plan.md, "Early UNCERR".
+
+**Not done yet:**
+- the initramfs (needed for 3e, not for 3c/3d);
+- 3c and 3d, which need the owner's OK.

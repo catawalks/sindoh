@@ -26,10 +26,18 @@ Checked https://github.com/orgs/MarvellEmbeddedProcessors/repositories:
 TIM builder and the WTP downloader for BootROM UART/USB download. Its
 platform list includes `88PA62_70` (GRANITE2), `88PA62_20` and `88PA62_10`,
 later printer SoCs. The 88PA6170 isn't listed.
-- **Possible use:** if the 6170's BootROM speaks the same download
+- **For the DP200:** if the 6170's BootROM speaks the same download
   protocol, that would be a way to unbrick a printer whose U-Boot is gone.
   Not verified, and not needed by the current plan, which never writes
   U-Boot.
+- **For the 2X, 1X and 7X:** these models use the 88PA6270 "granite2"
+  (other_models.md), which the tool lists by name (`P88PA62_70`). If we
+  expand to those models, this is the most useful thing in the org: the
+  BootROM download protocol and the TIM boot-header format. That means
+  unbricking, and running our own boot images without writing their
+  eMMC/NAND first.
+  - Worth keeping, with the exact repo commit (a3e1c67) noted here.
+  - No clone is needed until then.
 - **Not a TIM:** mtd0 starts with `c1de ed1c`, which isn't a TIM header
   (`TIMH`). So the boot block format is likely different.
 

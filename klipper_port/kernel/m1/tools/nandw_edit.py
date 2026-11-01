@@ -47,15 +47,27 @@ rep("""static void marvell_nfc_send_cmd(struct nand_chip *chip,
  * bch_v1 (88PA6170) program/erase window, in erase blocks of the chip.
  * Empty by default: nothing is programmed or erased until it is set, e.g.
  *   echo 4000,4000 > /sys/module/marvell_nand/parameters/write_window
- * It never reaches outside BCH_V1_FIRST_WRITABLE..(last block - 4): the
- * stock layout puts U-Boot, the kernel, the U-Boot env, the vendor BBT
- * partition, the logo, /backup and the factory recovery set (mtd0-mtd5)
- * below 0xd9a0000, and the vendor BBT (main + mirror + 2 spare blocks) in
- * the last 4 blocks of the chip.
+ * It never reaches outside three fixed areas of the stock layout: the
+ * kernel part of mtd0 (after the 2 U-Boot blocks), the logo (mtd3) and the
+ * root (mtd6) without the vendor BBT (main + mirror + 2 spare blocks) in
+ * the last 4 blocks of the chip. U-Boot, the U-Boot env, the vendor BBT
+ * partition, /backup and the factory recovery set are never written.
  */
+#define BCH_V1_KERNEL_FIRST	(0x40000 / SZ_128K)	/* mtd0 after U-Boot */
+#define BCH_V1_KERNEL_LAST	(0x800000 / SZ_128K - 1)
+#define BCH_V1_LOGO_FIRST	(0x8a0000 / SZ_128K)	/* mtd3 "boot-logo" */
+#define BCH_V1_LOGO_LAST	(0x9a0000 / SZ_128K - 1)
 #define BCH_V1_FIRST_WRITABLE	(0xd9a0000 / SZ_128K)	/* mtd6 "filesystem" */
 #define BCH_V1_BBT_BLOCKS	4
 #define BCH_V1_PAGES_PER_BLOCK	64
+
+static bool bch_v1_block_writable(int block, int nblocks)
+{
+	return (block >= BCH_V1_KERNEL_FIRST && block <= BCH_V1_KERNEL_LAST) ||
+	       (block >= BCH_V1_LOGO_FIRST && block <= BCH_V1_LOGO_LAST) ||
+	       (block >= BCH_V1_FIRST_WRITABLE &&
+		block < nblocks - BCH_V1_BBT_BLOCKS);
+}
 
 static int bch_v1_win_first = -1, bch_v1_win_last = -1;
 
@@ -127,8 +139,7 @@ static bool marvell_nfc_write_allowed(struct nand_chip *chip,
 	block = row / BCH_V1_PAGES_PER_BLOCK;
 	nblocks = nanddev_target_size(&chip->base) >> chip->phys_erase_shift;
 	return block >= first && block <= last &&
-	       block >= BCH_V1_FIRST_WRITABLE &&
-	       block < nblocks - BCH_V1_BBT_BLOCKS;
+	       bch_v1_block_writable(block, nblocks);
 }
 
 static void marvell_nfc_send_cmd(struct nand_chip *chip,
@@ -423,6 +434,62 @@ rep("""		else
 
 	/* Update the stats and max_bitflips */
 	mtd->ecc_stats.corrected += bf;""")
+
+# 9. bch_v1 early UNCERR (2026-11-01). On pages that need correction the
+# 88PA6170 sometimes raises UNCERR without RDDREQ, and no RDDREQ follows;
+# reading the page again works. Measured: ~5% of reads of a 1-bitflip page
+# (up to 16% back to back), never on clean pages; stock 3.2 reads the same
+# pages 1000/1000. Mainline returned the raw copy as failed, so /dev/mtd
+# readers got the uncorrected data and UBI had to retry. Now the BCH read
+# is repeated: a really uncorrectable page fails every time and is still
+# reported after BCH_V1_READ_TRIES.
+rep("""	if (!(ndsr & NDSR_RDDREQ)) {
+		ret = -EBADMSG;
+		goto out;
+	}""", """	bch_v1_last_ndsr = ndsr;
+	if (!(ndsr & NDSR_RDDREQ)) {
+		bch_v1_early_uncerr++;
+		ret = -EBADMSG;
+		goto out;
+	}""")
+rep("""	for (try = 0; try < 2; try++) {
+		max_bitflips = 0;
+		ret = marvell_nfc_bch_v1_ecc_read(chip, ecc_buf, page,
+						  &max_bitflips);
+		if (ret != -ETIMEDOUT)
+			break;
+		dev_warn_ratelimited(nfc->dev,
+				     "page %d: BCH read timed out%s\\n", page,
+				     try ? "" : ", retrying");
+	}""", """	for (try = 0; try < BCH_V1_READ_TRIES; try++) {
+		max_bitflips = 0;
+		ret = marvell_nfc_bch_v1_ecc_read(chip, ecc_buf, page,
+						  &max_bitflips);
+		if (ret != -ETIMEDOUT && ret != -EBADMSG)
+			break;
+		if (ret == -ETIMEDOUT)
+			dev_warn_ratelimited(nfc->dev,
+					     "page %d: BCH read timed out, retrying\\n",
+					     page);
+	}
+	if (!ret && try)
+		bch_v1_reread_ok++;""")
+rep("""	dev_warn_ratelimited(nfc->dev, "page %d: BCH read failed (%d), raw data\\n",
+			     page, ret);""", """	dev_warn_ratelimited(nfc->dev,
+			     "page %d: BCH read failed (%d) %d times, raw data, NDSR 0x%08x\\n",
+			     page, ret, BCH_V1_READ_TRIES, bch_v1_last_ndsr);""")
+rep("""#define BCH_V1_PAGES_PER_BLOCK	64
+""", """#define BCH_V1_PAGES_PER_BLOCK	64
+
+/* section 9: BCH reads per page before UNCERR / no data counts as failed */
+#define BCH_V1_READ_TRIES	4
+static uint bch_v1_early_uncerr, bch_v1_reread_ok;
+module_param_named(early_uncerr, bch_v1_early_uncerr, uint, 0444);
+MODULE_PARM_DESC(early_uncerr, "88PA6170: BCH reads that ended in UNCERR");
+module_param_named(reread_ok, bch_v1_reread_ok, uint, 0444);
+MODULE_PARM_DESC(reread_ok, "88PA6170: pages read correctly after a retry");
+static u32 bch_v1_last_ndsr;
+""")
 
 open(p, 'w').write(s)
 print('edited')

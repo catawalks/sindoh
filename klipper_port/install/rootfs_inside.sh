@@ -17,7 +17,7 @@ apt-get install -y -q -o Dpkg::Progress-Fancy=0 --no-install-recommends \
     procps iproute2 iputils-ping less nano ca-certificates \
     gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi \
     ustreamer v4l-utils \
-    python3-pil fonts-dejavu-core
+    python3-pil fonts-dejavu-core mtd-utils bzip2
 apt-get clean
 # time64 -> time32 V4L2 buffer ioctl shim for kernel 3.2 (see install/camera/)
 gcc -O2 -Wall -shared -fPIC -o /usr/local/lib/v4l2_time32_shim.so \
