@@ -61,6 +61,20 @@ Nothing here was run on those printers. It was read from the updates only
   the Klipper UPC port is the right model. But the core type, memory map
   (ITCM/DTCM) and step/ADC peripherals must be probed again, as was done
   for the DP200 (`upc_fw/probe/`). The DTB lists a `dcmotor` block.
+- **88PA6270 references in Marvell's public code**
+  (kernel/marvell_github.md):
+  - Marvell's A3700-utils-marvell repo (`wtptp/`, the TIM builder and the
+    WTP downloader) lists `88PA62_70` (GRANITE2) as a platform. That
+    downloader talks to the BootROM over UART/USB and is Marvell's tool for
+    loading a first-stage image onto a board with no working boot flash.
+  - **If the 6270 BootROM accepts it, it gives these models:**
+    - an unbrick path;
+    - a way to run our own U-Boot or kernel without touching eMMC/NAND;
+    - a reference for their TIM boot-header format (the TIM parser is
+      included).
+  - Not tried; the tool and TIM format details have to be checked against
+    a 2X/1X/7X boot partition first.
+  - Nothing else for these chips is in that GitHub org: no kernel, no U-Boot.
 - **2X** has two extruders (to be worked out with hardware). It comes in
   two board revisions: Prime_r1 boots from NAND, Prime_r2 from eMMC.
 - **eMMC boards** have partitions p1 (U-Boot), p2 (root with `/boot`), p3

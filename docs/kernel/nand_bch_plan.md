@@ -222,3 +222,52 @@ the window after more than 20 scrubs.
 **So the mainline write path works for UBI/UBIFS on the stock root**, and
 the stock kernel reads what it wrote. The card's boot slot holds the normal
 read-only m1-debian again (with the bitflip fix).
+
+## Early UNCERR on pages with bitflips (2026-11-01)
+
+**Symptom.** Attaching mtd5 logged ~90 "BCH read failed (-74)" messages,
+and UBI retried each one. Full page-by-page passes of mtd5 (102,400 pages)
+gave ~100-125 errors per pass, on different pages each time.
+
+**Measured:**
+
+| Test | Our kernel, before the fix | Stock 3.2 (same reads, via the SD chroot) |
+|---|---|---|
+| Page with 1 bitflip, read 1000 times | ~5.5% fail | 1000/1000 OK |
+| Same page, back to back | 16% of reads returned the **uncorrected data** through /dev/mtd5, with no error to the reader (mtdchar passes the data on -EBADMSG) | |
+| Clean pages | never fail | |
+| Full pass of mtd5 | ~100 errors | 0 errors (36 s) |
+
+So the flash is fine and our driver was wrong.
+
+**Cause.** On pages that need correction, the 88PA6170 sometimes raises
+UNCERR without RDDREQ, and RDDREQ never follows. A fresh read of the page
+works.
+- **Waiting longer for RDDREQ doesn't help:** it times out. A diagnostic
+  build only looked fixed because the timeout went through the old
+  timeout retry.
+- **NDECCCTRL makes no difference:** the vendor's 0x21 behaves the same as
+  mainline's 0x01.
+
+**Fix (patch 0010 section 9).**
+- An UNCERR or a timeout repeats the BCH read, up to 4 tries.
+- A really uncorrectable page fails all 4 tries and is still reported.
+- Counters: /sys/module/marvell_nand/parameters/early_uncerr and
+  reread_ok.
+
+**After the fix:**
+- 6000 back-to-back reads: all correct;
+- 3 full passes of mtd5: 0 errors (~990 early UNCERRs, all recovered);
+- 0 UBI retries.
+
+**Still open, speed only:**
+- Our passes take 70-86 s, stock's 36 s.
+- About 300 reads per pass end in a timeout (no RDDREQ and no UNCERR), and
+  the retry recovers them. Each one waits POLL_TIMEOUT.
+- Likely related to the raw-then-BCH double read, which the vendor driver
+  doesn't do.
+
+**Tools:**
+- tools/bulkread.py: page-by-page passes;
+- tools/pagetest.sh: repeated nanddump of a page;
+- tools/nand_hammer.py: back-to-back reads of one page, md5s counted.

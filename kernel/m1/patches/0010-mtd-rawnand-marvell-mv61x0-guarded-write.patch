@@ -18,7 +18,7 @@
  };
  
  static inline struct marvell_nfc *to_marvell_nfc(struct nand_controller *ctrl)
-@@ -672,17 +676,107 @@
+@@ -672,17 +676,127 @@
  	return false;
  }
  
@@ -26,15 +26,36 @@
 + * bch_v1 (88PA6170) program/erase window, in erase blocks of the chip.
 + * Empty by default: nothing is programmed or erased until it is set, e.g.
 + *   echo 4000,4000 > /sys/module/marvell_nand/parameters/write_window
-+ * It never reaches outside BCH_V1_FIRST_WRITABLE..(last block - 4): the
-+ * stock layout puts U-Boot, the kernel, the U-Boot env, the vendor BBT
-+ * partition, the logo, /backup and the factory recovery set (mtd0-mtd5)
-+ * below 0xd9a0000, and the vendor BBT (main + mirror + 2 spare blocks) in
-+ * the last 4 blocks of the chip.
++ * It never reaches outside three fixed areas of the stock layout: the
++ * kernel part of mtd0 (after the 2 U-Boot blocks), the logo (mtd3) and the
++ * root (mtd6) without the vendor BBT (main + mirror + 2 spare blocks) in
++ * the last 4 blocks of the chip. U-Boot, the U-Boot env, the vendor BBT
++ * partition, /backup and the factory recovery set are never written.
 + */
++#define BCH_V1_KERNEL_FIRST	(0x40000 / SZ_128K)	/* mtd0 after U-Boot */
++#define BCH_V1_KERNEL_LAST	(0x800000 / SZ_128K - 1)
++#define BCH_V1_LOGO_FIRST	(0x8a0000 / SZ_128K)	/* mtd3 "boot-logo" */
++#define BCH_V1_LOGO_LAST	(0x9a0000 / SZ_128K - 1)
 +#define BCH_V1_FIRST_WRITABLE	(0xd9a0000 / SZ_128K)	/* mtd6 "filesystem" */
 +#define BCH_V1_BBT_BLOCKS	4
 +#define BCH_V1_PAGES_PER_BLOCK	64
++
++/* section 9: BCH reads per page before UNCERR / no data counts as failed */
++#define BCH_V1_READ_TRIES	4
++static uint bch_v1_early_uncerr, bch_v1_reread_ok;
++module_param_named(early_uncerr, bch_v1_early_uncerr, uint, 0444);
++MODULE_PARM_DESC(early_uncerr, "88PA6170: BCH reads that ended in UNCERR");
++module_param_named(reread_ok, bch_v1_reread_ok, uint, 0444);
++MODULE_PARM_DESC(reread_ok, "88PA6170: pages read correctly after a retry");
++static u32 bch_v1_last_ndsr;
++
++static bool bch_v1_block_writable(int block, int nblocks)
++{
++	return (block >= BCH_V1_KERNEL_FIRST && block <= BCH_V1_KERNEL_LAST) ||
++	       (block >= BCH_V1_LOGO_FIRST && block <= BCH_V1_LOGO_LAST) ||
++	       (block >= BCH_V1_FIRST_WRITABLE &&
++		block < nblocks - BCH_V1_BBT_BLOCKS);
++}
 +
 +static int bch_v1_win_first = -1, bch_v1_win_last = -1;
 +
@@ -106,8 +127,7 @@
 +	block = row / BCH_V1_PAGES_PER_BLOCK;
 +	nblocks = nanddev_target_size(&chip->base) >> chip->phys_erase_shift;
 +	return block >= first && block <= last &&
-+	       block >= BCH_V1_FIRST_WRITABLE &&
-+	       block < nblocks - BCH_V1_BBT_BLOCKS;
++	       bch_v1_block_writable(block, nblocks);
 +}
 +
  static void marvell_nfc_send_cmd(struct nand_chip *chip,
@@ -130,7 +150,7 @@
  		WARN_ON_ONCE(1);
  		return;
  	}
-@@ -1068,6 +1162,10 @@
+@@ -1068,6 +1182,10 @@
  			bf = 1;
  	}
  
@@ -141,7 +161,17 @@
  	/* Update the stats and max_bitflips */
  	mtd->ecc_stats.corrected += bf;
  	*max_bitflips = max_t(unsigned int, *max_bitflips, bf);
-@@ -1265,7 +1363,7 @@
+@@ -1230,7 +1348,9 @@
+ 		ret = -ETIMEDOUT;
+ 		goto out;
+ 	}
++	bch_v1_last_ndsr = ndsr;
+ 	if (!(ndsr & NDSR_RDDREQ)) {
++		bch_v1_early_uncerr++;
+ 		ret = -EBADMSG;
+ 		goto out;
+ 	}
+@@ -1265,7 +1385,7 @@
  	struct mtd_info *mtd = nand_to_mtd(chip);
  	unsigned int max_bitflips = 0;
  	u8 *ecc_buf;
@@ -150,9 +180,28 @@
  
  	marvell_nfc_select_target(chip, chip->cur_cs);
  
-@@ -1299,6 +1397,18 @@
- 				     try ? "" : ", retrying");
+@@ -1288,17 +1408,32 @@
+ 	ecc_buf = kmalloc(lt->data_bytes + lt->spare_bytes, GFP_KERNEL);
+ 	if (!ecc_buf)
+ 		return -ENOMEM;
+-	for (try = 0; try < 2; try++) {
++	for (try = 0; try < BCH_V1_READ_TRIES; try++) {
+ 		max_bitflips = 0;
+ 		ret = marvell_nfc_bch_v1_ecc_read(chip, ecc_buf, page,
+ 						  &max_bitflips);
+-		if (ret != -ETIMEDOUT)
++		if (ret != -ETIMEDOUT && ret != -EBADMSG)
+ 			break;
+-		dev_warn_ratelimited(nfc->dev,
+-				     "page %d: BCH read timed out%s\n", page,
+-				     try ? "" : ", retrying");
++		if (ret == -ETIMEDOUT)
++			dev_warn_ratelimited(nfc->dev,
++					     "page %d: BCH read timed out, retrying\n",
++					     page);
  	}
++	if (!ret && try)
++		bch_v1_reread_ok++;
  	if (!ret) {
 +		/*
 +		 * NDSR ERRCNT is not usable here (it reads 16 even when
@@ -169,7 +218,17 @@
  		memcpy(buf, ecc_buf, lt->data_bytes);
  		memcpy(chip->oob_poi, ecc_buf + lt->data_bytes,
  		       lt->spare_bytes);
-@@ -1315,6 +1425,33 @@
+@@ -1308,13 +1443,41 @@
+ 	kfree(ecc_buf);
+ 
+ 	/* Uncorrectable, or no data twice: the raw copy, counted as failed */
+-	dev_warn_ratelimited(nfc->dev, "page %d: BCH read failed (%d), raw data\n",
+-			     page, ret);
++	dev_warn_ratelimited(nfc->dev,
++			     "page %d: BCH read failed (%d) %d times, raw data, NDSR 0x%08x\n",
++			     page, ret, BCH_V1_READ_TRIES, bch_v1_last_ndsr);
+ 	mtd->ecc_stats.failed++;
+ 	return 0;
  }
  
  /* Hamming write helpers */
@@ -203,7 +262,7 @@
  static int marvell_nfc_hw_ecc_hmg_do_write_page(struct nand_chip *chip,
  						const u8 *data_buf,
  						const u8 *oob_buf, bool raw,
-@@ -1341,6 +1478,9 @@
+@@ -1341,6 +1504,9 @@
  	/* NFCv2 needs more information about the operation being executed */
  	if (nfc->caps->is_nfcv2)
  		nfc_op.ndcb[0] |= NDCB0_CMD_XTYPE(XTYPE_MONOLITHIC_RW);
@@ -213,7 +272,7 @@
  
  	ret = marvell_nfc_prepare_cmd(chip);
  	if (ret)
-@@ -1363,6 +1503,9 @@
+@@ -1363,6 +1529,9 @@
  		marvell_nfc_xfer_data_out_pio(nfc, oob_buf, oob_bytes);
  	}
  
@@ -223,7 +282,7 @@
  	ret = marvell_nfc_wait_cmdd(chip);
  	if (ret)
  		return ret;
-@@ -2414,13 +2557,36 @@
+@@ -2414,13 +2583,36 @@
  	.free = marvell_nand_ooblayout_free,
  };
  
@@ -261,7 +320,7 @@
  static int marvell_nfc_ro_write_oob(struct nand_chip *chip, int page)
  {
  	return -EROFS;
-@@ -2484,7 +2650,8 @@
+@@ -2484,7 +2676,8 @@
  		 * three NDCB0 words, 2048 + 32 bytes with ECC on (+ 30 raw).
  		 * That is the Hamming helpers' transfer. The BCH chunk helpers
  		 * would need LEN_OVRD, which this controller does not have.
@@ -271,7 +330,7 @@
  		 */
  		chip->ecc.algo = NAND_ECC_ALGO_BCH;
  		ecc->strength = 16;
-@@ -2493,7 +2660,7 @@
+@@ -2493,7 +2686,7 @@
  		ecc->read_oob_raw = marvell_nfc_hw_ecc_hmg_read_oob_raw;
  		ecc->read_oob = ecc->read_oob_raw;
  		ecc->write_page_raw = marvell_nfc_ro_write_page;
@@ -280,7 +339,7 @@
  		ecc->write_oob_raw = marvell_nfc_ro_write_oob;
  		ecc->write_oob = marvell_nfc_ro_write_oob;
  	} else if (ecc->strength == 1) {
-@@ -2590,6 +2757,36 @@
+@@ -2590,6 +2783,36 @@
  	.pattern = bbt_mirror_pattern
  };
  
@@ -317,7 +376,7 @@
  static int marvell_nfc_setup_interface(struct nand_chip *chip, int chipnr,
  				       const struct nand_interface_config *conf)
  {
-@@ -2718,6 +2915,13 @@
+@@ -2718,6 +2941,13 @@
  		chip->bbt_md = &bbt_mirror_descr;
  	}
  
@@ -331,7 +390,7 @@
  	/* Save the chip-specific fields of NDCR */
  	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
  	if (chip->options & NAND_BUSWIDTH_16)
-@@ -2944,6 +3148,39 @@
+@@ -2944,6 +3174,39 @@
  		return ret;
  	}
  
