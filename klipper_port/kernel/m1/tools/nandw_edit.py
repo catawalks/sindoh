@@ -510,5 +510,35 @@ rep("""	unsigned int oob_bytes = lt->spare_bytes + (raw ? lt->ecc_bytes : 0);
 		oob_bytes = nand_to_mtd(chip)->oobsize;
 """)
 
+# 11. Leave the bch_v1 controller idle and clean on shutdown/reboot, for
+# U-Boot and the next kernel (stock reads NDSR 0 idle). Stock 3.2 also sets
+# NDCR bits 14 and 23 (idle NDCR 0xc184dfff); setting them in our reset
+# made every read return other pages' data (2026-11-01, read-only test), so
+# they are only a test switch (ndcr_set, bch_v1_read.c), default off.
+rep("""#define BCH_V1_PAGES_PER_BLOCK	64
+""", """#define BCH_V1_PAGES_PER_BLOCK	64
+#define BCH_V1_NDCR_PG_PER_BLK	BIT(14)
+#define BCH_V1_NDCR_SEQ_DIS	BIT(23)
+""")
+rep("""static struct platform_driver marvell_nfc_driver = {""",
+"""/* bch_v1: hand the controller over idle and clean (reboot, kexec, halt) */
+static void marvell_nfc_shutdown(struct platform_device *pdev)
+{
+	struct marvell_nfc *nfc = platform_get_drvdata(pdev);
+
+	if (!nfc || !nfc->caps->bch_v1)
+		return;
+	writel_relaxed(readl_relaxed(nfc->regs + NDCR) &
+		       ~(NDCR_ND_RUN | NDCR_ECC_EN), nfc->regs + NDCR);
+	writel_relaxed(0, nfc->regs + NDECCCTRL);
+	writel_relaxed(0xFFFFFFFF, nfc->regs + NDSR);
+}
+
+static struct platform_driver marvell_nfc_driver = {""")
+rep("""	.probe = marvell_nfc_probe,
+	.remove = marvell_nfc_remove,""", """	.probe = marvell_nfc_probe,
+	.remove = marvell_nfc_remove,
+	.shutdown = marvell_nfc_shutdown,""")
+
 open(p, 'w').write(s)
 print('edited')

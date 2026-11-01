@@ -28,18 +28,49 @@ MODULE_PARM_DESC(ack_early, "88PA6170: acknowledge UNCERR/CORERR before RDDREQ")
  * NDECCCTRL 0xf21 (BCH_EN, threshold 16, 30 in bits 7-14) and NDCR bits 14
  * (64 pages per block) and 23 (SEQ_DIS) set. Switches to test them:
  *   eccctrl   NDECCCTRL value for BCH reads (0: mainline's BCH_EN only)
- *   ndcr_set  bits ORed into NDCR before each page read
+ *   ndcr_set  NDCR bits 14/23 for page reads (0x4000, 0x800000; default 0)
+ * (The vendor writes NDECCCTRL 0x21 per command; 0xf00 reads back as status.)
  */
 static uint bch_v1_eccctrl;
 module_param_named(eccctrl, bch_v1_eccctrl, uint, 0644);
 static uint bch_v1_ndcr_set;
 module_param_named(ndcr_set, bch_v1_ndcr_set, uint, 0644);
+/*
+ * drain: after a BCH read, the controller can still offer data (NDSR
+ * RDDREQ set, 2026-11-01), and the next command's data then started with
+ * those stale bytes ("ramz", the tail of the previous page's "programz").
+ *   0: leave it (old behaviour)   1: count and drain it (up to 128 bytes)
+ * stats extra_reads / extra_bytes count what was found.
+ */
+static uint bch_v1_drain;
+module_param_named(drain, bch_v1_drain, uint, 0644);
 enum { ST_CLEAN, ST_COR, ST_ERASED, ST_RETRY, ST_FAILED, ST_TIMEOUT,
-       ST_EARLY_UNC, ST_EARLY_COR, ST_RDD_UNC, ST_END_UNC, ST_N };
+       ST_EARLY_UNC, ST_EARLY_COR, ST_RDD_UNC, ST_END_UNC, ST_EXTRA_READS,
+       ST_EXTRA_BYTES, ST_N };
 static uint bch_v1_st[ST_N];
 static int bch_v1_st_n = ST_N;
 module_param_array_named(stats, bch_v1_st, uint, &bch_v1_st_n, 0644);
-MODULE_PARM_DESC(stats, "88PA6170 reads: clean corrected erased retried failed timeouts early_unc early_cor rdd_unc end_unc");
+MODULE_PARM_DESC(stats, "88PA6170 reads: clean corrected erased retried failed timeouts early_unc early_cor rdd_unc end_unc extra_reads extra_bytes");
+
+/* data still offered after a read: count it, and drain it if asked */
+static void bch_v1_leftover(struct marvell_nfc *nfc)
+{
+	u32 ndsr = readl_relaxed(nfc->regs + NDSR);
+	unsigned int n = 0;
+	u8 tmp[FIFO_DEPTH];
+
+	if (!(ndsr & NDSR_RDDREQ))
+		return;
+	bch_v1_st[ST_EXTRA_READS]++;
+	if (!bch_v1_drain)
+		return;
+	while ((readl_relaxed(nfc->regs + NDSR) & NDSR_RDDREQ) && n < 128) {
+		writel_relaxed(NDSR_RDDREQ, nfc->regs + NDSR);
+		ioread32_rep(nfc->regs + NDDB, tmp, FIFO_REP(FIFO_DEPTH));
+		n += FIFO_DEPTH;
+	}
+	bch_v1_st[ST_EXTRA_BYTES] += n;
+}
 
 #define F_EARLY_UNC	BIT(0)
 #define F_EARLY_COR	BIT(1)
@@ -129,6 +160,7 @@ static int marvell_nfc_bch_v1_ecc_read(struct nand_chip *chip, u8 *ecc_buf,
 	if (ndsr & (NDSR_UNCERR | NDSR_CORERR))
 		writel_relaxed(ndsr & (NDSR_UNCERR | NDSR_CORERR),
 			       nfc->regs + NDSR);
+	bch_v1_leftover(nfc);
 	if (*flags & F_RDD_UNC)
 		bch_v1_st[ST_RDD_UNC]++;
 	if (*flags & F_END_UNC)
@@ -185,8 +217,16 @@ static int marvell_nfc_bch_v1_read_page(struct nand_chip *chip, u8 *buf,
 	int ret = 0, r, bf, try = 0;
 
 	marvell_nfc_select_target(chip, chip->cur_cs);
+	/*
+	 * test switch: NDCR bits 14/23 as ndcr_set has them. Only written when
+	 * set: an unconditional NDCR rewrite here broke raw-then-BCH reads
+	 * (stale FIFO bytes at the start of the data, 2026-11-01).
+	 */
 	if (bch_v1_ndcr_set)
-		writel_relaxed(readl_relaxed(nfc->regs + NDCR) | bch_v1_ndcr_set,
+		writel_relaxed((readl_relaxed(nfc->regs + NDCR) &
+				~(BCH_V1_NDCR_PG_PER_BLK | BCH_V1_NDCR_SEQ_DIS)) |
+			       (bch_v1_ndcr_set & (BCH_V1_NDCR_PG_PER_BLK |
+						   BCH_V1_NDCR_SEQ_DIS)),
 			       nfc->regs + NDCR);
 	ecc_buf = kmalloc(lt->data_bytes + lt->spare_bytes, GFP_KERNEL);
 	if (!ecc_buf)

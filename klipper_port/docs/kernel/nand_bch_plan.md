@@ -331,3 +331,38 @@ for mtd3) and never attached it. Whether a state left by our kernel before
 - mtd6_peb541_raw_20261101.bin, mtd6_peb51_raw_20261101.bin (Debian
   nanddump -n -o run on the stock kernel; its OOB layout is shifted by 4
   bytes).
+
+## Read path rework, part 2 (2026-11-01, read-only; md5s against the stock dumps)
+
+**Vendor driver, disassembled:**
+- writes NDECCCTRL = 0x21 per command (the 0xF00 that reads back is status);
+- builds NDCR from a probe-time value with bits 14 and 23 set;
+- reads 0x820 bytes with ECC and 0x840 raw.
+
+The labelled disassembly (private, derived from the vendor image) is in
+D:\DP200\backup\vendor_disasm\mv61x0_nand_3.2.S.
+
+**Results:**
+
+| Build / setting | Raw, then BCH | BCH first | Note |
+|---|---|---|---|
+| fc02567d, bits off | OK, 72 timeouts | OK, 1013 early UNCERR | |
+| bits 14+23 set in reset (37214ad3) | **wrong data** | **wrong data** | bit 14 changes how our page addresses are taken |
+| NDCR rewritten at each read start (dfb0bf2a) | **wrong data** | OK | stale FIFO bytes ("ramz") at the start of the data |
+| 411725bf, bits off, drain 0 | OK, 48 timeouts | | RDDREQ is set after **every** BCH read (86799/86799) |
+| drain 1 (read the extra bytes) | **wrong data** | | 15170 failures: the extra bytes aren't this page's |
+| bit 23 (SEQ_DIS) poked once while idle | OK, 103 timeouts | OK, 1843 early UNCERR | no improvement; RDDREQ still set after every read |
+
+So:
+- **The NDCR fix is ruled out:** stock's bits alone don't fix anything, and
+  bit 14 breaks addressing.
+- **Never rewrite NDCR mid-sequence:** it corrupts the next read.
+- **The stalls aren't explained yet:** early UNCERR and timeouts remain in
+  every setting. The best order is still raw first, then BCH (0 failures,
+  correct data, ~50 s per mtd5 pass against stock's 36 s).
+- **Open question:** how the vendor's interrupt-driven command sequence
+  ends each read, against our polled one.
+
+**Monitoring:**
+- tools/klog.sh (`mark` / `check`) runs before and after every test.
+- Tool downloads are size-checked: an empty klog.sh once went unnoticed.
