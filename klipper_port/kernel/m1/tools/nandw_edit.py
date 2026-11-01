@@ -260,9 +260,26 @@ rep("""	ret = nand_scan(chip, marvell_nand->nsels);
 	 */
 	if (nfc->caps->bch_v1 && !IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY)) {
 		if (chip->bbt_td && chip->bbt_td->pages[0] >= 0) {
+			int nblocks = nanddev_target_size(&chip->base) >>
+				      chip->phys_erase_shift;
+			int b, s;
+
 			dev_info(dev, "vendor BBT at page %d (mirror %d)\\n",
 				 chip->bbt_td->pages[0],
 				 chip->bbt_md ? chip->bbt_md->pages[0] : -1);
+			/*
+			 * The vendor kernel reserves the whole BBT area (the
+			 * last 4 blocks: main, mirror and 2 spare), so stock
+			 * UBI counts them as bad. Without NAND_BBT_WRITE,
+			 * nand_bbt reserves only the 2 blocks holding a table.
+			 * Reserve all 4 in the in-RAM BBT (2 bits per block,
+			 * 0x2 = reserved), as stock does. Nothing is written.
+			 */
+			for (b = nblocks - BCH_V1_BBT_BLOCKS; b < nblocks; b++) {
+				s = (b & 3) * 2;
+				chip->bbt[b >> 2] = (chip->bbt[b >> 2] & ~(3 << s)) |
+						    (0x2 << s);
+			}
 		} else {
 			dev_err(dev, "no vendor BBT found: read-only\\n");
 			nfc->no_write = true;
@@ -350,6 +367,62 @@ static int marvell_nfc_bch_v1_wait_prog(struct nand_chip *chip)
 }
 
 static int marvell_nfc_hw_ecc_hmg_do_write_page(struct nand_chip *chip,""")
+
+# 8. bch_v1 bitflip count. NDSR ERRCNT (bits 16-20) reads 16 even when idle
+# on the 88PA6170, so mainline's count (ERRCNT on CORERR) reported >= 16
+# bitflips on corrected reads: above UBI's scrub threshold (12), and UBI
+# scrubbed every PEB it read (2026-10-31). The page was read raw just
+# before, so count the bits BCH actually corrected (data + spare).
+rep("""	if (!ret) {
+		memcpy(buf, ecc_buf, lt->data_bytes);
+		memcpy(chip->oob_poi, ecc_buf + lt->data_bytes,
+		       lt->spare_bytes);
+		kfree(ecc_buf);
+		return max_bitflips;
+	}""",
+"""	if (!ret) {
+		/*
+		 * NDSR ERRCNT is not usable here (it reads 16 even when
+		 * idle): the corrected bits are the difference to the raw
+		 * read. One chunk per page, so this is the page's count.
+		 */
+		max_bitflips = 0;
+		for (i = 0; i < lt->data_bytes; i++)
+			max_bitflips += hweight8(buf[i] ^ ecc_buf[i]);
+		for (i = 0; i < lt->spare_bytes; i++)
+			max_bitflips += hweight8(chip->oob_poi[i] ^
+						 ecc_buf[lt->data_bytes + i]);
+		mtd->ecc_stats.corrected += max_bitflips;
+		memcpy(buf, ecc_buf, lt->data_bytes);
+		memcpy(chip->oob_poi, ecc_buf + lt->data_bytes,
+		       lt->spare_bytes);
+		kfree(ecc_buf);
+		return max_bitflips;
+	}""")
+rep("""	unsigned int max_bitflips = 0;
+	u8 *ecc_buf;
+	int ret, bf, try;""",
+"""	unsigned int max_bitflips = 0;
+	u8 *ecc_buf;
+	int ret, bf, try, i;""")
+# check_bitflips() still runs (UNCERR, and it clears NDSR), but its count and
+# its ecc_stats update are not used for bch_v1
+rep("""		else
+			bf = 1;
+	}
+
+	/* Update the stats and max_bitflips */
+	mtd->ecc_stats.corrected += bf;""",
+"""		else
+			bf = 1;
+	}
+
+	/* bch_v1 counts its bitflips itself (ERRCNT is not usable there) */
+	if (nfc->caps->bch_v1)
+		return 0;
+
+	/* Update the stats and max_bitflips */
+	mtd->ecc_stats.corrected += bf;""")
 
 open(p, 'w').write(s)
 print('edited')
