@@ -448,7 +448,6 @@ rep("""	if (!(ndsr & NDSR_RDDREQ)) {
 		goto out;
 	}""", """	bch_v1_last_ndsr = ndsr;
 	if (!(ndsr & NDSR_RDDREQ)) {
-		bch_v1_early_uncerr++;
 		ret = -EBADMSG;
 		goto out;
 	}""")
@@ -483,18 +482,16 @@ rep("""#define BCH_V1_PAGES_PER_BLOCK	64
 
 /* section 9: BCH reads per page before UNCERR / no data counts as failed */
 #define BCH_V1_READ_TRIES	4
-static uint bch_v1_early_uncerr, bch_v1_reread_ok;
-module_param_named(early_uncerr, bch_v1_early_uncerr, uint, 0444);
-MODULE_PARM_DESC(early_uncerr, "88PA6170: BCH reads that ended in UNCERR");
+static uint bch_v1_reread_ok;	/* more counters: stats (section 10) */
 module_param_named(reread_ok, bch_v1_reread_ok, uint, 0444);
 MODULE_PARM_DESC(reread_ok, "88PA6170: pages read correctly after a retry");
 static u32 bch_v1_last_ndsr;
 """)
 
-# 10. bch_v1 read path rework (2026-11-01): tools/bch_v1_read.c replaces
-# both read functions (vendor-style status handling, switches for the
-# measurements), and raw reads keep all 64 OOB bytes the FIFO delivers
-# (bytes 62-63 were drained and dropped).
+# 10. bch_v1 read path matched to the vendor driver (2026-11-01):
+# tools/bch_v1_read.c replaces both read functions (one BCH read per page,
+# UNCERR only with the data, erased pages from the BCH read), and raw reads
+# keep all 64 OOB bytes the FIFO delivers (bytes 62-63 were dropped).
 import os
 a = s.index("/*\n * bch_v1 (88PA6170): BCH page reads, one monolithic")
 b = s.index("/* Hamming write helpers */")
@@ -508,18 +505,20 @@ rep("""	unsigned int oob_bytes = lt->spare_bytes + (raw ? lt->ecc_bytes : 0);
 	/* bch_v1: a raw read delivers all 64 OOB bytes; keep them */
 	if (raw && nfc->caps->bch_v1)
 		oob_bytes = nand_to_mtd(chip)->oobsize;
+
+	/* bch_v1: start from a stopped controller, as bch_v1_stop() */
+	if (nfc->caps->bch_v1) {
+		writel_relaxed(0xFFFFFFFF, nfc->regs + NDSR);
+		writel_relaxed(readl_relaxed(nfc->regs + NDCR) & ~NDCR_ND_RUN,
+			       nfc->regs + NDCR);
+	}
 """)
 
 # 11. Leave the bch_v1 controller idle and clean on shutdown/reboot, for
 # U-Boot and the next kernel (stock reads NDSR 0 idle). Stock 3.2 also sets
 # NDCR bits 14 and 23 (idle NDCR 0xc184dfff); setting them in our reset
-# made every read return other pages' data (2026-11-01, read-only test), so
-# they are only a test switch (ndcr_set, bch_v1_read.c), default off.
-rep("""#define BCH_V1_PAGES_PER_BLOCK	64
-""", """#define BCH_V1_PAGES_PER_BLOCK	64
-#define BCH_V1_NDCR_PG_PER_BLK	BIT(14)
-#define BCH_V1_NDCR_SEQ_DIS	BIT(23)
-""")
+# made our reads return wrong data (2026-11-01, read-only test), so they
+# stay clear.
 rep("""static struct platform_driver marvell_nfc_driver = {""",
 """/* bch_v1: hand the controller over idle and clean (reboot, kexec, halt) */
 static void marvell_nfc_shutdown(struct platform_device *pdev)

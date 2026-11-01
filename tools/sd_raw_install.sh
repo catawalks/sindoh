@@ -38,5 +38,10 @@ dd if=/tmp/k.uimg of=/dev/mmcblk0 bs=32768 seek=$(( SECTOR / 64 )) conv=fsync 2>
 echo 3 > /proc/sys/vm/drop_caches && \
 echo READBACK \$(dd if=/dev/mmcblk0 bs=32768 skip=$(( SECTOR / 64 )) count=$(( (size + 32767) / 32768 )) 2>/dev/null | head -c $size | md5sum); \
 rm -f /tmp/k.uimg; fi" | grep -a "REFUSED\|READBACK" | tail -1 | tee /dev/stderr | grep -q "READBACK $md5" &&
-	echo "installed: sector $SECTOR, md5 $md5 (boot it with tools/sd_raw_boot.sh)" ||
+	{ echo "installed: sector $SECTOR, md5 $md5 (boot it with tools/sd_raw_boot.sh)"; exit 0; }
+# No result seen in the window (the shell can still be busy with an earlier
+# command, 2026-11-01): read the card back on its own and decide from that.
+py -3.15t "$here/serial_watch.py" COM3 60 "echo CHECK \$(dd if=/dev/mmcblk0 bs=32768 skip=$(( SECTOR / 64 )) count=$(( (size + 32767) / 32768 )) 2>/dev/null | head -c $size | md5sum)" |
+	grep -a "^CHECK" | tail -1 | tee /dev/stderr | grep -q "CHECK $md5" &&
+	echo "installed (confirmed by a separate readback): sector $SECTOR, md5 $md5" ||
 	{ echo "not installed"; exit 1; }

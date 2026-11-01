@@ -174,3 +174,20 @@ it is installed. Any update that refreshes recovery/ would then fail at
 that step. The installer's mtd5 backup on the stick (nanddump) and the
 remove stick's restore keep the set, but only on the stick. ~42 MB of the
 volume is free.
+
+## NAND wear and the root's writes (2026-11-01, agreed with the owner)
+
+**Wear isn't a practical limit:**
+- The chip is SLC (Macronix MX30LF4G18AC, typically ~100k erase cycles;
+  confirm against the datasheet).
+- UBI levels wear over mtd6's ~2350 blocks.
+- After years of stock use: mean erase count 10, max 127.
+
+**Still, for our root:**
+- **Logs in RAM:** tmpfs, capped, rotated. The latest log is copied to the
+  NAND on an error or crash.
+- **On the NAND:** G-code files (written once) and the power-loss resume
+  state (small, batched by UBIFS, survives a power cut).
+- **Mount options:** noatime, LZO compression.
+- **A wear readout** (UBI max/mean EC) on the touchscreen and through
+  Moonraker, with a warning far below the limit.
