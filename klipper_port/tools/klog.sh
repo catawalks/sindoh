@@ -20,7 +20,9 @@ mark)
 check)
 	from=$(( $(cat $M 2>/dev/null || echo 0) + 1 ))
 	alerts=$(dmesg | tail -n +$from |
-		grep -i 'error\|fail\|ro_mode\|read-only\|BCH read\|timed out\|refused\|corrupt\|scrub\|tortur\|oops\|bug:\|warning\|call trace\|uncorr\|-EIO\|mark.*bad' |
+		grep -i 'error\|fail\|ro_mode\|read-only\|BCH read\|timed out\|timeout\|did not succeed\|refused\|corrupt\|scrub\|tortur\|oops\|bug:\|warning\|call trace\|uncorr\|-EIO\|mark.*bad\|marvell-nfc\|ubi[0-9]* \|ubifs' |
+		grep -v '^Kernel command line:\|^UBIFS: \(recovery needed\|recovery completed\|mounted UBI device\|file system size\|journal size\|media format\|default compressor\|reserved for root\)' |
+		grep -v 'vendor BBT at page\|DMA not enabled in configuration\|ubi[0-9]*: \(attaching\|scanning\|attached\|PEB size\|min./max\|VID header\|good PEBs\|user volume\|max/mean\|available PEBs\|background thread\|detaching\|mtd[0-9]* is detached\)\|UBIFS (ubi[0-9]*:0): \(Mounting in unauthenticated\|LEB size\|FS size\|reserved\|media format\|default compressor\|un-mount\|UBIFS: mounted\)' |
 		grep -v 'EXT[23]-fs (mmcblk0p1): error: couldn.t mount because of unsupported optional features' |
 		grep -v 'CMD_RESP: cmd 0x5b error' |
 		grep -v 'ADDBA RSP: Failed\|ASSOC_RESP: Association Failed\|IOCTL failed: .* id=0x20000' |

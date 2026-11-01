@@ -366,3 +366,49 @@ So:
 **Monitoring:**
 - tools/klog.sh (`mark` / `check`) runs before and after every test.
 - Tool downloads are size-checked: an empty klog.sh once went unnoticed.
+
+## Read path rework, part 3 (2026-11-01): the vendor's order, and a tool artifact
+
+**The 4-byte shift was caused by our own tool.** tools/nfcregs.py dumped
+registers 0x00-0x7c, including +0x40 (NDDB, the data FIFO). Each dump
+took one word out of the FIFO, so every later page read started with the
+previous read's last 4 bytes ("ramz" / 0xff). It persisted until the next
+dump.
+
+That invalidates part 2's conclusions that "NDCR bits 14/23 break
+addressing", "an NDCR rewrite breaks reads", "the NDSR pre-clear breaks
+reads" and "draining corrupts". Those were second runs started in the
+shifted state, after the read test's closing register dump. It is also
+what made UBI report "layout volume not found". nfcregs.py now never reads
+NDDB.
+
+**Final read path** (patch 0010, tools/bch_v1_read.c):
+- **one BCH read per page** (2080 bytes, like the vendor);
+- **UNCERR counts only with the data**; an UNCERR before RDDREQ means read
+  again;
+- **erased page:** UNCERR after the data with data and spare all 0xff (no
+  raw read needed);
+- **CORERR:** read the page raw to count the corrected bits, and reject
+  more than 4 per step;
+- **every command starts from a stopped controller** (NDSR cleared, ND_RUN
+  off), as the vendor's does;
+- **at shutdown/reboot** the controller is left idle and clean.
+
+**Validation** on the read-only kernel m1-debian (519243ae), two rounds:
+
+| Check | Result |
+|---|---|
+| mtd0 / mtd3 / mtd5 md5s against the stock dumps | equal |
+| mtd5 pass | 31-37 s (stock 36 s) |
+| 6000 random reads with pauses (tools/nand_gapcheck.py, against nand_images/mtd0.bin) | 0 wrong |
+| UBI headers of all 2355 mtd6 blocks, read twice | identical |
+| Read-only UBI attach + UBIFS mount of the stock root, every file read | 2974 files, 1 error: /app/nvram/PJL, a special file that also fails on stock |
+| Failures | 0 |
+
+**Still open:**
+- "Timeout on CMDD" in the raw re-read after CORERR: ~160 in round 1 and 2
+  in round 2, each 100 ms, and the data is still correct. Next: test
+  whether NDSR ERRCNT at RDDREQ gives the corrected-bit count (the
+  "ERRCNT reads 16 idle" finding may predate the clean measurements). That
+  would drop the raw re-read, as the vendor never does one.
+- The UBI write test (mtd6) still has to be re-run with this read path.
