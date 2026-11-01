@@ -271,3 +271,63 @@ works.
 - tools/bulkread.py: page-by-page passes;
 - tools/pagetest.sh: repeated nanddump of a page;
 - tools/nand_hammer.py: back-to-back reads of one page, md5s counted.
+
+## Read path rework, part 1 (2026-11-01, measurements, nothing written)
+
+**Vendor 3.2 driver (disassembled mv61x0_nand_irq):**
+- UNCERR counts only when it comes with RDDREQ. Earlier status bits are
+  written back to NDSR (acknowledged).
+- Reads are 0x820 bytes with ECC on and 0x840 raw.
+
+**Our raw OOB bytes 62-63:** the FIFO delivered all 64 bytes, but we
+copied only 62. Fixed: raw reads keep all 64 (patch 0010 section 10).
+
+**Switches** (tools/bch_v1_read.c, m1-debian-nandw fc02567d). All four
+runs read correctly: mtd0, mtd3 and mtd5 matched the stock dumps' md5s,
+with 0 failures.
+
+| read_mode / ack_early | mtd5 pass | Timeouts | Early UNCERR | Note |
+|---|---|---|---|---|
+| 0 (raw, then BCH) / N | 54 s | 72 | 72 | |
+| 0 / Y | 51 s | 156 | 156 | acknowledging doesn't bring data: an UNCERR without RDDREQ is an abandoned command |
+| 1 (BCH first) / N | 191 s | 1 | 1013 | every erased page (26209) ends with UNCERR after its data |
+| 1 / Y | 99 s | 763 | 1008 | |
+
+**Stock's controller state is different** (devmem, idle):
+
+| Register | Ours | Stock |
+|---|---|---|
+| NDCR | 0x81079fff | 0xC184DFFF |
+| NDECCCTRL | 0 | 0xF21 |
+| NDSR (idle) | 0x1c02, RDDREQ still set | 0 |
+
+- **NDCR:** stock also sets bit 14 (64 pages per block) and bit 23
+  (SEQ_DIS in the PXA3xx driver), and has RD_ID_CNT 4 where ours is 7.
+- **NDECCCTRL:** 0xF21 is BCH_EN, threshold 16, and 30 in bits 7-14 (our
+  ECC byte count).
+- **Next test:** these values, as the `eccctrl` and `ndcr_set` switches
+  (build e19c8f39, not run yet).
+
+## Stock kernel write failure on mtd6 (2026-11-01, stock 3.2 from NAND)
+
+During a normal stock boot, Sindoh's driver logged `UBI error: ubi_io_write:
+error -5 while writing 2048 bytes to PEB 541:88064`. UBI started moving the
+block to PEB 51, then switched to read-only, and UBIFS went read-only too.
+After that, lookups under /usr failed with EINVAL (wget, md5sum and head
+"not found"). That also explains today's failed SD installs from stock.
+
+**State:**
+- **PEB 541** (chip block 2282): pages 0-42 are written in the normal stock
+  format, and page 43 (the failed write) onward is erased.
+- **PEB 51:** only its EC header page was written; the move never finished.
+- Nothing from pages 0-42 was lost.
+
+**Our kernel's role:** it wrote nothing to mtd6 today (window 69,76 only,
+for mtd3) and never attached it. Whether a state left by our kernel before
+`reboot -f` played any part isn't known.
+
+**Evidence on the 4 GB card**, /var/backups:
+- dmesg_stock_ubi_write_error_20261101.txt;
+- mtd6_peb541_raw_20261101.bin, mtd6_peb51_raw_20261101.bin (Debian
+  nanddump -n -o run on the stock kernel; its OOB layout is shifted by 4
+  bytes).

@@ -20,20 +20,23 @@ cp "$img" "$out/deploy/sd-raw.uimg"
 size=$(wc -c < "$img")
 blocks=$(( (size + 511) / 512 ))
 md5=$(md5sum "$img" | cut -d' ' -f1)
+# 32 KiB blocks: 512-byte dd on stock busybox took longer than the watch
+# window (2026-11-01), so a good install was reported as failed
+[ $(( SECTOR % 64 )) -eq 0 ] || { echo "SECTOR must be a multiple of 64"; exit 1; }
 echo "$(basename "$img"): $size bytes, $blocks sectors from $SECTOR, md5 $md5"
 curl -sf -o /dev/null "http://$pc:8099/deploy/sd-raw.uimg" ||
 	{ echo "no HTTP server at $pc:8099 serving $out"; exit 1; }
 
 # on the printer: partition 1 must start after the image; wget (stock) or
 # python3 (the Debian root on mainline) fetches it
-py -3.15t "$here/serial_watch.py" COM3 90 "p1=\$(cat /sys/block/mmcblk0/mmcblk0p1/start); \
+py -3.15t "$here/serial_watch.py" COM3 240 "p1=\$(cat /sys/block/mmcblk0/mmcblk0p1/start); \
 if [ \$(( $SECTOR + $blocks )) -gt \$p1 ]; then echo REFUSED partition 1 starts at \$p1; else \
 { wget -q -O /tmp/k.uimg http://$pc:8099/deploy/sd-raw.uimg 2>/dev/null || \
 python3 -c \"import urllib.request as u; open('/tmp/k.uimg','wb').write(u.urlopen('http://$pc:8099/deploy/sd-raw.uimg').read())\"; } && \
 [ \$(md5sum < /tmp/k.uimg | cut -d' ' -f1) = $md5 ] && \
-dd if=/tmp/k.uimg of=/dev/mmcblk0 bs=512 seek=$SECTOR conv=fsync 2>/dev/null && sync && \
+dd if=/tmp/k.uimg of=/dev/mmcblk0 bs=32768 seek=$(( SECTOR / 64 )) conv=fsync 2>/dev/null && sync && \
 echo 3 > /proc/sys/vm/drop_caches && \
-echo READBACK \$(dd if=/dev/mmcblk0 bs=512 skip=$SECTOR count=$blocks 2>/dev/null | head -c $size | md5sum); \
+echo READBACK \$(dd if=/dev/mmcblk0 bs=32768 skip=$(( SECTOR / 64 )) count=$(( (size + 32767) / 32768 )) 2>/dev/null | head -c $size | md5sum); \
 rm -f /tmp/k.uimg; fi" | grep -a "REFUSED\|READBACK" | tail -1 | tee /dev/stderr | grep -q "READBACK $md5" &&
 	echo "installed: sector $SECTOR, md5 $md5 (boot it with tools/sd_raw_boot.sh)" ||
 	{ echo "not installed"; exit 1; }

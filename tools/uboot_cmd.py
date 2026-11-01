@@ -108,6 +108,23 @@ def main():
                 con.command('mw.l %x 1002' % addr, timeout=5.0)
             print(con.command('md.l f8041080 2', timeout=5.0).decode('latin1'))
             return
+        if args and args[0] == '--stock-bootargs':
+            # Recovery boot of the stock kernel from RAM (2026-11-01): set
+            # the stock NAND bootargs in RAM only (U-Boot's own
+            # setbootargs_nand, no saveenv) and check them. Without
+            # root=ubi0:filesystem the stock initramfs would fall back to
+            # /etc/system_recovery.sh, so --bootm must not follow unless
+            # this prints BOOTARGS OK.
+            con.command('run setbootargs_nand', timeout=5.0)
+            out = con.command('printenv bootargs', timeout=5.0).decode('latin1')
+            print(out)
+            need = ('ubi.mtd=filesystem', 'root=ubi0:filesystem',
+                    'rootfstype=ubifs', 'mtdparts=mv61x0_nand:')
+            if all(n in out for n in need):
+                print('BOOTARGS OK')
+            else:
+                sys.exit('stock bootargs not set as expected')
+            return
         if args and args[0] == '--bootm':
             # bootm ADDR: only after iminfo verifies the image in RAM; then
             # record the console for SECS seconds (nothing more is sent).

@@ -46,3 +46,44 @@ Klipper boot hook (`/etc/profile` line, `/etc/dp200-boot.sh`,
 use Sindoh's factory procedure: `Sindoh_raw_dump/recovery/nand_write.sh` with
 `nandrootfs.ubifs` and `update.tar.bz2`. Don't run its `eFuse_program.elf`
 step.
+
+## Recovery boot: the stock kernel from the SD card (proven 2026-11-01)
+
+**When:** mtd0's kernel area is broken (U-Boot then stops at its prompt
+after the failed `bootm`). U-Boot itself (mtd0 blocks 0-1) and the env are
+never written by our tools.
+
+**What it does:** boots Sindoh's own kernel from RAM, with its own NAND
+driver and tools. RAM only: no NAND write, no saveenv.
+
+**The image:**
+- the stock uImage (pa6170_rodin_nand.bin from 0x40000; 6928784 bytes,
+  crc32 9f0bc791, md5 d6c40b8a);
+- stored as the contiguous, immutable (`chattr +i`) file
+  /var/backups/stock_kernel.uimg on the 4 GB card;
+- raw sector 4296704, 13533 sectors.
+
+**Steps (tools/sd_stock_boot.sh):**
+1. Catch U-Boot.
+2. `--pinmux-sd`.
+3. `mmc read 2000000 419000 34dd`, then `crc32 2000000 69b990` must be
+   9f0bc791.
+4. `uboot_cmd.py --stock-bootargs`: `run setbootargs_nand` in RAM, then a
+   check for `ubi.mtd=filesystem root=ubi0:filesystem rootfstype=ubifs
+   mtdparts=...`.
+5. `--bootm 2000000`.
+
+**Why step 4 matters:** U-Boot's saved `bootargs` is only `console=ttyS0`.
+With that, the stock initramfs can't mount the root and would fall back to
+/etc/system_recovery.sh.
+
+**Result:** "Booting kernel from Legacy Image at 02000000", Linux 3.2.0,
+the stock root mounted, "Root Console".
+- Stock has flash_erase, flash_eraseall, nandwrite and nanddump, so mtd0's
+  kernel area can be rewritten from there, using Sindoh's driver.
+- **Command:** `flash_erase /dev/mtd0 0x40000 62`, then `nandwrite -p -s
+  0x40000 /dev/mtd0` with the kernel part of pa6170_rodin_nand.bin.
+
+**Requirement:** this needs a stock root in mtd6. Once our root is
+installed, the same boot path loads our kernel from the SD card instead
+(tools/sd_raw_boot.sh).
