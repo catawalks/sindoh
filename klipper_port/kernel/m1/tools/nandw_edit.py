@@ -491,5 +491,24 @@ MODULE_PARM_DESC(reread_ok, "88PA6170: pages read correctly after a retry");
 static u32 bch_v1_last_ndsr;
 """)
 
+# 10. bch_v1 read path rework (2026-11-01): tools/bch_v1_read.c replaces
+# both read functions (vendor-style status handling, switches for the
+# measurements), and raw reads keep all 64 OOB bytes the FIFO delivers
+# (bytes 62-63 were drained and dropped).
+import os
+a = s.index("/*\n * bch_v1 (88PA6170): BCH page reads, one monolithic")
+b = s.index("/* Hamming write helpers */")
+s = s[:a] + open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              'bch_v1_read.c')).read() + s[b:]
+rep("""	unsigned int oob_bytes = lt->spare_bytes + (raw ? lt->ecc_bytes : 0);
+	int ret;
+""", """	unsigned int oob_bytes = lt->spare_bytes + (raw ? lt->ecc_bytes : 0);
+	int ret;
+
+	/* bch_v1: a raw read delivers all 64 OOB bytes; keep them */
+	if (raw && nfc->caps->bch_v1)
+		oob_bytes = nand_to_mtd(chip)->oobsize;
+""")
+
 open(p, 'w').write(s)
 print('edited')
