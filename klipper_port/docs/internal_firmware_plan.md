@@ -31,10 +31,12 @@ content.
   and runs `bootm`. The stock bootargs it passes (`ubi.mtd=filesystem
   root=ubi0:filesystem rootfstype=ubifs`, `mtdparts`) are right for our
   root as well.
-- **Back to stock = Sindoh's own recovery.** /etc/system_recovery.sh
-  rewrites mtd0, mtd3 and mtd6 from mtd5 and extracts the apps. Because
-  mtd5 stays intact, our system can run that same sequence and the printer
-  is factory stock again. Sindoh's updates then work normally.
+- **Back to stock = Sindoh's recovery sequence, from mtd5.** Our system runs
+  the same steps (rewrite mtd0's kernel area and mtd6 from mtd5, extract the
+  apps), and the printer is factory stock again. Sindoh's updates then work
+  normally. Correction (2026-11-01): Sindoh's own /etc/system_recovery.sh
+  uses the KARA-S file names and can't work on a DP200. Our version uses
+  the rodin names: see kernel/revert_to_stock_plan.md.
 
 **To build:**
 1. **NAND write support in the mainline driver** (BCH write path, erase, bad
@@ -158,8 +160,10 @@ this printer's mtd5 has the UBI volume `recovery`: 1580 PEBs reserved
 Who uses it:
 - **Automatic:** rcS, from the stock kernel's built-in initramfs (root_fs),
   runs /etc/system_recovery.sh when the root is broken (no /etc/profile).
-  That script mounts ubi2:recovery and rewrites mtd0, mtd3, mtd6 and the
-  apps from it.
+  That script mounts ubi2:recovery and is meant to rewrite mtd0, mtd3,
+  mtd6 and the apps from it. On the DP200 it looks for
+  pa6170_karas_nand.bin and boot-logo.bin, which aren't there, so it stops
+  before writing (2026-11-01, see kernel/revert_to_stock_plan.md).
 - **Manual:** `rodin_util.sh --system-recovery` (a service function) erases
   mtd6, so that the next boot recovers.
 - **Firmware updates:** an update with a `recovery/` folder copies it into
