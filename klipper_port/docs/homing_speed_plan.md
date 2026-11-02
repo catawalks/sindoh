@@ -50,3 +50,18 @@ max_z_velocity: 10          # bed moves (LOWER BED, park) too
    one point before and after (as in the 10-19 retest): <= 0.01 mm shift.
 3. Time each against stock if possible (owner's stopwatch / video).
 4. Commit the values to dp200_printer.cfg (port-owned) if all pass.
+
+## Result (2026-11-02, Stanley test printer, bed empty, owner present)
+
+- **X/Y at 50/10 mm/s: pass.** 10 homes each; the slow-creep trigger point
+  moved 0.02 mm (one 0.02 mm search step: X 216.02 -> 216.00, Y 5.50 ->
+  5.52). G28 X from X20: 5.7 s, G28 Y from Y200: 5.4 s.
+- **Z at 10 mm/s: fail.** Lowering the bed at 10 mm/s worked, but lifting
+  it stalled twice from Z150: "No trigger on stepper_z after full movement",
+  and on the retest a loud buzz about halfway up (owner stopped it). A short
+  climb from near the top worked. Lifting needs more torque than the
+  10-19 retest (downward) showed, which also explains the 10-18 losses.
+  Z stays at homing_speed 5 / max_z_velocity 5 (G28 Z from halfway: 31 s).
+- Possible later: 6-7 mm/s lift test, or more Z current (driver/motor limits
+  unknown). The stock Z homing speed is in the FM microcode (cmd 0x20, carried
+  in the main program), not in karas.db; not extracted yet.
