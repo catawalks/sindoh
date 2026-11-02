@@ -42,6 +42,13 @@ LOG=$STICK/dp200_klipper_install.log
 PRINTER_ID=`tr -d : < /sys/class/net/eth0/address 2>/dev/null`
 BACKUP=$STICK/../dp200_stock_backup/${PRINTER_ID:-unknown}
 GUI=/app/SVN_GUI
+# Qt WebKit (~21 MB uncompressed): only /app/appBrowser, the browser that
+# shows SVN_GUI, uses it (readelf, 2026-11-02). Removed and backed up with
+# SVN_GUI (WEBKIT.tar). ICU and the other Qt libraries stay: QtCore needs
+# ICU, and tinydebug (every on-screen message here) needs QtCore/Gui/Widgets.
+WK_FILE=/usr/lib/libQt5WebKit.so.5.0.2
+wk_list() { (cd / && ls -d usr/lib/libQt5WebKit.so* usr/lib/libQt5WebKitWidgets.so* 2>/dev/null); }
+wk_fingerprint() { (cd "$1" && find usr/lib -name 'libQt5WebKit*' -type f | sort | xargs md5sum | md5sum | cut -d' ' -f1); }
 TARGET=nand
 [ -f "$STICK/target_sd" ] && TARGET=sd
 SPARE_MB=15                 # left free on the stock root after the install
@@ -72,6 +79,9 @@ undo() {
     rm -rf /klipper
     if [ ! -d $GUI ] && [ -f "$BACKUP/SVN_GUI.tar" ]; then
         tar -xf "$BACKUP/SVN_GUI.tar" -C /app
+    fi
+    if [ ! -f $WK_FILE ] && [ -f "$BACKUP/WEBKIT.tar" ]; then
+        tar -xf "$BACKUP/WEBKIT.tar" -C /
     fi
     sync
 }
@@ -178,6 +188,8 @@ if [ $TARGET = nand ]; then
     # catches a shortfall and undoes the install)
     [ $UPGRADE = 1 ] && HAVE_MB=$(( HAVE_MB + `du_mb /klipper` ))
     [ -d $GUI ] && HAVE_MB=$(( HAVE_MB + `du_mb $GUI` ))
+    # WebKit: a library compresses to about half on UBIFS
+    [ -f $WK_FILE ] && HAVE_MB=$(( HAVE_MB + `du_mb $WK_FILE` / 2 ))
     [ $HAVE_MB -ge $NEED_MB ] || fail "not enough NAND space" "need $NEED_MB, have $HAVE_MB MB"
     if [ -d $GUI ] && [ ! -f "$BACKUP/SVN_GUI.tar" ]; then
         [ "$(mb_free "$STICK")" -ge $(( `du_mb $GUI` + 10 )) ] || fail "USB stick too full" "backup needs 100 MB"
@@ -195,6 +207,10 @@ if [ $TARGET = nand ]; then
             rm -rf /tmp/dp200-chk
         fi
         [ "$HAVE_FP" = "$WANT_FP" ] || fail "stick has the backup" "of another printer"
+    fi
+    if [ -f $WK_FILE ] && [ -f "$BACKUP/WEBKIT.files.md5" ]; then
+        [ "`wk_fingerprint /`" = "`cat "$BACKUP/WEBKIT.files.md5"`" ] \
+            || fail "stick has the backup" "of another printer"
     fi
 else
     grep -q " /mnt/sd " /proc/mounts || fail "no microSD card" "at /mnt/sd"
@@ -261,6 +277,22 @@ if [ $DRY_RUN = 0 ] && [ $TARGET = nand ]; then
         fi
         UNDO=1
         rm -rf $GUI
+    fi
+    if [ -f $WK_FILE ]; then
+        if [ ! -f "$BACKUP/WEBKIT.tar" ]; then
+            show "Saving Qt WebKit" "to the USB stick" "DO NOT POWER OFF"
+            mkdir -p "$BACKUP"
+            WK=`wk_list`
+            tar -cf "$BACKUP/WEBKIT.tmp" -C / $WK && sync && \
+                [ "`tar -cf - -C / $WK | md5sum`" = "`md5sum < "$BACKUP/WEBKIT.tmp"`" ] \
+                || fail "backup failed" "(Qt WebKit)"
+            mv "$BACKUP/WEBKIT.tmp" "$BACKUP/WEBKIT.tar"
+            md5sum < "$BACKUP/WEBKIT.tar" > "$BACKUP/WEBKIT.tar.md5"
+            wk_fingerprint / > "$BACKUP/WEBKIT.files.md5"
+            sync
+        fi
+        UNDO=1
+        (cd / && rm -f `wk_list`)
     fi
     UNDO=1
     stick_still_in
