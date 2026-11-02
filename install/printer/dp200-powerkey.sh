@@ -29,6 +29,8 @@ KEY_REG=0xF8045000
 KEY_BIT=$((1 << 27))
 LONG_S=5
 
+# The Debian root (mainline boot) has devmem only as a BusyBox applet
+command -v devmem >/dev/null || devmem() { busybox devmem "$@"; }
 pressed() { [ $(( $(devmem $KEY_REG 32) & KEY_BIT )) -ne 0 ]; }
 
 shutdown_now() {        # $1 = reboot | poweroff
@@ -49,6 +51,12 @@ shutdown_now() {        # $1 = reboot | poweroff
     # Leave the Klipper root clean: init's "umount -a -r" can't remount it
     # read-only while the chroot mounts and our log files are open on it.
     exec >/dev/console 2>&1
+    # The touch screen's progress frames (rc.dp200 showed steps 1-4): the
+    # chroot's /tmp is unmounted below, the stock /tmp is RAM too
+    F=/tmp/dp200-shutdown
+    rm -rf $F
+    [ -d $ROOT$F ] && cp -r $ROOT$F $F
+    [ -f $F/5.fb ] && cat $F/5.fb > /dev/fb0
     [ -f /var/run/dp200-netd.pid ] && kill $(cat /var/run/dp200-netd.pid) 2>/dev/null
     for p in $(ps | grep '[w]pa_cli' | awk '{print $1}'); do kill $p; done
     sleep 1
@@ -60,6 +68,15 @@ shutdown_now() {        # $1 = reboot | poweroff
     sync
     mount -o remount,ro $ROOT 2>/dev/null && echo "dp200-powerkey: $ROOT read-only" \
         || echo "dp200-powerkey: $ROOT still busy (journal will recover it)"
+    # What the stock init's shutdown does next (inittab: umount -a -r), done
+    # here so that the last frame comes after it; init repeats it harmlessly.
+    # The frame and the panel are opened first: it may unmount /tmp or /dev.
+    if [ -f $F/done.fb ] && [ -c /dev/fb0 ] && exec 3<$F/done.fb 4>/dev/fb0; then
+        umount -a -r 2>/dev/null
+        sync
+        cat <&3 >&4
+        exec 3<&- 4>&-
+    fi
     if [ "$1" = reboot ]; then
         reboot
     else

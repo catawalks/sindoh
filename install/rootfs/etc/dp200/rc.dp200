@@ -95,8 +95,16 @@ stop_pid() {
     rm -f $RUN/$1.pid
 }
 
+# Shutdown/reboot progress on the panel: the touch screen writes these
+# frames (dp200_screen.py write_shutdown_frames) only when it asked for one
+frame() {
+    [ -f /tmp/dp200-shutdown/$1.fb ] && cat /tmp/dp200-shutdown/$1.fb > /dev/fb0 2>/dev/null
+    return 0
+}
+
 case "$1" in
 start)
+    rm -rf /tmp/dp200-shutdown
     start_upc || exit 1
     start_klipper
     start_moonraker
@@ -110,10 +118,14 @@ start)
 stop)
     /usr/sbin/nginx -s quit 2>/dev/null
     stop_pid screen
+    frame 1
     stop_pid webcam
+    frame 2
     stop_pid moonraker
+    frame 3
     stop_pid klipper
     stop_pid bridge
+    frame 4
     # Hold both UPC cores in reset and force heaters/fans/motors off
     /usr/local/bin/upctool --force stop
     ;;

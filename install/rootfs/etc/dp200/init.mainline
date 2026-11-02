@@ -116,8 +116,24 @@ sh /dp200/dp200-powerkey.sh / >> /var/log/dp200-powerkey.log 2>&1 &
 
 stop_all() {
     /etc/dp200/rc.dp200 stop
+    # the touch screen's progress frames (see rc.dp200 frame)
+    F=/tmp/dp200-shutdown
+    [ -f $F/5.fb ] && cat $F/5.fb > /dev/fb0
+    # As any init does: end the other processes and close this log, so that
+    # / can go read-only (wpa_supplicant, the helpers, the serial shell)
+    echo "==== $1 $(date)"
+    kill -TERM -1 2>/dev/null
+    sleep 2
+    kill -KILL -1 2>/dev/null
+    exec >/dev/console 2>&1
     sync
-    mount -o remount,ro / 2>/dev/null
+    if mount -o remount,ro /; then
+        echo "dp200 init: / read-only"
+    else
+        echo "dp200 init: / still busy (synced; the journal recovers it)"
+    fi
+    # "It's now safe to turn off your printer" (or "Restarting...")
+    [ -f $F/done.fb ] && cat $F/done.fb > /dev/fb0
     # BusyBox's: the Debian root has no /sbin/reboot or poweroff (no systemd)
     [ "$1" = reboot ] && busybox reboot -f
     busybox poweroff -f
