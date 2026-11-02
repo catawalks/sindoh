@@ -1697,10 +1697,11 @@ class UI:
              C_BTN, 28, 'restart'),
             ('NETWORK', ('screen', 'network'), C_BTN, 28, 'WiFi / Ethernet'),
             ('DISPLAY', ('screen', 'display'), C_BTN, 28, 'screen'),
-            # the same page as a short press of the front power button
-            ('POWER', ('screen', 'power'), C_RED, 28, 'shut down / reboot'),
             ('INFO', ('info',), C_BTN, 28, 'versions, storage'),
             ('UPDATE', ('upd_open',), C_BTN, 28, 'web interface'),
+            # last, on its own: the same page as a short press of the front
+            # power button
+            ('POWER', ('screen', 'power'), C_RED, 28, 'shut down / reboot'),
         ], top=262, rows_h=88)
 
     def page_update(self, d, st):
