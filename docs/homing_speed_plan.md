@@ -76,9 +76,16 @@ program (`upc_driver_init` loads it to /dev/upc1). Extracted locally
 
 | Axis | Long jump (seek) | Find home (back-off) |
 |---|---|---|
-| X (cmd 0x23 / 0x24) | **208 mm/s** (16.7k steps/s), ramped | 10.4 mm/s |
-| Y (cmd 0x21 / 0x22) | **208 mm/s**, ramped | 10.4 mm/s |
-| Z (cmd 0x1f / 0x20) | **5.05 mm/s** (16.2k steps/s), ramped from 0.5 over ~0.3 mm | unclear in the emulation (period 400 = a placeholder from an unset parameter, not a real speed) |
+| X (cmd 0x23 / 0x24) | **208 mm/s** (16.7k steps/s), ramped (~4500 mm/s²) | 10.4 mm/s, at most 22.6 mm |
+| Y (cmd 0x21 / 0x22) | **208 mm/s**, ramped | 10.4 mm/s, at most 12.3 mm |
+| Z (cmd 0x1f / 0x20) | **5.05 mm/s** (16.2k steps/s), ramped from 0.5 over ~0.3 mm | **0.39 mm/s** (1250 steps/s), at most 1.26 mm, then Z = 9920 steps (3.1 mm) |
+
+Z back-off: the code writes period 400 and **engine +0x50 = 200** (X/Y/E
+moves write 1; the probe's single Z steps, cmd 0x2a, also write 200). +0x50
+is read as a clock divider: the main program adds the probe's move count 1:1
+to the Z step position (StepperFindLVSC311), so it is no repeat count, and
+400 ticks alone would be 78 mm/s. Inferred, not measured. (The 3DWOX
+stepper-mod-b0.ko register names did not help: a different register layout.)
 
 So stock Z homing is the same 5 mm/s as ours: the 10 mm/s stall is
 consistent with stock never going faster. Stock X/Y seek much faster than
