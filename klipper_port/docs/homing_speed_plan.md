@@ -63,5 +63,23 @@ max_z_velocity: 10          # bed moves (LOWER BED, park) too
   10-19 retest (downward) showed, which also explains the 10-18 losses.
   Z stays at homing_speed 5 / max_z_velocity 5 (G28 Z from halfway: 31 s).
 - Possible later: 6-7 mm/s lift test, or more Z current (driver/motor limits
-  unknown). The stock Z homing speed is in the FM microcode (cmd 0x20, carried
-  in the main program), not in karas.db; not extracted yet.
+  unknown).
+
+## Stock homing speeds (decoded 2026-11-02)
+
+The FM microcode is the `fm_ucode_data_P` array (16192 bytes) in the main
+program (`upc_driver_init` loads it to /dev/upc1). Extracted locally
+(RE_analysis/stock_fm.bin, Marvell code: never published) and run in
+`tools/fmseq.py` with the karas.db parameter blocks. Each axis homes with a
+"long jump" (fast, ramped, toward the switch until it triggers), then a
+"find home" (back off until the switch releases):
+
+| Axis | Long jump (seek) | Find home (back-off) |
+|---|---|---|
+| X (cmd 0x23 / 0x24) | **208 mm/s** (16.7k steps/s), ramped | 10.4 mm/s |
+| Y (cmd 0x21 / 0x22) | **208 mm/s**, ramped | 10.4 mm/s |
+| Z (cmd 0x1f / 0x20) | **5.05 mm/s** (16.2k steps/s), ramped from 0.5 over ~0.3 mm | unclear in the emulation (period 400 = a placeholder from an unset parameter, not a real speed) |
+
+So stock Z homing is the same 5 mm/s as ours: the 10 mm/s stall is
+consistent with stock never going faster. Stock X/Y seek much faster than
+our 50 mm/s (our max_velocity is 150); a 100 mm/s seek test is possible.
