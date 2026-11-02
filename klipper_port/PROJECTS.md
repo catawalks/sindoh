@@ -127,8 +127,10 @@ Parked.
 ## 10. Before a release
 
 - **Homing speed:** stock firmware homes much faster than our config
-  (owner, 2026-11-02, after going back to stock). Measure the stock speeds
-  and bring the [stepper_*] homing speeds close to them.
+  (owner, 2026-11-02, after going back to stock). Draft values and the
+  test in [docs/homing_speed_plan.md](docs/homing_speed_plan.md): X/Y
+  fast seek 50 + stock's 10 mm/s fine approach; Z 10 mm/s (clean in the
+  10-19 step-rate retest) after a check of the Z coupler.
 - **Stick backups and firmware versions:** a backup on the stick is
   refused when the printer's Sindoh app differs (another printer, or the
   same printer after a firmware update). Idea (owner agreed): store the
