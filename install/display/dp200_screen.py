@@ -478,6 +478,7 @@ class UI:
         self.dry = {'mat': 'PLA', 'temp': 50, 'hours': 4}   # dryer page selection
         # LOAD/UNLOAD page: which one, and the CUSTOM temperature (remembered)
         self.info = None               # SYSTEM -> INFO rows
+        self.upd = {}                  # SYSTEM -> UPDATE: versions from Moonraker
         self.fil = {'mode': 'load', 'temp': int(self.settings.get('fil_custom', 220))}
         self.bed_answered = 0.0        # last BED_CLEAR answer (status lags behind it)
         # bed level page: mode start/probing/result, live points {(col, row): z}
@@ -501,6 +502,16 @@ class UI:
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
             self.net_action(action)
+        elif kind == 'upd_open':                       # SYSTEM -> UPDATE
+            self.screen = 'update'
+            self._bg('Reading versions', self.upd_status)
+        elif kind == 'upd_check':
+            self._bg('Checking for updates', lambda: (
+                post('/machine/update/refresh?name=mainsail'), self.upd_status()))
+        elif kind == 'upd_mainsail':
+            self._bg('Updating Mainsail', lambda: (
+                post('/machine/update/upgrade?name=mainsail'), self.upd_status(),
+                self.flash('Mainsail updated: reload the web page')))
         elif kind == 'info':                           # SYSTEM -> INFO (read once when opened)
             self.info = system_info(self.ip)
             self.screen = 'info'
@@ -575,6 +586,18 @@ class UI:
             if held < LONG_POWER and not self.screen.startswith('powering'):
                 self.confirm = None
                 self.screen = 'power'
+
+    def upd_status(self):
+        """Versions from Moonraker's updater (no network: its last check)."""
+        try:
+            vi = get('/machine/update/status')['version_info']
+        except Exception as e:
+            self.upd = {'error': 'Moonraker: %s' % fail_text(e)}
+            return
+        m = vi.get('mainsail', {})
+        self.upd = {'mainsail': m.get('version', '-'), 'mainsail_new': m.get('remote_version', '?'),
+                    'klipper': (vi.get('klipper') or {}).get('version', '-'),
+                    'moonraker': (vi.get('moonraker') or {}).get('version', '-')}
 
     def _bg(self, label, fn):
         if self.busy:
@@ -1292,7 +1315,7 @@ class UI:
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
               'calibrate': 'move', 'shaper': 'calibrate', 'bedlevel': 'move', 'dryer': 'filament',
-              'fil_mat': 'filament', 'fil_custom': 'fil_mat', 'info': 'system',
+              'fil_mat': 'filament', 'fil_custom': 'fil_mat', 'info': 'system', 'update': 'system',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1677,7 +1700,39 @@ class UI:
             # the same page as a short press of the front power button
             ('POWER', ('screen', 'power'), C_RED, 28, 'shut down / reboot'),
             ('INFO', ('info',), C_BTN, 28, 'versions, storage'),
-        ], top=270)
+            ('UPDATE', ('upd_open',), C_BTN, 28, 'web interface'),
+        ], top=262, rows_h=88)
+
+    def page_update(self, d, st):
+        """SYSTEM -> UPDATE: Mainsail through Moonraker's updater (its
+        release zips, no git needed). Klipper and Moonraker are pinned to
+        the shipped commits; they come with the port's releases."""
+        d.text((20, 160), 'Update', font=font(28), fill=C_TXT)
+        u = self.upd
+        if self.busy:
+            d.text((20, 204), self.busy + '...', font=font(22), fill=C_WARN)
+        elif u.get('error'):
+            for i, l in enumerate(wrap(d, u['error'], font(20), PW - 40)[:3]):
+                d.text((20, 204 + i * 28), l, font=font(20), fill=C_WARN)
+        elif u.get('mainsail_new') not in (None, '?'):
+            same = u['mainsail_new'] == u.get('mainsail')
+            d.text((20, 204), 'Mainsail is up to date' if same else 'A new Mainsail is available',
+                   font=font(22), fill=C_ON if same else C_WARN)
+        rows = [('Mainsail', '%s  (latest %s)' % (u.get('mainsail', '-'), u.get('mainsail_new', '?'))),
+                ('Klipper', u.get('klipper', '-')), ('Moonraker', u.get('moonraker', '-'))]
+        f = font(20)
+        for i, (k, v) in enumerate(rows):
+            d.text((20, 300 + i * 32), k, font=f, fill=C_DIM)
+            d.text((150, 300 + i * 32), v, font=f, fill=C_TXT)
+        d.text((20, 400), 'Klipper and Moonraker come with the DP200', font=font(17), fill=C_DIM)
+        d.text((20, 422), 'port\'s releases (USB stick for now).', font=font(17), fill=C_DIM)
+        newer = u.get('mainsail_new') not in (None, '?', u.get('mainsail'))
+        printing = st['print_stats']['state'] in ('printing', 'paused')
+        items = [('CHECK NOW', ('upd_check',), C_BTN, 26, 'latest versions')]
+        if newer and not printing:
+            items.append(('UPDATE', ('confirm', 'Update the web interface (Mainsail) to %s?' % u['mainsail_new'],
+                                     ('upd_mainsail',)), C_ON, 28, 'Mainsail ' + u['mainsail_new']))
+        self.grid(d, items, top=470, rows_h=96)
 
     def page_info(self, d, st):
         """SYSTEM -> INFO: build and versions, the stock firmware, storage."""
