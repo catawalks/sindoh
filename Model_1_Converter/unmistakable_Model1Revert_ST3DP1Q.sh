@@ -13,14 +13,20 @@
 #   - a genuine Sindoh DP200Q also has 3DP200Q: the screen says this script is
 #     only for converted Stanley printers
 #   - only a real touch confirms; pulling the USB stick cancels
-#   - writes only the MachineTLI row (sqlite3), like the first step of
-#     Sindoh's karas_pinetree_util.sh --set-tli, without its U-Boot env change
+#
+# What it changes: it runs Sindoh's own karas_pinetree_util.sh --set-tli,
+# the same command Model1Fix ran, so everything Model1Fix changed goes back:
+# the model ID, the time zone (US), vendor and user ID (STANLEY, MODEL 1),
+# the boot logo (mtd3, /app/boot-logo_stanley.bin) and its boot-bar color
+# (U-Boot env: bar_color 1, boot_time 17, lcd_type 1), the homepage file
+# and the /backup copy of karas.db.
 #
 # Run by the stock /app/auto_update.sh from _update_rodin/ on a USB stick.
 exec >/dev/console 2>&1
 NEW_TLI=ST3DP1Q
 FROM_TLI=3DP200Q
-DB=${DB:-/app/nvram/karas.db}      # (DB=, NO_REBOOT=1: for testing on a copy)
+DB=${DB:-/app/nvram/karas.db}
+UTIL=${UTIL:-/app/karas_pinetree_util.sh}   # (DB=, UTIL=, NO_REBOOT=1: testing)
 STICK=${1:-/mnt/sda1/_update_rodin}
 ME=$STICK/unmistakable_Model1Revert.she
 [ -f "$ME" ] || ME=`ls "$STICK"/unmistakable_Model1Revert*.she 2>/dev/null | head -1`
@@ -48,7 +54,7 @@ TLI=`sqlite3 $DB "select MachineTLI from INST_MACHINE"`
 if [ "$TLI" != "$FROM_TLI" ]; then
     show "Model ID: $TLI" "not $FROM_TLI: skip" "Pull stick to exit"
     while [ -f "$ME" ]; do sleep 1; done
-    [ -n "$NO_REBOOT" ] || /app/karas_pinetree_util.sh --reboot
+    [ -n "$NO_REBOOT" ] || $UTIL --reboot
     exit 0
 fi
 show "Model ID: $TLI" "Touch to continue" "Pull stick to cancel"
@@ -56,7 +62,8 @@ confirm "Model ID: $TLI" "Touch to continue" "Pull stick to cancel"
 show "Only for a Stanley" "that Model1Fix made" "Touch: set $NEW_TLI"
 confirm "Only for a Stanley" "that Model1Fix made" "Touch: set $NEW_TLI"
 
-sqlite3 $DB "update INST_MACHINE set MachineTLI = \"$NEW_TLI\""
+show "Setting $NEW_TLI" "logo and settings" "DO NOT POWER OFF"
+$UTIL --set-tli $NEW_TLI
 sync
 TLI=`sqlite3 $DB "select MachineTLI from INST_MACHINE"`
 if [ "$TLI" = "$NEW_TLI" ]; then
@@ -66,5 +73,5 @@ else
 fi
 # pulling the stick ends the wait too
 /app/tinydebug keywait
-[ -n "$NO_REBOOT" ] || /app/karas_pinetree_util.sh --reboot
+[ -n "$NO_REBOOT" ] || $UTIL --reboot
 exit 0

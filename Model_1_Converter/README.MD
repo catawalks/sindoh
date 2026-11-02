@@ -33,10 +33,14 @@ open-filament mode with the latest firmware). Use the file you need:
 
 Notes:
 - A genuine Sindoh DP200Q also has the ID `3DP200Q`. Do not use this on one.
-- The script changes only the `MachineTLI` row in `/app/nvram/karas.db` (like
-  the first step of Sindoh's `karas_pinetree_util.sh --set-tli`). It does not
-  touch the U-Boot environment.
-- Tested on a copy of the database: 3DP200Q -> ST3DP1 / ST3DP1Q, other IDs
-  left alone, a pulled flash drive cancels.
+- It runs Sindoh's own `karas_pinetree_util.sh --set-tli`, the same command
+  Model1Fix runs, so everything Model1Fix changed goes back: the model ID, the
+  time zone (US), vendor and user ID (`STANLEY`, `MODEL 1`), the Stanley boot
+  logo (written to the boot-logo partition) and its boot-bar color (U-Boot
+  environment: `bar_color 1`, `boot_time 17`, `lcd_type 1`), and the backup
+  copy of the settings database.
+- Tested on a copy of the database with a stand-in for Sindoh's tool:
+  3DP200Q -> `--set-tli ST3DP1` / `ST3DP1Q`, other IDs left alone, a pulled
+  flash drive cancels. Not yet run on a real converted printer.
 - The source is `unmistakable_Model1Revert.sh` (and `_ST3DP1Q.sh`), packed with
   `klipper_port/install/usb/pack_she.sh`.
