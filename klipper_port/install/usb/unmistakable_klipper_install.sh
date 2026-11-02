@@ -347,6 +347,25 @@ if [ $DRY_RUN = 1 ]; then
     exit 0
 fi
 
+# The recovery set's version for SYSTEM -> INFO (owner's OK 2026-11-02): read
+# once here, not at every boot. UBI attach as Sindoh's recovery does, a
+# read-only mount, and only the first 16 MB of update.tar.bz2 (the Sindoh
+# app's gui_version.js sits 2.1 MB in). The recovery set has no firmware
+# version file; its app version tells factory (1.2.x) from later sets.
+show "Reading the" "recovery set version" ""
+if grep -q '^mtd5: 0c800000 00020000 "recovery"' /proc/mtd && [ ! -e /sys/class/ubi/ubi2 ] && \
+   ubiattach /dev/ubi_ctrl -m 5 -d 2 >/dev/null 2>&1; then
+    mkdir -p /tmp/dp200-rec
+    if mount -t ubifs -o ro ubi2:recovery /tmp/dp200-rec; then
+        V=`bunzip2 -c /tmp/dp200-rec/update.tar.bz2 2>/dev/null | head -c 16777216 | \
+            tar -xO ./app/SVN_GUI/js/gui_version.js 2>/dev/null | \
+            sed -n 's/.*GUI_VERSION *= *"\([^"]*\)".*/\1/p' | head -1`
+        umount /tmp/dp200-rec
+        [ -n "$V" ] && echo "recovery_app=$V" > $ROOT/etc/dp200/recovery_info
+    fi
+    ubidetach /dev/ubi_ctrl -d 2
+fi
+
 show "Installing boot hook" "" "DO NOT POWER OFF"
 sh $ROOT/dp200/hook_install.sh || fail "hook failed" "see install log"
 UNDO=0
