@@ -1,12 +1,15 @@
 #!/bin/sh
 # DP200 Klipper uninstaller - run by the stock /app/auto_update.sh from a USB
-# stick (_update_rodin/unmistakable_klipper_remove.she, packed by pack_she.sh).
-# Restores the stock boot (removes the /etc/profile hook, /etc/dp200-boot.sh
-# and /DEBUG_MACHINE).
+# stick (_update_rodin/unmistakable_klipper_remove.she, packed by
+# pack_she.sh). On the install stick it ships as _update_rodin_KlipperRemove/:
+# rename the install folder back, then this one to _update_rodin.
 #
-# NAND installs: if the stick also holds mtd5_recovery_backup.bin (+ .md5),
-# saved by the installer, the "recovery" partition gets its factory content
-# back (otherwise the Klipper volume just stays there, unused by the stock boot).
+# Restores the stock boot (removes the /etc/profile hook, /etc/dp200-boot.sh
+# and /DEBUG_MACHINE). NAND installs (/klipper on the stock root): deletes
+# /klipper and puts the Sindoh front end /app/SVN_GUI back from the backup
+# the installer saved on the stick (dp200_stock_backup/SVN_GUI.tar).
+# Without that backup it refuses to delete anything: Sindoh's OEM update (or
+# the recovery set in mtd5) restores the app instead.
 # SD installs: the Debian root on the card stays (reinstall = hook only).
 #
 # Full revert to OEM in one stick: put this .she next to Sindoh's OEM update
@@ -15,9 +18,8 @@
 # then returns (no reboot) to let the OEM update flash the stock firmware.
 exec >/dev/console 2>&1
 STICK=${1:-/mnt/sda1/_update_rodin}
-MTD=5
-UBI=2
-BACKUP=$STICK/mtd${MTD}_recovery_backup.bin
+BACKUP=$STICK/../dp200_stock_backup
+GUI=/app/SVN_GUI
 OEM=0
 [ -f "$STICK/update.she" ] && OEM=1
 show() { /app/display.sh "Klipper remove" "$1" "$2" "$3"; echo "[klipper-remove] $1 $2 $3"; }
@@ -26,17 +28,19 @@ show() { /app/display.sh "Klipper remove" "$1" "$2" "$3"; echo "[klipper-remove]
 kill -9 `pidof stdin2log` 2>/dev/null
 kill -9 `pidof appBrowser` 2>/dev/null
 
+# The Sindoh app: from the stick's backup, checked against its md5
 RESTORE=0
-if [ -f "$BACKUP" ] && [ -f "$BACKUP.md5" ]; then
-    show "Checking NAND backup" "(md5)" ""
-    [ "`awk '{print $1}' "$BACKUP.md5"`" = "`md5sum "$BACKUP" | awk '{print $1}'`" ] && RESTORE=1 \
-        || show "NAND backup damaged" "it will NOT be used" ""
+if [ ! -d $GUI ] && [ -f "$BACKUP/SVN_GUI.tar" ] && [ -f "$BACKUP/SVN_GUI.tar.md5" ]; then
+    show "Checking the backup" "of the Sindoh app" "(md5)"
+    [ "`cat "$BACKUP/SVN_GUI.tar.md5"`" = "`md5sum < "$BACKUP/SVN_GUI.tar"`" ] \
+        && RESTORE=1 || show "Sindoh app backup" "is damaged" ""
 fi
-if [ $RESTORE = 1 ]; then
-    show "Touch to restore" "Sindoh firmware" "+ NAND recovery area"
-else
-    show "Touch to restore" "the Sindoh firmware" "Power off to cancel"
+if [ ! -d $GUI ] && [ $RESTORE = 0 ] && [ $OEM = 0 ]; then
+    show "No Sindoh app backup" "on this stick" "Touch to reboot"
+    /app/tinydebug keywait
+    reboot; exit 1
 fi
+show "Touch to restore" "the Sindoh firmware" "Power off to cancel"
 /app/tinydebug keywait
 
 for r in /klipper /mnt/sd; do
@@ -53,14 +57,17 @@ fi
 rm -f /DEBUG_MACHINE /etc/dp200-boot.sh /etc/dp200-nand
 sync
 
+if [ -d /klipper ] && ! grep -q " /klipper " /proc/mounts; then
+    show "Removing Klipper" "from the NAND" "DO NOT POWER OFF"
+    rm -rf /klipper
+    sync
+fi
 if [ $RESTORE = 1 ]; then
-    show "Restoring NAND" "recovery area" "DO NOT POWER OFF"
-    grep -q " /klipper " /proc/mounts && umount /klipper
-    [ -e /sys/class/ubi/ubi$UBI ] && ubidetach -d $UBI
-    if flash_erase /dev/mtd$MTD 0 0 && nandwrite -p -q /dev/mtd$MTD "$BACKUP"; then
-        show "NAND restored" "" ""
+    show "Restoring" "the Sindoh app" "DO NOT POWER OFF"
+    if tar -xf "$BACKUP/SVN_GUI.tar" -C /app; then
+        show "Sindoh app restored" "" ""
     else
-        show "NAND restore FAILED" "stock boot is OK" "(area unused by it)"
+        show "Restore FAILED" "use Sindoh's update" "to repair the app"
         sleep 5
     fi
     sync
@@ -73,7 +80,7 @@ if [ $OEM = 1 ]; then
     sleep 3
     exit 0
 fi
-show "Stock boot restored" "Remove the stick" "Touch to reboot"
+show "Stock firmware restored" "Remove the stick" "Touch to reboot"
 /app/tinydebug keywait
 reboot
 exit 0

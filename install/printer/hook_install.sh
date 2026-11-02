@@ -5,7 +5,7 @@
 #
 # What it does (all reversible with hook_remove.sh):
 #   1. copies dp200-boot.sh to /etc/dp200-boot.sh (stage 1: finds the Klipper
-#      root on NAND mtd5 or the SD card and starts it)
+#      root on NAND (/klipper) or the SD card and starts it)
 #   2. backs up /etc/profile to /etc/profile.stock and adds one line to
 #      /etc/profile that runs /etc/dp200-boot.sh when the stock UI is bypassed
 #   3. creates /DEBUG_MACHINE, which makes the stock /etc/profile skip the
