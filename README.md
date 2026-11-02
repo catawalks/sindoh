@@ -94,6 +94,19 @@ installer for the internal NAND. Start with
 [`klipper_port/README.md`](klipper_port/README.md). The Klipper changes themselves are on the
 `sindoh-dp200` branch of [catawalks/klipper](https://github.com/catawalks/klipper/tree/sindoh-dp200).
 
+### Slicer profiles
+
+Ready-made printer profiles for the Klipper port are in
+[`klipper_port/install/slicer/`](klipper_port/install/slicer/): PrusaSlicer
+(`DP200_Klipper_PrusaSlicer.ini`), OrcaSlicer (printer, process and PLA profiles) and Cura
+(printer and extruder definitions), plus a pressure-advance tower generator. Their start G-code
+is `PRINT_START` + `PRIME_LINE` (heat, home, bed mesh, purge and wipe). Import steps are in
+[the slicer README](klipper_port/install/slicer/README.md).
+
+Before a print: Z homes upward, so anything left on the bed gets crushed. Klipper refuses to home
+Z until the bed is confirmed empty: answer YES to "Is the bed empty?" (or run `BED_CLEAR`) and
+start the print within 5 minutes.
+
 ## Custom boot logo
 
 [catawalks/sindoh-boot-logo](https://github.com/catawalks/sindoh-boot-logo) (Windows program, [download](https://github.com/catawalks/sindoh-boot-logo/releases/latest), + cross-platform script) turns your own picture into the boot logo
