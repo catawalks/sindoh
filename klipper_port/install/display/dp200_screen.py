@@ -507,6 +507,11 @@ class UI:
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
             self.net_action(action)
+        elif kind == 'go_home':                        # the HOME button in the header
+            if self.screen == 'papertest':
+                self.run(('cal_abort',))               # leaving ends the paper test
+            self.confirm = None
+            self.screen = 'home'
         elif kind == 'cal_start':                      # Z HEIGHT / PROBE OFFSET paper test
             mode = action[1]
             self.cal = {'mode': mode}
@@ -1365,9 +1370,20 @@ class UI:
         d.text((PW - 20 - d.textlength(txt, font=font(20)), 22), txt, font=font(20), fill=col)
         e, b = st['extruder'], st['heater_bed']
         d.text((20, 78), 'Nozzle', font=font(18), fill=C_DIM)
-        d.text((20, 100), '%.0f/%.0f°' % (e['temperature'], e['target']), font=font(36), fill=C_NOZ)
-        d.text((250, 78), 'Bed', font=font(18), fill=C_DIM)
-        d.text((250, 100), '%.0f/%.0f°' % (b['temperature'], b['target']), font=font(36), fill=C_BED)
+        d.text((20, 102), '%.0f/%.0f°' % (e['temperature'], e['target']), font=font(32), fill=C_NOZ)
+        d.text((200, 78), 'Bed', font=font(18), fill=C_DIM)
+        d.text((200, 102), '%.0f/%.0f°' % (b['temperature'], b['target']), font=font(32), fill=C_BED)
+        # HOME: straight back to the home page from anywhere in the menus
+        if self.screen not in ('home', 'print'):
+            box = (394, 72, PW - 12, 146)
+            self.button(d, box, '', ('go_home',), C_BTN, 20)
+            dy = 2 if self.pressed(box) else 0
+            cx, top = (box[0] + box[2]) // 2, 84 + dy
+            d.polygon([(cx - 16, top + 14), (cx, top), (cx + 16, top + 14)], fill=C_TXT)   # roof
+            d.rectangle((cx - 11, top + 14, cx + 11, top + 30), fill=C_TXT)               # walls
+            d.rectangle((cx - 4, top + 20, cx + 4, top + 30), fill=C_BTN)                 # door
+            f = font(15)
+            d.text((cx - d.textlength('HOME', font=f) // 2, top + 36), 'HOME', font=f, fill=C_DIM)
 
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
