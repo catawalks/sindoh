@@ -121,14 +121,23 @@ def summarize():
             e = eng.setdefault(n, {})
             if kind == 'W':
                 e[r] = v
+                if r == 0x58:
+                    e['pc58'] = pc
                 if r == 0x60 and v == 1:
                     cmd = e.get(0x5c, 0); edges, mode = cmd >> 16, cmd & 0xffff
                     per = e.get(0x58, 0); dirb = (e.get(0x44, 0) >> 4) & 1
                     steps = edges // 2
-                    rate = 200e6 / (2 * per) if per else 0
+                    # +0x50: 1 for every X/Y/E move; Z back-off (cmd 0x20) and
+                    # probe steps (0x2a) write 200 with period 400. Taken as a
+                    # clock divider (inferred: the main program adds the
+                    # probe's move count 1:1 to the Z step position, so it
+                    # is no repeat count; 400 ticks alone would be 78 mm/s)
+                    div = e.get(0x50, 1) or 1
+                    rate = 200e6 / (2 * per * div) if per else 0
                     out.append('MOVE %s dir=%d steps=%d (%.2f mm) period=%d -> %.1f steps/s (%.2f mm/s) mode=%#x ramp=%d'
                                % (AXIS[n], dirb, steps, steps / STEPS_MM[n], per, rate, rate / STEPS_MM[n],
-                                  mode, e.get(0x54, 0)))
+                                  mode, e.get(0x54, 0))
+                               + (' pc=%#x en50=%d' % (e.get('pc58', 0), e.get(0x50, 0)) if os.environ.get('SHOWPC') else ''))
                 elif r == 0x04:
                     out.append('ABORT %s' % AXIS[n])
                 elif r == 0x0c:
