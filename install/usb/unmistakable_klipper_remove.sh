@@ -92,6 +92,21 @@ if [ ! -d $GUI ] && [ $RESTORE = 0 ] && \
    grep -q "^mtd$REC_MTD: 0c800000 00020000 \"recovery\"" /proc/mtd; then
     RESTORE=2
 fi
+# Qt WebKit (removed by the installer with SVN_GUI): from WEBKIT.tar on the
+# stick, else from the recovery set (the same 2015 files as the 2020
+# firmware's, md5-identical)
+WK_FILE=/usr/lib/libQt5WebKit.so.5.0.2
+WK_MEMBERS="./usr/lib/libQt5WebKit.so.5 ./usr/lib/libQt5WebKit.so.5.0 ./usr/lib/libQt5WebKit.so.5.0.2
+            ./usr/lib/libQt5WebKitWidgets.so.5 ./usr/lib/libQt5WebKitWidgets.so.5.0 ./usr/lib/libQt5WebKitWidgets.so.5.0.2"
+WK_SRC=0
+if [ ! -f $WK_FILE ]; then
+    if [ -f "$BACKUP/WEBKIT.tar" ] && \
+       [ "`cat "$BACKUP/WEBKIT.tar.md5" 2>/dev/null`" = "`md5sum < "$BACKUP/WEBKIT.tar"`" ]; then
+        WK_SRC=1
+    elif grep -q "^mtd$REC_MTD: 0c800000 00020000 \"recovery\"" /proc/mtd; then
+        WK_SRC=2
+    fi
+fi
 if [ ! -d $GUI ] && [ $RESTORE = 0 ] && [ $OEM = 0 ]; then
     show "No Sindoh app backup" "on stick or NAND" "Pull stick to cancel"
     while [ -f "$ME" ]; do sleep 1; done
@@ -120,15 +135,23 @@ unreadable() {
     /app/tinydebug keywait
     reboot; exit 1
 }
-rm -rf /tmp/dp200-restore; mkdir -p /tmp/dp200-restore
+R=/tmp/dp200-restore
+rm -rf $R; mkdir -p $R/wk $R/rec
 if [ $RESTORE = 1 ]; then
     show "Reading the backup" "of the Sindoh app" "DO NOT POWER OFF"
-    tar -xf "$BACKUP/SVN_GUI.tar" -C /tmp/dp200-restore || unreadable "Backup"
-elif [ $RESTORE = 2 ]; then
+    tar -xf "$BACKUP/SVN_GUI.tar" -C $R || unreadable "Backup"
+fi
+if [ $WK_SRC = 1 ]; then
+    tar -xf "$BACKUP/WEBKIT.tar" -C $R/wk || unreadable "Backup"
+fi
+if [ $RESTORE = 2 ] || [ $WK_SRC = 2 ]; then
     # UBI attach as Sindoh's own recovery does; the volume is mounted
     # read-only and only read (UBI itself may still move a block it finds
     # bit errors in: normal housekeeping)
     show "Reading recovery set" "(about 5-10 min)" "DO NOT POWER OFF"
+    MEMBERS=
+    [ $RESTORE = 2 ] && MEMBERS="./app/SVN_GUI"
+    [ $WK_SRC = 2 ] && MEMBERS="$MEMBERS $WK_MEMBERS"
     ATTACHED=0
     if [ ! -e /sys/class/ubi/ubi$REC_UBI ]; then
         ubiattach /dev/ubi_ctrl -m $REC_MTD -d $REC_UBI >/dev/null 2>&1 || unreadable "Recovery set"
@@ -136,12 +159,18 @@ elif [ $RESTORE = 2 ]; then
     fi
     mkdir -p /tmp/dp200-rec
     if mount -t ubifs -o ro ubi$REC_UBI:recovery /tmp/dp200-rec; then
-        tar -xjf /tmp/dp200-rec/update.tar.bz2 -C /tmp/dp200-restore ./app/SVN_GUI
+        tar -xjf /tmp/dp200-rec/update.tar.bz2 -C $R/rec $MEMBERS
         umount /tmp/dp200-rec
     fi
     [ $ATTACHED = 1 ] && ubidetach /dev/ubi_ctrl -d $REC_UBI
-    [ -f /tmp/dp200-restore/app/SVN_GUI/home.html ] || unreadable "Recovery set"
-    mv /tmp/dp200-restore/app/SVN_GUI /tmp/dp200-restore/SVN_GUI
+    if [ $RESTORE = 2 ]; then
+        [ -f $R/rec/app/SVN_GUI/home.html ] || unreadable "Recovery set"
+        mv $R/rec/app/SVN_GUI $R/SVN_GUI
+    fi
+    if [ $WK_SRC = 2 ]; then
+        [ -f $R/rec$WK_FILE ] || unreadable "Recovery set"
+        mv $R/rec/usr $R/wk/usr
+    fi
 fi
 if [ -f /etc/profile.stock ]; then
     cp /etc/profile.stock /etc/profile
@@ -164,9 +193,14 @@ if [ $RESTORE != 0 ]; then
         show "Restore FAILED" "use Sindoh update" "to repair the app"
         sleep 5
     fi
-    rm -rf /tmp/dp200-restore
     sync
 fi
+if [ $WK_SRC != 0 ]; then
+    show "Restoring" "Qt WebKit" "DO NOT POWER OFF"
+    cp -a /tmp/dp200-restore/wk/. / || { show "Restore FAILED" "(Qt WebKit) use" "Sindoh update"; sleep 5; }
+    sync
+fi
+rm -rf /tmp/dp200-restore
 
 if [ $OEM = 1 ]; then
     # hand over to the OEM update.she on the same stick (it shows its own

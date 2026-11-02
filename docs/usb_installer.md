@@ -91,7 +91,7 @@ Findings, all fixed:
   (491 files; the 2020 one has 1260). With the 2020 firmware it starts and
   shows the stock home screen; Sindoh's 2020 update matches it again.
 
-## More room on the stock root: Qt WebKit (proposal, 2026-11-02)
+## More room on the stock root: Qt WebKit (2026-11-02)
 
 The NAND install leaves ~27 MB free. Of the stock libraries (readelf on the
 printer):
@@ -103,7 +103,14 @@ printer):
   `libQt5Core` needs it, and `tinydebug` (every installer and Sindoh update
   message) uses QtCore, QtGui and QtWidgets. So do `UIManager` and the
   Qt plugins in `/usr/lib/qt` (linuxfb).
-Not done: it deletes more stock files, the owner decides.
+Done (2026-11-02, owner's OK): the installer removes WebKit after SVN_GUI,
+backed up to the stick as `WEBKIT.tar` (+ `.md5`, `.files.md5`); undo and
+the remover put it back, from the stick or else from the recovery set
+(`update.tar.bz2` holds the same two libraries, md5-identical). Measured:
+deleting WebKit frees 12.9 MB of flash (it is stored compressed), so a
+NAND install should leave ~40 MB free. Tested on the test printer: the
+backup commands, then the remover's mtd5 fallback restoring WebKit
+(fingerprint identical, the stock browser starts).
 
 ## Update 2026-10-20: internal NAND is now the default target (superseded)
 
