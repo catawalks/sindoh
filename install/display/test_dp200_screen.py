@@ -144,6 +144,52 @@ tap('SENSOR OFF'); tap('YES')
 check('SENSOR OFF disables config', os.path.exists(S.ADXL_OFF) and not os.path.exists(S.ADXL_ON))
 os.unlink(S.ADXL_OFF); os.rmdir(adir)
 tap('BACK'); tap('BACK'); tap('BACK')
+# CALIBRATE: paper tests, PID tune, saving - all through the stand-ins
+# (post() records; manual_probe is faked; nothing moves or heats)
+_get = S.get
+S.get = lambda p: ({'status': {'manual_probe': {'is_active': True, 'z_position': 0.825}}}
+                   if 'manual_probe' in p else _get(p))
+st0 = ui.st
+ui.st = dict(st0)
+tap('MOVE'); tap('CALIBRATE'); tap('Z HEIGHT')
+check('Z HEIGHT asks if the bed is empty', ui.confirm is not None and 'EMPTY' in ui.confirm[0])
+n = len(sent); tap('YES'); time.sleep(0.5); step()
+check('Z HEIGHT homes and starts the paper test',
+      ('/printer/gcode/script', 'BED_CLEAR\nG28\nZ_ENDSTOP_CALIBRATE') in sent[n:] and ui.screen == 'papertest')
+ui.st['manual_probe'] = {'is_active': True, 'z_position': 2.275}
+tap('-0.1');              check('-0.1 sends TESTZ Z=-0.1', sent[-1] == ('/printer/gcode/script', 'TESTZ Z=-0.1'))
+tap('ACCEPT'); time.sleep(0.5); step()
+check('ACCEPT sends ACCEPT', sent[-1] == ('/printer/gcode/script', 'ACCEPT') and ui.cal.get('done'))
+ui.st['manual_probe'] = {'is_active': False}
+tap('SAVE'); tap('YES'); time.sleep(0.5); step()
+check('SAVE sends SAVE_CONFIG', sent[-1] == ('/printer/gcode/script', 'SAVE_CONFIG') and ui.screen == 'calibrate')
+tap('PROBE OFFSET'); tap('YES'); time.sleep(0.5); step()
+check('PROBE OFFSET starts LV_PROBE_CALIBRATE', sent[-1] == ('/printer/gcode/script', 'BED_CLEAR\nLV_PROBE_CALIBRATE'))
+ui.st['manual_probe'] = {'is_active': True, 'z_position': 0.825}
+tap('ACCEPT'); time.sleep(0.5); step()
+check('probe ACCEPT passes the height on',
+      sent[-1] == ('/printer/gcode/script', 'ACCEPT\nLV_PROBE_CALIBRATE_SAVE Z=0.825'))
+tap('DISCARD');           check('DISCARD -> calibrate', ui.screen == 'calibrate' and not ui.cal)
+tap('Z HEIGHT'); tap('YES'); time.sleep(0.5); step()
+n = len(sent); tap('BACK'); time.sleep(0.5); step()
+check('BACK during a paper test sends ABORT', ('/printer/gcode/script', 'ABORT') in sent[n:]
+      and ui.screen == 'calibrate')
+ui.st['manual_probe'] = {'is_active': False}
+tap('PID TUNE'); tap('NOZZLE')
+check('PID NOZZLE asks to confirm', ui.confirm is not None and '210' in ui.confirm[0])
+tap('YES'); time.sleep(0.5); step()
+check('YES sends PID_CALIBRATE extruder 210',
+      ('/printer/gcode/script', 'PID_CALIBRATE HEATER=extruder TARGET=210') in sent)
+tap('SAVE'); tap('YES'); time.sleep(0.5); step()
+check('PID SAVE sends SAVE_CONFIG', sent[-1] == ('/printer/gcode/script', 'SAVE_CONFIG'))
+ui.st['gcode_move'] = dict(st0['gcode_move'], homing_origin=[0.0, 0.0, 0.05, 0.0])
+ui.screen = 'calibrate'
+tap('SAVE Z OFFSET'); tap('YES'); time.sleep(0.5); step()
+check('SAVE Z OFFSET applies it and saves',
+      sent[-1] == ('/printer/gcode/script', 'Z_OFFSET_APPLY_ENDSTOP\nSAVE_CONFIG'))
+S.get = _get
+ui.st = st0
+ui.screen = 'home'
 check('BACK x3 -> home', ui.screen == 'home')
 tap('FILAMENT'); tap('UNLOCK');       check('UNLOCK asks to confirm', ui.confirm is not None)
 tap('YES');                           check('YES sends CARTRIDGE_RELEASE', sent[-1] == ('/printer/gcode/script', 'CARTRIDGE_RELEASE'))
