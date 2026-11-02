@@ -23,7 +23,45 @@ the community "Model 1 converter" (`Model_1_Converter/`) both use step 3.
 Both run in stock mode and in Klipper mode, because media.connect belongs to
 the stock kernel/BusyBox side.
 
-## Update 2026-10-20: internal NAND is now the default target
+## Update 2026-11-02: the stock root (mtd6) is the NAND target
+
+Agreed with the owner for a first release on the **stock 3.2 kernel**:
+Klipper goes into `/klipper`, a directory on the stock root (mtd6, UBIFS),
+written through Sindoh's own NAND driver. **mtd5 (the factory recovery set),
+mtd0, the U-Boot blocks and the env are never touched** (the mtd5 target
+below is dropped: it erased the recovery set).
+
+- **Room:** mtd6 has 264 MB, 54 MB free on stock. The installer deletes only
+  `/app/SVN_GUI` (93 MB, Sindoh's touch-screen app; Klipper's screen replaces
+  it), after copying it to the stick (`dp200_stock_backup/`, md5-checked).
+  The rest of the stock system stays: auto_update.sh and its key, upc.ko,
+  Wi-Fi, BusyBox, the Qt browser libraries.
+- **Size (measured on the printer):** `runtime.exclude` now also drops perl,
+  git, apt, iconv tables, pip/setuptools, compiler leftovers and this
+  printer's `/var/backups` and `/root`. Runtime 235 MB, payload 84 MB gzip;
+  UBIFS zlib estimate block by block (`ubifs_est.py`): 103 MB. About 44 MB
+  stays free for G-codes. New files are written with `compr=zlib`
+  (remount); the stock files stay LZO.
+- **Checks before any change:** DP200-family hardware (`/app/upc.ko`), kernel
+  `3.2.0-g67a8e16` (Sindoh 2020 firmware, the build upctool and cdc-acm.ko
+  are tested on; DP200 and Stanley Model 1 alike), mtd6 = "filesystem" as
+  the UBIFS root, space, room on the stick for the backup, payload md5.
+- **On failure** after the backup: `/klipper` is removed and SVN_GUI copied
+  back, so the stock firmware boots as before.
+- **Boot:** `dp200-boot.sh` starts `/klipper/dp200/dp200-start.sh`;
+  `etc/dp200/on_nand` keeps the logs in RAM.
+- **Remove:** `unmistakable_klipper_remove.she` restores the hook, deletes
+  `/klipper` and puts SVN_GUI back from the stick (md5-checked). Without the
+  backup it refuses (Sindoh's OEM update restores the app instead).
+- **Stick layout** (the folder that should run is renamed `_update_rodin`):
+  ```
+  _update_rodin_KlipperInstall/unmistakable_klipper_install.she
+                               dp200_klipper_payload.tar.gz (+ .md5, .size)
+  _update_rodin_KlipperRemove/unmistakable_klipper_remove.she
+  dp200_stock_backup/SVN_GUI (+ .md5)      written by the installer
+  ```
+
+## Update 2026-10-20: internal NAND is now the default target (superseded)
 
 - **Target:** the installer writes Klipper to **mtd5 "recovery"** as UBI
   volume `klipper` (ubi2), mounted on `/klipper`. Before formatting it, it

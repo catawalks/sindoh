@@ -55,3 +55,51 @@
 ./usr/lib/arm-linux-gnueabi/blas
 ./usr/lib/arm-linux-gnueabi/lapack
 ./usr/lib/arm-linux-gnueabi/libgfortran.so.5*
+# Stock-root install (2026-11-02): it must fit next to the stock system in
+# mtd6 (~147 MB with the Sindoh app removed), so drop more:
+# this printer's recovery/test files (stock kernel image, logo backups, tools)
+./var/backups
+./root
+# compiler leftovers the patterns above miss
+./usr/bin/*lto-dump*
+./usr/lib/arm-linux-gnueabi/libasan.so*
+./usr/lib/arm-linux-gnueabi/libubsan.so*
+./usr/lib/arm-linux-gnueabi/liblsan.so*
+./usr/lib/arm-linux-gnueabi/libtsan.so*
+./usr/lib/arm-linux-gnueabi/libisl.so*
+./usr/lib/arm-linux-gnueabi/libmpc.so*
+./usr/lib/arm-linux-gnueabi/libmpfr.so*
+./usr/lib/arm-linux-gnueabi/libbfd*
+./usr/lib/arm-linux-gnueabi/libopcodes*
+./usr/lib/arm-linux-gnueabi/libctf*
+./usr/lib/arm-linux-gnueabi/libgprofng*
+# perl (only Debian's package scripts use it; perl-base stays)
+./usr/lib/arm-linux-gnueabi/perl
+./usr/share/perl
+./usr/bin/perl5*
+# git (only Moonraker's update manager; updates come from the USB stick)
+./usr/lib/git-core
+./usr/share/git-core
+./usr/bin/git*
+./usr/bin/scalar
+# iconv character sets (Python and the stack don't use glibc iconv)
+./usr/lib/arm-linux-gnueabi/gconv
+# pip/setuptools inside the venvs (nothing is installed on the printer)
+./home/klipper/klippy-env/lib/python3*/site-packages/pip
+./home/klipper/klippy-env/lib/python3*/site-packages/setuptools
+./home/klipper/moonraker-env/lib/python3*/site-packages/pip
+./home/klipper/moonraker-env/lib/python3*/site-packages/setuptools
+./usr/share/python-wheels
+./var/lib/dpkg/info/*.md5sums
+# the perl binary, apt and debugging tools (no package installs on the printer)
+./usr/bin/perl
+./usr/lib/arm-linux-gnueabi/libperl.so*
+./usr/bin/apt*
+./usr/bin/sqv
+./usr/lib/apt
+./usr/lib/arm-linux-gnueabi/libapt-*
+./var/lib/apt
+./usr/bin/strace
+./home/klipper/klipper/scripts/*.ipynb
+*/site-packages/*/*.c
+*/site-packages/*/*.pyx

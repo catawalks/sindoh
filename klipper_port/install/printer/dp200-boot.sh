@@ -3,9 +3,11 @@
 # Called from the /etc/profile hook (hook_install.sh) when /DEBUG_MACHINE
 # bypasses the Sindoh app. Finds the Klipper root and starts it:
 #
-#   1. internal NAND: UBI volume "klipper" on mtd5 ("recovery", unused by the
-#      stock boot) -> attached as ubi2, mounted on /klipper
-#   2. microSD card: /mnt/sd (mounted by the stock media.connect)
+#   1. internal NAND: /klipper, a directory on the stock root (mtd6), where
+#      the USB installer puts it (2026-11-02)
+#   2. older NAND installs: UBI volume "klipper" on mtd5 ("recovery"),
+#      attached as ubi2 and mounted on /klipper (only with /etc/dp200-nand)
+#   3. microSD card: /mnt/sd (mounted by the stock media.connect)
 #
 # /etc/profile runs for every login too; dp200-start.sh has its own lock.
 MTD=5
@@ -23,7 +25,8 @@ nand_root() {
     mount -t ubifs -o compr=zlib ubi$UBI:klipper $MNT
 }
 
-if nand_root && [ -x $MNT/dp200/dp200-start.sh ]; then
+nand_root
+if [ -x $MNT/dp200/dp200-start.sh ]; then
     exec $MNT/dp200/dp200-start.sh "$@"
 fi
 # not on NAND: wait up to 30 s for the stock boot to mount the SD card

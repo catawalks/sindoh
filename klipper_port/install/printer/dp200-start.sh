@@ -27,8 +27,9 @@ mount_root() {
     grep -q " $ROOT/run " /proc/mounts || mount -t tmpfs -o size=16m,mode=755 run $ROOT/run
     grep -q " $ROOT/tmp " /proc/mounts || mount -t tmpfs -o size=64m,mode=1777 tmp $ROOT/tmp
     # On NAND, keep the chatty logs in RAM (flash wear); they are lost at
-    # power-off. The SD card keeps them on the card.
-    if grep -q " $ROOT ubifs " /proc/mounts; then
+    # power-off. The SD card keeps them on the card. (on_nand: written by the
+    # installer for /klipper on the stock root, which is no mount of its own)
+    if grep -q " $ROOT ubifs " /proc/mounts || [ -f $ROOT/etc/dp200/on_nand ]; then
         for d in var/log home/klipper/printer_data/logs; do
             grep -q " $ROOT/$d " /proc/mounts || mount -t tmpfs -o size=16m,mode=755 logs $ROOT/$d
         done
