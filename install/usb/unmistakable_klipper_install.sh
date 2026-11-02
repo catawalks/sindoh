@@ -53,8 +53,14 @@ if [ $DRY_RUN = 1 ]; then
     keywait() { :; }
 else
     [ $TARGET = nand ] && ROOT=/klipper || ROOT=/mnt/sd
-    TITLE="Klipper install"
-    show() { /app/display.sh "$TITLE" "$1" "$2" "$3"; echo "[klipper-install] $1 $2 $3"; echo "$(date) $1 $2 $3" >> $LOG; }
+    # tinydebug draws each line as a Qt label, which takes HTML: the title
+    # in color, "DO NOT POWER OFF" in red (tested 2026-11-02; bold shows no
+    # difference in its font). The log gets the plain text.
+    TITLE="== KLIPPER INSTALL =="
+    TCOLOR="#0040b0"
+    red() { case "$1" in "DO NOT POWER OFF") echo "<font color=\"#c00000\">$1</font>" ;; *) echo "$1" ;; esac; }
+    show() { /app/display.sh "<font color=\"$TCOLOR\">$TITLE</font>" "`red "$1"`" "`red "$2"`" "`red "$3"`"
+             echo "[klipper-install] $1 $2 $3"; echo "$(date) $1 $2 $3" >> $LOG; }
     keywait() { /app/tinydebug keywait; }
 fi
 # set once a NAND install starts changing the stock root: a failure then
@@ -72,7 +78,7 @@ undo() {
 fail() {
     [ $UNDO = 1 ] && undo
     [ $DRY_RUN = 1 ] || /app/tinydebug led red
-    TITLE="Install FAILED"
+    TITLE="!! INSTALL FAILED !!"; TCOLOR="#c00000"
     show "$1" "$2" "Touch to reboot"
     [ $DRY_RUN = 1 ] && exit 1
     keywait
@@ -92,10 +98,16 @@ screen_off() {
     done
 }
 screen_back() {
-    killall tinydebug 2>/dev/null
-    [ -n "$SCREEN_ROOT" ] && chroot $SCREEN_ROOT /usr/bin/env -i \
-        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
-        /etc/dp200/rc.dp200 restart-screen
+    if [ -n "$SCREEN_ROOT" ]; then
+        # feedback at once: the screen app takes several seconds to start
+        show "Cancelled" "Starting the" "Klipper screen..."
+        ( sleep 20; killall tinydebug ) >/dev/null 2>&1 &
+        chroot $SCREEN_ROOT /usr/bin/env -i \
+            PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
+            /etc/dp200/rc.dp200 restart-screen
+    else
+        show "Cancelled" "nothing was changed" ""
+    fi
 }
 # The confirm touch; pulling the stick out instead cancels: nothing has
 # been changed yet, so the Klipper screen comes back and the script ends
@@ -114,7 +126,7 @@ confirm() {
     while :; do
         /app/tinydebug keywait
         rc=$?
-        sleep 2                         # let a removal finish (unmount)
+        sleep 1                         # let a removal finish (unmount)
         [ -f "$PAYLOAD" ] || cancelled
         [ $rc = 0 ] && return 0
         # ended some other way with the stick still in: ask again (the

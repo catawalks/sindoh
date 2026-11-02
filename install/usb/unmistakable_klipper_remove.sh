@@ -25,7 +25,10 @@ BACKUP=$STICK/../dp200_stock_backup/${PRINTER_ID:-unknown}
 GUI=/app/SVN_GUI
 OEM=0
 [ -f "$STICK/update.she" ] && OEM=1
-show() { /app/display.sh "Klipper remove" "$1" "$2" "$3"; echo "[klipper-remove] $1 $2 $3"; }
+# tinydebug's lines take HTML: the title in color, "DO NOT POWER OFF" red
+red() { case "$1" in "DO NOT POWER OFF") echo "<font color=\"#c00000\">$1</font>" ;; *) echo "$1" ;; esac; }
+show() { /app/display.sh '<font color="#0040b0">== KLIPPER REMOVE ==</font>' "`red "$1"`" "`red "$2"`" "`red "$3"`"
+         echo "[klipper-remove] $1 $2 $3"; }
 ME=$STICK/unmistakable_klipper_remove.she     # gone = the stick was pulled
 
 # The Klipper touch screen would keep reading touches under these
@@ -41,10 +44,16 @@ screen_off() {
 }
 cancelled() {
     echo "[klipper-remove] stick removed: cancelled"
-    killall tinydebug 2>/dev/null
-    [ -n "$SCREEN_ROOT" ] && chroot $SCREEN_ROOT /usr/bin/env -i \
-        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
-        /etc/dp200/rc.dp200 restart-screen
+    if [ -n "$SCREEN_ROOT" ]; then
+        # feedback at once: the screen app takes several seconds to start
+        show "Cancelled" "Starting the" "Klipper screen..."
+        ( sleep 20; killall tinydebug ) >/dev/null 2>&1 &
+        chroot $SCREEN_ROOT /usr/bin/env -i \
+            PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
+            /etc/dp200/rc.dp200 restart-screen
+    else
+        show "Cancelled" "nothing was changed" ""
+    fi
     exit 1
 }
 # Only a real touch counts (keywait exits 0). Pulling the stick makes
@@ -53,7 +62,7 @@ confirm() {
     while :; do
         /app/tinydebug keywait
         rc=$?
-        sleep 2
+        sleep 1
         [ -f "$ME" ] || cancelled
         [ $rc = 0 ] && return 0
         show "$@"
