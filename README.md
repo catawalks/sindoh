@@ -103,9 +103,10 @@ Ready-made printer profiles for the Klipper port are in
 is `PRINT_START` + `PRIME_LINE` (heat, home, bed mesh, purge and wipe). Import steps are in
 [the slicer README](klipper_port/install/slicer/README.md).
 
-Before a print: Z homes upward, so anything left on the bed gets crushed. Klipper refuses to home
-Z until the bed is confirmed empty: answer YES to "Is the bed empty?" (or run `BED_CLEAR`) and
-start the print within 5 minutes.
+Before a print: Z homes upward, so anything left on the bed gets crushed. When a print starts,
+`PRINT_START` pauses before anything moves and asks "Is the bed empty?" on the touch screen and in
+Mainsail: YES starts the print, NO cancels it. (A `BED_CLEAR` in the 5 minutes before skips the
+question.)
 
 ## Custom boot logo
 
