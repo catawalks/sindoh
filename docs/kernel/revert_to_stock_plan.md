@@ -212,3 +212,28 @@ Copies on the 4 GB card in /var/backups:
 
 **Still to check:** the owner power-cycles and confirms that stock U-Boot
 shows the logo.
+
+## 3c-1: factory logo written from our kernel (2026-11-01, owner-requested)
+
+A different image this time, so the readback proves the write. Written
+with the revert script's own logo step (`dp200-revert.sh --part logo`) on
+m1-debian-nandw f370f49e, after its checks (recovery set md5s, bzip2 test,
+mtd0 U-Boot block, mtd6 UBI geometry).
+
+| Read | Logo (first 768000 bytes) | Whole mtd3 |
+|---|---|---|
+| Before, our kernel | aed9faa1 (owner's custom logo) | |
+| After, our kernel | **fe958b3e** = boot-logo_rodin.bin | **e106bfe3** = 10-26 stock dump nand_images/mtd3.bin |
+| After, stock 3.2 | fe958b3e | e106bfe3 |
+
+**Also checked:**
+- **Raw layout:** 375 pages programmed with "programz", 137 erased, as
+  stock writes it.
+- **Driver counters:** 0 retries, timeouts or failures.
+- **Window:** back to none.
+- **Stock log:** clean.
+
+**Still to check:** the owner confirms that the factory logo shows at boot.
+
+The owner's custom logo is kept on the 4 GB card as
+/var/backups/mtd3_logo_768000.bin (md5 aed9faa1), for writing back.
