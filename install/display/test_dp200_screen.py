@@ -187,6 +187,16 @@ ui.screen = 'calibrate'
 tap('SAVE Z OFFSET'); tap('YES'); time.sleep(0.5); step()
 check('SAVE Z OFFSET applies it and saves',
       sent[-1] == ('/printer/gcode/script', 'Z_OFFSET_APPLY_ENDSTOP\nSAVE_CONFIG'))
+# HOME in the header (its label is the house icon: '' in the label map)
+ui.screen = 'pid'
+tap('');                  check('HOME from a deep page -> home', ui.screen == 'home')
+find('LAMP');             check('no HOME button on the home page', '' not in labels)
+ui.screen = 'calibrate'
+tap('Z HEIGHT'); tap('YES'); time.sleep(0.5); step()
+ui.st['manual_probe'] = {'is_active': True, 'z_position': 2.0}
+n = len(sent); tap(''); time.sleep(0.5); step()
+check('HOME during a paper test aborts it', ('/printer/gcode/script', 'ABORT') in sent[n:]
+      and ui.screen == 'home')
 S.get = _get
 ui.st = st0
 ui.screen = 'home'
