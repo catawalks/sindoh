@@ -112,6 +112,9 @@ start)
     # load the saved WiFi networks into the stock wpa_supplicant (see dp200_wifi.py)
     [ -e /run/wpa_supplicant/mlan0 ] && /usr/bin/python3 /usr/local/bin/dp200_wifi.py apply &
     start_screen
+    # /var/log is RAM on a NAND install (empty at every boot); nginx won't
+    # start without its log directory
+    mkdir -p /var/log/nginx
     /usr/sbin/nginx
     echo "started: web UI on port 80, moonraker on 7125, webcam on /webcam/"
     ;;

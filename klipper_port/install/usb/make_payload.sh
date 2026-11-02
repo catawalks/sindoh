@@ -46,6 +46,9 @@ cp "$PORT"/klipper/config/printer.cfg "$PORT"/klipper/config/dp200_printer.cfg \
    "$PORT"/install/rootfs/home/klipper/printer_data/config/moonraker.conf $S/config/
 chown -R $(grep '^klipper:' $ROOT/etc/passwd | cut -d: -f3,4) $S
 cp "$PORT"/install/nand/runtime.exclude $ROOT/$STAGE/runtime.exclude
+# the USB-serial module (accelerometer) for the stock kernel: usr/src, where
+# the SD build keeps it, is not in the runtime image
+cp "$PORT"/install/kernel_modules/cdc-acm.ko $ROOT/dp200/cdc-acm.ko
 
 EXCL="--exclude=./$PD --exclude=./$STAGE/runtime.exclude --exclude=./home/klipper/.cache
       --exclude=./root/.cache --exclude=./var/cache/apt/archives/*.deb
@@ -57,7 +60,8 @@ DIRS="./bin ./etc ./home ./lib ./opt ./root ./sbin ./srv ./usr ./var"
 [ -e $ROOT/boot ] && DIRS="$DIRS ./boot"
 $TAR -C / -czf - --numeric-owner --one-file-system $EXCL \
     --transform="s,^\./$STAGE/printer_data,./$PD," \
-    $DIRS ./dp200/upctool $(cd $ROOT && ls ./dp200/*.sh) ./$STAGE/printer_data > "$OUT/$NAME"
+    $DIRS ./dp200/upctool $(cd $ROOT && ls ./dp200/*.sh ./dp200/*.py ./dp200/*.ko) \
+    ./$STAGE/printer_data > "$OUT/$NAME"
 rm -rf $ROOT/$STAGE
 cd "$OUT"
 md5sum $NAME > $NAME.md5

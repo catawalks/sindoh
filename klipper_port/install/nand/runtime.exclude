@@ -37,7 +37,7 @@
 ./home/klipper/klipper/.git
 ./home/klipper/klipper/lib
 ./home/klipper/klipper/src
-./home/klipper/klipper/docs
+./home/klipper/klipper/docs/*
 ./home/klipper/klipper/test
 ./home/klipper/klipper/out
 ./home/klipper/moonraker/.git
@@ -103,3 +103,5 @@
 ./home/klipper/klipper/scripts/*.ipynb
 */site-packages/*/*.c
 */site-packages/*/*.pyx
+# this printer's entropy seed (dp200-entropy.py): never shipped
+./var/lib/dp200/random-seed

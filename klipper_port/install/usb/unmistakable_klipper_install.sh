@@ -22,7 +22,7 @@
 # U-Boot blocks and the env are never touched. To make room, the Sindoh
 # touch-screen front end /app/SVN_GUI (93 MB of HTML, images and fonts for
 # its Qt browser; Klipper's screen replaces it) is first saved to the stick
-# (dp200_stock_backup/SVN_GUI.tar, md5-checked) and then deleted. The rest of the stock system stays
+# (dp200_stock_backup/<MAC>/SVN_GUI.tar, md5-checked) and then deleted. The rest of the stock system stays
 # (auto_update.sh and its key, upc.ko, Wi-Fi, BusyBox). The remove stick puts
 # SVN_GUI back. Target SD: the Debian root goes to /mnt/sd (ext2/3/4 card).
 # Both: the boot hook (/etc/profile line, /etc/dp200-boot.sh, /DEBUG_MACHINE).
@@ -37,11 +37,14 @@ DRY_RUN=${DRY_RUN:-0}
 [ $DRY_RUN = 1 ] || exec >/dev/console 2>&1
 PAYLOAD=$STICK/dp200_klipper_payload.tar.gz
 LOG=$STICK/dp200_klipper_install.log
-BACKUP=$STICK/../dp200_stock_backup
+# one backup per printer (one stick can serve several): named by the
+# Ethernet MAC address, which U-Boot passes to every DP200 board
+PRINTER_ID=`tr -d : < /sys/class/net/eth0/address 2>/dev/null`
+BACKUP=$STICK/../dp200_stock_backup/${PRINTER_ID:-unknown}
 GUI=/app/SVN_GUI
 TARGET=nand
 [ -f "$STICK/target_sd" ] && TARGET=sd
-SPARE_MB=40                 # left free on the stock root after the install
+SPARE_MB=15                 # left free on the stock root after the install
                             # (G-code uploads, the stock side's own files)
 
 if [ $DRY_RUN = 1 ]; then
@@ -50,7 +53,14 @@ if [ $DRY_RUN = 1 ]; then
     keywait() { :; }
 else
     [ $TARGET = nand ] && ROOT=/klipper || ROOT=/mnt/sd
-    show() { /app/display.sh "Klipper install" "$1" "$2" "$3"; echo "[klipper-install] $1 $2 $3"; echo "$(date) $1 $2 $3" >> $LOG; }
+    # tinydebug draws each line as a Qt label, which takes HTML: the title
+    # in color, "DO NOT POWER OFF" in red (tested 2026-11-02; bold shows no
+    # difference in its font). The log gets the plain text.
+    TITLE="== KLIPPER INSTALL =="
+    TCOLOR="#0040b0"
+    red() { case "$1" in "DO NOT POWER OFF") echo "<font color=\"#c00000\">$1</font>" ;; *) echo "$1" ;; esac; }
+    show() { /app/display.sh "<font color=\"$TCOLOR\">$TITLE</font>" "`red "$1"`" "`red "$2"`" "`red "$3"`"
+             echo "[klipper-install] $1 $2 $3"; echo "$(date) $1 $2 $3" >> $LOG; }
     keywait() { /app/tinydebug keywait; }
 fi
 # set once a NAND install starts changing the stock root: a failure then
@@ -68,14 +78,71 @@ undo() {
 fail() {
     [ $UNDO = 1 ] && undo
     [ $DRY_RUN = 1 ] || /app/tinydebug led red
-    show "FAILED: $1" "$2" "Touch to reboot"
+    TITLE="!! INSTALL FAILED !!"; TCOLOR="#c00000"
+    show "$1" "$2" "Touch to reboot"
     [ $DRY_RUN = 1 ] && exit 1
     keywait
     sync; reboot; exit 1
 }
+# A running Klipper touch screen keeps reading touches under the
+# installer's messages (2026-11-02: the confirm touch also pressed UNLOAD
+# in it). Stop it while the installer has the panel; bring it back if the
+# install is cancelled.
+SCREEN_ROOT=
+screen_off() {
+    for r in /klipper /mnt/sd; do
+        p=`cat $r/run/dp200/screen.pid 2>/dev/null`
+        [ -n "$p" ] && kill -0 $p 2>/dev/null || continue
+        kill $p                         # the screen loop ends the app too
+        SCREEN_ROOT=$r
+    done
+}
+screen_back() {
+    if [ -n "$SCREEN_ROOT" ]; then
+        # feedback at once: the screen app takes several seconds to start
+        show "Cancelled" "Starting the" "Klipper screen..."
+        ( sleep 20; killall tinydebug ) >/dev/null 2>&1 &
+        chroot $SCREEN_ROOT /usr/bin/env -i \
+            PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
+            /etc/dp200/rc.dp200 restart-screen
+    else
+        show "Cancelled" "nothing was changed" ""
+    fi
+}
+# The confirm touch; pulling the stick out instead cancels: nothing has
+# been changed yet, so the Klipper screen comes back and the script ends
+# (auto_update.sh then stops too)
+#
+# Only a real touch counts: keywait exits 0 for it. Removing the stick
+# makes Sindoh's media.connect unmount it and kill -9 every tinydebug, this
+# keywait too (exit 137): that must never be taken for a touch (2026-11-02,
+# a pulled stick started an upgrade).
+cancelled() {
+    echo "[klipper-install] stick removed: cancelled"
+    screen_back
+    exit 1
+}
+confirm() {
+    while :; do
+        /app/tinydebug keywait
+        rc=$?
+        sleep 1                         # let a removal finish (unmount)
+        [ -f "$PAYLOAD" ] || cancelled
+        [ $rc = 0 ] && return 0
+        # ended some other way with the stick still in: ask again (the
+        # prompt's tinydebug was killed with it)
+        show "$@"
+    done
+}
+# a check right before each step that changes the NAND
+stick_still_in() { [ -f "$PAYLOAD" ] || fail "USB stick removed" "(touch: restart)"; }
 mb_free() { echo $(( `df -k "$1" | tail -1 | awk '{print $(NF-2)}'` / 1024 )); }
 size_mb() { echo $(( `ls -l "$1" | awk '{print $5}'` / 1048576 )); }
 du_mb() { du -sk "$1" | awk '{print int($1 / 1024)}'; }
+# What the Sindoh app's files are, independent of how they were stored: the
+# md5 of the sorted per-file md5 list. (A tar stream's md5 changes with
+# the directory order, which differs after a restore: 2026-11-02.)
+gui_fingerprint() { (cd "$1" && find SVN_GUI -type f | sort | xargs md5sum | md5sum | cut -d' ' -f1); }
 
 # Take over the screen the way Sindoh's tools do
 if [ $DRY_RUN = 0 ]; then
@@ -83,6 +150,7 @@ if [ $DRY_RUN = 0 ]; then
     kill -9 `pidof stdin2log` 2>/dev/null
     kill -9 `pidof appBrowser` 2>/dev/null
     /app/tinydebug wdt disable
+    screen_off
 fi
 show "Klipper installer" "target: $TARGET" ""
 
@@ -92,27 +160,41 @@ show "Klipper installer" "target: $TARGET" ""
 # DP200 or Stanley Model 1 alike; but upctool and cdc-acm.ko are built and
 # tested for this kernel build (Sindoh's 2020 firmware, RODIN_200730_2)
 KVER=3.2.0-g67a8e16
-[ "`uname -r`" = $KVER ] || fail "firmware too old/new" "apply Sindoh 2020 update"
+[ "`uname -r`" = $KVER ] || fail "firmware too old/new" "use Sindoh 2020 fw"
 GZ_MB=$(size_mb "$PAYLOAD")
 RAW_MB=$(( `cat "$PAYLOAD.size" 2>/dev/null || echo 3000000` / 1024 ))
 UPGRADE=0
 if [ $TARGET = nand ]; then
     # the stock layout, root on the UBIFS volume of mtd6
-    grep -q '^mtd6: [0-9a-f]* 00020000 "filesystem"' /proc/mtd || fail "unexpected NAND layout" "mtd6 is not filesystem"
+    grep -q '^mtd6: [0-9a-f]* 00020000 "filesystem"' /proc/mtd || fail "unknown NAND layout" "mtd6 not filesystem"
     grep -q '^ubi0:filesystem / ubifs ' /proc/mounts || fail "unexpected root" "not ubi0:filesystem"
     [ -x /klipper/etc/dp200/rc.dp200 ] && UPGRADE=1
-    # Room: UBIFS zlib keeps ~ the gzip size (measured 2026-11-02); with a
-    # margin of 1/4. An upgrade frees the old copy first.
-    NEED_MB=$(( GZ_MB + GZ_MB / 4 + SPARE_MB ))
+    # Room: the first install of an 80 MB payload took 106 MB of the root
+    # (2026-11-02), so 1.3 x the gzip size. An upgrade frees the old copy.
+    NEED_MB=$(( GZ_MB * 13 / 10 + SPARE_MB ))
     HAVE_MB=$(mb_free /)
     # (du on UBIFS counts uncompressed sizes: SVN_GUI is mostly PNG and
     # fonts, which UBIFS stores nearly as is; the check after the unpack
     # catches a shortfall and undoes the install)
     [ $UPGRADE = 1 ] && HAVE_MB=$(( HAVE_MB + `du_mb /klipper` ))
     [ -d $GUI ] && HAVE_MB=$(( HAVE_MB + `du_mb $GUI` ))
-    [ $HAVE_MB -ge $NEED_MB ] || fail "not enough NAND space" "need $NEED_MB MB, $HAVE_MB MB"
+    [ $HAVE_MB -ge $NEED_MB ] || fail "not enough NAND space" "need $NEED_MB, have $HAVE_MB MB"
     if [ -d $GUI ] && [ ! -f "$BACKUP/SVN_GUI.tar" ]; then
-        [ "$(mb_free "$STICK")" -ge $(( `du_mb $GUI` + 10 )) ] || fail "USB stick too full" "need 100 MB for the backup"
+        [ "$(mb_free "$STICK")" -ge $(( `du_mb $GUI` + 10 )) ] || fail "USB stick too full" "backup needs 100 MB"
+    elif [ -d $GUI ]; then
+        # a backup is already there: only keep it if it holds this
+        # printer's files (backups made before SVN_GUI.files.md5 existed
+        # are unpacked to RAM and fingerprinted)
+        show "Checking the backup" "on the stick" ""
+        HAVE_FP=`gui_fingerprint /app`
+        if [ -f "$BACKUP/SVN_GUI.files.md5" ]; then
+            WANT_FP=`cat "$BACKUP/SVN_GUI.files.md5"`
+        else
+            rm -rf /tmp/dp200-chk; mkdir -p /tmp/dp200-chk
+            tar -xf "$BACKUP/SVN_GUI.tar" -C /tmp/dp200-chk && WANT_FP=`gui_fingerprint /tmp/dp200-chk`
+            rm -rf /tmp/dp200-chk
+        fi
+        [ "$HAVE_FP" = "$WANT_FP" ] || fail "stick has the backup" "of another printer"
     fi
 else
     grep -q " /mnt/sd " /proc/mounts || fail "no microSD card" "at /mnt/sd"
@@ -123,7 +205,7 @@ else
     [ $UPGRADE = 1 ] || [ "$(mb_free /mnt/sd)" -ge $NEED_MB ] || fail "SD card too full" "need $NEED_MB MB"
 fi
 [ $DRY_RUN = 1 ] && { mkdir -p $ROOT; NEED_MB=$(( RAW_MB + 50 ));
-    [ "$(mb_free $ROOT)" -ge $NEED_MB ] || fail "no room for the rehearsal" "need $NEED_MB MB in $ROOT"; }
+    [ "$(mb_free $ROOT)" -ge $NEED_MB ] || fail "no room for dry run" "need $NEED_MB MB"; }
 
 show "Checking payload" "(md5, ~1 min)" "DO NOT POWER OFF"
 if [ -f "$PAYLOAD.md5" ]; then
@@ -134,14 +216,19 @@ fi
 
 # ---- confirm on the touchscreen
 if [ $UPGRADE = 1 ]; then
-    show "Klipper found ($TARGET)" "Touch to UPGRADE" "(config is kept)"
+    PROMPT="Touch to UPGRADE|config is kept|Pull stick to cancel"
 else
-    show "Touch to INSTALL" "Klipper ($TARGET)" "Power off to cancel"
+    PROMPT="Touch to INSTALL|Klipper ($TARGET)|Pull stick to cancel"
 fi
-keywait
+IFS='|' read P1 P2 P3 <<EOF
+$PROMPT
+EOF
+show "$P1" "$P2" "$P3"
+[ $DRY_RUN = 1 ] || confirm "$P1" "$P2" "$P3"
 
 # ---- stop a running Klipper stack and unmount its chroot
 if [ $DRY_RUN = 0 ]; then
+    stick_still_in
     for r in /klipper /mnt/sd; do
         [ -x $r/dp200/dp200-start.sh ] && $r/dp200/dp200-start.sh stop
         for m in home/klipper/printer_data/logs var/log tmp run/wpa_supplicant run dev/shm dev/pts dev sys proc; do
@@ -157,6 +244,7 @@ rm -rf /tmp/klipper_cfg_keep /tmp/klipper_cfg_new
 
 # ---- prepare the target
 if [ $DRY_RUN = 0 ] && [ $TARGET = nand ]; then
+    stick_still_in
     if [ -d $GUI ]; then
         if [ ! -f "$BACKUP/SVN_GUI.tar" ]; then
             show "Saving the Sindoh app" "to the USB stick" "DO NOT POWER OFF"
@@ -168,12 +256,14 @@ if [ $DRY_RUN = 0 ] && [ $TARGET = nand ]; then
                 || fail "backup failed" "nothing changed"
             mv "$BACKUP/SVN_GUI.tmp" "$BACKUP/SVN_GUI.tar"
             md5sum < "$BACKUP/SVN_GUI.tar" > "$BACKUP/SVN_GUI.tar.md5"
+            gui_fingerprint /app > "$BACKUP/SVN_GUI.files.md5"
             sync
         fi
         UNDO=1
         rm -rf $GUI
     fi
     UNDO=1
+    stick_still_in
     # an upgrade replaces the whole root (the config is kept above)
     rm -rf /klipper
     sync
@@ -200,6 +290,7 @@ if [ -d /tmp/klipper_cfg_keep ]; then
 fi
 # logs in RAM on NAND (dp200-start.sh)
 [ $TARGET = nand ] && touch $ROOT/etc/dp200/on_nand
+show "Saving to NAND" "please wait" "DO NOT POWER OFF"
 sync
 
 # ---- verify the unpacked root
@@ -213,11 +304,11 @@ done
 [ -n "`ls $ROOT/home/klipper/klipper/klippy/chelper/c_helper.so 2>/dev/null`" ] || fail "incomplete install" "no c_helper.so"
 USED=`du -sk $ROOT | awk '{print int($1 / 1024)}'`
 [ $TARGET = nand ] && [ $DRY_RUN = 0 ] && \
-    { [ "$(mb_free /)" -ge 10 ] || fail "NAND full after unpack" "$(mb_free /) MB free"; }
+    { [ "$(mb_free /)" -ge 10 ] || fail "NAND full (unpack)" "$(mb_free /) MB free"; }
 show "Unpacked OK" "$USED MB in $ROOT" "$( [ $TARGET = nand ] && echo "$(mb_free /) MB free" )"
 
 if [ $DRY_RUN = 1 ]; then
-    show "DRY RUN complete" "nothing was flashed" "remove $ROOT when done"
+    show "DRY RUN complete" "nothing was flashed" "delete $ROOT"
     exit 0
 fi
 
@@ -228,7 +319,12 @@ rm -f /etc/dp200-nand          # (old mtd5 marker)
 sync
 
 /app/tinydebug led green 2>/dev/null
-show "DONE - remove stick" "Web UI: http://<ip>/" "Touch to reboot"
+# the address the web UI will have (Wi-Fi first, else Ethernet)
+IP=`ifconfig mlan0 2>/dev/null | sed -n 's/.*inet addr:\([0-9.]*\).*/\1/p'`
+[ -n "$IP" ] || IP=`ifconfig eth0 2>/dev/null | sed -n 's/.*inet addr:\([0-9.]*\).*/\1/p'`
+show "DONE" "Web: ${IP:-see SYSTEM page}" "Pull stick to reboot"
+sync                            # the log line, before the stick goes
+# pulling the stick ends the wait too (media.connect kills tinydebug)
 keywait
 sync
 reboot

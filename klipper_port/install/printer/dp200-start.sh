@@ -95,7 +95,9 @@ grep -q '^upc ' /proc/modules || insmod /app/upc.ko
 # kernel has no CDC-ACM driver, so load ours (built for 3.2.0-g67a8e16, tested
 # 2026-10-30 with a FLY-ADXL345); a Klipper board then shows up as
 # /dev/ttyACM0. The generic usb-serial new_id route doesn't bind on 3.2.
+# (a NAND install has it in dp200/: the payload leaves out usr/src)
 grep -q '^cdc_acm ' /proc/modules || \
+    insmod $ROOT/dp200/cdc-acm.ko 2>/dev/null || \
     insmod $ROOT/usr/src/dp200/klipper_port/install/kernel_modules/cdc-acm.ko 2>/dev/null
 
 # The kernel's text console blanks the panel after 600 s without keyboard
@@ -136,5 +138,9 @@ FW=/lib/firmware/mrvl/usb8782_uapsta.bin
 if [ -f $FW ] && ! cmp -s $FW $ROOT$FW 2>/dev/null; then
     mkdir -p $ROOT/lib/firmware/mrvl && cp $FW $ROOT$FW
 fi
+
+# Kernel 3.2's entropy pool: on NAND nothing fills it to the 64 bits that
+# OpenSSL waits for, and Moonraker and the screen hang (dp200-entropy.py)
+in_root /usr/bin/python3 -I /dp200/dp200-entropy.py
 
 in_root /etc/dp200/rc.dp200 start
