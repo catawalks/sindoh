@@ -347,6 +347,7 @@ def post(path, body=None):
 STOCK_INFO = '/run/dp200/stock_info'          # written at boot by dp200-start.sh (stock side)
 BUILD_FILE = '/etc/dp200/build'                # written by make_payload.sh
 ON_NAND = '/etc/dp200/on_nand'                 # written by the USB installer
+RECOVERY_INFO = '/etc/dp200/recovery_info'     # the installer reads it from mtd5 once
 
 def read_kv(path):
     try:
@@ -370,6 +371,7 @@ def system_info(ip):
         except Exception:
             return '-'
     stock = read_kv(STOCK_INFO)
+    rec = read_kv(RECOVERY_INFO).get('recovery_app')
     try:
         with open('/home/klipper/mainsail/release_info.json') as f:
             mainsail = json.load(f).get('version', '-')
@@ -397,6 +399,7 @@ def system_info(ip):
         ('Sindoh FW', stock.get('firmware') or ('- (mainline boot)' if not stock else '-')),
         ('Model ID', stock.get('model') or '-'),
         ('Serial', stock.get('serial') or '-'),
+        ('Recovery set', 'Sindoh app %s' % rec if rec else '- (read at install)'),
         ('IP address', ip),
         ('Storage', disk),
         ('Memory', mem),

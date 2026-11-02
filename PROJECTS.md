@@ -134,3 +134,20 @@ Parked.
   same printer after a firmware update). Idea (owner agreed): store the
   firmware version with each backup, and offer to replace a backup from an
   older firmware of the same printer. To discuss.
+- **Updates and NAND space (to decide, 2026-11-02).** Goal: Klipper and
+  Moonraker update from their upstream main branches through Moonraker,
+  without the port having to publish images. Facts: Klipper's host side is
+  upstream plus three add-on modules (dp200_cartridge, upc_clockcheck,
+  upc_stats: installable as plugins); Moonraker is unmodified. On the
+  printer, upstream updates need git + a shallow history (~15 MB), pip,
+  and a C compiler (Klipper rebuilds chelper; some Python packages have C
+  parts, no armel wheels): ~50 MB of flash, ~40 MB is free. The UPC
+  firmware (fm.bin/io.bin, ARM cross-compiler) can't be built on the
+  printer: an upstream MCU protocol change would need a rebuild.
+  Options: A) the stable base (Debian, Python, git, compiler) in a
+  read-only squashfs+xz image (needs squashfs.ko for 3.2; loop.ko ships),
+  the apps as writable git checkouts: ~25-35 MB free; B) no image, remove
+  more stock files (unused modules, /test/web, OpenCV; stick-only
+  restore) and add git/pip/compiler: ~15-20 MB free; C) git + pip only:
+  Moonraker/Mainsail from upstream, Klipper pinned. USB/SD storage is out
+  (no extra hardware).
