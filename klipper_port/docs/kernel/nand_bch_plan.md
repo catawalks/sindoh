@@ -412,3 +412,40 @@ NDDB.
   "ERRCNT reads 16 idle" finding may predate the clean measurements). That
   would drop the raw re-read, as the vendor never does one.
 - The UBI write test (mtd6) still has to be re-run with this read path.
+
+## Read path rework, part 4 (2026-11-01): ERRCNT, no raw re-reads, write test
+
+**ERRCNT is the corrected-bit count when read after CMDD.** On 5535 of
+5543 corrected pages it equalled the count from a raw re-read. Most of
+the other 8 were flips in the ECC bytes: ERRCNT sees those, while
+raw-against-corrected can't. At RDDREQ it reads 0, and idle it reads 16:
+only use it after CMDD.
+
+So corrected pages no longer get a raw re-read; the vendor driver never
+does one either. A raw read now happens only for an UNCERR that comes with
+the data, to tell an erased page from a failed one. An UNCERR before the
+data is simply read again.
+
+**Validation**, read-only kernel m1-debian 5df089a9, two rounds:
+- md5s equal to the stock dumps; 6000 random reads with pauses: 0 wrong;
+- UBI headers identical twice; read-only UBIFS mount with all 2974 files
+  read (only /app/nvram/PJL, a special file, fails, as on stock);
+- mtd5 pass 31 s (stock 36 s);
+- **0 retries, 0 timeouts, 0 early UNCERR, 0 failures** in ~225000 reads.
+  The early UNCERRs and CMDD timeouts were side effects of the raw
+  re-read.
+
+**UBI write test re-run** (step 2, owner-approved), m1-debian-nandw
+f370f49e:
+- 16 MB written through UBI/UBIFS on the stock root; md5 equal after a
+  remount; deleted;
+- 0 scrubs, 0 bitflip reports; driver counters with 0 retries, timeouts
+  or failures; window back to none.
+
+**Stock 3.2 afterwards:**
+- 5 bad PEBs, 0 corrupted;
+- UBIFS mounted without recovery;
+- 2974 files read (only PJL fails, as always); root rw; kernel log clean.
+
+UBI's "cannot reserve enough PEBs for bad PEB handling, reserved 23, need
+75" comes from stock's own layout: mainline asks for 20 per 1024 PEBs.
