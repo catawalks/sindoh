@@ -312,13 +312,16 @@ mkdir -p $ROOT/proc $ROOT/sys $ROOT/dev $ROOT/tmp $ROOT/run
 chmod 1777 $ROOT/tmp
 if [ -d /tmp/klipper_cfg_keep ]; then
     # keep the user's printer.cfg (calibration, SAVE_CONFIG data) and other
-    # files, but take dp200_*.cfg (port-owned) from the new payload
+    # files, but take dp200_*.cfg / dp200_*.conf (port-owned) from the new payload
     mkdir -p /tmp/klipper_cfg_new
     # (dp200_*.cfg.off = port files shipped disabled, e.g. the accelerometer;
     # an enabled copy the user made stays as it was)
-    cp -a $CFG/dp200_*.cfg $CFG/dp200_*.cfg.off /tmp/klipper_cfg_new/ 2>/dev/null
+    cp -a $CFG/dp200_*.cfg $CFG/dp200_*.cfg.off $CFG/dp200_*.conf /tmp/klipper_cfg_new/ 2>/dev/null
     cp -a /tmp/klipper_cfg_keep/. $CFG/
     cp -a /tmp/klipper_cfg_new/. $CFG/
+    # a moonraker.conf from before the update settings: include them
+    grep -q '^\[include dp200_moonraker.conf\]' $CFG/moonraker.conf 2>/dev/null || \
+        printf '\n# Update settings (Mainsail from its releases): port-owned, replaced on upgrades\n[include dp200_moonraker.conf]\n' >> $CFG/moonraker.conf
 fi
 # logs in RAM on NAND (dp200-start.sh)
 [ $TARGET = nand ] && touch $ROOT/etc/dp200/on_nand

@@ -27,7 +27,8 @@ MODE=${3:-runtime}
 TAR="chroot $ROOT /usr/bin/tar"
 for f in klipper/config/printer.cfg klipper/config/dp200_printer.cfg klipper/config/dp200_macros.cfg \
          klipper/config/dp200_adxl.cfg.off \
-         install/rootfs/home/klipper/printer_data/config/moonraker.conf install/nand/runtime.exclude; do
+         install/rootfs/home/klipper/printer_data/config/moonraker.conf \
+         install/rootfs/home/klipper/printer_data/config/dp200_moonraker.conf install/nand/runtime.exclude; do
     [ -f "$PORT/$f" ] || { echo "missing $PORT/$f"; exit 1; }
 done
 mkdir -p "$OUT"
@@ -43,7 +44,17 @@ S=$ROOT/$STAGE/printer_data
 rm -rf $ROOT/$STAGE; mkdir -p $S/config $S/logs $S/database $S/gcodes $S/comms
 cp "$PORT"/klipper/config/printer.cfg "$PORT"/klipper/config/dp200_printer.cfg \
    "$PORT"/klipper/config/dp200_macros.cfg "$PORT"/klipper/config/dp200_adxl.cfg.off \
-   "$PORT"/install/rootfs/home/klipper/printer_data/config/moonraker.conf $S/config/
+   "$PORT"/install/rootfs/home/klipper/printer_data/config/moonraker.conf \
+   "$PORT"/install/rootfs/home/klipper/printer_data/config/dp200_moonraker.conf $S/config/
+# Pin Klipper and Moonraker in Moonraker's updater to the commits shipped
+# here: on an SD install (full root, with .git) their checkouts track
+# upstream, and an "update" there would pull upstream over the DP200 port.
+# (The NAND runtime has no .git: nothing to update there anyway.)
+for r in klipper moonraker; do
+    c=`chroot $ROOT git -c safe.directory='*' -C /home/klipper/$r rev-parse HEAD 2>/dev/null`
+    [ -n "$c" ] && printf '\n# shipped commit: no updates from upstream (make_payload.sh)\n[update_manager %s]\npinned_commit: %s\n' \
+        $r $c >> $S/config/dp200_moonraker.conf
+done
 chown -R $(grep '^klipper:' $ROOT/etc/passwd | cut -d: -f3,4) $S
 cp "$PORT"/install/nand/runtime.exclude $ROOT/$STAGE/runtime.exclude
 # the USB-serial module (accelerometer) for the stock kernel: usr/src, where
