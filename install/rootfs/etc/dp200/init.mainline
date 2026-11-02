@@ -103,6 +103,9 @@ i=0
 while [ ! -e /sys/class/net/mlan0 ] && [ $i -lt 45 ]; do sleep 1; i=$((i + 1)); done
 [ -e /sys/class/net/mlan0 ] || echo "no mlan0 after ${i} s: Wi-Fi not started"
 [ -e /sys/class/net/mlan0 ] && wpa_supplicant -B -D nl80211 -i mlan0 -c $CONF -P /run/wpa_supplicant.pid
+# WiFi power saving off (missed key handshakes, see dp200-start.sh); iw is
+# in the root from the 2026-11-02 package list
+command -v iw >/dev/null && iw dev mlan0 set power_save off 2>/dev/null
 
 # The helpers dp200-start.sh runs today, with ROOT=/
 sh /dp200/dp200-wifi.sh / &

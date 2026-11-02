@@ -11,6 +11,8 @@ PID=/var/run/udhcpc.$IF.pid
 LAST=/var/run/dp200-wifi.$IF.ssid
 case "$2" in
 CONNECTED)
+    # power saving off again after each (re)connection (see dp200-start.sh)
+    iwconfig $IF power off 2>/dev/null || iw dev $IF set power_save off 2>/dev/null
     SSID=$(wpa_cli -i $IF status | sed -n 's/^ssid=//p')
     if grep -q "\"$IF\":{[^}]*\"mode\":\"static\"" $ROOT/etc/dp200/network.json 2>/dev/null; then
         sh $ROOT/dp200/dp200-netd.sh $ROOT apply $IF
