@@ -1341,13 +1341,18 @@ class UI:
             if pstate not in ('printing', 'paused') and self.screen == 'print':
                 self.screen = 'home'
             getattr(self, 'page_' + self.screen)(d, st)
-            # Z homing was refused until the bed is confirmed empty (BED_CLEAR)
-            if ((st.get('gcode_macro BED_CLEAR') or {}).get('asking') and not self.confirm
-                    and time.time() - self.bed_answered > 5):
+            # Z homing was refused until the bed is confirmed empty (BED_CLEAR);
+            # a print waits in PRINT_START for the same answer
+            asking = (st.get('gcode_macro BED_CLEAR') or {}).get('asking')
+            settled = time.time() - self.bed_answered > 5
+            if asking and not self.confirm and settled:
                 self.confirm = ('Is the bed EMPTY? Homing raises it to the top and crushes '
                                 'anything on it.',
                                 ('gcode', 'BED_CLEAR', 'Bed empty'),
                                 ('gcode', 'BED_CLEAR CANCEL=1', 'Homing cancelled'))
+            elif (not asking and settled and self.confirm
+                    and self.confirm[1][:2] == ('gcode', 'BED_CLEAR')):
+                self.confirm = None                    # answered in Mainsail meanwhile
         if self.confirm:
             self.overlay_confirm(d)
         self.footer(d)
