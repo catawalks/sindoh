@@ -123,3 +123,14 @@ remaining length) stays off unless the user explicitly agrees.
 
 CN3 header prepared, no TAP answered (likely fused off), [docs/jtag_prep.md](docs/jtag_prep.md).
 Parked.
+
+## 10. Before a release
+
+- **Homing speed:** stock firmware homes much faster than our config
+  (owner, 2026-11-02, after going back to stock). Measure the stock speeds
+  and bring the [stepper_*] homing speeds close to them.
+- **Stick backups and firmware versions:** a backup on the stick is
+  refused when the printer's Sindoh app differs (another printer, or the
+  same printer after a firmware update). Idea (owner agreed): store the
+  firmware version with each backup, and offer to replace a backup from an
+  older firmware of the same printer. To discuss.
