@@ -151,3 +151,8 @@ Parked.
   restore) and add git/pip/compiler: ~15-20 MB free; C) git + pip only:
   Moonraker/Mainsail from upstream, Klipper pinned. USB/SD storage is out
   (no extra hardware).
+- **Wi-Fi drops to the other saved network (2026-11-02, twice):** the AP
+  deauthenticates the printer (reason 15, 4-way handshake timeout, and 7);
+  wpa_supplicant then marks that network TEMP-DISABLED and joins the other
+  saved one (another subnet). Look at the 8782 driver/wpa settings, and
+  consider network priorities in the screen's WiFi page.

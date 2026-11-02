@@ -101,7 +101,7 @@ SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
            'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
-           'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR')
+           'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR', 'manual_probe')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -478,6 +478,8 @@ class UI:
                    'text': '', 'mode': 'abc', 'shift': False, 'show': False, 'hidden': False}
         # input shaping page: last recommended shaper per axis from the console
         self.shp = {'rev': 0, 'checked': 0.0, 'busy': False, 'res': {}}
+        # CALIBRATE: paper test mode ('zend' / 'probe'), accepted, PID tuned
+        self.cal = {}
         self.dry = {'mat': 'PLA', 'temp': 50, 'hours': 4}   # dryer page selection
         # LOAD/UNLOAD page: which one, and the CUSTOM temperature (remembered)
         self.info = None               # SYSTEM -> INFO rows
@@ -505,6 +507,43 @@ class UI:
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
             self.net_action(action)
+        elif kind == 'cal_start':                      # Z HEIGHT / PROBE OFFSET paper test
+            mode = action[1]
+            self.cal = {'mode': mode}
+            self.screen = 'papertest'
+            script = ('BED_CLEAR\nG28\nZ_ENDSTOP_CALIBRATE' if mode == 'zend'
+                      else 'BED_CLEAR\nLV_PROBE_CALIBRATE')
+            self.bed_answered = time.time()
+            self._bg('Homing' if mode == 'zend' else 'Probing',
+                     lambda: post('/printer/gcode/script', {'script': script}))
+        elif kind == 'cal_accept':
+            self._bg('Accepting', self.cal_accept)
+        elif kind == 'cal_abort':
+            # (after ACCEPT the paper test is over: nothing to abort)
+            active = (((self.st or {}).get('manual_probe') or {}).get('is_active')
+                      and not self.cal.get('done'))
+            self.cal = {}
+            self.screen = 'calibrate'
+            if active:
+                self._bg('Aborting', lambda: post('/printer/gcode/script', {'script': 'ABORT'}))
+        elif kind == 'cal_save':                       # [script before] SAVE_CONFIG
+            script = (action[1] + '\n' if len(action) > 1 else '') + 'SAVE_CONFIG'
+            self.cal = {}
+            self.screen = 'calibrate'
+            def save():
+                try:
+                    post('/printer/gcode/script', {'script': script})
+                except urllib.error.HTTPError:
+                    pass        # SAVE_CONFIG restarts Klipper: the reply can be a disconnect
+                self.flash('Saved: Klipper restarts (about 30 s)', 10)
+            self._bg('Saving (Klipper restarts)', save)
+        elif kind == 'pid_run':
+            heater, t = action[1], action[2]
+            def run_pid():
+                post('/printer/gcode/script',
+                     {'script': 'PID_CALIBRATE HEATER=%s TARGET=%d' % (heater, t)})
+                self.cal.setdefault('pid_done', []).append(heater)
+            self._bg('Tuning %s (5-10 min)' % ('nozzle' if heater == 'extruder' else 'bed'), run_pid)
         elif kind == 'upd_open':                       # SYSTEM -> UPDATE
             self.screen = 'update'
             self._bg('Reading versions', self.upd_status)
@@ -589,6 +628,21 @@ class UI:
             if held < LONG_POWER and not self.screen.startswith('powering'):
                 self.confirm = None
                 self.screen = 'power'
+
+    def cal_accept(self):
+        """ACCEPT the paper test. PROBE OFFSET then needs the accepted
+        height for LV_PROBE_CALIBRATE_SAVE: Klipper clears it after ACCEPT,
+        so it is read fresh first and sent in the same script."""
+        mp = get('/printer/objects/query?manual_probe')['status'].get('manual_probe') or {}
+        z = mp.get('z_position')
+        if self.cal.get('mode') == 'probe':
+            if z is None:
+                raise RuntimeError('no paper-test height')
+            script = 'ACCEPT\nLV_PROBE_CALIBRATE_SAVE Z=%.3f' % z
+        else:
+            script = 'ACCEPT'
+        post('/printer/gcode/script', {'script': script})
+        self.cal.update(done=True, z=z)
 
     def upd_status(self):
         """Versions from Moonraker's updater (no network: its last check)."""
@@ -1319,6 +1373,7 @@ class UI:
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
               'calibrate': 'move', 'shaper': 'calibrate', 'bedlevel': 'move', 'dryer': 'filament',
               'fil_mat': 'filament', 'fil_custom': 'fil_mat', 'info': 'system', 'update': 'system',
+              'pid': 'calibrate',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1331,6 +1386,8 @@ class UI:
             return ('kb_cancel',)
         if self.screen == 'numpad':
             return ('np_cancel',)
+        if self.screen == 'papertest':
+            return ('cal_abort',)                      # leaving ends the paper test
         ready = self.st is not None and self.st['webhooks']['state'] == 'ready'
         if not ready:
             # only the network pages work without Klipper; their top goes back
@@ -1625,9 +1682,88 @@ class UI:
 
     def page_calibrate(self, d, st):
         d.text((20, 160), 'Calibrate', font=font(28), fill=C_TXT)
-        self.grid(d, [
+        printing = st['print_stats']['state'] in ('printing', 'paused')
+        bed = 'Is the bed EMPTY? %s homes Z (the bed rises to the top), then a paper test.'
+        items = [
+            ('Z HEIGHT', ('confirm', bed % 'Z HEIGHT', ('cal_start', 'zend')), C_BTN, 26, 'paper test'),
+            ('PROBE OFFSET', ('confirm', bed % 'PROBE OFFSET probes, then', ('cal_start', 'probe')),
+             C_BTN, 24, 'paper test'),
+            ('PID TUNE', ('screen', 'pid'), C_BTN, 26, 'nozzle / bed'),
             ('INPUT SHAPING', ('screen', 'shaper'), C_BTN, 24, 'USB accelerometer'),
-        ], top=240)
+        ]
+        if printing:
+            items = [it[:1] + (None,) + it[2:] for it in items]       # not during a print
+        self.grid(d, items, top=210, rows_h=96)
+        # a baby-step offset from the print page can be kept for good
+        zoff = st['gcode_move']['homing_origin'][2]
+        if abs(zoff) >= 0.001:
+            d.text((20, 446), 'Baby-step Z offset now: %+.3f mm' % zoff, font=font(20), fill=C_TXT)
+            if not printing:
+                self.button(d, (30, 480, PW - 30, 570), 'SAVE Z OFFSET',
+                            ('confirm', 'Keep the %+.3f mm baby-step offset as the new Z height? '
+                                        'Klipper restarts.' % zoff,
+                             ('cal_save', 'Z_OFFSET_APPLY_ENDSTOP')),
+                            C_ON, 28, 'restarts Klipper')
+
+    def page_papertest(self, d, st):
+        """The paper test of Z HEIGHT (Z_ENDSTOP_CALIBRATE) and PROBE OFFSET
+        (LV_PROBE_CALIBRATE), following Klipper's manual_probe status."""
+        c = self.cal
+        mp = st.get('manual_probe') or {}
+        d.text((20, 156), 'Z height' if c.get('mode') == 'zend' else 'Probe offset',
+               font=font(28), fill=C_TXT)
+        if c.get('done'):
+            z = c.get('z')
+            d.text((20, 204), 'Accepted at Z %.3f' % z if z is not None else 'Accepted',
+                   font=font(24), fill=C_ON)
+            for i, l in enumerate(('SAVE writes it to printer.cfg and', 'restarts Klipper (about 30 s).')):
+                d.text((20, 246 + i * 28), l, font=font(20), fill=C_DIM)
+            self.grid(d, [
+                ('SAVE', ('confirm', 'Save the new value? Klipper restarts.', ('cal_save',)), C_ON, 30,
+                 'printer.cfg'),
+                ('DISCARD', ('cal_abort',), C_BTN, 28, 'keep the old one'),
+            ], top=330)
+            return
+        if not mp.get('is_active'):
+            d.text((20, 204), 'Moving into position...' if not self.busy else self.busy + '...',
+                   font=font(22), fill=C_WARN)
+            d.text((20, 240), 'The paper test starts when it stops.', font=font(20), fill=C_DIM)
+            self.button(d, (30, 470, PW - 30, 560), 'ABORT', ('cal_abort',), C_RED, 28)
+            return
+        for i, l in enumerate(('1. Slide a sheet of paper under the nozzle.',
+                               '2. Move the bed up until the paper just', '    drags when you pull it.')):
+            d.text((20, 196 + i * 26), l, font=font(19), fill=C_DIM)
+        z = mp.get('z_position')
+        s = 'Z %.3f' % z if z is not None else 'Z ?'
+        f = font(46)
+        d.text(((PW - d.textlength(s, font=f)) // 2, 278), s, font=f, fill=C_NOZ)
+        steps = [('-0.5', 'closer'), ('-0.1', 'closer'), ('-0.025', 'closer'),
+                 ('+0.025', 'further'), ('+0.1', 'further'), ('+0.5', 'further')]
+        self.grid(d, [(v, ('gcode', 'TESTZ Z=%s' % v, 'Bed ' + v), C_BTN, 26, sub) for v, sub in steps],
+                  top=346, rows_h=72, cols=3)
+        self.button(d, (30, 530, 230, 610), 'ACCEPT', ('cal_accept',), C_ON, 28)
+        self.button(d, (250, 530, PW - 30, 610), 'ABORT', ('cal_abort',), C_RED, 28)
+
+    def page_pid(self, d, st):
+        d.text((20, 160), 'PID tune', font=font(28), fill=C_TXT)
+        for i, l in enumerate(('Measures how this printer\'s heaters',
+                               'respond, for steady temperatures. Several',
+                               'minutes each; it cycles around the target.')):
+            d.text((20, 200 + i * 26), l, font=font(19), fill=C_DIM)
+        printing = st['print_stats']['state'] in ('printing', 'paused')
+        items = []
+        for name, heater, t in (('NOZZLE', 'extruder', 210), ('BED', 'heater_bed', 60)):
+            act = ('confirm', 'Heat the %s to %d°C and tune it? About 5-10 minutes; stay nearby.'
+                   % (name.lower(), t), ('pid_run', heater, t))
+            items.append((name, None if printing else act, C_BTN, 30, '%d°C' % t))
+        self.grid(d, items, top=300)
+        if self.cal.get('pid_done'):
+            names = ['nozzle' if h == 'extruder' else 'bed' for h in self.cal['pid_done']]
+            d.text((20, 430), 'Tuned: %s. SAVE to keep it.' % ', '.join(names),
+                   font=font(20), fill=C_ON)
+            self.button(d, (30, 470, PW - 30, 560), 'SAVE',
+                        ('confirm', 'Save the new PID values? Klipper restarts.', ('cal_save',)),
+                        C_ON, 30, 'restarts Klipper')
 
     def page_shaper(self, d, st):
         on = os.path.exists(ADXL_ON)
