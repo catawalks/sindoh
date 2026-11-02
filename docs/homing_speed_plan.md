@@ -15,7 +15,9 @@ Limits found earlier (hardware_notes):
 - Z: the 2026-10-19 retest stepped Z cleanly at 6/8/10 mm/s (up to 32k
   steps/s, busy_hits 0). max_z_velocity stayed at 5 because the 10-18 run
   lost steps at 8-10 mm/s, which pointed to a mechanical cause (Z motor
-  coupler or leadscrew grub screw slipping). **Check that first.**
+  coupler or leadscrew grub screw slipping). The owner (2026-11-02): not
+  seen again since that first test, so taken as a one-off; no coupler
+  check needed before this test.
 
 ## Proposed values (to test at the printer, bed EMPTY)
 
@@ -41,11 +43,10 @@ max_z_velocity: 10          # bed moves (LOWER BED, park) too
 
 ## Test (owner present)
 
-1. Inspect the Z coupler and grub screws (the 10-18 step loss).
-2. X/Y: home 10 times (`G28 X`, `G28 Y`), then the drift test
+1. X/Y: home 10 times (`G28 X`, `G28 Y`), then the drift test
    (scratchpad drift_test.py / UPC_STEP_STATS): the trigger position must
    repeat to the step, busy_hits 0.
-3. Z: with BED_CLEAR, home from the bottom 5 times; LV probe reference at
+2. Z: with BED_CLEAR, home from the bottom 5 times; LV probe reference at
    one point before and after (as in the 10-19 retest): <= 0.01 mm shift.
-4. Time each against stock if possible (owner's stopwatch / video).
-5. Commit the values to dp200_printer.cfg (port-owned) if all pass.
+3. Time each against stock if possible (owner's stopwatch / video).
+4. Commit the values to dp200_printer.cfg (port-owned) if all pass.
