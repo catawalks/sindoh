@@ -178,8 +178,11 @@ volume is free.
 ## NAND wear and the root's writes (2026-11-01, agreed with the owner)
 
 **Wear isn't a practical limit:**
-- The chip is SLC (Macronix MX30LF4G18AC, typically ~100k erase cycles;
-  confirm against the datasheet).
+- The chip is SLC (Macronix MX30LF4G18AC). Distributors list it as SLC
+  with 4-bit ECC; Macronix lists 100k P/E cycles for the MX30LF family's
+  smaller parts. The 4 Gb part's own figure still needs the datasheet
+  (2026-11-02: the PDF's text is font-encoded and couldn't be read here).
+  Our BCH (16 bits per page) covers 4-bit ECC.
 - UBI levels wear over mtd6's ~2350 blocks.
 - After years of stock use: mean erase count 10, max 127.
 
