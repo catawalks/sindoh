@@ -61,6 +61,36 @@ below is dropped: it erased the recovery set).
   dp200_stock_backup/SVN_GUI (+ .md5)      written by the installer
   ```
 
+## Tested on the test printer (2026-11-02) and what it taught
+
+Install from the stick (twice), pull-to-cancel at the INSTALL prompt, a
+boot without the SD card, remove with the stick backup, remove with the
+mtd5 fallback; each time the stock UI or Klipper came back as expected.
+Findings, all fixed:
+
+- **Pulling a stick kills `tinydebug`.** Sindoh's `media.connect` (USB
+  removal) unmounts the stick and runs `kill -9` on every tinydebug,
+  including the `keywait` that waits for the confirm touch. A pulled stick
+  started an upgrade once. Now only keywait's exit 0 (a touch) with the
+  stick still present counts; 137 (killed) cancels or asks again.
+- **Our touch screen kept reading touches** under the installer's messages:
+  it is stopped first and started again on a cancel.
+- **Entropy on NAND** (kernel 3.2, OpenSSL 3): Moonraker and the screen
+  hung on the boot logo; fixed by `dp200-entropy.py` (seed file).
+- **nginx** needed `/var/log/nginx` (logs are RAM on NAND).
+- **`tinydebug` lines are Qt labels and render HTML:** colored titles
+  (`<font color=...>`); about 21 characters fit on a line.
+- **Stock `ubiattach`/`ubidetach` need the control device:**
+  `ubiattach /dev/ubi_ctrl -m 5 -d 2`.
+- **A tar stream's md5 is not a file-set identity** (directory order changes
+  after a restore): backups are matched by a fingerprint of the per-file
+  md5s (`SVN_GUI.files.md5`).
+- **Space:** the 80 MB payload took 106 MB of the root; removing SVN_GUI
+  freed 79 MB (not its 93 MB du size). 27 MB stays free.
+- **mtd5 fallback:** the recovery set's SVN_GUI is the factory 2017 one
+  (491 files; the 2020 one has 1260). With the 2020 firmware it starts and
+  shows the stock home screen; Sindoh's 2020 update matches it again.
+
 ## Update 2026-10-20: internal NAND is now the default target (superseded)
 
 - **Target:** the installer writes Klipper to **mtd5 "recovery"** as UBI
