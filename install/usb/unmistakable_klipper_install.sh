@@ -139,6 +139,10 @@ stick_still_in() { [ -f "$PAYLOAD" ] || fail "USB stick removed" "(touch: restar
 mb_free() { echo $(( `df -k "$1" | tail -1 | awk '{print $(NF-2)}'` / 1024 )); }
 size_mb() { echo $(( `ls -l "$1" | awk '{print $5}'` / 1048576 )); }
 du_mb() { du -sk "$1" | awk '{print int($1 / 1024)}'; }
+# What the Sindoh app's files are, independent of how they were stored: the
+# md5 of the sorted per-file md5 list. (A tar stream's md5 changes with
+# the directory order, which differs after a restore: 2026-11-02.)
+gui_fingerprint() { (cd "$1" && find SVN_GUI -type f | sort | xargs md5sum | md5sum | cut -d' ' -f1); }
 
 # Take over the screen the way Sindoh's tools do
 if [ $DRY_RUN = 0 ]; then
@@ -178,9 +182,19 @@ if [ $TARGET = nand ]; then
     if [ -d $GUI ] && [ ! -f "$BACKUP/SVN_GUI.tar" ]; then
         [ "$(mb_free "$STICK")" -ge $(( `du_mb $GUI` + 10 )) ] || fail "USB stick too full" "backup needs 100 MB"
     elif [ -d $GUI ]; then
-        # a backup is already there: only keep it if it is this printer's
-        [ "`tar -cf - -C /app SVN_GUI | md5sum`" = "`cat "$BACKUP/SVN_GUI.tar.md5" 2>/dev/null`" ] \
-            || fail "stick has the backup" "of another printer"
+        # a backup is already there: only keep it if it holds this
+        # printer's files (backups made before SVN_GUI.files.md5 existed
+        # are unpacked to RAM and fingerprinted)
+        show "Checking the backup" "on the stick" ""
+        HAVE_FP=`gui_fingerprint /app`
+        if [ -f "$BACKUP/SVN_GUI.files.md5" ]; then
+            WANT_FP=`cat "$BACKUP/SVN_GUI.files.md5"`
+        else
+            rm -rf /tmp/dp200-chk; mkdir -p /tmp/dp200-chk
+            tar -xf "$BACKUP/SVN_GUI.tar" -C /tmp/dp200-chk && WANT_FP=`gui_fingerprint /tmp/dp200-chk`
+            rm -rf /tmp/dp200-chk
+        fi
+        [ "$HAVE_FP" = "$WANT_FP" ] || fail "stick has the backup" "of another printer"
     fi
 else
     grep -q " /mnt/sd " /proc/mounts || fail "no microSD card" "at /mnt/sd"
@@ -242,6 +256,7 @@ if [ $DRY_RUN = 0 ] && [ $TARGET = nand ]; then
                 || fail "backup failed" "nothing changed"
             mv "$BACKUP/SVN_GUI.tmp" "$BACKUP/SVN_GUI.tar"
             md5sum < "$BACKUP/SVN_GUI.tar" > "$BACKUP/SVN_GUI.tar.md5"
+            gui_fingerprint /app > "$BACKUP/SVN_GUI.files.md5"
             sync
         fi
         UNDO=1

@@ -74,20 +74,36 @@ kill -9 `pidof stdin2log` 2>/dev/null
 kill -9 `pidof appBrowser` 2>/dev/null
 screen_off
 
-# The Sindoh app: from the stick's backup, checked against its md5
+# The Sindoh app (RESTORE): 1 = the installer's backup on this stick
+# (md5-checked, this printer's exact copy); 2 = without it, the factory
+# recovery set in mtd5 (Sindoh's own update.tar.bz2, ./app/SVN_GUI): the
+# printer then always has a way back, even with the stick lost. That copy
+# is the FACTORY version (2017); a printer updated since (2020 firmware)
+# should then get Sindoh's update again for a matching app.
 RESTORE=0
+REC_MTD=5
+REC_UBI=2
 if [ ! -d $GUI ] && [ -f "$BACKUP/SVN_GUI.tar" ] && [ -f "$BACKUP/SVN_GUI.tar.md5" ]; then
     show "Checking the backup" "of the Sindoh app" "(md5)"
     [ "`cat "$BACKUP/SVN_GUI.tar.md5"`" = "`md5sum < "$BACKUP/SVN_GUI.tar"`" ] \
         && RESTORE=1 || show "Sindoh app backup" "is damaged" ""
 fi
+if [ ! -d $GUI ] && [ $RESTORE = 0 ] && \
+   grep -q "^mtd$REC_MTD: 0c800000 00020000 \"recovery\"" /proc/mtd; then
+    RESTORE=2
+fi
 if [ ! -d $GUI ] && [ $RESTORE = 0 ] && [ $OEM = 0 ]; then
-    show "No Sindoh app backup" "on this stick" "Pull stick to cancel"
+    show "No Sindoh app backup" "on stick or NAND" "Pull stick to cancel"
     while [ -f "$ME" ]; do sleep 1; done
     cancelled
 fi
-show "Touch to restore" "the Sindoh firmware" "Pull stick to cancel"
-confirm "Touch to restore" "the Sindoh firmware" "Pull stick to cancel"
+if [ $RESTORE = 2 ]; then
+    P2="(factory app, mtd5)"
+else
+    P2="the Sindoh firmware"
+fi
+show "Touch to restore" "$P2" "Pull stick to cancel"
+confirm "Touch to restore" "$P2" "Pull stick to cancel"
 
 for r in /klipper /mnt/sd; do
     [ -x $r/dp200/dp200-start.sh ] && $r/dp200/dp200-start.sh stop
@@ -98,15 +114,34 @@ done
 # The app goes to RAM first (/tmp is tmpfs; the stack is stopped, so there
 # is room): /klipper has to go before it fits on the NAND, and from here
 # on nothing depends on the stick any more
+unreadable() {
+    rm -rf /tmp/dp200-restore
+    show "$1 unreadable" "nothing changed" "Pull stick to reboot"
+    /app/tinydebug keywait
+    reboot; exit 1
+}
+rm -rf /tmp/dp200-restore; mkdir -p /tmp/dp200-restore
 if [ $RESTORE = 1 ]; then
     show "Reading the backup" "of the Sindoh app" "DO NOT POWER OFF"
-    rm -rf /tmp/dp200-restore; mkdir -p /tmp/dp200-restore
-    if ! tar -xf "$BACKUP/SVN_GUI.tar" -C /tmp/dp200-restore; then
-        rm -rf /tmp/dp200-restore
-        show "Backup unreadable" "nothing changed" "Pull stick to reboot"
-        /app/tinydebug keywait
-        reboot; exit 1
+    tar -xf "$BACKUP/SVN_GUI.tar" -C /tmp/dp200-restore || unreadable "Backup"
+elif [ $RESTORE = 2 ]; then
+    # UBI attach as Sindoh's own recovery does; the volume is mounted
+    # read-only and only read (UBI itself may still move a block it finds
+    # bit errors in: normal housekeeping)
+    show "Reading recovery set" "(about 5-10 min)" "DO NOT POWER OFF"
+    ATTACHED=0
+    if [ ! -e /sys/class/ubi/ubi$REC_UBI ]; then
+        ubiattach /dev/ubi_ctrl -m $REC_MTD -d $REC_UBI >/dev/null 2>&1 || unreadable "Recovery set"
+        ATTACHED=1
     fi
+    mkdir -p /tmp/dp200-rec
+    if mount -t ubifs -o ro ubi$REC_UBI:recovery /tmp/dp200-rec; then
+        tar -xjf /tmp/dp200-rec/update.tar.bz2 -C /tmp/dp200-restore ./app/SVN_GUI
+        umount /tmp/dp200-rec
+    fi
+    [ $ATTACHED = 1 ] && ubidetach /dev/ubi_ctrl -d $REC_UBI
+    [ -f /tmp/dp200-restore/app/SVN_GUI/home.html ] || unreadable "Recovery set"
+    mv /tmp/dp200-restore/app/SVN_GUI /tmp/dp200-restore/SVN_GUI
 fi
 if [ -f /etc/profile.stock ]; then
     cp /etc/profile.stock /etc/profile
@@ -121,7 +156,7 @@ if [ -d /klipper ] && ! grep -q " /klipper " /proc/mounts; then
     rm -rf /klipper
     sync
 fi
-if [ $RESTORE = 1 ]; then
+if [ $RESTORE != 0 ]; then
     show "Restoring" "the Sindoh app" "DO NOT POWER OFF"
     if cp -a /tmp/dp200-restore/SVN_GUI /app/; then
         show "Sindoh app restored" "Saving, please wait" "DO NOT POWER OFF"
@@ -140,7 +175,12 @@ if [ $OEM = 1 ]; then
     sleep 3
     exit 0
 fi
-show "Stock firmware back" "" "Pull stick to reboot"
+if [ $RESTORE = 2 ]; then
+    # the factory app next to newer firmware: say how to match them
+    show "Factory app back" "Sindoh update for" "latest. Pull stick"
+else
+    show "Stock firmware back" "" "Pull stick to reboot"
+fi
 sync
 /app/tinydebug keywait
 reboot

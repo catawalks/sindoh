@@ -19,7 +19,7 @@ nand_root() {
     # only when the NAND installer put Klipper there: attaching mtd5 lets UBI
     # write to it (housekeeping), which must not happen to the stock content
     [ -f /etc/dp200-nand ] || return 1
-    [ -e /sys/class/ubi/ubi$UBI ] || ubiattach -m $MTD -d $UBI >/dev/null 2>&1 || return 1
+    [ -e /sys/class/ubi/ubi$UBI ] || ubiattach /dev/ubi_ctrl -m $MTD -d $UBI >/dev/null 2>&1 || return 1
     grep -q '^klipper$' /sys/class/ubi/ubi$UBI/ubi${UBI}_*/name 2>/dev/null || return 1
     mkdir -p $MNT
     mount -t ubifs -o compr=zlib ubi$UBI:klipper $MNT
