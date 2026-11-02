@@ -8,15 +8,17 @@ To use this script:
 ## Reverting to a Stanley Model 1
 
 `unmistakable_Model1Revert.she` undoes Model1Fix: it sets a converted printer's
-model ID back from `3DP200Q` to the Stanley `ST3DP1Q`.
+model ID back from `3DP200Q` to the stock Stanley Model 1 ID, `ST3DP1`.
 
 Model1Fix changes only the model ID (from `ST3DP1` or `ST3DP1Q` to `3DP200Q`)
-and does not keep the old one, so use the file that matches your printer:
+and does not keep the old one. `ST3DP1Q` is what Sindoh's open-filament
+script makes of the stock ID (it appends a `Q` to any model ID, which enables
+open-filament mode with the latest firmware). Use the file you need:
 
 | File | Sets the model ID to |
 |---|---|
-| `unmistakable_Model1Revert.she` | `ST3DP1Q` (the "Q" ID; use this one unless you know your printer was an `ST3DP1`) |
-| `unmistakable_Model1Revert_ST3DP1.she` | `ST3DP1` |
+| `unmistakable_Model1Revert.she` | `ST3DP1`, the stock Model 1 ID |
+| `unmistakable_Model1Revert_ST3DP1Q.she` | `ST3DP1Q`, the stock ID with open-filament mode |
 
 1. Create the folder `_update_rodin` on a FAT32 flash drive
 2. Put **only one** of the two files in it (the printer runs every
@@ -34,7 +36,7 @@ Notes:
 - The script changes only the `MachineTLI` row in `/app/nvram/karas.db` (like
   the first step of Sindoh's `karas_pinetree_util.sh --set-tli`). It does not
   touch the U-Boot environment.
-- Tested on a copy of the database: 3DP200Q -> ST3DP1Q / ST3DP1, other IDs
+- Tested on a copy of the database: 3DP200Q -> ST3DP1 / ST3DP1Q, other IDs
   left alone, a pulled flash drive cancels.
-- The source is `unmistakable_Model1Revert.sh` (and `_ST3DP1.sh`), packed with
+- The source is `unmistakable_Model1Revert.sh` (and `_ST3DP1Q.sh`), packed with
   `klipper_port/install/usb/pack_she.sh`.

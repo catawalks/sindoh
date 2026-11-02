@@ -4,8 +4,9 @@
 #
 # Model1Fix changes only the printer's model ID, from ST3DP1 or ST3DP1Q to
 # 3DP200Q (one row in /app/nvram/karas.db). The original ID is not kept
-# anywhere. THIS VARIANT sets ST3DP1, for a printer that was an ST3DP1;
-# unmistakable_Model1Revert.she (same script) sets ST3DP1Q.
+# anywhere. THIS VARIANT sets ST3DP1Q: the stock ST3DP1 with the Q that
+# Sindoh's open-filament script appends (keeps open-filament mode).
+# unmistakable_Model1Revert.she (same script) sets the stock ST3DP1.
 #
 # Safety:
 #   - only acts when the current ID is 3DP200Q; anything else is left alone
@@ -17,7 +18,7 @@
 #
 # Run by the stock /app/auto_update.sh from _update_rodin/ on a USB stick.
 exec >/dev/console 2>&1
-NEW_TLI=ST3DP1
+NEW_TLI=ST3DP1Q
 FROM_TLI=3DP200Q
 DB=${DB:-/app/nvram/karas.db}      # (DB=, NO_REBOOT=1: for testing on a copy)
 STICK=${1:-/mnt/sda1/_update_rodin}
