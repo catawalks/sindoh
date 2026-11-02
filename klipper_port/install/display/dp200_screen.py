@@ -13,7 +13,7 @@ Run as root inside the Debian chroot with Debian's python3-pil:
 Anything that moves or heats asks for confirmation first. STOP (bottom
 right on every screen) is an emergency stop: hold it for 1 second.
 """
-import json, os, re, select, socket, struct, sys, threading, time, urllib.error, urllib.parse, urllib.request
+import json, os, re, select, shutil, socket, struct, sys, threading, time, urllib.error, urllib.parse, urllib.request
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -56,6 +56,13 @@ HW_CUT = 2.0                          # measured roughly: "2 s hold" switched it
 HOLD_WARN = 0.4                       # s held before the warning appears
 LONG_POWER = 5.0
 POWER_REQ = '/run/dp200/power'        # "reboot" / "poweroff" for dp200-powerkey.sh
+# Shutdown/reboot progress: the stop scripts end this app first, so it draws
+# one frame per step beforehand (raw fb data, in RAM). rc.dp200 stop and the
+# init (dp200-powerkey.sh on stock) copy each frame to the panel as its step
+# starts, and done.fb once the files are saved and the root is read-only.
+SHUT_DIR = '/tmp/dp200-shutdown'
+SHUT_STEPS = ('Web page and camera', 'Moonraker', 'Klipper',
+              'Heaters and motors off', 'Saving files')
 BOOTBAR_STOP = '/sys/module/dp200_bootbar/parameters/stop'
 
 # Preheat presets (nozzle, bed); bed max_temp is 100, nozzle 260
@@ -133,6 +140,58 @@ def fb_pages(path):
         except OSError:
             vh = FB_H
     return tuple(range(0, max(vh // FB_H, 1) * FB_H, FB_H))
+
+def draw_shutdown(d, what, step):
+    """Shutdown ('poweroff') or reboot progress: step 1..len(SHUT_STEPS)
+    running, one more = finished."""
+    d.rectangle((0, 0, PW, PH), fill=(0, 0, 0))
+    n = len(SHUT_STEPS)
+    if step > n:
+        if what == 'reboot':
+            d.text((PW // 2, 360), 'Restarting...', font=font(36), fill=C_TXT, anchor='mm')
+            d.text((PW // 2, 420), 'The Sindoh logo comes next.', font=font(22),
+                   fill=C_DIM, anchor='mm')
+        else:
+            # the old Windows 95 screen, in its colours
+            for i, l in enumerate(("It's now safe", 'to turn off', 'your printer.')):
+                d.text((PW // 2, 260 + i * 62), l, font=font(46), fill=(255, 160, 0), anchor='mm')
+            for i, l in enumerate(('Hold the POWER BUTTON', 'for about 2 seconds.')):
+                d.text((PW // 2, 500 + i * 36), l, font=font(24), fill=C_DIM, anchor='mm')
+        return
+    d.text((30, 130), 'Restarting' if what == 'reboot' else 'Shutting down',
+           font=font(36), fill=C_TXT)
+    d.text((30, 182), 'Step %d of %d' % (step, n), font=font(22), fill=C_DIM)
+    for i, name in enumerate(SHUT_STEPS):
+        y = 250 + i * 58
+        if i < step - 1:                       # done: a tick
+            d.line((36, y + 16, 46, y + 26, 64, y + 4), fill=C_ON, width=5)
+            col = C_TXT
+        elif i == step - 1:                    # running
+            d.ellipse((38, y + 4, 60, y + 26), fill=C_WARN)
+            col = C_TXT
+        else:
+            d.ellipse((40, y + 6, 58, y + 24), outline=C_DIM, width=2)
+            col = C_DIM
+        d.text((80, y), name, font=font(26), fill=col)
+    frac = (step - 1) / n
+    d.rounded_rectangle((30, 560, PW - 30, 596), radius=8, outline=C_DIM, width=2)
+    if frac:
+        d.rounded_rectangle((32, 562, 32 + int((PW - 64) * frac), 594), radius=7, fill=C_ON)
+    d.text((30, 620), "Don't switch it off yet.", font=font(24), fill=C_WARN)
+
+def write_shutdown_frames(what, path=FB):
+    """The frames the stop scripts show (SHUT_DIR/1.fb .. N.fb, done.fb), one
+    copy per fb page, as Panel.show() writes them."""
+    os.makedirs(SHUT_DIR, exist_ok=True)
+    pages = len(fb_pages(path))
+    for step in range(1, len(SHUT_STEPS) + 2):
+        im = Image.new('RGB', (PW, PH))
+        draw_shutdown(ImageDraw.Draw(im), what, step)
+        raw = rgb565(im.transpose(Image.Transpose.ROTATE_270)) * pages
+        name = os.path.join(SHUT_DIR, str(step) if step <= len(SHUT_STEPS) else 'done')
+        with open(name + '.tmp', 'wb') as f:
+            f.write(raw)
+        os.replace(name + '.tmp', name + '.fb')
 
 class Panel:
     def __init__(self, path=FB):
@@ -379,15 +438,23 @@ class UI:
 
     def power_request(self, what):
         """Ask dp200-powerkey.sh (stock side) to reboot or power off. It stops
-        Klipper first, which also ends this app; the last frame stays up."""
-        try:
-            os.makedirs(os.path.dirname(POWER_REQ), exist_ok=True)
-            with open(POWER_REQ, 'w') as f:
-                f.write(what)
-            self.screen = 'powering_' + what
-            self.power_at = time.time()
-        except OSError as e:
-            self.flash('%s failed: %s' % (what, e))
+        this app first, so the progress frames are written before asking."""
+        self.screen = 'powering_' + what
+        self.power_at = time.time()
+
+        def work():
+            try:
+                write_shutdown_frames(what)
+            except Exception as e:             # no progress frames: still go ahead
+                print('shutdown frames: %s' % e, flush=True)
+            try:
+                os.makedirs(os.path.dirname(POWER_REQ), exist_ok=True)
+                with open(POWER_REQ, 'w') as f:
+                    f.write(what)
+            except OSError as e:
+                self.screen = 'home'
+                self.flash('%s failed: %s' % (what, e))
+        threading.Thread(target=work, daemon=True).start()
 
     def key_event(self, down, now):
         """Power button edges from the main loop."""
@@ -1540,18 +1607,19 @@ class UI:
             d.rounded_rectangle((30, 430, PW - 30, 470), radius=8, outline=(200, 120, 120), width=2)
             d.rounded_rectangle((32, 432, 32 + int((PW - 64) * frac), 468), radius=7, fill=(240, 60, 60))
         else:
-            self.screen = 'powering_poweroff'          # dp200-powerkey.sh acts on its own
+            self.screen = 'powering_hold'              # dp200-powerkey.sh acts on its own
             self.power_at = time.time()
             d.text((30, 320), 'Shutting down...', font=font(30), fill=C_WARN)
 
     def page_powering(self, d):
         what = self.screen.split('_', 1)[1]
+        if what != 'hold':                     # the stop scripts show the next steps
+            draw_shutdown(d, what, 1)
+            return
+        # button held (no progress frames): dp200-powerkey.sh shuts down by itself
         d.rectangle((0, 0, PW, PH), fill=(0, 0, 0))
-        if what == 'reboot':
-            lines = ['Rebooting...', '', 'Klipper stops, then the', 'printer restarts', '(about 1-2 min).']
-        else:
-            lines = ['Shutting down...', '', 'Klipper stops and Linux', 'halts (~30 s). Then hold',
-                     'the POWER BUTTON ~2 s', 'to switch the printer off.']
+        lines = ['Shutting down...', '', 'Klipper stops and Linux', 'halts (~30 s). Then hold',
+                 'the POWER BUTTON ~2 s', 'to switch the printer off.']
         for i, l in enumerate(lines):
             d.text((30, 240 + i * 44), l, font=font(30 if i == 0 else 24),
                    fill=C_TXT if i == 0 else C_DIM)
@@ -1706,6 +1774,7 @@ def main():
             # still running: dp200-powerkey.sh didn't act (not started?)
             ui.screen = 'home'
             ui.flash('Power-off/reboot did not happen (dp200-powerkey not running?)', 15)
+            shutil.rmtree(SHUT_DIR, ignore_errors=True)   # else a later rc.dp200 stop shows them
         polled = now >= next_poll
         if polled:
             try:
