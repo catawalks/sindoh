@@ -275,6 +275,7 @@ if [ -d /tmp/klipper_cfg_keep ]; then
 fi
 # logs in RAM on NAND (dp200-start.sh)
 [ $TARGET = nand ] && touch $ROOT/etc/dp200/on_nand
+show "Saving to NAND" "please wait" "DO NOT POWER OFF"
 sync
 
 # ---- verify the unpacked root

@@ -124,7 +124,7 @@ fi
 if [ $RESTORE = 1 ]; then
     show "Restoring" "the Sindoh app" "DO NOT POWER OFF"
     if cp -a /tmp/dp200-restore/SVN_GUI /app/; then
-        show "Sindoh app restored" "" ""
+        show "Sindoh app restored" "Saving, please wait" "DO NOT POWER OFF"
     else
         show "Restore FAILED" "use Sindoh update" "to repair the app"
         sleep 5
