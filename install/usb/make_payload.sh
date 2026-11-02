@@ -49,6 +49,20 @@ cp "$PORT"/install/nand/runtime.exclude $ROOT/$STAGE/runtime.exclude
 # the USB-serial module (accelerometer) for the stock kernel: usr/src, where
 # the SD build keeps it, is not in the runtime image
 cp "$PORT"/install/kernel_modules/cdc-acm.ko $ROOT/dp200/cdc-acm.ko
+# Versions for the SYSTEM -> INFO page and Moonraker: the runtime image has
+# no .git, so Klipper and Moonraker fall back to their .version files; our
+# build is <commit date> from the PORT checkout's BUILD file (written by
+# whoever staged it), else the payload date.
+for r in klipper:klippy moonraker:moonraker; do
+    v=`chroot $ROOT git -c safe.directory='*' -C /home/klipper/${r%%:*} \
+        describe --always --tags --long --dirty 2>/dev/null`
+    [ -n "$v" ] && echo "$v" > $ROOT/home/klipper/${r%%:*}/${r#*:}/.version
+done
+if [ -f "$PORT/BUILD" ]; then
+    cp "$PORT/BUILD" $ROOT/etc/dp200/build
+else
+    echo "payload `date +%Y-%m-%d`" > $ROOT/etc/dp200/build
+fi
 
 EXCL="--exclude=./$PD --exclude=./$STAGE/runtime.exclude --exclude=./home/klipper/.cache
       --exclude=./root/.cache --exclude=./var/cache/apt/archives/*.deb
