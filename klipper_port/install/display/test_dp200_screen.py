@@ -139,6 +139,33 @@ tap('STOP DRYING'); tap('YES')
 check('running dryer: STOP DRYING sends FILAMENT_DRY_STOP', sent[-1] == ('/printer/gcode/script', 'FILAMENT_DRY_STOP'))
 ui.st = saved_st
 tap('BACK')
+# LOAD / UNLOAD: filament presets and a custom temperature (saved setting
+# in a temp file here)
+check('DRYER BACK -> filament', ui.screen == 'filament')
+S.SETTINGS = os.path.join(tempfile.mkdtemp(), 'screen_settings.json')
+tap('LOAD');                          check('LOAD -> filament choice', ui.screen == 'fil_mat')
+n = len(sent); tap('PLA')
+check('PLA asks to confirm', ui.confirm is not None and len(sent) == n)
+tap('YES');                           check('YES sends LOAD_FILAMENT MATERIAL=PLA',
+                                            sent[-1] == ('/printer/gcode/script', 'LOAD_FILAMENT MATERIAL=PLA'))
+tap('PETG'); tap('YES');              check('PETG sends LOAD_FILAMENT TEMP=240',
+                                            sent[-1] == ('/printer/gcode/script', 'LOAD_FILAMENT TEMP=240'))
+tap('CUSTOM');                        check('CUSTOM -> temperature page', ui.screen == 'fil_custom')
+t0 = ui.fil['temp']; tap('+10'); tap('-5')
+check('+10 -5 changes the temperature', ui.fil['temp'] == t0 + 5)
+for _ in range(12):
+    tap('+10')
+check('capped at the extruder limit', ui.fil['temp'] == S.FIL_MAX)
+n = len(sent); tap('LOAD'); tap('NO')
+check('custom LOAD asks first, NO sends nothing', len(sent) == n and ui.confirm is None)
+tap('LOAD'); tap('YES');              check('custom LOAD sends TEMP=260',
+                                            sent[-1] == ('/printer/gcode/script', 'LOAD_FILAMENT TEMP=%d' % S.FIL_MAX))
+check('custom temperature saved', S.load_settings().get('fil_custom') == S.FIL_MAX)
+tap('BACK'); tap('BACK');             check('BACK x2 -> filament', ui.screen == 'filament')
+tap('UNLOAD'); tap('ABS'); tap('YES')
+check('UNLOAD ABS sends UNLOAD_FILAMENT MATERIAL=ABS',
+      sent[-1] == ('/printer/gcode/script', 'UNLOAD_FILAMENT MATERIAL=ABS'))
+tap('BACK')
 tap('BACK')
 # STOP: a short tap must NOT stop, a 1 s hold must
 tap('STOP');              check('short STOP tap ignored', all(p != '/printer/emergency_stop' for p, _ in sent))

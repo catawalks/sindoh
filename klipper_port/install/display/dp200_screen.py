@@ -79,6 +79,14 @@ NUMPY_LINK = '/usr/local/lib/dp200-numpy/numpy'   # install/input_shaping/setup_
 DRY_PRESETS = (('PLA', 50, 4), ('PETG', 65, 4), ('TPU', 50, 5),
                ('ABS', 80, 4), ('ASA', 80, 4), ('NYLON', 85, 8))
 DRY_HOURS = (2, 4, 6, 8, 12)
+# LOAD / UNLOAD temperatures (nozzle C). PLA and ABS run the macros' stock
+# settings (MATERIAL=); the others and CUSTOM pass TEMP=. The extruder's
+# max_temp is 260 and min_extrude_temp 170 (dp200_printer.cfg).
+FIL_PRESETS = (('PLA', 230), ('PETG', 240), ('ABS', 250),
+               ('ASA', 250), ('TPU', 230), ('NYLON', 255))
+FIL_STOCK = ('PLA', 'ABS')
+FIL_MIN, FIL_MAX = 180, 260
+FIL_STEPS = (-10, -5, 5, 10)
 # Bed level page: 4x4 probe grid, the two front screws and the fixed back support
 PROBE_RE = re.compile(r'probe: at ([\d.]+),([\d.]+) bed will contact at z=(-?[\d.]+)')
 BL_SCREWS = (('Left', 8, 8), ('Right', 202, 8))   # ~10 mm in from the front corners
@@ -384,6 +392,8 @@ class UI:
         # input shaping page: last recommended shaper per axis from the console
         self.shp = {'rev': 0, 'checked': 0.0, 'busy': False, 'res': {}}
         self.dry = {'mat': 'PLA', 'temp': 50, 'hours': 4}   # dryer page selection
+        # LOAD/UNLOAD page: which one, and the CUSTOM temperature (remembered)
+        self.fil = {'mode': 'load', 'temp': int(self.settings.get('fil_custom', 220))}
         self.bed_answered = 0.0        # last BED_CLEAR answer (status lags behind it)
         # bed level page: mode start/probing/result, live points {(col, row): z}
         self.bl = {'rev': 0, 'mode': 'start', 'pts': {}, 'mesh': None, 'xs': None, 'ys': None,
@@ -406,6 +416,17 @@ class UI:
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
             self.net_action(action)
+        elif kind == 'fil_mode':                       # LOAD or UNLOAD: choose the filament
+            self.fil['mode'] = action[1]
+            self.screen = 'fil_mat'
+        elif kind == 'fil_step':                       # CUSTOM temperature +/-
+            self.fil['temp'] = max(FIL_MIN, min(FIL_MAX, self.fil['temp'] + action[1]))
+        elif kind == 'fil_custom_go':
+            t = self.fil['temp']
+            if self.settings.get('fil_custom') != t:
+                self.settings['fil_custom'] = t
+                save_settings(self.settings)
+            self.confirm = fil_confirm(self.fil['mode'], 'CUSTOM', t)[1:]
         elif kind == 'set_timeout':
             self.settings['timeout'] = action[1]
             ok = save_settings(self.settings)
@@ -1183,6 +1204,7 @@ class UI:
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
               'calibrate': 'move', 'shaper': 'calibrate', 'bedlevel': 'move', 'dryer': 'filament',
+              'fil_mat': 'filament', 'fil_custom': 'fil_mat',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1296,17 +1318,41 @@ class UI:
             d.text((20, 200), 'Cartridge: none (open filament)', font=font(20), fill=C_DIM)
         d.text((20, 228), 'Runout encoder: %s' % ('on' if enc.get('enabled') else 'off'),
                font=font(20), fill=C_DIM)
-        items = []
-        for mat in ('PLA', 'ABS'):
-            items.append(('LOAD ' + mat, ('confirm', 'Heat and LOAD %s?' % mat,
-                                          ('gcode', 'LOAD_FILAMENT MATERIAL=' + mat, 'Load ' + mat))))
-        for mat in ('PLA', 'ABS'):
-            items.append(('UNLOAD ' + mat, ('confirm', 'Heat and UNLOAD %s?' % mat,
-                                            ('gcode', 'UNLOAD_FILAMENT MATERIAL=' + mat, 'Unload ' + mat))))
+        items = [('LOAD', ('fil_mode', 'load'), C_BTN, 32, 'choose filament'),
+                 ('UNLOAD', ('fil_mode', 'unload'), C_BTN, 32, 'choose filament')]
         items.append(('UNLOCK', ('confirm', 'Release the cartridge latch for 4 s? Unload the filament first.',
                                  ('gcode', 'CARTRIDGE_RELEASE', 'Cartridge release')), C_BTN, 28, 'cartridge'))
         items.append(('DRYER', ('screen', 'dryer'), C_BTN, 28, 'spool on bed'))
         self.grid(d, items, top=270, rows_h=96)
+
+    def page_fil_mat(self, d, st):
+        """LOAD or UNLOAD: the filament (sets the nozzle temperature)."""
+        mode = self.fil['mode']
+        d.text((20, 160), '%s filament' % mode.capitalize(), font=font(28), fill=C_TXT)
+        d.text((20, 200), 'Pick the filament (sets the nozzle):', font=font(20), fill=C_DIM)
+        items = [(name, fil_confirm(mode, name, t), C_BTN, 30, '%d °C' % t)
+                 for name, t in FIL_PRESETS]
+        items.append(('CUSTOM', ('screen', 'fil_custom'), C_BTN, 30, 'other filament'))
+        self.grid(d, items, top=240, rows_h=96)
+
+    def page_fil_custom(self, d, st):
+        """CUSTOM temperature for LOAD/UNLOAD (other filaments)."""
+        mode = self.fil['mode']
+        t = self.fil['temp']
+        d.text((20, 160), '%s: custom temperature' % mode.capitalize(), font=font(26), fill=C_TXT)
+        d.text((20, 198), 'The filament maker\'s print temperature', font=font(18), fill=C_DIM)
+        d.text((20, 222), '(%d-%d °C)' % (FIL_MIN, FIL_MAX), font=font(18), fill=C_DIM)
+        s = '%d °C' % t
+        f = font(64)
+        d.text(((PW - d.textlength(s, font=f)) // 2, 262), s, font=f, fill=C_NOZ)
+        w, gap = (PW - 40 - 3 * 10) // 4, 10
+        for i, step in enumerate(FIL_STEPS):
+            x = 20 + i * (w + gap)
+            ok = t < FIL_MAX if step > 0 else t > FIL_MIN   # steps stop at the limits
+            self.button(d, (x, 360, x + w, 440), '%+d' % step,
+                        ('fil_step', step) if ok else None, C_BTN if ok else C_BAR, 30)
+        self.button(d, (20, 470, PW - 20, 570), mode.upper(), ('fil_custom_go',), C_ON, 34,
+                    'heat to %d °C' % t)
 
     def page_preheat(self, d, st):
         d.text((20, 160), 'Preheat', font=font(28), fill=C_TXT)
@@ -1696,6 +1742,14 @@ def save_settings(s):
         return True
     except OSError:
         return False
+
+def fil_confirm(mode, name, t):
+    """The confirm action for LOAD/UNLOAD of filament `name` at t C."""
+    macro = 'LOAD_FILAMENT' if mode == 'load' else 'UNLOAD_FILAMENT'
+    arg = 'MATERIAL=%s' % name if name in FIL_STOCK else 'TEMP=%d' % t
+    what = name if name != 'CUSTOM' else 'filament'
+    return ('confirm', 'Heat the nozzle to %d°C and %s %s?' % (t, mode.upper(), what),
+            ('gcode', '%s %s' % (macro, arg), '%s %s' % (mode.capitalize(), what)))
 
 def fmt_timeout(s):
     return 'never' if not s else '%d min' % (s // 60) if s >= 60 else '%d s' % s
