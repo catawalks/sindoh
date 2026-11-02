@@ -91,6 +91,20 @@ Findings, all fixed:
   (491 files; the 2020 one has 1260). With the 2020 firmware it starts and
   shows the stock home screen; Sindoh's 2020 update matches it again.
 
+## More room on the stock root: Qt WebKit (proposal, 2026-11-02)
+
+The NAND install leaves ~27 MB free. Of the stock libraries (readelf on the
+printer):
+- `libQt5WebKit` (20 MB) and `libQt5WebKitWidgets` are needed only by
+  `/app/appBrowser`, Sindoh's touch-screen browser, which only shows the
+  SVN_GUI pages the install already removes. Removing them (backed up and
+  restored with SVN_GUI) would give ~48 MB free.
+- ICU (`libicudata` 18 MB, `libicui18n`, `libicuuc`) must stay:
+  `libQt5Core` needs it, and `tinydebug` (every installer and Sindoh update
+  message) uses QtCore, QtGui and QtWidgets. So do `UIManager` and the
+  Qt plugins in `/usr/lib/qt` (linuxfb).
+Not done: it deletes more stock files, the owner decides.
+
 ## Update 2026-10-20: internal NAND is now the default target (superseded)
 
 - **Target:** the installer writes Klipper to **mtd5 "recovery"** as UBI
