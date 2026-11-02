@@ -321,6 +321,18 @@ def err_text(e):
         return 'Moonraker: Klipper not connected yet (HTTP %d)' % e.code
     return str(r)
 
+def fail_text(e):
+    """Why a Moonraker request failed: for a refused G-code that is
+    Klipper's own message in the JSON body (the HTTP reason phrase is just
+    'Bad Request' or 'unknown')."""
+    if isinstance(e, urllib.error.HTTPError):
+        try:
+            msg = json.load(e)['error']['message']
+            return str(msg).strip().splitlines()[0][:160]
+        except Exception:
+            return 'HTTP %d' % e.code
+    return str(getattr(e, 'reason', e))
+
 def get(path):
     with urllib.request.urlopen(API + path, timeout=5) as r:
         return json.load(r)['result']
@@ -426,14 +438,14 @@ class UI:
             if self.settings.get('fil_custom') != t:
                 self.settings['fil_custom'] = t
                 save_settings(self.settings)
-            self.confirm = fil_confirm(self.fil['mode'], 'CUSTOM', t)[1:]
+            self.confirm = with_bed_check(*fil_confirm(self.fil['mode'], 'CUSTOM', t)[1:], self.st)
         elif kind == 'set_timeout':
             self.settings['timeout'] = action[1]
             ok = save_settings(self.settings)
             self.flash('Screen timeout: %s%s' % (fmt_timeout(action[1]), '' if ok else ' (not saved!)'))
             self.screen = 'display'
         elif kind == 'confirm':
-            self.confirm = (action[1], action[2])
+            self.confirm = with_bed_check(action[1], action[2], self.st)
         elif kind == 'cancel':
             self.confirm = None
         elif kind == 'gcode':
@@ -498,7 +510,7 @@ class UI:
             try:
                 fn()
             except Exception as e:
-                self.flash('%s failed: %s' % (label, getattr(e, 'reason', e)))
+                self.flash('%s failed: %s' % (label, fail_text(e)))
             finally:
                 self.busy = None
         threading.Thread(target=work, daemon=True).start()
@@ -1562,12 +1574,17 @@ class UI:
         homed = st['toolhead'].get('homed_axes', '')
         d.text((20, 160), 'Home', font=font(28), fill=C_TXT)
         d.text((20, 200), 'Homed: %s' % (homed.upper() or 'no'), font=font(20), fill=C_DIM)
-        items = [('HOME ALL', ('confirm', 'Home all axes?', ('gcode', 'G28', 'Home all')))]
-        for axis, what in (('X', 'the print head'), ('Y', 'the bed (front/back)'),
-                           ('Z', 'the bed up to the top switch')):
+        # Z homing raises the bed to the top: Klipper refuses it until the bed
+        # is confirmed empty (BED_CLEAR, dp200_macros.cfg). Ask that here, and
+        # YES sends the confirmation with the homing (as the bed level page).
+        bed_q = 'Is the bed EMPTY? Homing %s raises the bed to the top and crushes anything on it.'
+        items = [('HOME ALL', ('confirm', bed_q % 'all axes', ('gcode', 'BED_CLEAR\nG28', 'Home all')))]
+        for axis, what in (('X', 'the print head'), ('Y', 'the bed (front/back)')):
             items.append(('HOME ' + axis, ('confirm', 'Home %s? This moves %s.' % (axis, what),
                                            ('gcode', 'G28 ' + axis, 'Home ' + axis)),
                           C_ON if axis.lower() in homed else C_BTN))
+        items.append(('HOME Z', ('confirm', bed_q % 'Z', ('gcode', 'BED_CLEAR\nG28 Z', 'Home Z')),
+                      C_ON if 'z' in homed else C_BTN))
         self.grid(d, items, top=240)
 
     def page_system(self, d, st):
@@ -1742,6 +1759,25 @@ def save_settings(s):
         return True
     except OSError:
         return False
+
+# Macros that home all axes first when the printer is not homed
+# (_SINDOH_ENSURE_HOMED, dp200_macros.cfg). Homing Z needs BED_CLEAR.
+HOMES_FIRST = ('_SINDOH_ENSURE_HOMED', 'CLEAN_NOZZLE', 'LOAD_FILAMENT', 'UNLOAD_FILAMENT',
+               'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCURACY', 'LV_PROBE_CALIBRATE',
+               'FILAMENT_DRY')
+
+def with_bed_check(question, act, st):
+    """A confirm for a command that homes first while the printer isn't
+    homed: ask about the bed in the same question, and send BED_CLEAR with
+    it (otherwise Klipper refuses and the user has to answer and retry)."""
+    if act[0] != 'gcode' or act[1].startswith('BED_CLEAR'):
+        return (question, act)
+    first = act[1].split()[0] if act[1].split() else ''
+    homed = ((st or {}).get('toolhead') or {}).get('homed_axes', '')
+    if first not in HOMES_FIRST or homed == 'xyz':
+        return (question, act)
+    return (question + ' It homes first: is the bed EMPTY?',
+            (act[0], 'BED_CLEAR\n' + act[1]) + tuple(act[2:]))
 
 def fil_confirm(mode, name, t):
     """The confirm action for LOAD/UNLOAD of filament `name` at t C."""

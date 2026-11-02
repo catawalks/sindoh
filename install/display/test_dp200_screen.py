@@ -37,6 +37,8 @@ class FakeTouch(S.Touch):
 ui = S.UI()
 ui.settings = {}                      # default timeout, whatever the printer has saved
 ui.st = S.query()
+# results must not depend on whether the printer happens to be homed
+ui.st['toolhead'] = dict(ui.st['toolhead'], homed_axes='xyz')
 touch = FakeTouch()
 fails = 0
 
@@ -88,13 +90,21 @@ tap('LAMP');              check('LAMP sends LAMP_TOGGLE', sent[-1:] == [('/print
 tap('MOVE'); tap('HOME');  check('MOVE -> HOME -> homing screen', ui.screen == 'homing')
 tap('HOME ALL')
 check('HOME ALL asks to confirm', ui.confirm is not None and sent[-1][1] == 'LAMP_TOGGLE')
-tap('YES');               check('YES sends G28', sent[-1] == ('/printer/gcode/script', 'G28'))
+check('HOME ALL asks if the bed is empty', 'EMPTY' in ui.confirm[0])
+tap('YES');               check('YES sends BED_CLEAR + G28', sent[-1] == ('/printer/gcode/script', 'BED_CLEAR\nG28'))
 for axis in 'XY':
     n = len(sent); tap('HOME ' + axis)
     check('HOME %s asks to confirm' % axis, ui.confirm is not None and len(sent) == n)
     tap('YES');           check('YES sends G28 ' + axis, sent[-1] == ('/printer/gcode/script', 'G28 ' + axis))
 n = len(sent); tap('HOME Z'); tap('NO')
 check('NO on HOME Z sends nothing', len(sent) == n and ui.screen == 'homing')
+tap('HOME Z');            check('HOME Z asks if the bed is empty', 'EMPTY' in ui.confirm[0])
+tap('YES');               check('YES sends BED_CLEAR + G28 Z', sent[-1] == ('/printer/gcode/script', 'BED_CLEAR\nG28 Z'))
+# a refused G-code shows Klipper's message, not the HTTP reason phrase
+import io, urllib.error
+body = io.BytesIO(b'{"error": {"code": 400, "message": "Must home axis first: 0.000 0.000 0.000"}}')
+err = urllib.error.HTTPError(S.API, 400, 'unknown', {}, body)
+check('refusal shows the Klipper message', S.fail_text(err) == 'Must home axis first: 0.000 0.000 0.000')
 tap('BACK');              check('BACK -> move screen', ui.screen == 'move')
 tap('BACK')
 # input shaping: sensor config switched by renaming files (in a temp dir here)
@@ -162,6 +172,16 @@ tap('LOAD'); tap('YES');              check('custom LOAD sends TEMP=260',
                                             sent[-1] == ('/printer/gcode/script', 'LOAD_FILAMENT TEMP=%d' % S.FIL_MAX))
 check('custom temperature saved', S.load_settings().get('fil_custom') == S.FIL_MAX)
 tap('BACK'); tap('BACK');             check('BACK x2 -> filament', ui.screen == 'filament')
+# not homed: a command that homes first asks about the bed and sends BED_CLEAR
+ui.st['toolhead'] = dict(ui.st['toolhead'], homed_axes='')
+tap('LOAD'); tap('PETG')
+check('unhomed LOAD asks if the bed is empty', 'EMPTY' in ui.confirm[0])
+tap('YES');                           check('YES sends BED_CLEAR + LOAD_FILAMENT',
+                                            sent[-1] == ('/printer/gcode/script', 'BED_CLEAR\nLOAD_FILAMENT TEMP=240'))
+tap('CUSTOM'); tap('LOAD')
+check('unhomed custom LOAD asks too', 'EMPTY' in ui.confirm[0] and ui.confirm[1][1].startswith('BED_CLEAR\n'))
+tap('NO'); tap('BACK'); tap('BACK')
+ui.st['toolhead'] = dict(ui.st['toolhead'], homed_axes='xyz')
 tap('UNLOAD'); tap('ABS'); tap('YES')
 check('UNLOAD ABS sends UNLOAD_FILAMENT MATERIAL=ABS',
       sent[-1] == ('/printer/gcode/script', 'UNLOAD_FILAMENT MATERIAL=ABS'))
