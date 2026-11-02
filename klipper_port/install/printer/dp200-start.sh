@@ -108,6 +108,11 @@ echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null
 
 # WiFi: joining the owner's network was the stock app's job (see dp200-wifi.sh)
 sh $ROOT/dp200/dp200-wifi.sh $ROOT
+# WiFi power saving off: with it on, the 8782 misses the access point's key
+# handshakes and is deauthenticated (reason 15) about every 5 minutes; now
+# and then that ends on another saved network (2026-11-02: 68 in 6 h with
+# power saving, none in 30 min without). dp200-wifi-action.sh re-applies it.
+iwconfig mlan0 power off 2>/dev/null
 # network settings from the touch screen (DHCP/static per port, Ethernet hotplug)
 mkdir -p $ROOT/run/dp200
 # Stock-side facts for the screen's SYSTEM -> INFO page. All read-only: the
