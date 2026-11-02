@@ -344,6 +344,78 @@ def post(path, body=None):
     with urllib.request.urlopen(req, timeout=3600) as r:   # gcode scripts block until done
         return json.load(r)
 
+STOCK_INFO = '/run/dp200/stock_info'          # written at boot by dp200-start.sh (stock side)
+BUILD_FILE = '/etc/dp200/build'                # written by make_payload.sh
+ON_NAND = '/etc/dp200/on_nand'                 # written by the USB installer
+
+def read_kv(path):
+    try:
+        with open(path) as f:
+            return dict(l.rstrip('\n').split('=', 1) for l in f if '=' in l)
+    except OSError:
+        return {}
+
+def system_info(ip):
+    """(label, value) rows for SYSTEM -> INFO. Files and two local requests
+    only; anything missing shows as '-'."""
+    def first(path, default='-'):
+        try:
+            with open(path) as f:
+                return f.readline().strip() or default
+        except OSError:
+            return default
+    def req(path, key):
+        try:
+            return str(get(path).get(key) or '-')
+        except Exception:
+            return '-'
+    stock = read_kv(STOCK_INFO)
+    try:
+        with open('/home/klipper/mainsail/release_info.json') as f:
+            mainsail = json.load(f).get('version', '-')
+    except (OSError, ValueError):
+        mainsail = '-'
+    try:
+        v = os.statvfs('/')
+        disk = '%d MB free of %d MB' % (v.f_bavail * v.f_frsize >> 20, v.f_blocks * v.f_frsize >> 20)
+    except OSError:
+        disk = '-'
+    mem = read_meminfo()
+    try:
+        with open('/proc/uptime') as f:
+            up = int(float(f.read().split()[0]))
+        uptime = '%dd %dh %02dm' % (up // 86400, up % 86400 // 3600, up % 3600 // 60)
+    except (OSError, ValueError):
+        uptime = '-'
+    return [
+        ('Build', first(BUILD_FILE, 'not stamped (SD build)')),
+        ('Installed on', 'internal NAND' if os.path.exists(ON_NAND) else 'microSD card'),
+        ('Klipper', req('/printer/info', 'software_version')),
+        ('Moonraker', req('/server/info', 'moonraker_version')),
+        ('Mainsail', mainsail),
+        ('Kernel', stock.get('kernel') or os.uname().release),
+        ('Sindoh FW', stock.get('firmware') or ('- (mainline boot)' if not stock else '-')),
+        ('Model ID', stock.get('model') or '-'),
+        ('Serial', stock.get('serial') or '-'),
+        ('IP address', ip),
+        ('Storage', disk),
+        ('Memory', mem),
+        ('Uptime', uptime),
+    ]
+
+def read_meminfo():
+    try:
+        m = {}
+        with open('/proc/meminfo') as f:
+            for l in f:
+                k, v = l.split(':', 1)
+                m[k] = int(v.split()[0])
+        # kernel 3.2 has no MemAvailable: free + buffers + page cache
+        avail = m.get('MemAvailable', m.get('MemFree', 0) + m.get('Buffers', 0) + m.get('Cached', 0))
+        return '%d MB free of %d MB' % (avail >> 10, m.get('MemTotal', 0) >> 10)
+    except (OSError, ValueError):
+        return '-'
+
 def my_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -405,6 +477,7 @@ class UI:
         self.shp = {'rev': 0, 'checked': 0.0, 'busy': False, 'res': {}}
         self.dry = {'mat': 'PLA', 'temp': 50, 'hours': 4}   # dryer page selection
         # LOAD/UNLOAD page: which one, and the CUSTOM temperature (remembered)
+        self.info = None               # SYSTEM -> INFO rows
         self.fil = {'mode': 'load', 'temp': int(self.settings.get('fil_custom', 220))}
         self.bed_answered = 0.0        # last BED_CLEAR answer (status lags behind it)
         # bed level page: mode start/probing/result, live points {(col, row): z}
@@ -428,6 +501,9 @@ class UI:
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
             self.net_action(action)
+        elif kind == 'info':                           # SYSTEM -> INFO (read once when opened)
+            self.info = system_info(self.ip)
+            self.screen = 'info'
         elif kind == 'fil_mode':                       # LOAD or UNLOAD: choose the filament
             self.fil['mode'] = action[1]
             self.screen = 'fil_mat'
@@ -1216,7 +1292,7 @@ class UI:
     # page -> page that BACK returns to (None: top level, no BACK)
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
               'calibrate': 'move', 'shaper': 'calibrate', 'bedlevel': 'move', 'dryer': 'filament',
-              'fil_mat': 'filament', 'fil_custom': 'fil_mat',
+              'fil_mat': 'filament', 'fil_custom': 'fil_mat', 'info': 'system',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1600,7 +1676,19 @@ class UI:
             ('DISPLAY', ('screen', 'display'), C_BTN, 28, 'screen'),
             # the same page as a short press of the front power button
             ('POWER', ('screen', 'power'), C_RED, 28, 'shut down / reboot'),
+            ('INFO', ('info',), C_BTN, 28, 'versions, storage'),
         ], top=270)
+
+    def page_info(self, d, st):
+        """SYSTEM -> INFO: build and versions, the stock firmware, storage."""
+        d.text((20, 160), 'System information', font=font(28), fill=C_TXT)
+        f, lh = font(19), 31
+        for i, (k, v) in enumerate(self.info or []):
+            y = 206 + i * lh
+            d.text((20, y), k, font=f, fill=C_DIM)
+            while d.textlength(v, font=f) > PW - 190 and len(v) > 4:
+                v = v[:-2].rstrip() + '…'                 # keep long versions on one line
+            d.text((180, y), v, font=f, fill=C_TXT)
 
     def page_display(self, d, st):
         t = self.settings.get('timeout', DIM_AFTER)

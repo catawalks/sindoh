@@ -110,6 +110,15 @@ echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null
 sh $ROOT/dp200/dp200-wifi.sh $ROOT
 # network settings from the touch screen (DHCP/static per port, Ethernet hotplug)
 mkdir -p $ROOT/run/dp200
+# Stock-side facts for the screen's SYSTEM -> INFO page. All read-only: the
+# firmware version is read OUT of /snapshot_version.sh, never by running
+# it (its first line writes the U-Boot env).
+{
+    echo "firmware=`sed -n "s/.*echo '\(RODIN_[^']*\)'.*/\1/p" /snapshot_version.sh 2>/dev/null | head -1`"
+    echo "model=`sqlite3 /app/nvram/karas.db 'select MachineTLI from INST_MACHINE' 2>/dev/null`"
+    echo "serial=`sqlite3 /app/nvram/karas.db 'select MachineSerialNo from INST_MACHINE' 2>/dev/null`"
+    echo "kernel=`uname -r`"
+} > $ROOT/run/dp200/stock_info
 if ! { [ -f /var/run/dp200-netd.pid ] && kill -0 $(cat /var/run/dp200-netd.pid) 2>/dev/null; }; then
     sh $ROOT/dp200/dp200-netd.sh $ROOT </dev/null >> $ROOT/var/log/dp200-netd.log 2>&1 &
     echo $! > /var/run/dp200-netd.pid
