@@ -305,6 +305,11 @@ tap('YES');                check('YES sends BED_CLEAR', sent[-1][1] == 'BED_CLEA
 ui.render();               check('no re-pop while status lags', ui.confirm is None)
 ui.bed_answered = 0.0
 tap('NO');                 check('NO sends BED_CLEAR CANCEL=1', sent[-1][1] == 'BED_CLEAR CANCEL=1')
+ui.st = dict(ui.st, **{'gcode_macro BED_CLEAR': {'ok': 0, 'asking': 1}})
+ui.bed_answered = 0.0; ui.confirm = None
+ui.render();               check('bed dialog up again while asking', ui.confirm is not None)
+ui.st = dict(ui.st, **{'gcode_macro BED_CLEAR': {'ok': 1, 'asking': 0}})
+ui.render();               check('answered in Mainsail: the dialog closes', ui.confirm is None)
 ui.st = dict(ui.st, **{'gcode_macro BED_CLEAR': {'ok': 0, 'asking': 0}})
 ui.confirm = None
 
