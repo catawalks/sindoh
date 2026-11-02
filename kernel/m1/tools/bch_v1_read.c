@@ -3,22 +3,23 @@
  * (2026-11-01; docs/kernel/nand_bch_plan.md, "Read path rework").
  *
  * Like the vendor's mv61x0_nand_do_cmd()/mv61x0_nand_irq(), a page is read
- * once, with BCH on (2048 data + 32 spare), and UNCERR counts only when it
- * comes with the data (RDDREQ). Measured against the stock dumps, 3 x 1000s
- * of reads: all md5s equal, a full mtd5 pass 33 s (stock 36 s), 0 timeouts.
+ * once, with BCH on (2048 data + 32 spare), from a stopped controller, and
+ * UNCERR counts only when it comes with the data (RDDREQ):
+ *  - nothing flagged: the page as read;
+ *  - CORERR: corrected. NDSR ERRCNT read after CMDD is the number of bits
+ *    corrected (it equalled the count from a raw re-read on 5535 of 5543
+ *    pages; the rest were flips in the ECC bytes, which only ERRCNT sees).
+ *    At RDDREQ it still reads 0, and idle it reads 16: only use it here;
  *  - UNCERR only after the data, with data and spare all 0xff: an erased
- *    page (every programmed page has "programz" in its spare).
- *  - UNCERR before RDDREQ (rare, after pages that needed correction): the
- *    controller gives no data for that command; read the page again.
- *  - CORERR: read the page raw too and count the corrected bits (NDSR
- *    ERRCNT reads 16 even when idle). More than t bits in an ECC step can't
- *    be a correction: read again.
- * What made reads return wrong data here (never do these): any extra NDCR
- * or NDSR write once the controller is running (an NDCR rewrite at the
- * start of a read, the vendor's NDSR 0x001f0010 clear after ND_RUN),
- * draining the RDDREQ the controller still shows after a BCH read, NDCR
- * bits 14/23 (stock sets them; with our command words the data is wrong),
- * and the old raw-then-BCH order, which broke with each of those.
+ *    page (every programmed page has "programz" in its spare);
+ *  - UNCERR before RDDREQ (rare): the controller gives no data for that
+ *    command; read the page again;
+ *  - UNCERR otherwise: read it raw to tell an erased page from a failure,
+ *    and try again; after BCH_V1_READ_TRIES it is counted as failed.
+ * Validated against the stock dumps: md5s of mtd0/mtd3/mtd5, 6000 random
+ * reads with pauses, the UBI headers of mtd6, a read-only UBIFS mount of
+ * the stock root. Never read NDDB from a debug tool: it takes a word out
+ * of the FIFO and shifts every later read by 4 bytes.
  * stats (0644, write zeros to reset): clean corrected erased retried
  * failed timeouts early_unc early_cor rdd_unc end_unc
  */
@@ -28,6 +29,7 @@ static uint bch_v1_st[ST_N];
 static int bch_v1_st_n = ST_N;
 module_param_array_named(stats, bch_v1_st, uint, &bch_v1_st_n, 0644);
 MODULE_PARM_DESC(stats, "88PA6170 reads: clean corrected erased retried failed timeouts early_unc early_cor rdd_unc end_unc");
+static u32 bch_v1_end_ndsr;
 
 #define F_EARLY_UNC	BIT(0)
 #define F_EARLY_COR	BIT(1)
@@ -119,6 +121,7 @@ static int marvell_nfc_bch_v1_ecc_read(struct nand_chip *chip, u8 *ecc_buf,
 		goto out;
 	}
 	ndsr = readl_relaxed(nfc->regs + NDSR);
+	bch_v1_end_ndsr = ndsr;
 	if (ndsr & NDSR_UNCERR)
 		*flags |= F_END_UNC;
 	if (ndsr & NDSR_CORERR)
@@ -144,31 +147,6 @@ out:
 	return ret;
 }
 
-/*
- * Corrected bits per ECC step, from the raw read and the BCH read. 30 ECC
- * bytes = 4 steps of 60 bits (t = 4, m = 15), each over 512 data + 8 spare
- * bytes. Returns the largest step count; *total gets the page total.
- */
-static unsigned int bch_v1_flips(const struct marvell_hw_ecc_layout *lt,
-				 const u8 *raw, const u8 *raw_spare,
-				 const u8 *ecc_buf, unsigned int *total)
-{
-	unsigned int step, i, n, max = 0;
-	unsigned int dstep = lt->data_bytes / 4, sstep = lt->spare_bytes / 4;
-
-	*total = 0;
-	for (step = 0; step < 4; step++) {
-		n = 0;
-		for (i = step * dstep; i < (step + 1) * dstep; i++)
-			n += hweight8(raw[i] ^ ecc_buf[i]);
-		for (i = step * sstep; i < (step + 1) * sstep; i++)
-			n += hweight8(raw_spare[i] ^ ecc_buf[lt->data_bytes + i]);
-		*total += n;
-		max = max(max, n);
-	}
-	return max;
-}
-
 static void bch_v1_take(struct nand_chip *chip, u8 *buf, const u8 *ecc_buf,
 			bool oob_rest_ff)
 {
@@ -188,7 +166,7 @@ static int marvell_nfc_bch_v1_read_page(struct nand_chip *chip, u8 *buf,
 	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
 	const struct marvell_hw_ecc_layout *lt = marvell_nand->layout;
 	struct mtd_info *mtd = nand_to_mtd(chip);
-	unsigned int flags = 0, flips, total;
+	unsigned int flags = 0, flips;
 	bool have_raw = false;
 	u8 *ecc_buf;
 	int ret = 0, r, bf, try;
@@ -226,7 +204,19 @@ static int marvell_nfc_bch_v1_read_page(struct nand_chip *chip, u8 *buf,
 				goto done;
 			}
 		}
-		/* the raw copy: corrected bits, or erased vs failed */
+		if (!ret) {
+			/* corrected: ERRCNT after CMDD is the bit count */
+			flips = max_t(unsigned int, 1, NDSR_ERRCNT(bch_v1_end_ndsr));
+			mtd->ecc_stats.corrected += flips;
+			bch_v1_take(chip, buf, ecc_buf, true);
+			bch_v1_st[ST_COR]++;
+			ret = flips;
+			goto done;
+		}
+		/* UNCERR before the data: no data came, just read again */
+		if (flags & F_EARLY_UNC)
+			continue;
+		/* UNCERR: the raw copy tells an erased page from a failed one */
 		marvell_nfc_disable_hw_ecc(chip);
 		r = marvell_nfc_hw_ecc_hmg_do_read_page(chip, buf, chip->oob_poi,
 							true, page);
@@ -235,32 +225,16 @@ static int marvell_nfc_bch_v1_read_page(struct nand_chip *chip, u8 *buf,
 			continue;
 		}
 		have_raw = true;
-		if (ret == -EBADMSG) {
-			bf = nand_check_erased_ecc_chunk(buf, lt->data_bytes,
-							 chip->oob_poi + lt->spare_bytes,
-							 lt->ecc_bytes,
-							 chip->oob_poi,
-							 lt->spare_bytes,
-							 chip->ecc.strength);
-			if (bf >= 0) {
-				bch_v1_st[ST_ERASED]++;
-				mtd->ecc_stats.corrected += bf;
-				ret = bf;
-				goto done;
-			}
-			continue;
+		bf = nand_check_erased_ecc_chunk(buf, lt->data_bytes,
+						 chip->oob_poi + lt->spare_bytes,
+						 lt->ecc_bytes, chip->oob_poi,
+						 lt->spare_bytes, chip->ecc.strength);
+		if (bf >= 0) {
+			bch_v1_st[ST_ERASED]++;
+			mtd->ecc_stats.corrected += bf;
+			ret = bf;
+			goto done;
 		}
-		/* corrected: more than t bits in a step can't be a correction */
-		flips = bch_v1_flips(lt, buf, chip->oob_poi, ecc_buf, &total);
-		if (flips > chip->ecc.strength) {
-			ret = -EBADMSG;
-			continue;
-		}
-		mtd->ecc_stats.corrected += total;
-		bch_v1_take(chip, buf, ecc_buf, false);
-		bch_v1_st[total ? ST_COR : ST_CLEAN]++;
-		ret = flips;
-		goto done;
 	}
 
 	/* Uncorrectable, or no data: the raw copy, counted as failed */
