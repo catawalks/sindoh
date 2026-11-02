@@ -73,6 +73,41 @@ fail() {
     keywait
     sync; reboot; exit 1
 }
+# A running Klipper touch screen keeps reading touches under the
+# installer's messages (2026-11-02: the confirm touch also pressed UNLOAD
+# in it). Stop it while the installer has the panel; bring it back if the
+# install is cancelled.
+SCREEN_ROOT=
+screen_off() {
+    for r in /klipper /mnt/sd; do
+        p=`cat $r/run/dp200/screen.pid 2>/dev/null`
+        [ -n "$p" ] && kill -0 $p 2>/dev/null || continue
+        kill $p                         # the screen loop ends the app too
+        SCREEN_ROOT=$r
+    done
+}
+screen_back() {
+    killall tinydebug 2>/dev/null
+    [ -n "$SCREEN_ROOT" ] && chroot $SCREEN_ROOT /usr/bin/env -i \
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
+        /etc/dp200/rc.dp200 restart-screen
+}
+# The confirm touch; pulling the stick out instead cancels: nothing has
+# been changed yet, so the Klipper screen comes back and the script ends
+# (auto_update.sh then stops too)
+confirm() {
+    /app/tinydebug keywait &
+    k=$!
+    while kill -0 $k 2>/dev/null; do
+        if [ ! -f "$PAYLOAD" ]; then
+            kill $k 2>/dev/null
+            echo "[klipper-install] stick removed: cancelled"
+            screen_back
+            exit 1
+        fi
+        sleep 1
+    done
+}
 mb_free() { echo $(( `df -k "$1" | tail -1 | awk '{print $(NF-2)}'` / 1024 )); }
 size_mb() { echo $(( `ls -l "$1" | awk '{print $5}'` / 1048576 )); }
 du_mb() { du -sk "$1" | awk '{print int($1 / 1024)}'; }
@@ -83,6 +118,7 @@ if [ $DRY_RUN = 0 ]; then
     kill -9 `pidof stdin2log` 2>/dev/null
     kill -9 `pidof appBrowser` 2>/dev/null
     /app/tinydebug wdt disable
+    screen_off
 fi
 show "Klipper installer" "target: $TARGET" ""
 
@@ -134,11 +170,11 @@ fi
 
 # ---- confirm on the touchscreen
 if [ $UPGRADE = 1 ]; then
-    show "Klipper found ($TARGET)" "Touch to UPGRADE" "(config is kept)"
+    show "Touch to UPGRADE" "Klipper ($TARGET), config kept" "Pull the stick to cancel"
 else
-    show "Touch to INSTALL" "Klipper ($TARGET)" "Power off to cancel"
+    show "Touch to INSTALL" "Klipper ($TARGET)" "Pull the stick to cancel"
 fi
-keywait
+[ $DRY_RUN = 1 ] || confirm
 
 # ---- stop a running Klipper stack and unmount its chroot
 if [ $DRY_RUN = 0 ]; then
