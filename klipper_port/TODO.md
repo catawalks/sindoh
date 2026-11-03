@@ -51,9 +51,11 @@ the work; it is how open items survive between sessions.
     11-02): done so far: engine register map (COM_STP +0x78 candidate),
     `CONFIG_UPC_STEP_SINGLE` (fork branch fast-stepping, default off) halves
     step interrupts, emulator-identical; engine run 11-03 (driver off):
-    +0x78 = 24-bit edge down-counter, engine clock 197.9 MHz. Next: phase
-    2b (multi-step moves; engine model in kemu first); phase 4 tests of
-    UPC_STEP_SINGLE at the printer (user).
+    +0x78 = 24-bit edge down-counter, engine clock 197.9 MHz. Phase 2b/3b
+    done: `CONFIG_UPC_STEP_BATCH` (constant blocks as engine moves, default
+    off) passes the kemu engine model (25 steps: 1 engine start instead of
+    25, steps 40 ticks after schedule instead of 840). Next: phase 4 at the
+    printer (user): SINGLE, then BATCH - homing, drift test, probing, cube.
 14. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
     Done); still untested with motion (homing/moves need the owner). They
     are the fallback; the printer runs the gcc builds from /opt/dp200.

@@ -27,6 +27,12 @@ struct gpio_out gpio_out_setup(uint8_t pin, uint8_t val);
 void gpio_out_reset(struct gpio_out g, uint8_t val);
 void gpio_out_toggle_noirq(struct gpio_out g);
 void gpio_out_toggle(struct gpio_out g);
+// multi-step engine moves (CONFIG_UPC_STEP_BATCH, src/stepper.c)
+uint32_t gpio_step_burst(struct gpio_out g, uint32_t steps, uint32_t half);
+uint32_t gpio_step_burst_done(struct gpio_out g, uint32_t c0);
+int gpio_step_burst_busy(struct gpio_out g);
+void gpio_step_burst_end(struct gpio_out g);
+uint32_t gpio_step_burst_stop(struct gpio_out g, uint32_t c0);
 void gpio_out_write(struct gpio_out g, uint8_t val);
 
 struct gpio_in {

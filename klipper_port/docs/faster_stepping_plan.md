@@ -170,9 +170,48 @@ So the option halves the step interrupts with identical pulses and
 positions in the emulator. Next for it: phase 4 on the printer (drift and
 homing tests, owner present) before it becomes the default.
 
+### Phase 2b: constant-rate blocks as engine moves (`CONFIG_UPC_STEP_BATCH`)
+
+Fork branch `fast-stepping` (8a93c354, f05f998e, e358e96b), default off;
+selects UPC_STEP_SINGLE. FM image 12,404 bytes.
+
+- A queue_step block with add == 0 and >= 8 steps (UPC_STEP_BATCH_MIN)
+  runs as one engine move: edge period = interval / 4 engine ticks (the
+  engine clock is half the timer's), started half an interval before the
+  first step so each rising edge falls on its step time.
+- interval & 3 makes each step up to 3 ticks early: a block is split into
+  parts whose accumulated error stays under UPC_STEP_BATCH_ERR (400 ticks,
+  1 us); each part starts on the exact schedule. Max 32,767 steps a part.
+- After an engine move the next constant block starts at once if that is
+  at most UPC_STEP_BATCH_LATE (800) ticks after its ideal start; after a
+  one-step pulse it waits out the pulse (4 x the half period) or steps.
+- `stepper_get_position` mid-move and `stepper_stop` (trsync, shutdown) use
+  the edge counter: read, ABORT, read again (whether ABORT resets it is
+  unknown), then the per-step period is restored.
+- Accelerating blocks (add != 0) are stepped as before (UPC_STEP_SINGLE).
+
+### Phase 3b: emulator, engine model (tools/kemu.py)
+
+kemu now models the engines as measured: edge count x period x divider at
+half the timer clock, busy/done bits, the 24-bit edge counter, ABORT. Step
+times are the rising edges; each test compares them with Klipper's own
+schedule for the queued blocks (gcc builds from the printer, e358e96b):
+
+| Test | off | single | batch |
+|---|---|---|---|
+| 25 constant steps: engine STARTs, step time - schedule | 25, +840 | 25, +840 | **1, +40** |
+| step events (toggle calls) for those 25 | 51 | 26 | **1** |
+| 40 accelerating steps after a dir change | +840..860, pos ok | same | same (stepped) |
+| mixed: 50 const, 30 accel, 60 const (4130), 20 accel | 160 STARTs | 160 | **52**, -54..+875 |
+| back-to-back const 40 + 40 + 400 (interval 4003: split) | 480 STARTs, +840..879 | 480 | **6**, +60..+757 |
+| position read mid-move | exact (lag 1-2 = the reply's own time) | same | same |
+| trsync stop mid-move | stops, 0 steps after, position exact | same | same (engine aborted) |
+| engine STARTs while busy | 0 | 0 | 0 |
+
 ### Next
 
-- Phase 2b: multi-step engine moves for constant-speed blocks, with the
-  stop position from +0x78. Needs an engine model in kemu first (multi-edge
-  timing, busy, abort, the counter) so it can be checked like phase 2a.
-- Phase 4 for UPC_STEP_SINGLE at the printer (owner present).
+- Phase 4 at the printer (owner present, bed empty): first UPC_STEP_SINGLE,
+  then UPC_STEP_BATCH: homing repeatability (as on 11-02, 208 mm/s), the
+  drift test at 30/100/208 mm/s, probing, then a cube. The engine's
+  first-edge delay (assumed one edge time after START) and the ABORT
+  counter behaviour are only measured there.

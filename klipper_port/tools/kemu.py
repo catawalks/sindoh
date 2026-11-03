@@ -41,8 +41,55 @@ def rd(base):
             return state['t1']
         if 0xf930a180 <= a < 0xf930a1a8:
             return ADC_FIFO[mem.get(0xf930a200, 0) & 1]
+        if 0xf8150000 <= a < 0xf8155000:
+            e = eng.get((a - 0xf8150000) >> 12)
+            r = a & 0xfff
+            if e is not None and r in (0x64, 0x78, 0x88):
+                now = state['ticks']
+                if r == 0x64:                         # COM_STAT: bit 8 busy
+                    return 0x106 if now < e['end'] else 7
+                if r == 0x88:                         # I_PEND: bit 8 done
+                    return 0x108 if now >= e['end'] else 8
+                done = min(e['edges'], (now - e['start']) // e['tpe'])
+                return (e['c0'] - done) & 0xffffff    # COM_STP: edge down-counter
         return mem.get(a, 0)
     return f
+
+# Stepper engine model (hardware run 2026-11-03, docs/faster_stepping_plan.md):
+# START runs CMD's edge count at PWM_M x PWM_P engine ticks per edge (engine
+# clock = half the FM timer); +0x64 bit 8 busy, +0x88 bit 8 done, +0x78 a
+# 24-bit down-counter of edges; ABORT (+0x04 = 0x100) stops it. Rising
+# edges (the steps) are at start + (2k+1) edge times. starts_at = step times
+# of engine 0; state['overrun'] counts STARTs while still busy.
+eng = {}
+
+def eng_write(n, r, val):
+    now = state['ticks']
+    e = eng.get(n)
+    if r == 0x60 and val == 1:
+        if e is not None and now < e['end']:
+            state['overrun'] = state.get('overrun', 0) + 1
+        b = 0xf8150000 + 0x1000 * n
+        edges = mem.get(b + 0x5c, 0) >> 16
+        tpe = max(1, mem.get(b + 0x58, 0) * max(1, mem.get(b + 0x50, 1)) * 2)
+        c0 = 0
+        if e is not None:
+            c0 = (e['c0'] - min(e['edges'], (now - e['start']) // e['tpe'])) & 0xffffff
+        eng[n] = {'start': now, 'end': now + edges * tpe, 'edges': edges, 'tpe': tpe, 'c0': c0}
+        if n == 0:
+            starts_at.extend(now + tpe * (2 * k + 1) for k in range(edges // 2))
+    elif r == 0x04 and val & 0x100 and e is not None:
+        if now < e['end']:
+            e['edges'] = (now - e['start']) // e['tpe']
+            e['end'] = now
+            if n == 0:
+                starts_at[:] = [t for t in starts_at if t <= now]
+        else:
+            e['c0'], e['edges'] = 0, 0                # config ABORT: counter back to 0
+
+def steps_done():
+    """Engine 0 steps whose rising edge has happened by now."""
+    return sum(1 for t in starts_at if t <= state['ticks'])
 
 def wr(base):
     def f(u, off, size, val, ud):
@@ -50,8 +97,8 @@ def wr(base):
         if a == TIMER: state['t1'] = val
         mem[a] = val
         writes.append((a, val))
-        if a == 0xf8150060:                       # engine 0 START: when (emulated ticks)
-            starts_at.append(state['ticks'])
+        if 0xf8150000 <= a < 0xf8155000:
+            eng_write((a - 0xf8150000) >> 12, a & 0xfff, val)
     return f
 
 for b, s in [(0x08000000, 0x10000), (0xf8000000, 0x200000), (0xf9300000, 0x10000)]:
@@ -168,60 +215,83 @@ if FM:
     send('config_digital_out oid=2 pin=smot_en0 value=1 default_value=1 max_duration=0')
     send('finalize_config crc=1234'); r = transact('get_config', 'config')
     print('after finalize: is_config', r['is_config'], 'move_count', r['move_count'])
+    def expected(t, blocks):
+        """Klipper's step times for queue_step blocks after a step at t."""
+        out = []
+        for interval, count, add in blocks:
+            t += interval
+            out.append(t)
+            iv = interval + add
+            for _ in range(count - 1):
+                t += iv
+                out.append(t)
+                iv += add
+        return out
+
+    def run_blocks(name, blocks, dir_=None, loops=200):
+        starts_at.clear(); calls[0] = 0; state['overrun'] = 0
+        t0 = clock() + 300000
+        send('reset_step_clock oid=0 clock=%d' % t0)
+        if dir_ is not None:
+            send('set_next_step_dir oid=0 dir=%d' % dir_)
+        for b in blocks:
+            send('queue_step oid=0 interval=%d count=%d add=%d' % b)
+        want = expected(t0, blocks)
+        for _ in range(loops):
+            run(100000); recv()
+            if len(starts_at) >= len(want) and steps_done() >= len(want):
+                break
+        got = sorted(starts_at)
+        dev = [g - w for g, w in zip(got, want)]
+        print('%s: %d steps (expected %d), step time - schedule %d..%d ticks, '
+              'engine STARTs %d, overruns %d, hooked calls %d'
+              % (name, len(got), len(want), min(dev), max(dev),
+                 sum(1 for a, v in writes if a == 0xf8150060 and v == 1),
+                 state.get('overrun', 0), calls[0]))
+        writes.clear()
+        return len(got)
+
     writes.clear()
-    t0 = clock() + 200000
-    send('reset_step_clock oid=0 clock=%d' % t0)
-    send('set_next_step_dir oid=0 dir=1')
-    send('queue_step oid=0 interval=4000 count=25 add=0')
-    for _ in range(40):
-        run(100000); recv()
-    starts = [w for w in writes if w[0] == 0xf8150060]
-    dirw = [hex(v) for a, v in writes if a == 0xf8150044]
-    print('stepper 0: %d hardware pulses issued (expected 25); ctrl writes %s' % (len(starts), dirw[:3]))
-    gaps = [b - a for a, b in zip(starts_at, starts_at[1:])]
-    print('pulse gaps (emulated ticks): %s' % sorted(set(gaps)))
-    r = transact('stepper_get_position oid=0', 'stepper_position'); print('stepper position', r['pos'])
-    # Acceleration after a direction change, then a long move read mid-way
-    # (UPC_STEP_SINGLE must give the same pulses, times and positions)
-    starts_at.clear(); state['treads'] = 0; calls[0] = 0
-    send('reset_step_clock oid=0 clock=%d' % (clock() + 200000))
-    send('set_next_step_dir oid=0 dir=0')
-    send('queue_step oid=0 interval=6000 count=40 add=-20')
-    for _ in range(80):
-        run(100000); recv()
-    gaps = [b - a for a, b in zip(starts_at, starts_at[1:])]
-    print('accel: %d pulses (expected 40), gaps %d..%d, hooked calls %d'
-          % (len(starts_at), min(gaps), max(gaps), calls[0]))
-    r = transact('stepper_get_position oid=0', 'stepper_position'); print('position after accel', r['pos'], '(expected -15)')
+    run_blocks('constant', [(4000, 25, 0)], dir_=1)
+    r = transact('stepper_get_position oid=0', 'stepper_position'); print('position', r['pos'], '(expected 25)')
+    run_blocks('accel after dir change', [(6000, 40, -20)], dir_=0)
+    r = transact('stepper_get_position oid=0', 'stepper_position'); print('position', r['pos'], '(expected -15)')
+    run_blocks('mixed blocks', [(5000, 50, 0), (5000, 30, -30), (4130, 60, 0), (4130, 20, 25)])
+    r = transact('stepper_get_position oid=0', 'stepper_position'); print('position', r['pos'], '(expected -175)')
+    run_blocks('back-to-back constant', [(5000, 40, 0), (4400, 40, 0), (4003, 400, 0)], loops=400)
+    r = transact('stepper_get_position oid=0', 'stepper_position'); print('position', r['pos'], '(expected -655)')
+    # position read in the middle of a long constant block
     starts_at.clear()
-    send('reset_step_clock oid=0 clock=%d' % (clock() + 200000))
+    send('reset_step_clock oid=0 clock=%d' % (clock() + 300000))
     send('queue_step oid=0 interval=8000 count=200 add=0')
-    for _ in range(12):
+    for _ in range(14):
         run(100000); recv()
     r = transact('stepper_get_position oid=0', 'stepper_position')
-    print('mid-move: %d pulses by the reply, position %d (-15 - pulses = %d)'
-          % (len(starts_at), r['pos'], -15 - len(starts_at)))
-    # Homing-style stop (trsync) in the middle of a move: afterwards the
-    # position must equal the pulses actually issued
-    for _ in range(60):
+    n = steps_done()
+    print('mid-move: %d steps done at the reply, position %d (-655 - steps = %d)' % (n, r['pos'], -655 - n))
+    for _ in range(120):
         run(100000); recv()
+        if steps_done() >= 200:
+            break
     base = transact('stepper_get_position oid=0', 'stepper_position')['pos']
+    # Homing-style stop (trsync) in the middle of a move: afterwards the
+    # position must equal the steps actually made, and none may follow
     starts_at.clear()
     send('trsync_start oid=3 report_clock=0 report_ticks=0 expire_reason=4')
     send('stepper_stop_on_trigger oid=0 trsync_oid=3')
-    send('reset_step_clock oid=0 clock=%d' % (clock() + 200000))
+    send('reset_step_clock oid=0 clock=%d' % (clock() + 300000))
     send('queue_step oid=0 interval=8000 count=300 add=0')
-    for _ in range(14):
+    for _ in range(16):
         run(100000); recv()
     send('trsync_trigger oid=3 reason=1')
     for _ in range(20):
         run(100000); recv()
-    n = len(starts_at)
-    for _ in range(20):
+    n = steps_done()
+    for _ in range(40):
         run(100000); recv()
     pos = transact('stepper_get_position oid=0', 'stepper_position')['pos']
-    print('trsync stop: %d of 300 pulses, none after (%d), position %d (expected %d)'
-          % (n, len(starts_at), pos, base - n))
+    print('trsync stop: %d of 300 steps, %d after the stop, position %d (expected %d)'
+          % (n, steps_done() - n, pos, base - n))
     mem[0x0800165c] = 1 << 10
     r = transact('endstop_query_state oid=1', 'endstop_state'); print('endstop xena42 high ->', r['pin_value'])
     mem[0x0800165c] = 0
