@@ -45,11 +45,12 @@ the work; it is how open items survive between sessions.
     (inside) or USB stick, in tiers; NAND-only stays a full install with
     managed space (~140-150 MB free once our root replaces the stock one).
 11c. **Per-printer data for the full mtd6 replacement**
-    (internal_firmware_plan.md, 11-03): app/nvram (karas.db: serial, model,
-    calibration) and the network/Wi-Fi settings are in no Sindoh package;
-    the installer must save them (stick + a copy in our root) and the revert
-    must restore them after Sindoh's recovery. All Sindoh software is in
-    mtd5 (factory 2017) or the 2020 update.
+    (internal_firmware_plan.md, 11-03): all Sindoh software is in mtd5
+    (factory 2017) or the 2020 update; karas.db (model, serial, calibration)
+    rebuilds itself from Sindoh's copy on mtd4 at the first boot after a
+    recovery (db_setup), so no backup is required. Optional: the installer
+    keeps the live karas.db + network files on the stick for the latest
+    calibration and Wi-Fi. mtd4 stays never-written.
 
 ## Agent (no user needed)
 

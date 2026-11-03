@@ -207,11 +207,29 @@ match install/nand/recovery.md5) and with Sindoh's 2020 update
 - None of the 12 DP200 updates (2016-2020) has the live auto_update.sh,
   run.sh or restart.sh: they are the local edits above.
 
-**Consequence for the full mtd6 replacement:** Sindoh's recovery rebuilds
-mtd6 from its image, so `app/nvram` would be lost (serial, model,
-calibration). The installer must save the per-printer data above (to the
-stick, and a copy inside our root), and a revert must put it back after the
-recovery; then Sindoh's 2020 update brings the software to 2020.
+**karas.db rebuilds itself from mtd4 (checked 2026-11-03).** The stock
+/etc/profile mounts `ubi1:backup` (mtd4) on /backup, and Sindoh keeps a
+copy there, `/backup/karas_backup.db` (rodin_util.sh writes it at
+--set-tli, --set-serial and --test-end). The main program's NVRAM setup
+(`db_setup` in the gemstone ELF) at every start:
+- no karas.db ("No DB") or a failed integrity check -> copy the backup in
+  (after checking the backup's integrity);
+- karas.db without a model (TLI empty or "NOTLI") while the backup has one
+  -> copy the backup in ("TLI integrity check fail... DB recovery");
+- a broken backup -> copy the live DB over it.
+So after Sindoh's recovery wipes mtd6, the first boot restores model,
+serial and calibration from mtd4 - as long as **mtd4 is never written**
+(already a rule). Test printer: the backup is intact, same TLI (3DP200Q)
+and serial as live; the dumps differ only in one CONF_MACHINE_OFFSET value
+(a later calibration), two newer saved Wi-Fi networks and two error-log
+rows. Network settings (etc/network, the stock wpa_supplicant.conf) are
+not in it.
+
+**Consequence for the full mtd6 replacement:** no backup is required for a
+correct recovery. Optional convenience: the installer saves the live
+karas.db and the network files (~100 KB) to the stick, so a revert can also
+restore the latest calibration and Wi-Fi. Never refresh mtd4's copy
+ourselves. Then Sindoh's 2020 update brings the software to 2020.
 
 ## NAND wear and the root's writes (2026-11-01, agreed with the owner)
 
