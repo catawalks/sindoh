@@ -50,9 +50,10 @@ the work; it is how open items survive between sessions.
 13. **Faster stepping** (docs/faster_stepping_plan.md, phases 1-3 approved
     11-02): done so far: engine register map (COM_STP +0x78 candidate),
     `CONFIG_UPC_STEP_SINGLE` (fork branch fast-stepping, default off) halves
-    step interrupts, emulator-identical. Next: owner's OK for the
-    driver-disabled engine run (COM_STP, clock ratio); phase 4 tests of the
-    option at the printer (user); then phase 2b (multi-step moves).
+    step interrupts, emulator-identical; engine run 11-03 (driver off):
+    +0x78 = 24-bit edge down-counter, engine clock 197.9 MHz. Next: phase
+    2b (multi-step moves; engine model in kemu first); phase 4 tests of
+    UPC_STEP_SINGLE at the printer (user).
 14. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
     Done); still untested with motion (homing/moves need the owner). They
     are the fallback; the printer runs the gcc builds from /opt/dp200.
