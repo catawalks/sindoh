@@ -163,6 +163,13 @@ for cmd in cmds:
     except UcError as e:
         print('cmd stop', e, hex(uc.reg_read(UC_ARM_REG_PC)))
     sensor_reads = {a: n for a, n in nreads.items() if a in (0x0800165c, 0x08001658)}
+    if os.environ.get('ENGREADS'):                 # which engine registers the code reads
+        eng = {}
+        for a, n in nreads.items():
+            if 0xf8150000 <= a < 0xf8155000:
+                k = '%s+%#x' % (AXIS[(a - 0xf8150000) >> 12], a & 0xfff)
+                eng[k] = eng.get(k, 0) + n
+        print('  engine reads:', dict(sorted(eng.items())))
     print('==== FM cmd %#x  uart=%r  sensor polls=%s' % (cmd, ''.join(uart), {hex(k): v for k, v in sensor_reads.items()}))
     uart.clear()
     prev = None; rep = 0

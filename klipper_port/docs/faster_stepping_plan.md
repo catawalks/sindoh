@@ -1,6 +1,6 @@
-# Faster stepping in the UPC firmware (plan, 2026-11-02, for review)
+# Faster stepping in the UPC firmware (plan 2026-11-02; phases 1-3 approved)
 
-PROJECTS.md #5. Nothing here is started; the owner reviews this first.
+PROJECTS.md #5. Results so far are at the end.
 
 ## Today
 
@@ -91,3 +91,75 @@ the per-step path at first.
 - Clock drift between engine and timer: phase 1 step 1 settles it.
 - Time: phases 1-3 are a few sessions without the printer; phase 4 needs
   the owner for about an hour.
+
+## Results (2026-11-02/03)
+
+### Phase 1: engine registers (emulator + read-only dump)
+
+- The stock FM microcode reads only +0x58 (period), +0x64 (status) and
+  +0x88 (done) of the engines (all 60 commands emulated, `ENGREADS=1
+  tools/fmseq.py`): no step counter is used by stock.
+- Read-only dump of all five engines on the idle printer (`busybox devmem`,
+  0x00-0xfc; the vendor's own 3DWOX stepper driver dumps the same block in
+  dbg_print_reg). With the 3DWOX driver's register names aligned so that
+  CMD = +0x5c, every value fits a "next move" set and a "current move"
+  (COM_) copy:
+
+  | Offset | Name (3DWOX stepper-mod-b0.ko) | Idle value X/Y/Z | Meaning |
+  |---|---|---|---|
+  | +0x44 | OUT_MODE | 0x33224 | output mode; bit 4 = direction |
+  | +0x48 | STEP_INT | 0 | ? |
+  | +0x4c | PWM_T | 1 | ? |
+  | +0x50 | PWM_P | 1 | **clock divider** (stock Z back-off and probe: 200) |
+  | +0x54 | ACC_INCR | 0 | ramp increment (RAMP_LEN) |
+  | +0x58 | PWM_M | 0x190 | period (ticks per edge) |
+  | +0x5c | CMD | 0x20001 | (edges << 16) / mode |
+  | +0x60 | - | 0 | START (write 1) |
+  | +0x64 | COM_STAT | 7 | status (bit 8 = busy) |
+  | +0x68 | COM_PWM_P | 1 | = PWM_P of the running/last move |
+  | +0x6c | COM_ACC_INCR | 0 | = ACC_INCR |
+  | +0x70 | COM_PWM_M | 0x190 | = PWM_M |
+  | +0x74 | COM_CMD | 0x20001 | = CMD |
+  | **+0x78** | **COM_STP** | 0 | **steps of the running move (candidate)** |
+  | +0x7c | COM_TVT | 1 | |
+  | +0x80 | COM_SEQ | 3 | |
+  | +0x84 | I_EN | 0 | interrupt enable |
+  | +0x88 | I_PEND | 8 / 0x100 | done (bit 8) |
+  | +0x8c | SMC_TRIG | 0 | we write 0x100 to clear done |
+
+  Engine 4 (unused) fits too: PWM_P 0 and COM_PWM_P 0, PWM_M 1 and
+  COM_PWM_M 1. The COM_ copies suggest the engine latches a command at
+  START, so the next one could be written while a move runs.
+- **Still open (needs an engine to run):** that COM_STP counts during a move,
+  and the exact engine/timer clock ratio. Proposed test (owner's OK
+  needed): one long engine move on X with the driver disabled (+0x0c bit 0
+  = 1, as at idle: no motion), reading +0x78 and the timer while it runs,
+  registers restored afterwards.
+
+### Phase 2a: one timer event per step (`CONFIG_UPC_STEP_SINGLE`)
+
+A smaller first step than batching: Klipper's step/unstep path runs two
+timer events per step, and on the UPC the unstep event does nothing (the
+engine makes the whole pulse). With the option (fork branch
+`fast-stepping`, commit 9ade7319, default off) the steppers run
+single-scheduled and every step-pin toggle starts one engine pulse; the
+host's step times are unchanged. FM image 11,844 bytes (off: 11,840).
+
+### Phase 3a: emulator regression (tools/kemu.py, gcc builds from the printer)
+
+| Check | Option off | Option on |
+|---|---|---|
+| 25 steps, interval 4000 | 25 pulses, gaps 4000 | same |
+| 40 steps with add -20 after a dir change | 40 pulses, gaps 5200-6000, position -15 | same |
+| Step events for those 40 steps (calls of gpio_out_toggle_noirq, `HOOK=`) | **81** | **41** |
+| Position read mid-move | lags the pulses by 2 | same |
+| trsync stop mid-move (homing) | 103 of 300 pulses, none after, position exact | 101 of 300, none after, exact |
+
+So the option halves the step interrupts with identical pulses and
+positions in the emulator. Next for it: phase 4 on the printer (drift and
+homing tests, owner present) before it becomes the default.
+
+### Next
+
+- Phase 1 test above (COM_STP, clock ratio), then phase 2b: multi-step
+  engine moves for constant-speed blocks.

@@ -47,8 +47,12 @@ the work; it is how open items survive between sessions.
 12. **Wi-Fi drops:** watching the test printer's log. 68 deauths total,
     none since power saving went off (checked 2026-11-03 ~01:50 and again
     ~02:40). Check again after a day; then the work printer.
-13. **Faster stepping in the UPC firmware** (PROJECTS.md #5): plan first,
-    owner reviews it before work starts.
+13. **Faster stepping** (docs/faster_stepping_plan.md, phases 1-3 approved
+    11-02): done so far: engine register map (COM_STP +0x78 candidate),
+    `CONFIG_UPC_STEP_SINGLE` (fork branch fast-stepping, default off) halves
+    step interrupts, emulator-identical. Next: owner's OK for the
+    driver-disabled engine run (COM_STP, clock ratio); phase 4 tests of the
+    option at the printer (user); then phase 2b (multi-step moves).
 14. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
     Done); still untested with motion (homing/moves need the owner). They
     are the fallback; the printer runs the gcc builds from /opt/dp200.

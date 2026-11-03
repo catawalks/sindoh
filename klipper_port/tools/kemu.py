@@ -4,7 +4,7 @@ import sys, struct
 kl, binpath, core = sys.argv[1:4]
 sys.path.insert(0, kl + '/klippy')
 import msgproto
-from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UcError
+from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE, UcError
 from unicorn import arm_const as A
 
 FM = core == 'fm'
@@ -20,7 +20,7 @@ uc.mem_map(0, 0x10000); uc.mem_write(0, open(binpath, 'rb').read())
 uc.mem_map(0x04000000, 0x40000)
 
 state = {'ticks': 0, 't1': int(__import__('os').environ.get('T1INIT', '0'), 0)}
-mem = {}; writes = []
+mem = {}; writes = []; starts_at = []
 ADC_FIFO = {0: 600, 1: 300}   # raw counts returned for mux sel 0 / 1
 
 def rd(base):
@@ -29,6 +29,7 @@ def rd(base):
         if a == TIMER:
             d = int(__import__('os').environ.get('TICK','40'))
             state['ticks'] = (state['ticks'] + d) & 0xffffffff   # true elapsed time
+            state['treads'] = state.get('treads', 0) + 1
             state['t1'] = max(0, state.get('t1', 0) - d)          # one-shot down-counter
             if not FM and state['t1'] < 0x40000000:               # play the FM core's reload
                 sh = 0x04018000
@@ -49,10 +50,21 @@ def wr(base):
         if a == TIMER: state['t1'] = val
         mem[a] = val
         writes.append((a, val))
+        if a == 0xf8150060:                       # engine 0 START: when (emulated ticks)
+            starts_at.append(state['ticks'])
     return f
 
 for b, s in [(0x08000000, 0x10000), (0xf8000000, 0x200000), (0xf9300000, 0x10000)]:
     uc.mmio_map(b, s, rd(b), None, wr(b), None)
+
+# HOOK=0x1715: count calls of one function (address from the build's
+# klipper.elf; Thumb bit dropped), e.g. gpio_out_toggle_noirq = step events
+calls = [0]
+if __import__('os').environ.get('HOOK'):
+    _h = int(__import__('os').environ['HOOK'], 0) & ~1
+    def _count(u, addr, size, ud):
+        calls[0] += 1
+    uc.hook_add(UC_HOOK_CODE, _count, begin=_h, end=_h)
 
 def r32(a): return struct.unpack('<I', uc.mem_read(a, 4))[0]
 def w32(a, v): uc.mem_write(a, struct.pack('<I', v & 0xffffffff))
@@ -149,7 +161,8 @@ r = transact('get_config', 'config'); print('get_config', {k: r[k] for k in ('is
 def clock(): return transact('get_clock', 'clock')['clock']
 
 if FM:
-    send('allocate_oids count=3')
+    send('allocate_oids count=4')
+    send('config_trsync oid=3')
     send('config_stepper oid=0 step_pin=smot_step0 dir_pin=smot_dir0 invert_step=0 step_pulse_ticks=400')
     send('config_endstop oid=1 pin=xena42 pull_up=1')
     send('config_digital_out oid=2 pin=smot_en0 value=1 default_value=1 max_duration=0')
@@ -165,7 +178,50 @@ if FM:
     starts = [w for w in writes if w[0] == 0xf8150060]
     dirw = [hex(v) for a, v in writes if a == 0xf8150044]
     print('stepper 0: %d hardware pulses issued (expected 25); ctrl writes %s' % (len(starts), dirw[:3]))
+    gaps = [b - a for a, b in zip(starts_at, starts_at[1:])]
+    print('pulse gaps (emulated ticks): %s' % sorted(set(gaps)))
     r = transact('stepper_get_position oid=0', 'stepper_position'); print('stepper position', r['pos'])
+    # Acceleration after a direction change, then a long move read mid-way
+    # (UPC_STEP_SINGLE must give the same pulses, times and positions)
+    starts_at.clear(); state['treads'] = 0; calls[0] = 0
+    send('reset_step_clock oid=0 clock=%d' % (clock() + 200000))
+    send('set_next_step_dir oid=0 dir=0')
+    send('queue_step oid=0 interval=6000 count=40 add=-20')
+    for _ in range(80):
+        run(100000); recv()
+    gaps = [b - a for a, b in zip(starts_at, starts_at[1:])]
+    print('accel: %d pulses (expected 40), gaps %d..%d, hooked calls %d'
+          % (len(starts_at), min(gaps), max(gaps), calls[0]))
+    r = transact('stepper_get_position oid=0', 'stepper_position'); print('position after accel', r['pos'], '(expected -15)')
+    starts_at.clear()
+    send('reset_step_clock oid=0 clock=%d' % (clock() + 200000))
+    send('queue_step oid=0 interval=8000 count=200 add=0')
+    for _ in range(12):
+        run(100000); recv()
+    r = transact('stepper_get_position oid=0', 'stepper_position')
+    print('mid-move: %d pulses by the reply, position %d (-15 - pulses = %d)'
+          % (len(starts_at), r['pos'], -15 - len(starts_at)))
+    # Homing-style stop (trsync) in the middle of a move: afterwards the
+    # position must equal the pulses actually issued
+    for _ in range(60):
+        run(100000); recv()
+    base = transact('stepper_get_position oid=0', 'stepper_position')['pos']
+    starts_at.clear()
+    send('trsync_start oid=3 report_clock=0 report_ticks=0 expire_reason=4')
+    send('stepper_stop_on_trigger oid=0 trsync_oid=3')
+    send('reset_step_clock oid=0 clock=%d' % (clock() + 200000))
+    send('queue_step oid=0 interval=8000 count=300 add=0')
+    for _ in range(14):
+        run(100000); recv()
+    send('trsync_trigger oid=3 reason=1')
+    for _ in range(20):
+        run(100000); recv()
+    n = len(starts_at)
+    for _ in range(20):
+        run(100000); recv()
+    pos = transact('stepper_get_position oid=0', 'stepper_position')['pos']
+    print('trsync stop: %d of 300 pulses, none after (%d), position %d (expected %d)'
+          % (n, len(starts_at), pos, base - n))
     mem[0x0800165c] = 1 << 10
     r = transact('endstop_query_state oid=1', 'endstop_state'); print('endstop xena42 high ->', r['pin_value'])
     mem[0x0800165c] = 0
