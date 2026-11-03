@@ -196,6 +196,68 @@ smot_pulse(uint8_t n)
     reg_write(b + SMOT_START, 1);
 }
 
+#if CONFIG_UPC_STEP_BATCH
+// Multi-step engine moves for src/stepper.c (CONFIG_UPC_STEP_BATCH):
+// 'steps' steps at 'half' engine ticks per edge, so a step's rising edge
+// comes every 2 * half ticks. +0x78 counts the engine's output edges down
+// (24 bits, measured 2026-11-03); returns its value at the start.
+uint32_t
+gpio_step_burst(struct gpio_out g, uint32_t steps, uint32_t half)
+{
+    uint8_t n = g.pin - PIN_STEP_BASE;
+    uint32_t b = SMOT_BASE(n);
+    smot_pulses[n] += steps;
+    if (smot_wait_idle(b))
+        smot_busy_hits[n]++;
+    uint32_t c0 = reg_read(b + SMOT_EDGES);
+    reg_write(b + SMOT_CLEAR, SMOT_DONE_BIT);
+    reg_write(b + SMOT_PERIOD, half);
+    reg_write(b + SMOT_CMD, ((2 * steps) << 16) | SMOT_MODE_CONST);
+    reg_write(b + SMOT_START, 1);
+    return c0;
+}
+
+// Steps of the running move made so far (a step counts from its rising
+// edge, as a stepped step counts from its event)
+uint32_t
+gpio_step_burst_done(struct gpio_out g, uint32_t c0)
+{
+    uint32_t b = SMOT_BASE(g.pin - PIN_STEP_BASE);
+    uint32_t edges = (c0 - reg_read(b + SMOT_EDGES)) & 0xffffff;
+    return (edges + 1) / 2;
+}
+
+int
+gpio_step_burst_busy(struct gpio_out g)
+{
+    return reg_read(SMOT_BASE(g.pin - PIN_STEP_BASE) + SMOT_STATUS) & SMOT_DONE_BIT;
+}
+
+// After the last move: the one-step period back for single steps
+void
+gpio_step_burst_end(struct gpio_out g)
+{
+    reg_write(SMOT_BASE(g.pin - PIN_STEP_BASE) + SMOT_PERIOD,
+              CONFIG_UPC_STEP_HALF_TICKS);
+}
+
+// Stop a running move (homing trigger, shutdown); returns its steps made.
+// The counter is read before and after the abort: whether ABORT resets it
+// is not known (it is 0 after the config-time ABORT).
+uint32_t
+gpio_step_burst_stop(struct gpio_out g, uint32_t c0)
+{
+    uint32_t b = SMOT_BASE(g.pin - PIN_STEP_BASE);
+    uint32_t c1 = reg_read(b + SMOT_EDGES);
+    reg_write(b + SMOT_ABORT, SMOT_DONE_BIT);
+    uint32_t c2 = reg_read(b + SMOT_EDGES);
+    uint32_t c = c2 ? c2 : c1;
+    reg_write(b + SMOT_CLEAR, SMOT_DONE_BIT);
+    gpio_step_burst_end(g);
+    return ((((c0 - c) & 0xffffff)) + 1) / 2;
+}
+#endif
+
 #if CONFIG_UPC_CORE_FM
 void
 command_upc_step_stats(uint32_t *args)
@@ -300,8 +362,13 @@ gpio_out_toggle_noirq(struct gpio_out g)
         uint8_t n = pin - PIN_STEP_BASE;
         uint8_t val = step_level[n] ^ 1;
         step_level[n] = val;
+#if CONFIG_UPC_STEP_SINGLE
+        // one toggle per step: src/stepper.c runs these single-scheduled
+        smot_pulse(n);
+#else
         if (val != step_idle[n])
             smot_pulse(n);
+#endif
     } else if (pin_in(pin, PIN_DIR_BASE, SMOT_COUNT)) {
         uint8_t n = pin - PIN_DIR_BASE;
         smot_set_dir(n, !dir_level[n]);

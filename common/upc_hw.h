@@ -84,6 +84,7 @@
 #define SMOT_CMD            0x5c  // (edges << 16) | mode; edges = 2 * steps
 #define SMOT_START          0x60  // write 1
 #define SMOT_STATUS         0x64
+#define SMOT_EDGES          0x78  // COM_STP: output edges, 24-bit down-counter
 #define SMOT_DONE           0x88  // bit8 = move finished
 #define SMOT_CLEAR          0x8c  // write 0x100 to clear done
 #define SMOT_CTRL_STOCK     0x33224u

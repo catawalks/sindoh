@@ -60,6 +60,53 @@ config UPC_STEP_HALF_TICKS
       high for this many 5 ns ticks, then low for the same time. 400 =
       2 us high, comfortably above the A4982's 1 us minimum.
 
+config UPC_STEP_SINGLE
+    bool "One timer event per step (no unstep events)"
+    depends on UPC_CORE_FM
+    default n
+    help
+      The stepper engine makes the whole STEP pulse in hardware, so the
+      "unstep" timer event of Klipper's step/unstep path does nothing but
+      cost an interrupt. With this, the stepper code runs one event per
+      step (its single-schedule mode, as for "step on both edges") and
+      every STEP pin toggle starts one engine pulse. The host's step
+      timing is unchanged. Halves the step interrupts.
+
+config UPC_STEP_BATCH
+    bool "Run constant-rate step blocks as multi-step engine moves"
+    depends on UPC_CORE_FM
+    select UPC_STEP_SINGLE
+    default n
+    help
+      A queue_step block with add == 0 is handed to the stepper engine
+      as one move (its rising edges on the scheduled step times) instead
+      of one timer event per step. Positions mid-move and after a homing
+      stop come from the engine's edge counter (+0x78).
+
+config UPC_STEP_BATCH_MIN
+    int "Fewest steps in a block for an engine move"
+    depends on UPC_STEP_BATCH
+    default 8
+
+config UPC_STEP_BATCH_ERR
+    int "Most timer ticks an engine move's last step may come early"
+    depends on UPC_STEP_BATCH
+    default 400
+    help
+      The engine's edge period is the step interval / 4 (engine ticks);
+      the remainder makes each step up to 3 timer ticks early. Longer
+      blocks are split so this stays below the limit (400 = 1 us).
+
+config UPC_STEP_BATCH_LATE
+    int "Most timer ticks a chained engine move may start late"
+    depends on UPC_STEP_BATCH
+    default 800
+    help
+      A constant block right after an engine move starts when that one
+      has been seen to end; if that is later than its first step needs,
+      by at most this many ticks, its steps come that much late (a
+      stepped step comes ~840 ticks after its time); else it is stepped.
+
 config UPC_ADC_SETTLE_US
     int "Wait after selecting an ADC input before reading (microseconds)"
     depends on UPC_CORE_IO
