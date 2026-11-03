@@ -87,10 +87,45 @@ carries the 2020 update.tar and the revert extracts it instead.
    - has `--dry-run`, which prints every erase and write with the window
      closed.
 4. **Trigger:**
+   - **a Sindoh DP200 firmware update stick** (`_update_rodin/` with
+     Sindoh's `update.she`, any version): the main user path, decided
+     2026-11-03 (see below). The screen asks "Return this printer to
+     stock?"; on yes the marker is set and the printer reboots into the
+     revert;
    - a revert stick: a marker file in `_update_rodin/`, checked by the
      initramfs at boot;
    - a "Back to stock" button in the screen app, which sets a marker and
      reboots.
+
+## The user's revert path (owner, 2026-11-03)
+
+**"Run a Sindoh firmware update" is how a user goes back to stock**, with
+no files from us. Everything needed is already on the printer, in areas we
+never write:
+- **mtd5:** the factory recovery set (kernel, logo, stock root, apps; the
+  2017 firmware).
+- **mtd4:** Sindoh's `karas_backup.db`. On the first stock boot the app's
+  db_setup restores karas.db from it (model, serial, calibration;
+  internal_firmware_plan.md, "karas.db rebuilds itself").
+- **The Sindoh update on the stick:** after the revert reboots into stock,
+  the stock system finds the same stick at boot and runs the update as on
+  any stock printer (RODIN_200730_2 brings the software to 2020).
+
+A plain Sindoh stick can't do it alone: its updater (auto_update.sh via
+/etc/profile and media.connect) lives in the stock root that our system
+replaces, update.sh only unpacks the apps over an existing stock root, and
+Sindoh's self-recovery is in the stock kernel's initramfs. So our system
+must recognize the stick and run the revert above first.
+
+The stick backups of the USB installer (Sindoh app, WebKit, optionally the
+live karas.db and network files) stay an extra: the latest calibration and
+Wi-Fi.
+
+**Remaining risk, accepted:** power lost while mtd0 is being written leaves
+a kernel that doesn't boot. U-Boot is untouched and only boots mtd0
+without an env change, so the fix is the serial console - the same risk,
+and the same last resort, as Sindoh's own kernel updates. Mitigations: write
+mtd0 last, rarely, and verify it before the reboot.
 
 ## Test sequence (each write stage needs the owner's OK)
 

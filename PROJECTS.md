@@ -73,6 +73,8 @@ upgrade, cancel and remove (stick backup or the mtd5 fallback) tested on
 the test printer; installs on the work printer from 160505 and 191210
 firmware. Open: our kernel in mtd0 (step 3c, not approved), NAND space for
 upstream updates (#10).
+End goal (our kernel in mtd0, our root in mtd6, mtd5 untouched): revert by
+plugging in a Sindoh update stick (decided 2026-11-03, TODO 11d).
 
 ## 4. Object-on-bed check with the camera
 
