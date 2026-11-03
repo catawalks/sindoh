@@ -175,6 +175,44 @@ that step. The installer's mtd5 backup on the stick (nanddump) and the
 remove stick's restore keep the set, but only on the stick. ~42 MB of the
 volume is free.
 
+## What a revert to stock can restore (2026-11-03)
+
+File-by-file comparison of the test printer's live stock root (2020
+firmware RODIN_200730_2, 2,962 files, md5 each) with the mtd5 recovery set
+(nandrootfs.ubifs + update.tar.bz2, extracted from the PC copies whose md5s
+match install/nand/recovery.md5) and with Sindoh's 2020 update
+(image.app -> app.tar.bz2):
+
+| Live files | Count | Restorable from |
+|---|---|---|
+| identical in the recovery set (factory 2017, GUI 1.2.51) | 1,734 | mtd5 |
+| missing there or different, identical in the 2020 update | 1,178 | Sindoh's 2020 update (newer GUI, gemstone ELF, UIManager, tinydebug, libs, web, examples) |
+| per-printer data | ~30 | **nowhere but the printer** |
+| local edits / ours | ~20 | not needed |
+
+- **Per-printer data:** `app/nvram/` (17 files: **karas.db** = serial,
+  model ID / TLI (the Stanley conversion), calibration offsets, settings;
+  NET*, WIF*, UAP0, PLAT, PJLO, STRM, jobid.dat, sc_details.dat),
+  `etc/network/{interfaces,CONN_SSID,SSID_LIST}`,
+  `etc/init.d/{wpa_supplicant.conf,wifi_sta_start.sh}`, `etc/resolv.conf`,
+  `var/net-snmp/snmpd.conf`, `var/spool/cron/crontabs/root`,
+  `app/homepage.txt`, `app/.browser/`, logs (`app/errorlog`,
+  `app/update.log`, `var/log`).
+- **Local edits:** `app/auto_update.sh` (whitespace only), `test/run.sh` and
+  `test/restart.sh` (webcam 1 -> 4 fps), `app/ALPINE_MOUNT.sh`, an editor
+  backup and a stray `usr/local/ssl/bin/-`; ours: DEBUG_MACHINE,
+  etc/dp200-boot.sh, etc/profile(.stock).
+- The Wi-Fi firmware in `lib/firmware/mrvl/` equals
+  `lib/modules/8782/usb8782_uapsta.bin` (in the packages).
+- None of the 12 DP200 updates (2016-2020) has the live auto_update.sh,
+  run.sh or restart.sh: they are the local edits above.
+
+**Consequence for the full mtd6 replacement:** Sindoh's recovery rebuilds
+mtd6 from its image, so `app/nvram` would be lost (serial, model,
+calibration). The installer must save the per-printer data above (to the
+stick, and a copy inside our root), and a revert must put it back after the
+recovery; then Sindoh's 2020 update brings the software to 2020.
+
 ## NAND wear and the root's writes (2026-11-01, agreed with the owner)
 
 **Wear isn't a practical limit:**
