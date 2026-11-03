@@ -474,7 +474,7 @@ class UI:
         self.net = {'rev': 0, 'info': {}, 'dns': [], 'checked': 0.0, 'busy': False,
                     'iface': 'eth0', 'draft': {}, 'field': 'ip', 'text': ''}
         # WiFi setup state (pages wifi, wifi_list, wifi_kb)
-        self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'list': [], 'page': 0,
+        self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'saved_list': [], 'list': [], 'page': 0,
                    'busy': None, 'checked': 0.0, 'target': b'', 'kb_for': 'psk',
                    'text': '', 'mode': 'abc', 'shift': False, 'show': False, 'hidden': False}
         # input shaping page: last recommended shaper per axis from the console
@@ -498,7 +498,7 @@ class UI:
         kind = action[0]
         if kind == 'screen':
             self.screen = action[1]
-            if self.screen in ('wifi', 'network'):
+            if self.screen in ('wifi', 'wifi_saved', 'network'):
                 self.wifi_refresh()
             if self.screen == 'network':
                 self.net['checked'] = 0
@@ -843,15 +843,21 @@ class UI:
     def wifi_refresh(self):
         def fn(w):
             self.wf['status'] = wifi.status(w)
-            self.wf['saved'] = len(wifi.load_saved())
+            self.load_saved_list()
             self.ip = my_ip()
         self.wf['checked'] = time.time()
         self.wifi_bg(None, fn)
 
+    def load_saved_list(self):
+        """Saved networks, first choice first (names and priorities only)."""
+        nets = sorted(wifi.load_saved(), key=lambda n: -n['priority'])
+        self.wf['saved_list'] = [(n['ssid'], n['priority']) for n in nets]
+        self.wf['saved'] = len(nets)
+
     def wifi_tick(self):
         """Keep the WiFi page's status current while it is shown, and run the
         no-IP watchdog every 10 s on any page."""
-        if self.screen == 'wifi' and not self.wf['busy'] and time.time() - self.wf['checked'] > 4:
+        if self.screen in ('wifi', 'wifi_saved') and not self.wf['busy'] and time.time() - self.wf['checked'] > 4:
             self.wifi_refresh()
         if wifi is not None and time.time() - self.wf.get('wd_at', 0) > 10 and not self.wf.get('wd_run'):
             self.wf['wd_at'] = time.time()
@@ -903,7 +909,7 @@ class UI:
             def fn(w):
                 ok, msg = wifi.connect(w, ssid, psk)
                 wf['status'] = wifi.status(w)
-                wf['saved'] = len(wifi.load_saved())
+                self.load_saved_list()
                 self.flash(('%s: %s' % (name, msg))[:40], 10)
             self.wifi_bg('Connecting to %s...' % name, fn)
         elif kind == 'wifi_forget':
@@ -912,8 +918,16 @@ class UI:
             def fn(w):
                 wifi.forget(w, ssid)
                 wf['status'] = wifi.status(w)
-                wf['saved'] = len(wifi.load_saved())
+                self.load_saved_list()
             self.wifi_bg('Forgetting...', fn)
+        elif kind == 'wifi_prefer':
+            ssid = action[1]
+
+            def fn(w):
+                wifi.prefer(w, ssid)
+                self.load_saved_list()
+                self.flash('%s is now the first choice' % ssid.decode('utf-8', 'replace')[:20])
+            self.wifi_bg('Saving...', fn)
         elif kind == 'kb':
             ch = action[1]
             if len(wf['text']) < 63:
@@ -1133,7 +1147,45 @@ class UI:
         if name:
             items.append(('FORGET', ('confirm', 'Forget %s? The printer will leave this network.' % name,
                                      ('wifi_forget', s['ssid'])), C_RED, 28, name[:14]))
+        if wf['saved']:
+            items.append(('SAVED', ('screen', 'wifi_saved'), C_BTN, 28, 'order, forget'))
         self.grid(d, items, top=380, rows_h=100)
+
+    def page_wifi_saved(self, d, st):
+        """The saved networks, first choice first. After a drop the printer may
+        join a back-up network; it returns to the first choice when that is in
+        range again (dp200_wifi.watchdog, every 10 min)."""
+        wf = self.wf
+        s = wf['status']
+        cur = s.get('ssid') if s.get('wpa_state') == 'COMPLETED' else None
+        d.text((20, 160), 'Saved networks', font=font(28), fill=C_TXT)
+        d.text((20, 198), 'First choice on top. The printer goes back', font=font(18), fill=C_DIM)
+        d.text((20, 222), 'to it when it is in range.', font=font(18), fill=C_DIM)
+        if wf['busy']:
+            d.text((20, 250), wf['busy'], font=font(20), fill=C_WARN)
+        nets = wf['saved_list'][:5]
+        if not nets:
+            d.text((20, 290), 'No saved networks', font=font(22), fill=C_DIM)
+        for i, (ssid, prio) in enumerate(nets):
+            y = 284 + i * 84
+            d.rounded_rectangle((20, y, PW - 20, y + 76), radius=12, fill=C_BAR)
+            label = ssid.decode('utf-8', 'replace')
+            f = font(22)
+            while d.textlength(label, font=f) > PW - 290 and len(label) > 4:
+                label = label[:-2] + '…'
+            d.text((34, y + 12), label, font=f, fill=C_TXT)
+            sub = ('1st choice', '2nd', '3rd')[i] if i < 3 else '%dth' % (i + 1)
+            if ssid == cur:
+                sub += ' - connected'
+            d.text((34, y + 44), sub, font=font(18), fill=C_ON if ssid == cur else C_DIM)
+            if i:
+                self.button(d, (PW - 254, y + 8, PW - 144, y + 68), 'PREFER',
+                            ('wifi_prefer', ssid), C_BTN, 22)
+            name = ssid.decode('utf-8', 'replace')
+            q = ('Forget %s? The printer will leave this network.' % name if ssid == cur
+                 else 'Forget %s?' % name)
+            self.button(d, (PW - 134, y + 8, PW - 30, y + 68), 'FORGET',
+                        ('confirm', q, ('wifi_forget', ssid)), C_RED, 22)
 
     def page_wifi_list(self, d, st):
         wf = self.wf
@@ -1399,9 +1451,10 @@ class UI:
               'fil_mat': 'filament', 'fil_custom': 'fil_mat', 'info': 'system', 'update': 'system',
               'pid': 'calibrate', 'objects': 'print',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
+              'wifi_saved': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
-    NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_kb', 'power')
+    NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_saved', 'wifi_kb', 'power')
 
     def back_action(self):
         if self.confirm:

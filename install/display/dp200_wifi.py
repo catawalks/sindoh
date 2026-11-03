@@ -278,14 +278,34 @@ def connect(w, ssid, psk, timeout=30.0, path=CONF):
     apply(w, saved)                                    # back to the saved networks
     return False, 'Could not connect - wrong password?' if psk else 'Could not connect'
 
+def prefer(w, ssid, path=CONF):
+    """Make a saved network the first choice: the others keep their order
+    below it. Priorities are renumbered n..1 (they only grew before), saved,
+    and set on the daemon's live networks. wpa_supplicant uses them when it
+    (re)connects; the watchdog moves back to the first choice when it is in
+    range (after a drop to a back-up network, 2026-11-02)."""
+    saved = sorted(load_saved(path), key=lambda n: -n['priority'])
+    order = [n for n in saved if n['ssid'] == ssid] + [n for n in saved if n['ssid'] != ssid]
+    for i, n in enumerate(order):
+        n['priority'] = len(order) - i
+    write_saved(order, path)
+    prio = {n['ssid']: n['priority'] for n in order}
+    for nid, s, flags in list_networks(w):
+        if s in prio:
+            w.ok('SET_NETWORK %d priority %d' % (nid, prio[s]))
+    return order
+
 def forget(w, ssid, path=CONF):
     saved = [n for n in load_saved(path) if n['ssid'] != ssid]
     write_saved(saved, path)
+    st = status(w)
+    current = st.get('wpa_state') == 'COMPLETED' and st.get('ssid') == ssid
     for nid, s, flags in list_networks(w):
         if s == ssid:
             w.ok('REMOVE_NETWORK %d' % nid)
     w.ok('ENABLE_NETWORK all')
-    w.ok('REASSOCIATE')
+    if current:                                       # (a back-up network: the link stays)
+        w.ok('REASSOCIATE')
 
 # ---------------------------------------------------------------------------
 def main():
