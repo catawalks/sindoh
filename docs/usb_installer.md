@@ -48,17 +48,27 @@ below is dropped: it erased the recovery set).
   the UBIFS root, space, room on the stick for the backup, payload md5.
 - **On failure** after the backup: `/klipper` is removed and SVN_GUI copied
   back, so the stock firmware boots as before.
+- **Backups per printer and firmware:** `dp200_stock_backup/<eth0 MAC>/`
+  holds SVN_GUI.tar and WEBKIT.tar (+ .md5, files fingerprint) and
+  `FIRMWARE` (Sindoh's version, e.g. RODIN_200730_2, read out of
+  `/snapshot_version.sh` without running it). A backup that doesn't match
+  the printer's app is the same printer on another firmware (a Sindoh
+  update since the last install): the installer shows both versions and,
+  on a touch, renames the old folder to `<MAC>_<firmware>` (kept) and makes
+  a new backup. Pulling the stick cancels.
 - **Boot:** `dp200-boot.sh` starts `/klipper/dp200/dp200-start.sh`;
   `etc/dp200/on_nand` keeps the logs in RAM.
 - **Remove:** `unmistakable_klipper_remove.she` restores the hook, deletes
-  `/klipper` and puts SVN_GUI back from the stick (md5-checked). Without the
-  backup it refuses (Sindoh's OEM update restores the app instead).
+  `/klipper` and puts SVN_GUI and WebKit back from the stick (md5-checked).
+  Without a stick backup it uses the factory app from the mtd5 recovery set
+  (read-only), and says to run Sindoh's update for the latest app.
 - **Stick layout** (the folder that should run is renamed `_update_rodin`):
   ```
   _update_rodin_KlipperInstall/unmistakable_klipper_install.she
                                dp200_klipper_payload.tar.gz (+ .md5, .size)
   _update_rodin_KlipperRemove/unmistakable_klipper_remove.she
-  dp200_stock_backup/SVN_GUI (+ .md5)      written by the installer
+  dp200_stock_backup/<MAC>/SVN_GUI.tar, WEBKIT.tar, FIRMWARE   written by the installer
+  dp200_stock_backup/<MAC>_<firmware>/    an older backup, set aside
   ```
 
 ## Tested on the test printer (2026-11-02) and what it taught
