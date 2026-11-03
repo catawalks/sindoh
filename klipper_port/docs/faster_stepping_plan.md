@@ -240,9 +240,21 @@ Then the test run `p4.py` (scratchpad) per build, gcc builds of e358e96b:
   (option off), then the batch build again.
 - The printer is back on the gcc build (option off).
 
+**Probe comparison (2026-11-03 morning, `p5.py`):** home, then 2 x 5
+probes at X95 Y130:
+
+| | round 1 (right after G28) | round 2 |
+|---|---|---|
+| gcc build (option off) | 2.4375 -> 2.4189, spread 0.019, mean 2.4243 | spread 0.007, mean 2.4157 |
+| UPC_STEP_BATCH | 2.4309 -> 2.4105, spread 0.021, mean 2.4170 | spread 0.007, mean 2.4158 |
+
+Same on both: the first touches after homing read ~0.015-0.02 mm high and
+settle; after that both repeat to 0.007 mm and agree to 0.0001 mm. So
+probing is unaffected; the settling is the probe/bed, not the stepping
+(worth a look for BED_MESH after G28: e.g. a few untimed touches first).
+
 ### Next
 
-- Probe comparison above (owner present; quiet enough: Z only).
 - Then a cube with UPC_STEP_BATCH, and an FM load measurement during a
   print (mcu_awake / task_avg) against option off.
 - Original phase 4 list: first UPC_STEP_SINGLE,
