@@ -54,14 +54,19 @@ snapshot are in `docs/kernel/`. A GPL source request is drafted in that doc
    U-Boot first (milestone 1: UART + GIC + timer). Weeks of work; see the
    "routes" section of kernel_research.md. Needs SD boot (project 2).
 
-## 2. SD-card boot
+## 2. SD-card boot (low priority: after the end-goal release)
 
-**Goal:** boot from an SD card (DIP switch / U-Boot) as an alternative to the
-internal NAND, and as the test bed for a newer kernel.
-**Status:** read-only investigation, [docs/sd_boot_plan.md](docs/sd_boot_plan.md).
-**Next:** read U-Boot's environment and commands (mtd1, U-Boot strings),
-answer whether U-Boot can load a kernel from SD or serial. Then, with the
-user: boot into U-Boot with Klipper off, nothing written to flash.
+**Goal (owner, 2026-11-03):** boot from the SD card by the DIP switch,
+without the NAND. An extra recovery path if the NAND is ever completely
+corrupted, and maybe a way for NAND-only installs to stop depending on mtd5,
+freeing its ~200 MB.
+**Status** ([docs/sd_boot_plan.md](docs/sd_boot_plan.md)): U-Boot from NAND
+can read the card once the two SD pin selects are set (0xf8041080/84 =
+0x1002, RAM only: `uboot_cmd.py --pinmux-sd`), and boots our kernel from raw
+card sectors by hand (`tools/sd_raw_boot.sh`, 2026-10-31). The DIP-switch
+boot (the boot ROM loading U-Boot from the card) hangs silently; open lead:
+the SD pad settings the ROM uses in mode 6.
+**Not the daily boot path:** that is our kernel in mtd0 (#3).
 
 ## 3. Internal NAND install (stock printers have no SD card)
 
@@ -75,6 +80,8 @@ firmware. Open: our kernel in mtd0 (step 3c, not approved), NAND space for
 upstream updates (#10).
 End goal (our kernel in mtd0, our root in mtd6, mtd5 untouched): revert by
 plugging in a Sindoh update stick (decided 2026-11-03, TODO 11d).
+The sequence to get there: [docs/end_goal_install_plan.md](docs/end_goal_install_plan.md)
+(all stages approved 2026-11-03; start after the weekly token refresh).
 
 ## 4. Object-on-bed check with the camera
 
@@ -131,13 +138,26 @@ Parked.
 
 ## 10. Before a release
 
+**Release decision (owner, 2026-11-03):** the current installer (stock
+kernel, Klipper in /klipper on mtd6) becomes the first public release, but
+not yet: the screen app and features are still being refined, and the
+faster stepping is still being tested. The work printer has completed a
+long print on it.
+
 - **Homing speed:** DONE 2026-11-02: X/Y at stock's 208 mm/s seek, Z
   stays at 5 mm/s (stock 5.05; 10 stalls lifting the bed).
   [docs/homing_speed_plan.md](docs/homing_speed_plan.md).
 - **Stick backups and firmware versions:** DONE 2026-11-02: each backup
   stores the firmware version; a mismatch offers a new backup and keeps
   the old one as `<MAC>_<firmware>`.
-- **Updates and NAND space (to decide, 2026-11-02).** Goal: Klipper and
+- **Updates and NAND space: DECIDED 2026-11-03** (with the storage tiers,
+  #11): on a NAND-only install Mainsail and Moonraker update from upstream
+  (git, shallow), Klipper (host + UPC firmware) from our releases; with an
+  SD card everything updates from upstream and builds on the printer.
+  Our Klipper fork is public, so anyone can build the images if our
+  releases stop. Background below (written for the ~40 MB of the current
+  /klipper install; the end-goal root leaves ~140-150 MB):
+  Goal: Klipper and
   Moonraker update from their upstream main branches through Moonraker,
   without the port having to publish images. Facts: Klipper's host side is
   upstream plus three add-on modules (dp200_cartridge, upc_clockcheck,
@@ -160,7 +180,7 @@ Parked.
   The screen's WiFi -> SAVED page sets the first choice; the watchdog goes
   back to it. Still watching for a day, then on the work printer.
 
-## 11. G-code and log storage (2026-11-03, to talk through)
+## 11. G-code and log storage (2026-11-03, decided: see the end)
 
 **Problem:** the NAND install leaves ~40 MB free on mtd6. A 23-min cube is
 0.4 MB, but long prints run 15-25 MB (the owner's USB stick) and detailed

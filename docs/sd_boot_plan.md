@@ -1,10 +1,21 @@
 # SD-card boot (DIP switch / U-Boot) - investigation
 
-Status 2026-10-20: read-only investigation (U-Boot environment from the NAND
-dump, kernel config, SD card layout). Nothing was changed. The main install
-path for owners stays the USB stick → internal NAND (see usb_installer.md).
-SD boot is the alternative for owners who have a card, and the test bed for a
-newer kernel (kernel_research.md).
+**Current status (2026-11-03):**
+- U-Boot from NAND reads the card once the two SD pin selects are set
+  (0xf8041080/84 = 0x1002, RAM only) and boots our kernel from raw card
+  sectors by hand (`tools/sd_raw_boot.sh`, 2026-10-31). `ext2load` can't
+  read ext4.
+- The DIP-switch boot (boot ROM -> U-Boot from the card) still hangs
+  silently; open lead: the SD pad settings in ROM mode 6 (end of this doc).
+- **Not the daily boot path.** Decided: our kernel in mtd0, our root in
+  mtd6, no U-Boot env change; an SD card (optional) is used by our kernel
+  for storage (PROJECTS.md #11). DIP-switch SD boot is a low-priority
+  project for after the end-goal release: an extra recovery path for a
+  fully corrupted NAND, maybe freeing mtd5 for NAND-only installs
+  (PROJECTS.md #2).
+
+Status 2026-10-20 (history): read-only investigation (U-Boot environment
+from the NAND dump, kernel config, SD card layout). Nothing was changed.
 
 ## How the DP200 boots
 
@@ -86,6 +97,13 @@ either:
 
 ## Rescue card test (2026-10-22)
 
+**Superseded in part (2026-10-31):** the "can't see the card" result below
+was before the SD pin selects were found. After `mw.l f8041080 1002;
+mw.l f8041084 1002` (RAM only, `uboot_cmd.py --pinmux-sd`) `mmcinfo` works
+and `mmc read` loads raw sectors; see "Open lead" below and
+kernel/debian_root_boot.md, "Fast boot from raw SD sectors". `ext2load`
+still can't read the ext4 card.
+
 U-Boot's SD driver can't see the card: `mmcinfo` reports 0 bytes on both
 controllers (`mmc list`: mvsdh0, mvsdh1), with or without `mmc rescan`. So
 U-Boot loads nothing from SD, and the stock `mv61X0_mmcboot` can't work on
@@ -104,10 +122,13 @@ and the stock init runs from the card. Card layout and restore notes are in
 part the Klipper install writes). It needs mtd0 (U-Boot + kernel) to be
 intact.
 
-The consequence for way B: U-Boot can't test whether a card is present, so
-"boot SD if present, else NAND" can't be decided in U-Boot. It would have to
-happen in Linux, for example in the kernel's initramfs or very early in the
-NAND root's boot scripts.
+The consequence for way B (as of 10-22): U-Boot can't test whether a card is
+present, so "boot SD if present, else NAND" can't be decided in U-Boot. It
+would have to happen in Linux, for example in the kernel's initramfs or very
+early in the NAND root's boot scripts. (With the pin selects, a bootcmd
+could try `mmc read` + `bootm` and fall back to NAND when the image check
+fails - but that is a U-Boot env change, which the end-user path rules out;
+the decided path picks the root in our kernel's initramfs.)
 
 ## Boot ROM (dumped 2026-10-22)
 
