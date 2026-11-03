@@ -157,3 +157,26 @@ Parked.
   is now off at boot and on every connection: 0 drops in ~6 h (68 before).
   The screen's WiFi -> SAVED page sets the first choice; the watchdog goes
   back to it. Still watching for a day, then on the work printer.
+
+## 11. G-code and log storage (2026-11-03, to talk through)
+
+**Problem:** the NAND install leaves ~40 MB free on mtd6. A 23-min cube is
+0.4 MB, but long prints run 15-25 MB (the owner's USB stick) and detailed
+multi-hour ones 50-200 MB; Moonraker never deletes G-code by itself.
+**Owner's direction:** an SD card added once inside the case (the microSD
+slot is on the mainboard, not reachable from outside), then forgotten;
+any size. Our own kernel may add whatever filesystem support is needed
+(the stock 3.2 kernel has vfat, ext2/3/4 and an NFS client; no exFAT, no
+SMB).
+**Pieces:**
+- Detect the card at boot, mount it (ext4; FAT32 too), use it for
+  printer_data/gcodes and logs; NAND as before without one. Offer to
+  format a new card from the screen.
+- NAND space safety for printers without a card: refuse uploads that
+  don't fit, offer/auto-delete the oldest finished G-codes, show free
+  space on the screen and in Mainsail.
+- Alternatives considered: a USB stick on the front port (shared with the
+  accelerometer: hub), an NFS share (unlimited, but a network drop ends a
+  print), and, as the owner's last resort, Klipper/Moonraker on a separate
+  host with the printer as bridge + screen (upctool bridge over TCP).
+**Next:** talk through with the owner; then build the card detection.

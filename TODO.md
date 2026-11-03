@@ -41,12 +41,17 @@ the work; it is how open items survive between sessions.
 
 11. **Updates and NAND space, options A/B/C** (PROJECTS.md #10): Klipper
     and Moonraker from upstream through Moonraker without image publishing.
+11b. **G-code storage** (PROJECTS.md #11): ~40 MB free on the NAND holds
+    one or two big jobs. Owner (11-03): an SD card added once inside the
+    case (the slot is on the mainboard, not reachable from outside) and then
+    forgotten, any size; our own kernel may add any filesystem. Plus space
+    safety on the NAND for printers without a card. To talk through.
 
 ## Agent (no user needed)
 
-12. **Wi-Fi drops:** watching the test printer's log. 68 deauths total,
-    none since power saving went off (checked 2026-11-03 ~01:50 and again
-    ~02:40). Check again after a day; then the work printer.
+12. **Wi-Fi drops:** test printer: 68 deauths total and none since power
+    saving went off, over about a day (last check 2026-11-03 08:40). Left:
+    the work printer after its upgrade.
 13. **Faster stepping** (docs/faster_stepping_plan.md, phases 1-3 approved
     11-02): done so far: engine register map (COM_STP +0x78 candidate),
     `CONFIG_UPC_STEP_SINGLE` (fork branch fast-stepping, default off) halves
@@ -57,9 +62,13 @@ the work; it is how open items survive between sessions.
     25, steps 40 ticks after schedule instead of 840). Phase 4 (11-03):
     both builds home and move with no lost steps (drift 0.000-0.04 =
     measurement steps, 0 busy hits); ABORT resets the edge counter
-    (handled). Next (user): probe x5 on the gcc build vs batch (both builds
-    drifted lower per touch, 0.015/0.028), then a cube + FM load with BATCH.
-    Printer is back on the gcc build.
+    (handled). Probe 11-03: batch = gcc build (0.007 spread, means within
+    0.0001 mm). Next (user): a cube + FM load with BATCH, then make it the
+    default. Printer is on the gcc build.
+15. **Probe settling after homing:** on either firmware the first ~5 touches
+    after G28 read 0.015-0.02 mm high, then repeat to 0.007. Check whether
+    BED_MESH_CALIBRATE right after homing is affected; maybe a few warm-up
+    touches first.
 14. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
     Done); still untested with motion (homing/moves need the owner). They
     are the fallback; the printer runs the gcc builds from /opt/dp200.
