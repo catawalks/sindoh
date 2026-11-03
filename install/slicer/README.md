@@ -40,7 +40,7 @@ about ±1 mm.
 It adds the printer "Sindoh DP200 Klipper", the print profile "DP200 0.20mm
 Klipper" and the filament "DP200 PLA". The cut-outs are part of the bed
 shape. Objects are labelled for Klipper's exclude-object (cancel one
-object in Mainsail).
+object in Mainsail, or on the touch screen: OBJECTS on the print page).
 
 ## OrcaSlicer
 

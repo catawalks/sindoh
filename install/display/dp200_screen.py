@@ -101,7 +101,8 @@ SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
            'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
-           'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR', 'manual_probe')
+           'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR', 'manual_probe',
+           'exclude_object')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -507,6 +508,8 @@ class UI:
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
             self.net_action(action)
+        elif kind == 'obj_more':
+            self.obj_page = getattr(self, 'obj_page', 0) + 1
         elif kind == 'go_home':                        # the HOME button in the header
             if self.screen == 'papertest':
                 self.run(('cal_abort',))               # leaving ends the paper test
@@ -1338,7 +1341,7 @@ class UI:
             pstate = st['print_stats']['state']
             if pstate in ('printing', 'paused') and self.screen == 'home':
                 self.screen = 'print'
-            if pstate not in ('printing', 'paused') and self.screen == 'print':
+            if pstate not in ('printing', 'paused') and self.screen in ('print', 'objects'):
                 self.screen = 'home'
             getattr(self, 'page_' + self.screen)(d, st)
             # Z homing was refused until the bed is confirmed empty (BED_CLEAR);
@@ -1394,7 +1397,7 @@ class UI:
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
               'calibrate': 'move', 'shaper': 'calibrate', 'bedlevel': 'move', 'dryer': 'filament',
               'fil_mat': 'filament', 'fil_custom': 'fil_mat', 'info': 'system', 'update': 'system',
-              'pid': 'calibrate',
+              'pid': 'calibrate', 'objects': 'print',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
@@ -1495,7 +1498,40 @@ class UI:
             ('Z -0.025', ('gcode', 'SET_GCODE_OFFSET Z_ADJUST=-0.025 MOVE=1', 'Z -0.025'), C_BTN, 26, 'closer'),
             ('Z +0.025', ('gcode', 'SET_GCODE_OFFSET Z_ADJUST=0.025 MOVE=1', 'Z +0.025'), C_BTN, 26, 'further'),
             ('LAMP', ('gcode', 'LAMP_TOGGLE', 'Lamp'), C_ON if lamp else C_BTN, 30, 'on' if lamp else 'off'),
+            # cancel one object (Klipper's exclude_object; the slicer must
+            # label the objects): only with more than one object
+            ('OBJECTS', ('screen', 'objects'), C_BTN, 30, 'skip one')
+            if len(print_objects(st)) > 1 else None,
         ], top=320, rows_h=96)
+
+    OBJ_PER_PAGE = 8
+
+    def page_objects(self, d, st):
+        objs = print_objects(st)
+        ex = set((st.get('exclude_object') or {}).get('excluded_objects') or [])
+        cur = (st.get('exclude_object') or {}).get('current_object')
+        left = [o for o in objs if o not in ex]
+        d.text((20, 160), 'Objects (%d, %d skipped)' % (len(objs), len(ex)), font=font(26), fill=C_TXT)
+        d.text((20, 196), 'Tap one to stop printing it.', font=font(20), fill=C_DIM)
+        n = self.OBJ_PER_PAGE
+        pages = max(1, (len(objs) + n - 1) // n)
+        self.obj_page = getattr(self, 'obj_page', 0) % pages
+        items = []
+        for o in objs[self.obj_page * n:(self.obj_page + 1) * n]:
+            label = o if len(o) <= 14 else o[:13] + '~'
+            if o in ex:
+                items.append((label, None, C_BAR, 22, 'skipped', C_DIM))
+            elif len(left) == 1:
+                # the last one: that is CANCEL on the print page
+                items.append((label, None, C_BTN, 22, 'last one'))
+            else:
+                items.append((label, ('confirm', 'Stop printing %s? The others continue.' % o,
+                                      ('gcode', 'EXCLUDE_OBJECT NAME=%s' % o, 'Skip ' + label)),
+                               C_ON if o == cur else C_BTN, 22, 'printing now' if o == cur else None))
+        if pages > 1:
+            items += [None] * (n - len(items))
+            items.append(('MORE', ('obj_more',), C_BTN, 24, '%d / %d' % (self.obj_page + 1, pages)))
+        self.grid(d, items, top=232, rows_h=64)
 
     def page_filament(self, d, st):
         lever = st.get('filament_switch_sensor cartridge_lever', {})
@@ -2018,6 +2054,11 @@ class UI:
             d.text((40, 250 + i * 38), l, font=font(28), fill=C_TXT)
         self.button(d, (40, 440, 220, 530), 'YES', action, C_ON)
         self.button(d, (260, 440, PW - 40, 530), 'NO', no)
+
+def print_objects(st):
+    """Names of the labelled objects in the current print (exclude_object)."""
+    return [o.get('name', '?') for o in ((st.get('exclude_object') or {}).get('objects') or [])]
+
 
 def bl_colour(v, lo=-0.25, hi=0.25):
     """Blue (low) - green (level) - red (high)."""
