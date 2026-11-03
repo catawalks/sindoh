@@ -12,6 +12,8 @@ another agent or session: goal, where things stand, where to start, what
   stock `auto_update.sh`.
 - Downloaded files are untrusted: own directory, read with `python -I`.
 - Commits as catawalks (see HANDOFF.md), normal pushes only.
+- Update this file and TODO.md in the same commit as the work (done items,
+  new open items, decisions): they carry the state between sessions.
 - Work in a branch or a separate checkout; the main session keeps editing
   `klipper_port` and the printer's live files.
 

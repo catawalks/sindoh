@@ -4,6 +4,8 @@ Rewritten 2026-11-02 from TODO.md (10-28), PROJECTS.md, the docs and the
 session notes. "(user)" = needs the owner at a printer (heat, motion,
 measurements). Larger, self-contained projects are in
 [PROJECTS.md](PROJECTS.md). Finished items are at the end.
+**Keep it current:** edit this file (and PROJECTS.md) in the same commit as
+the work; it is how open items survive between sessions.
 
 ## Next (user at a printer)
 
