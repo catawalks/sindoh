@@ -42,7 +42,8 @@ snapshot are in `docs/kernel/`. A GPL source request is drafted in that doc
    read-only: 165 structs identical to the vendor modules' debug info,
    145/148 USB/tty field offsets identical to the running kernel's own code
    (the 3 differences are code generation), all 65 imports exported, only
-   ABS32/CALL relocations. Risk low. Next: the insmod test (user present).
+   ABS32/CALL relocations. Risk low. **Loaded 2026-10-30** (with the owner's
+   OK): a FLY-ADXL345 shows up as /dev/ttyACM0; dp200-start.sh loads it.
    The same recipe can build other missing modules (e.g. ch341, cp210x).
 2. **GPL request** (user sends the draft; what it is and the realistic
    chances: kernel_research.md, "What a GPL source request is") - if the
@@ -62,14 +63,14 @@ user: boot into U-Boot with Klipper off, nothing written to flash.
 
 ## 3. Internal NAND install (stock printers have no SD card)
 
-**Goal:** the USB-stick installer puts the Klipper runtime on mtd5.
-**Status:** plan [docs/internal_firmware_plan.md](docs/internal_firmware_plan.md),
-installer scripts in install/usb + install/nand, payload builds and passes
-its release check on the SD build. Size 2026-10-27: 431 MB raw / 141 MB
-gzip vs ~190 MB of UBI space - fits, headroom shrinking.
-**Next:** trim (git-core 23 MB, Moonraker env, libs); then, with the user's
-OK, back up mtd5 and do the first real NAND install; then the remove/restore
-path.
+**DONE 2026-11-02** ([docs/usb_installer.md](docs/usb_installer.md)): the
+USB stick installs the runtime into `/klipper` on the stock root (mtd6, not
+mtd5: that would erase the factory recovery set), removing Sindoh's app
+(backed up to the stick per printer and firmware) and Qt WebKit. Install,
+upgrade, cancel and remove (stick backup or the mtd5 fallback) tested on
+the test printer; installs on the work printer from 160505 and 191210
+firmware. Open: our kernel in mtd0 (step 3c, not approved), NAND space for
+upstream updates (#10).
 
 ## 4. Object-on-bed check with the camera
 
@@ -96,8 +97,8 @@ changes with height.
 **Goal:** raise the step-rate ceiling. Each step is one hardware engine move
 now; the engines can do multi-step moves with their own ramp (stock firmware
 does), which would cut per-step overhead.
-**Status:** idea (hardware_notes 2026-10-18/19). Today's limits are fine for
-the stock speeds. Also open: what step-engine registers +0x10 / +0x14 /
+**Status:** plan for review: [docs/faster_stepping_plan.md](docs/faster_stepping_plan.md)
+(2026-11-02). Today's limits are fine for the stock speeds. Also open: what step-engine registers +0x10 / +0x14 /
 +0x2c mean (copied from the stock app, 2026-10-27).
 **Done =** drift test (scratchpad drift_test.py) still 0.000 mm at higher
 speeds, emulator regression passes.
@@ -126,16 +127,12 @@ Parked.
 
 ## 10. Before a release
 
-- **Homing speed:** stock firmware homes much faster than our config
-  (owner, 2026-11-02, after going back to stock). Draft values and the
-  test in [docs/homing_speed_plan.md](docs/homing_speed_plan.md): X/Y
-  fast seek 50 + stock's 10 mm/s fine approach; Z 10 mm/s (clean in the
-  10-19 step-rate retest) after a check of the Z coupler.
-- **Stick backups and firmware versions:** a backup on the stick is
-  refused when the printer's Sindoh app differs (another printer, or the
-  same printer after a firmware update). Idea (owner agreed): store the
-  firmware version with each backup, and offer to replace a backup from an
-  older firmware of the same printer. To discuss.
+- **Homing speed:** DONE 2026-11-02: X/Y at stock's 208 mm/s seek, Z
+  stays at 5 mm/s (stock 5.05; 10 stalls lifting the bed).
+  [docs/homing_speed_plan.md](docs/homing_speed_plan.md).
+- **Stick backups and firmware versions:** DONE 2026-11-02: each backup
+  stores the firmware version; a mismatch offers a new backup and keeps
+  the old one as `<MAC>_<firmware>`.
 - **Updates and NAND space (to decide, 2026-11-02).** Goal: Klipper and
   Moonraker update from their upstream main branches through Moonraker,
   without the port having to publish images. Facts: Klipper's host side is
@@ -153,8 +150,8 @@ Parked.
   restore) and add git/pip/compiler: ~15-20 MB free; C) git + pip only:
   Moonraker/Mainsail from upstream, Klipper pinned. USB/SD storage is out
   (no extra hardware).
-- **Wi-Fi drops to the other saved network (2026-11-02, twice):** the AP
-  deauthenticates the printer (reason 15, 4-way handshake timeout, and 7);
-  wpa_supplicant then marks that network TEMP-DISABLED and joins the other
-  saved one (another subnet). Look at the 8782 driver/wpa settings, and
-  consider network priorities in the screen's WiFi page.
+- **Wi-Fi drops to the other saved network (2026-11-02, twice):** cause:
+  power saving (the 8782 missed key handshakes, reason 15). Power saving
+  is now off at boot and on every connection: 0 drops in ~6 h (68 before).
+  The screen's WiFi -> SAVED page sets the first choice; the watchdog goes
+  back to it. Still watching for a day, then on the work printer.

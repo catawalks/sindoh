@@ -127,6 +127,30 @@ tap('CONNECT');                       check('empty password = open hidden net', 
 # forget
 tap('FORGET');                        check('forget asks to confirm', ui.confirm is not None)
 tap('YES');                           check('forget(HomeNet)', ('forget', b'HomeNet') in calls)
+# saved networks: order (PREFER) and FORGET for any of them
+saved[:] = [{'ssid': b'HomeNet', 'psk': 'pw1', 'priority': 21},
+            {'ssid': b'BackupNet', 'psk': 'pw2', 'priority': 5}]
+def _prefer(w, ssid):
+    calls.append(('prefer', ssid))
+    for n in saved:
+        n['priority'] = 9 if n['ssid'] == ssid else 1
+fake.prefer = _prefer
+ui.wifi_refresh(); wait_idle()
+tap('SAVED');                         check('wifi -> saved networks', ui.screen == 'wifi_saved')
+wait_idle(); render()
+check('first choice listed first', [s for s, p in ui.wf['saved_list']] == [b'HomeNet', b'BackupNet'])
+check('one PREFER (not on the first)', sum(1 for b, a in ui.buttons if a[0] == 'wifi_prefer') == 1)
+tap('PREFER');                        check('PREFER sends prefer(BackupNet)', ('prefer', b'BackupNet') in calls)
+check('the list re-orders', [s for s, p in ui.wf['saved_list']] == [b'BackupNet', b'HomeNet'])
+tap_action(lambda a: a[0] == 'confirm' and 'HomeNet' in a[1])
+check('FORGET the connected one warns', 'leave' in ui.confirm[0])
+tap('NO')
+n = len(calls)
+tap_action(lambda a: a[0] == 'confirm' and 'BackupNet' in a[1])
+check('FORGET asks first', ui.confirm is not None and len(calls) == n)
+check('a back-up network: no "leave" warning', 'leave' not in ui.confirm[0])
+tap('YES');                           check('forget(BackupNet) from the list', ('forget', b'BackupNet') in calls)
+tap('BACK');                          check('saved BACK -> wifi', ui.screen == 'wifi')
 # SYSTEM -> DISPLAY -> TIMEOUT (settings saved to a temp file)
 import tempfile
 S.SETTINGS = os.path.join(tempfile.mkdtemp(), 'screen_settings.json')
@@ -207,6 +231,10 @@ check('power page has SHUT DOWN/REBOOT/KLIPPER', all(k in labels for k in ('SHUT
 tap('REBOOT');                        check('reboot asks to confirm', ui.confirm is not None)
 tap('NO');                            check('NO -> no request', not os.path.exists(S.POWER_REQ))
 tap('SHUT DOWN'); tap('YES')
+for _ in range(100):                  # written by a worker after the shutdown frames
+    if os.path.exists(S.POWER_REQ):
+        break
+    time.sleep(0.1)
 check('poweroff request written', open(S.POWER_REQ).read() == 'poweroff')
 check('powering screen shown', ui.screen == 'powering_poweroff'); shot('powering')
 os.remove(S.POWER_REQ)
@@ -216,8 +244,8 @@ render();                             check('held 2 s -> countdown overlay', ui.
 shot('key_held')
 ui.key_event(False, time.time());     check('released before 5 s -> power page', ui.screen == 'power')
 ui.key_event(True, time.time() - 6.0); render()
-check('held 6 s -> powering (stock side acts)', ui.screen == 'powering_poweroff')
-ui.key_event(False, time.time());     check('release after long press: no power page', ui.screen == 'powering_poweroff')
+check('held 6 s -> powering (stock side acts)', ui.screen == 'powering_hold')
+ui.key_event(False, time.time());     check('release after long press: no power page', ui.screen == 'powering_hold')
 ui.screen = 'home'
 ui.st = None
 ui.key_event(True, time.time()); ui.key_event(False, time.time())

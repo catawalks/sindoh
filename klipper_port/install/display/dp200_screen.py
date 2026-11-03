@@ -101,7 +101,8 @@ SHAPER_RE = re.compile(r'Recommended shaper_type_([xy]) = (\w+), shaper_freq_\1 
 OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extruder',
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
            'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
-           'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR', 'manual_probe')
+           'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR', 'manual_probe',
+           'exclude_object')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -473,7 +474,7 @@ class UI:
         self.net = {'rev': 0, 'info': {}, 'dns': [], 'checked': 0.0, 'busy': False,
                     'iface': 'eth0', 'draft': {}, 'field': 'ip', 'text': ''}
         # WiFi setup state (pages wifi, wifi_list, wifi_kb)
-        self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'list': [], 'page': 0,
+        self.wf = {'rev': 0, 'status': {}, 'saved': 0, 'saved_list': [], 'list': [], 'page': 0,
                    'busy': None, 'checked': 0.0, 'target': b'', 'kb_for': 'psk',
                    'text': '', 'mode': 'abc', 'shift': False, 'show': False, 'hidden': False}
         # input shaping page: last recommended shaper per axis from the console
@@ -497,7 +498,7 @@ class UI:
         kind = action[0]
         if kind == 'screen':
             self.screen = action[1]
-            if self.screen in ('wifi', 'network'):
+            if self.screen in ('wifi', 'wifi_saved', 'network'):
                 self.wifi_refresh()
             if self.screen == 'network':
                 self.net['checked'] = 0
@@ -507,6 +508,8 @@ class UI:
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
             self.net_action(action)
+        elif kind == 'obj_more':
+            self.obj_page = getattr(self, 'obj_page', 0) + 1
         elif kind == 'go_home':                        # the HOME button in the header
             if self.screen == 'papertest':
                 self.run(('cal_abort',))               # leaving ends the paper test
@@ -840,15 +843,21 @@ class UI:
     def wifi_refresh(self):
         def fn(w):
             self.wf['status'] = wifi.status(w)
-            self.wf['saved'] = len(wifi.load_saved())
+            self.load_saved_list()
             self.ip = my_ip()
         self.wf['checked'] = time.time()
         self.wifi_bg(None, fn)
 
+    def load_saved_list(self):
+        """Saved networks, first choice first (names and priorities only)."""
+        nets = sorted(wifi.load_saved(), key=lambda n: -n['priority'])
+        self.wf['saved_list'] = [(n['ssid'], n['priority']) for n in nets]
+        self.wf['saved'] = len(nets)
+
     def wifi_tick(self):
         """Keep the WiFi page's status current while it is shown, and run the
         no-IP watchdog every 10 s on any page."""
-        if self.screen == 'wifi' and not self.wf['busy'] and time.time() - self.wf['checked'] > 4:
+        if self.screen in ('wifi', 'wifi_saved') and not self.wf['busy'] and time.time() - self.wf['checked'] > 4:
             self.wifi_refresh()
         if wifi is not None and time.time() - self.wf.get('wd_at', 0) > 10 and not self.wf.get('wd_run'):
             self.wf['wd_at'] = time.time()
@@ -900,7 +909,7 @@ class UI:
             def fn(w):
                 ok, msg = wifi.connect(w, ssid, psk)
                 wf['status'] = wifi.status(w)
-                wf['saved'] = len(wifi.load_saved())
+                self.load_saved_list()
                 self.flash(('%s: %s' % (name, msg))[:40], 10)
             self.wifi_bg('Connecting to %s...' % name, fn)
         elif kind == 'wifi_forget':
@@ -909,8 +918,16 @@ class UI:
             def fn(w):
                 wifi.forget(w, ssid)
                 wf['status'] = wifi.status(w)
-                wf['saved'] = len(wifi.load_saved())
+                self.load_saved_list()
             self.wifi_bg('Forgetting...', fn)
+        elif kind == 'wifi_prefer':
+            ssid = action[1]
+
+            def fn(w):
+                wifi.prefer(w, ssid)
+                self.load_saved_list()
+                self.flash('%s is now the first choice' % ssid.decode('utf-8', 'replace')[:20])
+            self.wifi_bg('Saving...', fn)
         elif kind == 'kb':
             ch = action[1]
             if len(wf['text']) < 63:
@@ -1130,7 +1147,45 @@ class UI:
         if name:
             items.append(('FORGET', ('confirm', 'Forget %s? The printer will leave this network.' % name,
                                      ('wifi_forget', s['ssid'])), C_RED, 28, name[:14]))
+        if wf['saved']:
+            items.append(('SAVED', ('screen', 'wifi_saved'), C_BTN, 28, 'order, forget'))
         self.grid(d, items, top=380, rows_h=100)
+
+    def page_wifi_saved(self, d, st):
+        """The saved networks, first choice first. After a drop the printer may
+        join a back-up network; it returns to the first choice when that is in
+        range again (dp200_wifi.watchdog, every 10 min)."""
+        wf = self.wf
+        s = wf['status']
+        cur = s.get('ssid') if s.get('wpa_state') == 'COMPLETED' else None
+        d.text((20, 160), 'Saved networks', font=font(28), fill=C_TXT)
+        d.text((20, 198), 'First choice on top. The printer goes back', font=font(18), fill=C_DIM)
+        d.text((20, 222), 'to it when it is in range.', font=font(18), fill=C_DIM)
+        if wf['busy']:
+            d.text((20, 250), wf['busy'], font=font(20), fill=C_WARN)
+        nets = wf['saved_list'][:5]
+        if not nets:
+            d.text((20, 290), 'No saved networks', font=font(22), fill=C_DIM)
+        for i, (ssid, prio) in enumerate(nets):
+            y = 284 + i * 84
+            d.rounded_rectangle((20, y, PW - 20, y + 76), radius=12, fill=C_BAR)
+            label = ssid.decode('utf-8', 'replace')
+            f = font(22)
+            while d.textlength(label, font=f) > PW - 290 and len(label) > 4:
+                label = label[:-2] + '…'
+            d.text((34, y + 12), label, font=f, fill=C_TXT)
+            sub = ('1st choice', '2nd', '3rd')[i] if i < 3 else '%dth' % (i + 1)
+            if ssid == cur:
+                sub += ' - connected'
+            d.text((34, y + 44), sub, font=font(18), fill=C_ON if ssid == cur else C_DIM)
+            if i:
+                self.button(d, (PW - 254, y + 8, PW - 144, y + 68), 'PREFER',
+                            ('wifi_prefer', ssid), C_BTN, 22)
+            name = ssid.decode('utf-8', 'replace')
+            q = ('Forget %s? The printer will leave this network.' % name if ssid == cur
+                 else 'Forget %s?' % name)
+            self.button(d, (PW - 134, y + 8, PW - 30, y + 68), 'FORGET',
+                        ('confirm', q, ('wifi_forget', ssid)), C_RED, 22)
 
     def page_wifi_list(self, d, st):
         wf = self.wf
@@ -1338,7 +1393,7 @@ class UI:
             pstate = st['print_stats']['state']
             if pstate in ('printing', 'paused') and self.screen == 'home':
                 self.screen = 'print'
-            if pstate not in ('printing', 'paused') and self.screen == 'print':
+            if pstate not in ('printing', 'paused') and self.screen in ('print', 'objects'):
                 self.screen = 'home'
             getattr(self, 'page_' + self.screen)(d, st)
             # Z homing was refused until the bed is confirmed empty (BED_CLEAR);
@@ -1394,11 +1449,12 @@ class UI:
     PARENT = {'filament': 'home', 'preheat': 'home', 'move': 'home', 'homing': 'move', 'system': 'home',
               'calibrate': 'move', 'shaper': 'calibrate', 'bedlevel': 'move', 'dryer': 'filament',
               'fil_mat': 'filament', 'fil_custom': 'fil_mat', 'info': 'system', 'update': 'system',
-              'pid': 'calibrate',
+              'pid': 'calibrate', 'objects': 'print',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
+              'wifi_saved': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
-    NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_kb', 'power')
+    NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_saved', 'wifi_kb', 'power')
 
     def back_action(self):
         if self.confirm:
@@ -1495,7 +1551,40 @@ class UI:
             ('Z -0.025', ('gcode', 'SET_GCODE_OFFSET Z_ADJUST=-0.025 MOVE=1', 'Z -0.025'), C_BTN, 26, 'closer'),
             ('Z +0.025', ('gcode', 'SET_GCODE_OFFSET Z_ADJUST=0.025 MOVE=1', 'Z +0.025'), C_BTN, 26, 'further'),
             ('LAMP', ('gcode', 'LAMP_TOGGLE', 'Lamp'), C_ON if lamp else C_BTN, 30, 'on' if lamp else 'off'),
+            # cancel one object (Klipper's exclude_object; the slicer must
+            # label the objects): only with more than one object
+            ('OBJECTS', ('screen', 'objects'), C_BTN, 30, 'skip one')
+            if len(print_objects(st)) > 1 else None,
         ], top=320, rows_h=96)
+
+    OBJ_PER_PAGE = 8
+
+    def page_objects(self, d, st):
+        objs = print_objects(st)
+        ex = set((st.get('exclude_object') or {}).get('excluded_objects') or [])
+        cur = (st.get('exclude_object') or {}).get('current_object')
+        left = [o for o in objs if o not in ex]
+        d.text((20, 160), 'Objects (%d, %d skipped)' % (len(objs), len(ex)), font=font(26), fill=C_TXT)
+        d.text((20, 196), 'Tap one to stop printing it.', font=font(20), fill=C_DIM)
+        n = self.OBJ_PER_PAGE
+        pages = max(1, (len(objs) + n - 1) // n)
+        self.obj_page = getattr(self, 'obj_page', 0) % pages
+        items = []
+        for o in objs[self.obj_page * n:(self.obj_page + 1) * n]:
+            label = o if len(o) <= 14 else o[:13] + '~'
+            if o in ex:
+                items.append((label, None, C_BAR, 22, 'skipped', C_DIM))
+            elif len(left) == 1:
+                # the last one: that is CANCEL on the print page
+                items.append((label, None, C_BTN, 22, 'last one'))
+            else:
+                items.append((label, ('confirm', 'Stop printing %s? The others continue.' % o,
+                                      ('gcode', 'EXCLUDE_OBJECT NAME=%s' % o, 'Skip ' + label)),
+                               C_ON if o == cur else C_BTN, 22, 'printing now' if o == cur else None))
+        if pages > 1:
+            items += [None] * (n - len(items))
+            items.append(('MORE', ('obj_more',), C_BTN, 24, '%d / %d' % (self.obj_page + 1, pages)))
+        self.grid(d, items, top=232, rows_h=64)
 
     def page_filament(self, d, st):
         lever = st.get('filament_switch_sensor cartridge_lever', {})
@@ -2018,6 +2107,11 @@ class UI:
             d.text((40, 250 + i * 38), l, font=font(28), fill=C_TXT)
         self.button(d, (40, 440, 220, 530), 'YES', action, C_ON)
         self.button(d, (260, 440, PW - 40, 530), 'NO', no)
+
+def print_objects(st):
+    """Names of the labelled objects in the current print (exclude_object)."""
+    return [o.get('name', '?') for o in ((st.get('exclude_object') or {}).get('objects') or [])]
+
 
 def bl_colour(v, lo=-0.25, hi=0.25):
     """Blue (low) - green (level) - red (high)."""

@@ -313,6 +313,27 @@ ui.render();               check('answered in Mainsail: the dialog closes', ui.c
 ui.st = dict(ui.st, **{'gcode_macro BED_CLEAR': {'ok': 0, 'asking': 0}})
 ui.confirm = None
 
+# cancel one object during a print (exclude_object)
+saved = ui.st
+ps = dict(ui.st['print_stats'], state='printing', filename='three.gcode')
+ui.st = dict(ui.st, print_stats=ps, exclude_object={
+    'objects': [{'name': 'CUBE_A'}, {'name': 'CUBE_B'}, {'name': 'CUBE_C'}],
+    'excluded_objects': [], 'current_object': 'CUBE_B'})
+ui.screen = 'home'; ui.render()
+check('a print shows the print page', ui.screen == 'print')
+tap('OBJECTS');            check('OBJECTS -> objects page', ui.screen == 'objects')
+n = len(sent); tap('CUBE_A')
+check('an object asks to confirm', ui.confirm is not None and 'CUBE_A' in ui.confirm[0] and len(sent) == n)
+tap('YES');                check('YES sends EXCLUDE_OBJECT', sent[-1] == ('/printer/gcode/script', 'EXCLUDE_OBJECT NAME=CUBE_A'))
+ui.st['exclude_object'] = dict(ui.st['exclude_object'], excluded_objects=['CUBE_A', 'CUBE_B'])
+ui.render(); n = len(sent); tap('CUBE_A'); tap('CUBE_C')
+check('skipped and last objects: no action', ui.confirm is None and len(sent) == n)
+tap('BACK');               check('objects BACK -> print', ui.screen == 'print')
+ui.st['exclude_object'] = {'objects': [{'name': 'ONLY'}], 'excluded_objects': []}
+labels.clear(); ui.render(); check('one object: no OBJECTS button', 'OBJECTS' not in labels)
+ui.screen = 'objects'; ui.st = saved; ui.render()
+check('print over: objects page -> home', ui.screen == 'home')
+
 # Panel: partial updates must equal a full redraw
 tmp = tempfile.NamedTemporaryFile(delete=False)
 tmp.write(b'\0' * S.FB_W * S.FB_H * 4); tmp.close()

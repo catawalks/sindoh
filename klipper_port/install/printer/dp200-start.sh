@@ -119,7 +119,7 @@ mkdir -p $ROOT/run/dp200
 # firmware version is read OUT of /snapshot_version.sh, never by running
 # it (its first line writes the U-Boot env).
 {
-    echo "firmware=`sed -n "s/.*echo '\(RODIN_[^']*\)'.*/\1/p" /snapshot_version.sh 2>/dev/null | head -1`"
+    echo "firmware=`sed -n 's/.*\(RODIN_[0-9A-Za-z_]*\).*/\1/p' /snapshot_version.sh 2>/dev/null | head -1`"
     echo "model=`sqlite3 /app/nvram/karas.db 'select MachineTLI from INST_MACHINE' 2>/dev/null`"
     echo "serial=`sqlite3 /app/nvram/karas.db 'select MachineSerialNo from INST_MACHINE' 2>/dev/null`"
     echo "kernel=`uname -r`"
