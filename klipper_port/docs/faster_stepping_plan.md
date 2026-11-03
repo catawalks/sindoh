@@ -208,9 +208,44 @@ schedule for the queued blocks (gcc builds from the printer, e358e96b):
 | trsync stop mid-move | stops, 0 steps after, position exact | same | same (engine aborted) |
 | engine STARTs while busy | 0 | 0 | 0 |
 
+### Phase 4 at the printer (2026-11-03, owner present, bed empty)
+
+ABORT check first (driver disabled, no motion, `tools/engabort.sh`): ABORT
+stops a running move at once (busy clears, no more edges) and **resets
++0x78 to 0**; gpio_step_burst_stop uses the value read just before the
+abort then (at most one edge between: a stop is exact to 1 step).
+
+Then the test run `p4.py` (scratchpad) per build, gcc builds of e358e96b:
+
+| | UPC_STEP_SINGLE | UPC_STEP_BATCH |
+|---|---|---|
+| G28 all | 10.2 s | 12.7 s |
+| X homing x10 at 208 mm/s (trigger by slow creep) | 215.980 -> 215.960 | 216.020 -> 215.980 |
+| Y homing x10 at 208 mm/s | 5.500 -> 5.500 | 5.500 -> 5.500 |
+| X 30 / 100 mm/s zig-zags x50, 208 mm/s 20-200 x20 | 0.000 / 0.000 / 0.000 | 0.000 / 0.000 / 0.000 |
+| Y same, 20-180 | -0.020 / 0.000 / 0.000 | 0.000 / -0.040 / 0.000 |
+| busy hits (X/Y/Z, ~1.2-1.5 M pulses each) | 0 / 0 / 0 | 0 / 0 / 0 |
+| probe x5 at X95 Y130 | 2.4672 ... 2.4525 (0.015) | 2.4898 ... 2.4620 (0.028) |
+
+- No lost steps, no crash, no busy hits in either build; batched homing
+  seeks stopped at the switch as they should. The creep measurement steps
+  0.02 mm; the X readings right after a firmware restart were off by one
+  or two of those before as well (11-02: 0.06 at 150 mm/s), and the Y
+  readings wander 5.44-5.48 without a trend over the 208 mm/s travels
+  that follow (no accumulating loss).
+- **Open: the probe.** Both builds read lower on each of the 5 touches
+  (single 2.467 -> 2.453, batch 2.490 -> 2.462) and more spread than the
+  0.0006 mm of 10-19. Same trend in both, so probably the probe or the bed
+  rather than the stepping; to check: the same 5 probes on the gcc build
+  (option off), then the batch build again.
+- The printer is back on the gcc build (option off).
+
 ### Next
 
-- Phase 4 at the printer (owner present, bed empty): first UPC_STEP_SINGLE,
+- Probe comparison above (owner present; quiet enough: Z only).
+- Then a cube with UPC_STEP_BATCH, and an FM load measurement during a
+  print (mcu_awake / task_avg) against option off.
+- Original phase 4 list: first UPC_STEP_SINGLE,
   then UPC_STEP_BATCH: homing repeatability (as on 11-02, 208 mm/s), the
   drift test at 30/100/208 mm/s, probing, then a cube. The engine's
   first-edge delay (assumed one edge time after START) and the ABORT
