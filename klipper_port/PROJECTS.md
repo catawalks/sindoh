@@ -67,6 +67,24 @@ card sectors by hand (`tools/sd_raw_boot.sh`, 2026-10-31). The DIP-switch
 boot (the boot ROM loading U-Boot from the card) hangs silently; open lead:
 the SD pad settings the ROM uses in mode 6.
 **Not the daily boot path:** that is our kernel in mtd0 (#3).
+**Later layout option it would open (2026-11-03): merge mtd5 + mtd6.**
+- Space: mtd6 alone 294 MB raw, ~258 MB usable (measured df), ~150 MB free
+  after our ~106 MB runtime; mtd5 + mtd6 (blocks 141-4091, ~3,950 x 128 KB)
+  494 MB raw, ~435 MB usable (estimate, same ~12 % UBI/UBIFS overhead),
+  **~330 MB free**. mtd0 (kernel), mtd1 (U-Boot env, 128 KB), mtd2 (bad
+  block table, 512 KB), mtd3 (logo), mtd4 (karas.db backup) and the vendor
+  BBT blocks 4092-4095 stay.
+- No U-Boot change: our kernel sets its own partition layout instead of the
+  mtdparts U-Boot passes.
+- **mtd5 must be saved first:** the stock base root (nandrootfs.ubifs) is
+  only in mtd5 - Sindoh's downloadable updates carry the apps and kernel,
+  not the base root - and we can't publish Sindoh/Marvell images. The
+  installer copies the 149 MB recovery set to the user's stick or card
+  before wiping it; without that copy stock can't come back.
+- The revert then boots a recovery SD card (DIP switch) that writes the
+  saved set back to mtd5/mtd6 and hands over to Sindoh's update, instead
+  of the mtd5-based Sindoh-stick revert. Only once the DIP-switch SD boot
+  works; it would also cover a fully corrupted NAND.
 
 ## 3. Internal NAND install (stock printers have no SD card)
 
