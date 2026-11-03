@@ -54,8 +54,12 @@ the work; it is how open items survive between sessions.
     +0x78 = 24-bit edge down-counter, engine clock 197.9 MHz. Phase 2b/3b
     done: `CONFIG_UPC_STEP_BATCH` (constant blocks as engine moves, default
     off) passes the kemu engine model (25 steps: 1 engine start instead of
-    25, steps 40 ticks after schedule instead of 840). Next: phase 4 at the
-    printer (user): SINGLE, then BATCH - homing, drift test, probing, cube.
+    25, steps 40 ticks after schedule instead of 840). Phase 4 (11-03):
+    both builds home and move with no lost steps (drift 0.000-0.04 =
+    measurement steps, 0 busy hits); ABORT resets the edge counter
+    (handled). Next (user): probe x5 on the gcc build vs batch (both builds
+    drifted lower per touch, 0.015/0.028), then a cube + FM load with BATCH.
+    Printer is back on the gcc build.
 14. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
     Done); still untested with motion (homing/moves need the owner). They
     are the fallback; the printer runs the gcc builds from /opt/dp200.
