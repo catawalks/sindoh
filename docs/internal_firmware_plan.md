@@ -178,11 +178,21 @@ volume is free.
 ## NAND wear and the root's writes (2026-11-01, agreed with the owner)
 
 **Wear isn't a practical limit:**
-- The chip is SLC (Macronix MX30LF4G18AC). Distributors list it as SLC
-  with 4-bit ECC; Macronix lists 100k P/E cycles for the MX30LF family's
-  smaller parts. The 4 Gb part's own figure still needs the datasheet
-  (2026-11-02: the PDF's text is font-encoded and couldn't be read here).
+- The chip is SLC (Macronix MX30LF4G18AC). Datasheet PM2129 rev. 1.3
+  (2015-07-10; read 2026-11-02 from the copy at
+  static.rapidonline.com/pdf/73-3784.pdf):
+  - **Endurance: typically 100K P/E cycles**, with 4-bit ECC per
+    (512+16) bytes (the "18A" option code = 4-bit ECC required).
+  - Data retention 10 years; up to 4 partial programs (NOP) per page.
+  - **Valid blocks: at least 4016 of 4096** (4 Gb part). Bad blocks are
+    marked 00h in the first spare byte of pages 0 and 1, and new ones may
+    appear in use: the driver's bad-block table must be kept (we never erase
+    the marks; UBI handles new bad blocks).
+  - **Block 0 is guaranteed good only up to 1K P/E cycles** (with ECC). It
+    holds U-Boot, which we never write.
   Our BCH (16 bits per page) covers 4-bit ECC.
+- Scale: mtd6 has ~2350 blocks of 128 KiB, so 100K cycles are ~30 TB of
+  erases. At 1 GB of writes a day that is decades, before UBI's levelling.
 - UBI levels wear over mtd6's ~2350 blocks.
 - After years of stock use: mean erase count 10, max 127.
 

@@ -60,9 +60,11 @@ Cura:
 
 Then **Preferences → Printers → Add → Non-networked → Sindoh → Sindoh DP200
 (Klipper)** and choose Generic PLA. The cut-outs are disallowed areas (grey
-on the build plate). **Check once that they show at the back corners**;
-if they're at the front, change the sign of the second number of every
-point in `machine_disallowed_areas`. Cura doesn't label objects for
+on the build plate) at the back corners: Cura puts the origin of these
+points at the plate centre with negative Y at the back (its BuildVolume.py
+maps a point straight to scene Z, whose larger values are the front), so
+Y -100.5..-92.5 is the 8 mm strip at the back, as in the PrusaSlicer bed
+shape (Y 193-201). Cura doesn't label objects for
 exclude-object.
 
 ## Other slicers
