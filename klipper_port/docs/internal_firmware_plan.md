@@ -22,9 +22,9 @@ content.
 | 1 | u-boot-env | 128 KB | settings | unchanged (only bar_* variables from the boot-logo app) |
 | 2 | bbt | 512 KB | bad-block table | unchanged |
 | 3 | boot-logo | 1 MB | logo | logo (boot-logo app) |
-| 4 | backup | 8 MB | Sindoh /backup (~5 MB) | unchanged |
+| 4 | backup | 8 MB | Sindoh /backup (~5 MB): karas_backup.db (restored by the stock app after a recovery), point.db | **never written** |
 | 5 | recovery | 200 MB | **factory recovery set** (149 MB, see the correction below) | **unchanged** |
-| 6 | filesystem | 294 MB | stock root + apps (264 MB) | **our root**: Debian + Klipper + Moonraker + Mainsail + screen app (~160-175 MB est.; ~265 MB usable, ~90 MB for G-codes/logs) |
+| 6 | filesystem | 294 MB | stock root + apps (264 MB) | **our root**: Debian + Klipper + Moonraker + Mainsail + screen app. 2026-11-02 measurement: today's runtime takes ~106 MB on UBIFS (84 MB gzip payload); ~258 MB usable -> **~140-150 MB free** for G-code, logs and upstream updates (estimate; the old ~160-175 MB / ~90 MB figures were before the trims) |
 
 **Why this layout:**
 - **U-Boot is unchanged.** It still reads 0x7C0000 bytes from mtd0+0x40000

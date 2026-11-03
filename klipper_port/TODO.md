@@ -39,8 +39,11 @@ the work; it is how open items survive between sessions.
 
 ## Decision open
 
-11. **Updates and NAND space, options A/B/C** (PROJECTS.md #10): Klipper
-    and Moonraker from upstream through Moonraker without image publishing.
+11. **Updates:** decided 11-03 (PROJECTS #10): NAND only = Mainsail and
+    Moonraker from upstream, Klipper from our releases; SD card = all
+    upstream, built on the printer. To build with the end-goal install.
+11a. **First public release** = the current installer, later: after the
+    screen/feature work and the faster-stepping tests (PROJECTS #10).
 11b. **G-code storage** (PROJECTS.md #11): decided 11-03: optional SD card
     (inside) or USB stick, in tiers; NAND-only stays a full install with
     managed space (~140-150 MB free once our root replaces the stock one).
@@ -51,6 +54,9 @@ the work; it is how open items survive between sessions.
     recovery (db_setup), so no backup is required. Optional: the installer
     keeps the live karas.db + network files on the stick for the latest
     calibration and Wi-Fi. mtd4 stays never-written.
+11e. **End-goal install sequence** (docs/end_goal_install_plan.md):
+    stages 1-9 approved by the owner 11-03; **start after the weekly token
+    refresh**; owner at the printer for each write stage.
 11d. **End-goal revert = a Sindoh update stick** (owner, 11-03;
     kernel/revert_to_stock_plan.md): our system recognizes a Sindoh DP200
     update stick, asks, restores stock from mtd5 (mtd0 kernel part, mtd6
