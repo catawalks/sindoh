@@ -90,3 +90,20 @@ stepper-mod-b0.ko register names did not help: a different register layout.)
 So stock Z homing is the same 5 mm/s as ours: the 10 mm/s stall is
 consistent with stock never going faster. Stock X/Y seek much faster than
 our 50 mm/s (our max_velocity is 150); a 100 mm/s seek test is possible.
+
+## Stock-speed X/Y seek (2026-11-02): adopted
+
+Same test (10 homes per axis, trigger by slow creep before/after, then 5
+homes with a trigger measurement after each):
+
+| Seek | G28 X from X20 | G28 Y from Y200 | Shift / spread |
+|---|---|---|---|
+| 50 mm/s | 5.7 s | 5.4 s | 0.02 mm |
+| 150 mm/s | 3.1 s | 2.8 s | 0.000 (one 0.06 reading right after a restart) |
+| **208 mm/s** (stock) | **2.7 s** | **2.5 s** | **0.000** |
+
+Klipper ramps the seek at max_accel (1500 mm/s^2; stock ~4500) and stops
+dead at the switch (stock ramps down past it); the 10 mm/s second pass sets
+the position, so a skipped step at the stop would not matter. max_velocity
+went to 210 for it (stock's motion tables top out ~197 mm/s). Kernel log
+clean.
