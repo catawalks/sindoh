@@ -41,11 +41,15 @@ the work; it is how open items survive between sessions.
 
 11. **Updates and NAND space, options A/B/C** (PROJECTS.md #10): Klipper
     and Moonraker from upstream through Moonraker without image publishing.
-11b. **G-code storage** (PROJECTS.md #11): ~40 MB free on the NAND holds
-    one or two big jobs. Owner (11-03): an SD card added once inside the
-    case (the slot is on the mainboard, not reachable from outside) and then
-    forgotten, any size; our own kernel may add any filesystem. Plus space
-    safety on the NAND for printers without a card. To talk through.
+11b. **G-code storage** (PROJECTS.md #11): decided 11-03: optional SD card
+    (inside) or USB stick, in tiers; NAND-only stays a full install with
+    managed space (~140-150 MB free once our root replaces the stock one).
+11c. **Per-printer data for the full mtd6 replacement**
+    (internal_firmware_plan.md, 11-03): app/nvram (karas.db: serial, model,
+    calibration) and the network/Wi-Fi settings are in no Sindoh package;
+    the installer must save them (stick + a copy in our root) and the revert
+    must restore them after Sindoh's recovery. All Sindoh software is in
+    mtd5 (factory 2017) or the 2020 update.
 
 ## Agent (no user needed)
 

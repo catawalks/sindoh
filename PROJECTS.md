@@ -179,4 +179,16 @@ SMB).
   accelerometer: hub), an NFS share (unlimited, but a network drop ends a
   print), and, as the owner's last resort, Klipper/Moonraker on a separate
   host with the printer as bridge + screen (upctool bridge over TCP).
-**Next:** talk through with the owner; then build the card detection.
+**Decided 2026-11-03: optional, with tiers.** No card is required to
+install. Boot path stays the agreed one: our kernel in mtd0, our system in
+mtd6, mtd5 recovery untouched, no U-Boot env change. With our system
+replacing the stock root, ~140-150 MB of mtd6 should be free (estimate:
+~106 MB on flash for today's runtime). Tiers:
+- NAND only: managed G-code space (upload check, auto-delete oldest
+  finished jobs, free space shown), logs in RAM, Mainsail/Moonraker
+  updates from upstream, Klipper from our releases if space is tight.
+- SD card inside (or a USB stick on the front port): G-code and logs on
+  it, full upstream updates (git/pip/compiler), timelapse, swap, backups.
+- Our kernel detects a card/stick marked for the printer at boot; the
+  screen offers to format one; the installer reports what it found.
+**Next:** build it with the mtd0 kernel install (step 3c, pending OK).
