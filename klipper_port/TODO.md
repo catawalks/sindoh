@@ -51,6 +51,13 @@ the work; it is how open items survive between sessions.
     recovery (db_setup), so no backup is required. Optional: the installer
     keeps the live karas.db + network files on the stick for the latest
     calibration and Wi-Fi. mtd4 stays never-written.
+11d. **End-goal revert = a Sindoh update stick** (owner, 11-03;
+    kernel/revert_to_stock_plan.md): our system recognizes a Sindoh DP200
+    update stick, asks, restores stock from mtd5 (mtd0 kernel part, mtd6
+    root + apps) from RAM, reboots; stock then runs the update from the same
+    stick and restores karas.db from mtd4. No backup files from us needed.
+    Accepted risk: power loss during the mtd0 write -> serial, as with
+    Sindoh's own updates.
 
 ## Agent (no user needed)
 

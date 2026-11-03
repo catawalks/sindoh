@@ -54,7 +54,9 @@ content.
    - automatic recovery when the root is broken (the rcS behavior);
    - a revert stick that runs the recovery from mtd5;
    - a Sindoh `update.she` on a stick: offer to go back to stock first, so
-     the stock updater can run it.
+     the stock updater can run it. **Decided 2026-11-03: this is the user's
+     revert path**, needing no backup files from us (mtd5 + mtd4 hold
+     everything; kernel/revert_to_stock_plan.md, "The user's revert path").
 4. **Size budget** of the trimmed runtime, now with numpy, busybox,
    wpasupplicant and the firmware.
 5. **Tests** on more printers and boards before release.
