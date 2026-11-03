@@ -153,6 +153,37 @@ du_mb() { du -sk "$1" | awk '{print int($1 / 1024)}'; }
 # md5 of the sorted per-file md5 list. (A tar stream's md5 changes with
 # the directory order, which differs after a restore: 2026-11-02.)
 gui_fingerprint() { (cd "$1" && find SVN_GUI -type f | sort | xargs md5sum | md5sum | cut -d' ' -f1); }
+# Sindoh's firmware version (RODIN_200730_2), stored with each backup. Read
+# OUT of snapshot_version.sh, never run: its first line writes the U-Boot env.
+# (2016-2017 firmware quotes it with ", 2020 with ')
+FW=`sed -n 's/.*\(RODIN_[0-9A-Za-z_]*\).*/\1/p' /snapshot_version.sh 2>/dev/null | head -1`
+FW=${FW:-unknown}
+# The backup folder is named by this board's MAC, so a backup that doesn't
+# match the installed app is this printer's app from another firmware (a
+# Sindoh update since the last install; 2026-11-02 on the work printer), or
+# an app changed by hand. Offer a new backup; the old one is kept, renamed
+# with its firmware version (<MAC>_RODIN_160505_1), never deleted.
+replace_backup() {
+    OLD_FW=`cat "$BACKUP/FIRMWARE" 2>/dev/null`
+    if [ -n "$OLD_FW" ]; then
+        show "Backup on stick is" "from fw ${OLD_FW#RODIN_}" "printer: ${FW#RODIN_}"
+    else
+        OLD_FW=older                    # made before FIRMWARE files existed
+        show "Backup on stick is" "from older firmware" "printer: ${FW#RODIN_}"
+    fi
+    [ $DRY_RUN = 1 ] || sleep 5
+    show "Touch: new backup" "(old one is kept)" "Pull stick to cancel"
+    [ $DRY_RUN = 1 ] || confirm "Touch: new backup" "(old one is kept)" "Pull stick to cancel"
+    ASIDE="${BACKUP}_$OLD_FW"; n=2
+    while [ -e "$ASIDE" ]; do ASIDE="${BACKUP}_${OLD_FW}_$n"; n=$((n + 1)); done
+    if [ $DRY_RUN = 1 ]; then
+        show "DRY: would move" "the backup to" "`basename $ASIDE`"
+        return
+    fi
+    stick_still_in
+    mv "$BACKUP" "$ASIDE" && sync || fail "can't rename the" "old backup"
+    [ "$(mb_free "$STICK")" -ge $(( `du_mb $GUI` + 10 )) ] || fail "USB stick too full" "backup needs 100 MB"
+}
 
 # Take over the screen the way Sindoh's tools do
 if [ $DRY_RUN = 0 ]; then
@@ -206,9 +237,17 @@ if [ $TARGET = nand ]; then
             tar -xf "$BACKUP/SVN_GUI.tar" -C /tmp/dp200-chk && WANT_FP=`gui_fingerprint /tmp/dp200-chk`
             rm -rf /tmp/dp200-chk
         fi
-        [ "$HAVE_FP" = "$WANT_FP" ] || fail "stick has the backup" "of another printer"
-    fi
-    if [ -f $WK_FILE ] && [ -f "$BACKUP/WEBKIT.files.md5" ]; then
+        if [ "$HAVE_FP" != "$WANT_FP" ]; then
+            replace_backup
+        elif [ -f $WK_FILE ] && [ -f "$BACKUP/WEBKIT.files.md5" ] &&
+             [ "`wk_fingerprint /`" != "`cat "$BACKUP/WEBKIT.files.md5"`" ]; then
+            replace_backup
+        else
+            # it matches: tag a backup made before FIRMWARE files existed
+            [ $DRY_RUN = 1 ] || [ -f "$BACKUP/FIRMWARE" ] || echo "$FW" > "$BACKUP/FIRMWARE"
+        fi
+    elif [ -f $WK_FILE ] && [ -f "$BACKUP/WEBKIT.files.md5" ]; then
+        # (an upgrade: SVN_GUI is gone, only the WebKit check is left)
         [ "`wk_fingerprint /`" = "`cat "$BACKUP/WEBKIT.files.md5"`" ] \
             || fail "stick has the backup" "of another printer"
     fi
@@ -273,6 +312,7 @@ if [ $DRY_RUN = 0 ] && [ $TARGET = nand ]; then
             mv "$BACKUP/SVN_GUI.tmp" "$BACKUP/SVN_GUI.tar"
             md5sum < "$BACKUP/SVN_GUI.tar" > "$BACKUP/SVN_GUI.tar.md5"
             gui_fingerprint /app > "$BACKUP/SVN_GUI.files.md5"
+            echo "$FW" > "$BACKUP/FIRMWARE"
             sync
         fi
         UNDO=1
@@ -289,6 +329,7 @@ if [ $DRY_RUN = 0 ] && [ $TARGET = nand ]; then
             mv "$BACKUP/WEBKIT.tmp" "$BACKUP/WEBKIT.tar"
             md5sum < "$BACKUP/WEBKIT.tar" > "$BACKUP/WEBKIT.tar.md5"
             wk_fingerprint / > "$BACKUP/WEBKIT.files.md5"
+            echo "$FW" > "$BACKUP/FIRMWARE"
             sync
         fi
         UNDO=1
