@@ -44,14 +44,14 @@ the work; it is how open items survive between sessions.
 
 ## Agent (no user needed)
 
-12. **Wi-Fi drops:** watching the test printer's log. 2026-11-03 01:49: 68
-    deauths total, none since power saving went off (~6 h). Check again
-    after a day; then the work printer.
+12. **Wi-Fi drops:** watching the test printer's log. 68 deauths total,
+    none since power saving went off (checked 2026-11-03 ~01:50 and again
+    ~02:40). Check again after a day; then the work printer.
 13. **Faster stepping in the UPC firmware** (PROJECTS.md #5): plan first,
     owner reviews it before work starts.
-14. **Prebuilt (zig) UPC images:** only emulator-checked; the printer runs
-    the gcc builds from /opt/dp200. Test with the owner's OK (it swaps the
-    MCU firmware; no heat or motion).
+14. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
+    Done); still untested with motion (homing/moves need the owner). They
+    are the fallback; the printer runs the gcc builds from /opt/dp200.
 
 ## Done (2026-11-02, this round)
 
@@ -70,3 +70,8 @@ the work; it is how open items survive between sessions.
 - Probe offset method, lever zone, clock settle: in hardware_notes.
 - Mainsail stays (no benefit found in Fluidd).
 - Mainsail history: the cancelled bedask_test job removed.
+- Prebuilt (zig) images 10-27 run on the printer: both cores load, Klipper
+  ready, clocks 395.90/395.98 MHz, temperatures and endstops read; the gcc
+  builds put back (fork src unchanged since).
+- Stick updated: payload build 4d3bcdf (md5 5af91c1e...) + the installer with
+  firmware-tagged backups (dry-run tested); not ejected.
