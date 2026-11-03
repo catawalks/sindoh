@@ -130,11 +130,22 @@ the per-step path at first.
   Engine 4 (unused) fits too: PWM_P 0 and COM_PWM_P 0, PWM_M 1 and
   COM_PWM_M 1. The COM_ copies suggest the engine latches a command at
   START, so the next one could be written while a move runs.
-- **Still open (needs an engine to run):** that COM_STP counts during a move,
-  and the exact engine/timer clock ratio. Proposed test (owner's OK
-  needed): one long engine move on X with the driver disabled (+0x0c bit 0
-  = 1, as at idle: no motion), reading +0x78 and the timer while it runs,
-  registers restored afterwards.
+- **Engine run, 2026-11-03 (owner's OK; `tools/engtest.sh`):** one move of
+  60,000 edges (30,000 steps) at period 13,333 on X with the driver
+  disabled (+0x0c = 0x11 in every sample: no motor current, nothing
+  moved), sampled 35 times against /proc/uptime; the touched registers
+  were saved and restored, kernel log clean, Klipper ready after.
+  - **+0x78 counts edges, down, 24 bits:** 0x000000 -> 0xFF15A0 at the end,
+    and 0x1000000 - 0xFF15A0 = 60,000 exactly. It keeps its value after the
+    move (CLEAR does not reset it); Klipper's engine setup (ABORT at
+    config) leaves it at 0. So steps done in a running move =
+    ((value at START - value now) & 0xFFFFFF) / 2.
+  - **Clock:** 59,212 edges in 3.99 s = 14,840 edges/s at 13,333 ticks per
+    edge -> engine clock **197.9 MHz +-0.5 %** (10 ms uptime resolution),
+    i.e. half the FM timer (Klipper measures 395.9 MHz). With the counter,
+    stops don't need the exact ratio.
+  - **Status:** +0x64 = 0x106 while running (bit 8 busy), 7 idle; +0x88
+    bit 8 set at the end.
 
 ### Phase 2a: one timer event per step (`CONFIG_UPC_STEP_SINGLE`)
 
@@ -161,5 +172,7 @@ homing tests, owner present) before it becomes the default.
 
 ### Next
 
-- Phase 1 test above (COM_STP, clock ratio), then phase 2b: multi-step
-  engine moves for constant-speed blocks.
+- Phase 2b: multi-step engine moves for constant-speed blocks, with the
+  stop position from +0x78. Needs an engine model in kemu first (multi-edge
+  timing, busy, abort, the counter) so it can be checked like phase 2a.
+- Phase 4 for UPC_STEP_SINGLE at the printer (owner present).
