@@ -5,6 +5,33 @@ Sindoh and Marvell bring nothing back. It covers two things:
 - how far out-of-tree modules for the running 3.2 kernel can go;
 - the plan for porting a mainline 6.x kernel without vendor source.
 
+**Superseded in parts (note 2026-11-04).** The decisions in force are in
+HANDOFF.md ("Current state") and docs/end_goal_install_plan.md. Where this
+document says otherwise, they win:
+- **NAND writes are no longer out of scope.** UBI/UBIFS writes on mtd6 and
+  mtd3 rewrites from our kernel were tested 11-01 (patch 0010, guarded
+  write). The end goal writes mtd0's kernel area and mtd6; mtd4 and mtd5
+  are never written.
+- **Our kernel in mtd0 is the end goal** (U-Boot's signed boot block
+  untouched, no U-Boot env change), not "out" as row 12 of the step list
+  says.
+- **Revert = a Sindoh update stick**: our system restores stock from mtd5,
+  then stock runs the update and restores karas.db from mtd4
+  (kernel/revert_to_stock_plan.md).
+- **SD card:** the "only the 2 GB rescue card" rule was lifted for the
+  Debian-root boots (D1/D2 ran from the 4 GB card). The end goal keeps a
+  card optional (storage tiers, PROJECTS.md #11).
+- **Status table:** it shows 10-30. Later, on hardware: all output pads, RTC
+  setup, touch chip, Debian root, Klipper + Moonraker on mainline.
+- **UPC stepping:** new mainline UPC/stepper work builds on
+  CONFIG_UPC_STEP_BATCH (default, fork f035bdbc) and the stepper-engine
+  register map in docs/faster_stepping_plan.md.
+- **Items end_goal_install_plan.md expects here** (needed by stage 5 at the
+  latest): read-write NAND in the DT for mtd0/mtd6 (patch 0010 v2 write
+  window), a UBI wear readout, power-loss behaviour of the UBIFS root,
+  storage-tier card detection in the initramfs, and the touch event stream
+  and D2 Wi-Fi fix (909c509; not yet verified on hardware).
+
 Nothing here touched the printer. Every new fact comes from offline analysis
 of the vendor kernel image in our own NAND dump (`nand_images/mtd0.bin`),
 using `tools/kernel_re/` (README there), plus the existing
