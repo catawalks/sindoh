@@ -40,6 +40,11 @@
 ./home/klipper/klipper/docs/*
 ./home/klipper/klipper/test
 ./home/klipper/klipper/out
+# scratch build trees and test firmware (2026-11-03: kb_out got packed)
+./home/klipper/kb
+./home/klipper/kb_out
+./opt/dp200/fm_*.bin
+./opt/dp200/io_*.bin
 ./home/klipper/moonraker/.git
 ./home/klipper/moonraker/docs
 ./home/klipper/printer_data/logs/*
