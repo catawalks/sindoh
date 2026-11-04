@@ -126,8 +126,10 @@ changes with height.
 **Goal:** raise the step-rate ceiling. Each step is one hardware engine move
 now; the engines can do multi-step moves with their own ramp (stock firmware
 does), which would cut per-step overhead.
-**Status:** plan for review: [docs/faster_stepping_plan.md](docs/faster_stepping_plan.md)
-(2026-11-02). Today's limits are fine for the stock speeds. Also open: what step-engine registers +0x10 / +0x14 /
+**Status: DONE 2026-11-03** ([docs/faster_stepping_plan.md](docs/faster_stepping_plan.md)):
+CONFIG_UPC_STEP_BATCH (constant-rate blocks as engine moves, one timer
+event per step otherwise) is the default in dp200_fm.config. Left: an
+idle-loop counter for an on-printer load figure. Also open: what step-engine registers +0x10 / +0x14 /
 +0x2c mean (copied from the stock app, 2026-10-27).
 **Done =** drift test (scratchpad drift_test.py) still 0.000 mm at higher
 speeds, emulator regression passes.

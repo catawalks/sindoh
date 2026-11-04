@@ -270,10 +270,14 @@ the step timers aren't in that span. A real load figure needs an idle-loop
 counter in our firmware (e.g. loop iterations per second reported by
 upc_step_stats). The emulator's event counts stay the load evidence.
 
+**Adopted 2026-11-03** (owner: surfaces as before): fork branch merged
+into sindoh-dp200, `CONFIG_UPC_STEP_BATCH=y` in config/dp200_fm.config
+(f035bdbc, mirrored to klipper/configs/). The test printer runs it from
+/opt/dp200/fm.bin (the previous build kept as fm_gcc.bin); the USB payload
+is rebuilt with it.
+
 ### Next
 
-- Owner's verdict on the cube; then decide UPC_STEP_BATCH as the default
-  (dp200_fm.config) and rebuild the payload.
 - Idle-loop counter in upc_step_stats for an on-printer load figure.
 - Original phase 4 list: first UPC_STEP_SINGLE,
   then UPC_STEP_BATCH: homing repeatability (as on 11-02, 208 mm/s), the

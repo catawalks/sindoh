@@ -83,7 +83,9 @@ the work; it is how open items survive between sessions.
     (handled). Probe 11-03: batch = gcc build (0.007 spread, means within
     0.0001 mm). Cube with BATCH 11-03: completed, 1,507 s (gcc 1,502),
     0 busy hits; measured X 20.0 / Y 19.9 / Z 20.3 (gcc 20.1/20.0/20.2).
-    Next: surface check, then BATCH as the default. klippy's mcu_awake doesn't see UPC step load: add an idle-loop
+    Surfaces as before -> **BATCH is the default** (fork f035bdbc, test
+    printer and the payload rebuilt 11-03). Left: the idle-loop counter;
+    the work printer gets it with its upgrade. klippy's mcu_awake doesn't see UPC step load: add an idle-loop
     counter to upc_step_stats. Printer is on the gcc build.
 15. **Probe settling after homing:** on either firmware the first ~5 touches
     after G28 read 0.015-0.02 mm high, then repeat to 0.007. Check whether
