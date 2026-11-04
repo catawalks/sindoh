@@ -1,4 +1,42 @@
-# DP200 Klipper port - session handoff (2026-10-18)
+# DP200 Klipper port - session handoff
+
+## Current state (2026-11-04) - read this first
+
+The sections below this one are history (from 2026-10-18 on); several of
+their decisions were changed later. The live documents:
+- **TODO.md** - open items (update it in the same commit as the work);
+- **PROJECTS.md** - larger projects with status and decisions;
+- **docs/end_goal_install_plan.md** - the approved 9-stage sequence to the
+  end-goal install (start after the weekly token refresh);
+- **docs/internal_firmware_plan.md** - NAND layout, space, what a revert can
+  restore; **docs/kernel/revert_to_stock_plan.md** - the revert;
+- **docs/faster_stepping_plan.md**, **docs/usb_installer.md**,
+  **docs/hardware_notes.md** (measured facts).
+
+Decisions in force:
+- **End goal:** our mainline kernel in mtd0 (U-Boot block untouched), our
+  root in mtd6, mtd5 (factory recovery set) and mtd4 (Sindoh's karas.db
+  backup) never written, no U-Boot env change. Mainline 6.18 already runs
+  Klipper from the SD card on the dev printer; mainline NAND writes work.
+- **Revert:** plugging in a Sindoh update stick; our system restores stock
+  from mtd5, stock then runs the update and restores karas.db from mtd4.
+  No backup files from us needed (stick backups are an extra).
+- **Storage:** optional SD card (inside) or USB stick, in tiers; NAND-only
+  stays a full install (~140-150 MB free once our root replaces stock).
+- **Updates:** NAND only = Mainsail/Moonraker upstream, Klipper from our
+  releases; with a card everything upstream.
+- **Interim install** (stock 3.2 kernel, Klipper in /klipper on mtd6, USB
+  stick): the work printer runs it; it becomes the first public release
+  after the current feature work. Stick build 60316e4.
+- **Faster stepping:** UPC_STEP_BATCH is the default (fork sindoh-dp200
+  f035bdbc).
+- **Printers:** dev = Stanley Model 1 on COM3 (SD card, serial console);
+  work printer = end-user stand-in (no card, USB stick only). The filament
+  cartridge system is not working under Klipper; PLA is normally loaded.
+- Low priority: DIP-switch SD boot (PROJECTS #2) - an extra recovery path,
+  and with it a possible merged mtd5+mtd6 layout (~330 MB free).
+
+## History: handoff 2026-10-18
 
 Read this first, then README.md, docs/hardware_notes.md (measured facts) and
 docs/stock_routines.md (decoded stock load/unload/clean/probe routines).
