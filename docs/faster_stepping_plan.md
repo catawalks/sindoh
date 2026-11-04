@@ -256,8 +256,11 @@ probing is unaffected; the settling is the probe/bed, not the stepping
 **Cube with UPC_STEP_BATCH (2026-11-03 afternoon):**
 xyzCalibration_cube_zhop.gcode completed in 1,507 s (1,502 s on the gcc
 build, 10-28), no pause or error, busy hits 0 on X/Y/Z/E (2.2 / 2.0 / 1.7 /
-2.9 M pulses), kernel log clean. Owner's measurements and surface check:
-pending. Printer back on the gcc build afterwards.
+2.9 M pulses), kernel log clean. Owner's measurements: **X 20.0, Y 19.9,
+Z 20.3 mm** (gcc build 10-28: 20.1 / 20.0 / 20.2): X/Y within caliper and
+print variation; Z +0.1 vs then, a first-layer/Z-offset matter (Z stepping
+matched the gcc build to 0.0001 mm in the probe test). Printer back on the
+gcc build afterwards.
 
 **FM load measurement: not possible with klippy's stats.** A fixed motion
 pattern (diagonals, print-speed zig-zags, 208 mm/s travels; tools/fast_stepping_load.py,
