@@ -253,10 +253,25 @@ settle; after that both repeat to 0.007 mm and agree to 0.0001 mm. So
 probing is unaffected; the settling is the probe/bed, not the stepping
 (worth a look for BED_MESH after G28: e.g. a few untimed touches first).
 
+**Cube with UPC_STEP_BATCH (2026-11-03 afternoon):**
+xyzCalibration_cube_zhop.gcode completed in 1,507 s (1,502 s on the gcc
+build, 10-28), no pause or error, busy hits 0 on X/Y/Z/E (2.2 / 2.0 / 1.7 /
+2.9 M pulses), kernel log clean. Owner's measurements and surface check:
+pending. Printer back on the gcc build afterwards.
+
+**FM load measurement: not possible with klippy's stats.** A fixed motion
+pattern (diagonals, print-speed zig-zags, 208 mm/s travels; tools/fast_stepping_load.py,
+run) gave mcu_awake 0.0008 moving vs 0.0010 idle on the gcc build:
+klippy's mcu_awake / task_avg only time the main-loop tasks, and on the UPC
+the step timers aren't in that span. A real load figure needs an idle-loop
+counter in our firmware (e.g. loop iterations per second reported by
+upc_step_stats). The emulator's event counts stay the load evidence.
+
 ### Next
 
-- Then a cube with UPC_STEP_BATCH, and an FM load measurement during a
-  print (mcu_awake / task_avg) against option off.
+- Owner's verdict on the cube; then decide UPC_STEP_BATCH as the default
+  (dp200_fm.config) and rebuild the payload.
+- Idle-loop counter in upc_step_stats for an on-printer load figure.
 - Original phase 4 list: first UPC_STEP_SINGLE,
   then UPC_STEP_BATCH: homing repeatability (as on 11-02, 208 mm/s), the
   drift test at 30/100/208 mm/s, probing, then a cube. The engine's
