@@ -10,9 +10,11 @@ the work; it is how open items survive between sessions.
 ## Next (user at a printer)
 
 1. **Work printer upgrade (user):** the stick's `_update_rodin_KlipperInstall`
-   (rename to `_update_rodin`). First install of this build: also checks the
-   Wi-Fi power-save fix, 208 mm/s X/Y homing and the firmware-tagged backup
-   (its backup folder predates FIRMWARE files, so it gets tagged).
+   (rename to `_update_rodin`), build **60316e4** (2026-11-03, payload md5
+   08465408...). First install of this build: also checks the Wi-Fi
+   power-save fix, 208 mm/s X/Y homing, the faster stepping (UPC_STEP_BATCH)
+   and the firmware-tagged backup (its backup folder predates FIRMWARE
+   files, so it gets tagged).
 2. **Screen features not yet used on hardware (user):** the calibration
    wizards (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET), the
    HOME button, LOAD switching the heater off, OBJECTS (skip one object in a
