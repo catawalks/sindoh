@@ -82,6 +82,13 @@ install, a long print, the Sindoh-stick revert, reinstall.
 
 **9. Release checklist** (PROJECTS #10), then the public end-goal release.
 
+## Root architecture (owner, 2026-11-06)
+
+The root stays **armel** through the end-goal release: the interim USB
+installer (stock 3.2 kernel, no Thumb, so no armhf) and our kernel then run
+the same root. After the interim installer is retired, our kernel's root
+moves to armhf (faster); until then two roots would have to be maintained.
+
 ## Mainline items that ride along
 
 Tracked in no_gpl_plan.md; needed by stage 5 at the latest: NAND
