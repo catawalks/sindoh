@@ -73,6 +73,14 @@ carries the 2020 update.tar and the revert extracts it instead.
    - **Always refused:** U-Boot (0-1), env (64), the bbt partition (65-68),
      backup and recovery (77-1740) and the vendor BBT (4092-4095).
    - **DT:** in the NANDW images only, mtd0 and mtd3 lose `read-only`, like mtd6.
+   - **Done 2026-11-06 (offline, compiled, not run):** the window takes up
+     to 4 ranges (`FIRST,LAST;FIRST,LAST`), so mtd6 can stay open for the
+     running root while mtd0 is opened for a kernel write. A range that is
+     not wholly inside one of the three areas is refused as a whole
+     (-EINVAL), and every program/erase is checked against the areas again.
+     The single-range form `1741,4091` of dp200-revert.sh still works. The
+     NAND-boot image opens mtd6 from the command line
+     (`marvell_nand.write_window=1741,4091`, nand_boot_cmdline.md).
 2. **Initramfs in our kernel** (busybox + mtd-utils, ~2 MB). The stock kernel
    has one too.
    - **Normal boot:** mount the root and `switch_root`.
