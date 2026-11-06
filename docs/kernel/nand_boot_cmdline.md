@@ -65,7 +65,11 @@ header's data size and ignores the rest of the read.
 | planned additions: mtd-utils (ubiformat, flash_erase; static, ~0.3 MB raw), the boot/revert scripts | ~+0.1-0.2 MB compressed |
 | expected nandboot uImage | **~3.2-3.3 MB, about 40 % of the budget** |
 
-The first nandboot build (2026-11-06, below) gives the measured figure.
+**Measured (first build, 2026-11-06):** m1-nandboot.uimg = 2,582,068 bytes
+(md5 b9d9e518...), **32 % of the budget**, smaller than m1-full because it
+has no 8782 firmware, wpa_supplicant or iw. It doesn't have mtd-utils yet
+either (ubiformat + flash_erase, ~0.1 MB compressed: they wait for the
+owner's OK to download).
 
 Also checked:
 - bootm copies the data from 0x400040 to 0x8000; for images over ~4 MB the

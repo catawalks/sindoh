@@ -384,6 +384,20 @@ UBI/UBIFS come later. The RTC driver only reads the seconds counter at
 sequence is a proposal (docs/kernel/rtc_setup.md). `/etc/m1-variant.sh`
 prints one line per block. Check each against that variant's own card.
 
+### nandboot: the end-goal image for mtd0 (built, not booted)
+
+`VARIANT=nandboot` = full + NAND writes (patch 0010 v2, the window opened
+for mtd6 from the command line) + USB storage, without the 8782 firmware,
+with `CONFIG_CMDLINE_FORCE` so the stock U-Boot line is ignored
+(docs/kernel/nand_boot_cmdline.md). Its /init (`initramfs/nandboot/init`):
+revert from RAM for a Sindoh or revert stick (confirmed by a touch) or the
+root marker `/.dp200-revert`; otherwise the root is a card/stick partition
+with `/.dp200-root`, else ubi0:filesystem; a broken root offers the
+recovery from mtd5. `tools/test_nandboot_init.sh` runs its decisions
+offline with stubs. ubiformat/flash_erase need mtd-utils (`MTDSHA`, see
+build.sh). Not for writing to mtd0 until stage 3 has run from the SD
+fast path.
+
 ### sd: the SD socket, read-only
 
 0. Pre-check, read-only, before spending a boot: at the U-Boot prompt

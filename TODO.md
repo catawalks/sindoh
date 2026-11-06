@@ -139,6 +139,25 @@ still require the owner's explicit OK.
 16. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
     Done); still untested with motion (homing/moves need the owner). They
     are the fallback; the printer runs the gcc builds from /opt/dp200.
+17. **End-goal offline prep (2026-11-06, kernel side session; nothing run
+    on hardware):**
+    - done: the stock U-Boot command line and size budget
+      (docs/kernel/nand_boot_cmdline.md: CONFIG_CMDLINE_FORCE, no
+      ubi.mtd, image ~3.2 MB of 7.75 MB); write guard v2 (patch 0010:
+      up to 4 window ranges, each inside mtd0 2-63 / mtd3 / mtd6,
+      compiled); `VARIANT=nandboot` (full + NAND writes, no 8782
+      firmware, USB storage) with the stage-3 initramfs
+      (kernel/m1/initramfs/nandboot/init: marked card/stick root, else
+      mtd6; Sindoh/revert stick + touch, or the root marker -> revert from
+      RAM; broken root -> "touch to recover"), checked offline by
+      kernel/m1/tools/test_nandboot_init.sh (9 paths).
+    - **needs the owner:** OK to download mtd-utils 2.3.0 (ubiformat and
+      flash_erase are not in BusyBox) and its sha256 from the signed
+      infradead release, for `MTDSHA`. Without them the revert refuses at
+      its tool check.
+    - open: stage 3's test from the SD fast path (owner at the printer);
+      the screen app's "Back to stock" button (writes /.dp200-revert);
+      Ethernet MAC from mtd1 (the stock line's ethaddr is ignored now).
 
 ## Done (2026-11-02, this round)
 
