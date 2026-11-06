@@ -150,11 +150,16 @@ still require the owner's explicit OK.
       (kernel/m1/initramfs/nandboot/init: marked card/stick root, else
       mtd6; Sindoh/revert stick + touch, or the root marker -> revert from
       RAM; broken root -> "touch to recover"), checked offline by
-      kernel/m1/tools/test_nandboot_init.sh (9 paths).
-    - **needs the owner:** OK to download mtd-utils 2.3.0 (ubiformat and
-      flash_erase are not in BusyBox) and its sha256 from the signed
-      infradead release, for `MTDSHA`. Without them the revert refuses at
-      its tool check.
+      kernel/m1/tools/test_nandboot_init.sh (9 paths + the initramfs list).
+    - mtd-utils (owner OK 11-06): Debian trixie's 1:2.3.0-1 source, by
+      apt from deb.debian.org (signed InRelease -> Sources -> .dsc ->
+      sha256 d1242d44...; infradead.org didn't resolve from here), in
+      D:/DP200/kernel/src/mtd-utils. 11 static tools in the initramfs
+      instead of BusyBox's (ubiattach/ubidetach/nandwrite there take other
+      options than dp200-revert.sh uses). Image 2,649,276 bytes = 33 % of
+      mtd0's 7.75 MB. Their options were checked against the sources'
+      getopt strings; qemu-arm can't run these static binaries under WSL,
+      so they first run on the printer (stage 3).
     - open: stage 3's test from the SD fast path (owner at the printer);
       the screen app's "Back to stock" button (writes /.dp200-revert);
       Ethernet MAC from mtd1 (the stock line's ethaddr is ignored now).

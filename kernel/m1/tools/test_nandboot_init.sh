@@ -75,3 +75,23 @@ run "revert stick, touched" UBIROOT=ok STICKDEV="${STK:-x}" STICKFILE=dp200-reve
 run "broken root, touched" UBIROOT=broken TOUCH=yes
 run "broken root, no touch" UBIROOT=broken TOUCH=no
 run "revert fails" UBIROOT=revert REVRC=1
+
+# The built image's initramfs list (if there is one): every tool that
+# dp200-revert.sh checks for and that the init calls is in it, and the
+# UBI/NAND tools are mtd-utils binaries, not BusyBox links (other options).
+L=${IRFS_LIST:-$HOME/dp200/initramfs-m1-nandboot/initramfs.list}
+if [ -f "$L" ]; then
+	bad=0
+	for t in ubiattach ubidetach ubiformat ubimkvol ubiupdatevol flash_erase \
+		 nandwrite bzip2 tar cmp od awk md5sum mountpoint switch_root \
+		 timeout tee setsid cttyhack dd dp200-revert.sh; do
+		grep -qE "^(file|slink) /[a-z/]*/$t " "$L" || { echo "MISSING $t"; bad=1; }
+	done
+	for t in ubiattach ubidetach ubiformat ubimkvol ubiupdatevol flash_erase nandwrite; do
+		grep -qE "^slink /[a-z/]*/$t " "$L" && { echo "BUSYBOX LINK $t"; bad=1; }
+	done
+	grep -q "^file /usr/sbin/recovery.md5 " "$L" || { echo "MISSING recovery.md5"; bad=1; }
+	[ $bad = 0 ] && echo "initramfs list: all revert and init tools present"
+else
+	echo "(no $L: build VARIANT=nandboot for the list check)"
+fi
