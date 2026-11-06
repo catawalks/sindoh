@@ -21,6 +21,19 @@ the work; it is how open items survive between sessions.
    (fm c313d379). **Left:** a real print on the test printer (user present),
    then a new payload for the stick - the stick's 60316e4 payload has the
    bug: don't print on the work printer with it.
+1b. **New payload needed (agent, then user):** rebuild after the real print
+   test of the stepping fix. It must also carry 2026-11-06's fixes: no Wi-Fi
+   networks from the build printer (runtime.exclude: etc/dp200/
+   wpa_supplicant.conf - the owner's HOME SSIDs and passwords had landed on
+   the work printer; the current stick payload 60316e4 still contains them,
+   never publish it), and the generic reboot text ("Rebooting now." instead
+   of "The Sindoh logo comes next." - the logo may be the owner's own).
+   Both edits are committed, not yet on a printer.
+1c. **Ethernet doesn't recover after a switch outage (work printer,
+   2026-11-06):** the switch lost power/its uplink overnight; after it came
+   back other devices got IPs, the printer only after a reboot. Check
+   dp200-netd.sh: link down/up handling and DHCP retry (udhcpc restart on
+   carrier up, lease renewal when the DHCP server was gone).
 2. **Screen features not yet used on hardware (user):** the calibration
    wizards (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET),
    LOAD switching the heater off, OBJECTS (skip one object in a print with

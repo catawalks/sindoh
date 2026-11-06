@@ -52,6 +52,12 @@
 ./home/klipper/printer_data/gcodes/*
 */__pycache__/*.opt-*.pyc
 ./etc/dp200/rc.dp200.*
+# the build printer's own saved Wi-Fi networks (with passwords): never ship
+# them (2026-11-06: the owner's home SSIDs landed on the work printer). A new
+# install builds its list from that printer's stock settings (dp200-wifi.sh)
+./etc/dp200/wpa_supplicant.conf
+./etc/dp200/wpa_supplicant.conf.*
+./etc/wpa_supplicant/*.conf
 ./opt/dp200/fm_*.bin
 ./opt/dp200/io_*.bin
 # numpy for input shaping is opt-in (~25 MB): setup_numpy.sh reinstalls it

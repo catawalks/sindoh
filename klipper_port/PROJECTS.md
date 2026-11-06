@@ -140,6 +140,10 @@ speeds, emulator regression passes.
 **Status:** [docs/other_models.md](docs/other_models.md); OEM firmware for all
 models decrypted (oem_models, oem_3dwox1); the 30X key is unknown.
 **Next:** 1X testing; 2X second extruder; 30X key.
+Note (owner, 2026-11-06): the 3DWOX 1X shows a shutdown loading screen on a
+long press of the power button. When working on the 1X, look in its
+firmware (oem_models/1x) for how it does that (our DP200 shutdown screens:
+dp200_screen.py draw_shutdown, dp200-powerkey.sh).
 
 ## 7. Spaghetti / failure detection
 
