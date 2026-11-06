@@ -146,10 +146,14 @@ models decrypted (oem_models, oem_3dwox1); the 30X key is unknown.
 Not on the printer (CPU/RAM). Document how a main Klipper host running
 Obico (or similar) can watch this printer through its Moonraker.
 
-## 8. Cartridge chip writing
+## 8. Cartridge chip read/write (low priority)
 
-Read-only today (docs/cartridge_chip.md). Writing (e.g. resetting the
-remaining length) stays off unless the user explicitly agrees.
+The owner wants to continue investigating cartridge-chip reading and
+writing, but this is a low-priority, independent project. It is not a
+prerequisite or blocker for other work; do not wait on it during a session
+unless the owner explicitly makes it the current task. Current work remains
+read-only (docs/cartridge_chip.md). Any write operation (for example,
+resetting the remaining length) requires the owner's explicit OK.
 
 ## 9. JTAG
 
@@ -194,11 +198,16 @@ long print on it.
   restore) and add git/pip/compiler: ~15-20 MB free; C) git + pip only:
   Moonraker/Mainsail from upstream, Klipper pinned. USB/SD storage is out
   (no extra hardware).
-- **Wi-Fi drops to the other saved network (2026-11-02, twice):** cause:
-  power saving (the 8782 missed key handshakes, reason 15). Power saving
-  is now off at boot and on every connection: 0 drops in ~6 h (68 before).
-  The screen's WiFi -> SAVED page sets the first choice; the watchdog goes
-  back to it. Still watching for a day, then on the work printer.
+- **Wi-Fi stability and saved-network priority:** power saving reduced drops
+  on the test printer (the 8782 had missed key handshakes, reason 15). The
+  owner reports a separate priority bug: when connected to a lower-priority
+  SSID, the printer does not rejoin a higher-priority SSID when it becomes
+  available. Open: reproduce and trace preference/watchdog reconnect logic,
+  then verify on the work printer. A displayed ordering is not evidence that
+  priority works. The SYSTEM -> NETWORK -> WIFI summary page also sometimes
+  shows inaccurate data; it displayed the Ethernet IP as the Wi-Fi IP on the
+  test printer. Trace the page's data source/state updates and clean it up to
+  show Wi-Fi information only, without stale or Ethernet values.
 
 ## 11. G-code and log storage (2026-11-03, decided: see the end)
 

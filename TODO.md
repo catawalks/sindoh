@@ -9,21 +9,24 @@ the work; it is how open items survive between sessions.
 
 ## Next (user at a printer)
 
-1. **Work printer upgrade (user):** the stick's `_update_rodin_KlipperInstall`
-   (rename to `_update_rodin`), build **60316e4** (2026-11-03, payload md5
-   08465408...). First install of this build: also checks the Wi-Fi
-   power-save fix, 208 mm/s X/Y homing, the faster stepping (UPC_STEP_BATCH)
-   and the firmware-tagged backup (its backup folder predates FIRMWARE
-   files, so it gets tagged).
+1. **Work printer failed test print (user/logs):** the work printer is
+   upgraded to the latest build, but a test print failed. Get the logs from
+   the owner after the token reset, hand them to Claude for diagnosis, then
+   record the cause and fix here.
 2. **Screen features not yet used on hardware (user):** the calibration
-   wizards (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET), the
-   HOME button, LOAD switching the heater off, OBJECTS (skip one object in a
-   print with two or more), WiFi -> SAVED (PREFER / FORGET).
+   wizards (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET),
+   LOAD switching the heater off, OBJECTS (skip one object in a print with
+   two or more), WiFi -> SAVED (PREFER / FORGET).
 3. **PRINT_START pause-and-ask, YES (user):** a real print answered YES on
    the screen (NO was tested: nothing moved, the print was cancelled).
 4. **A real Mainsail update** from SYSTEM -> UPDATE (only CHECK NOW tried).
 5. **Dryer leftovers (user):** STOP DRYING, PRINT_START during drying,
    FORCE=1 above the 70 C sheet limit.
+6. **Homing clearance (code + user validation):** investigate changing the
+   HOME ALL sequence to create a few mm of Z clearance before X homing, so
+   the nozzle is less likely to drag across failed-print material left on
+   the bed. Confirm the safe direction and coordinates for this bed-moving
+   Z axis, then validate the sequence on the printer.
 
 ## Needs the user, longer
 
@@ -40,6 +43,12 @@ the work; it is how open items survive between sessions.
 10. Optional: a 6-7 mm/s Z lift test (10 stalls lifting; stock is 5.05).
 
 ## Decision open
+
+**Low-priority project - cartridge chip read/write:** reading and writing
+the cartridge chip remains work the owner wants to pursue, but it is not a
+prerequisite or blocker for other tasks. Do not wait on this project during
+a session unless the owner explicitly makes it the current task. Chip writes
+still require the owner's explicit OK.
 
 11. **Updates:** decided 11-03 (PROJECTS #10): NAND only = Mainsail and
     Moonraker from upstream, Klipper from our releases; SD card = all
@@ -69,10 +78,19 @@ the work; it is how open items survive between sessions.
 
 ## Agent (no user needed)
 
-12. **Wi-Fi drops:** test printer: 68 deauths total and none since power
-    saving went off, over about a day (last check 2026-11-03 08:40). Left:
-    the work printer after its upgrade.
-13. **Faster stepping** (docs/faster_stepping_plan.md, phases 1-3 approved
+12. **Wi-Fi stability and saved-network priority:** power saving reduced
+    drops on the test printer (68 deauths before the change, none over about
+    a day as of 2026-11-03 08:40). Separate open bug: after falling back to
+    a lower-priority SSID, the printer does not rejoin a higher-priority
+    SSID when it becomes available. Reproduce and trace preference/watchdog
+    reconnect logic; the displayed ordering alone does not verify priority.
+    Check stability on the upgraded work printer too.
+13. **Wi-Fi summary page accuracy:** SYSTEM -> NETWORK -> WIFI can show
+    inaccurate data; the owner saw the Ethernet IP displayed on the WIFI
+    summary page on the test printer. Trace the page's data source and state
+    updates, then clean it up to display Wi-Fi information only and avoid
+    presenting stale or Ethernet values as Wi-Fi details.
+14. **Faster stepping** (docs/faster_stepping_plan.md, phases 1-3 approved
     11-02): done so far: engine register map (COM_STP +0x78 candidate),
     `CONFIG_UPC_STEP_SINGLE` (fork branch fast-stepping, default off) halves
     step interrupts, emulator-identical; engine run 11-03 (driver off):
@@ -93,7 +111,7 @@ the work; it is how open items survive between sessions.
     after G28 read 0.015-0.02 mm high, then repeat to 0.007. Check whether
     BED_MESH_CALIBRATE right after homing is affected; maybe a few warm-up
     touches first.
-14. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
+16. **Prebuilt (zig) UPC images, motion:** loaded and run 2026-11-02 (see
     Done); still untested with motion (homing/moves need the owner). They
     are the fallback; the printer runs the gcc builds from /opt/dp200.
 
@@ -119,3 +137,7 @@ the work; it is how open items survive between sessions.
   builds put back (fork src unchanged since).
 - Stick updated: payload build 4d3bcdf (md5 5af91c1e...) + the installer with
   firmware-tagged backups (dry-run tested); not ejected.
+- Work printer upgraded to the latest build; the subsequent test print
+  failed. Logs are expected after the token reset for diagnosis.
+- HOME ALL button verified working; the homing sequence still needs a
+  clearance review before X homing (see open item 6).
