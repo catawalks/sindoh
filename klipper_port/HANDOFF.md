@@ -27,9 +27,14 @@ Decisions in force:
   releases; with a card everything upstream.
 - **Interim install** (stock 3.2 kernel, Klipper in /klipper on mtd6, USB
   stick): the work printer runs it; it becomes the first public release
-  after the current feature work. Stick build 60316e4.
-- **Faster stepping:** UPC_STEP_BATCH is the default (fork sindoh-dp200
-  f035bdbc).
+  after the current feature work. **Stick build 60316e4 must not be used:**
+  it has the batching bug that stopped the work printer's print and carries
+  the build printer's home Wi-Fi networks (TODO 1, 1b). Rebuild after the
+  fixed stepping has passed a real print.
+- **Faster stepping:** UPC_STEP_BATCH is the default (fork sindoh-dp200);
+  its first version stopped a slow first layer ("Stepper too far in past"),
+  fixed in 8d4fb4d8 (a block's last step is stepped normally), emulator-
+  checked; the dev printer runs the fix (fm c313d379), real print pending.
 - **Printers:** dev = Stanley Model 1 on COM3 (SD card, serial console);
   work printer = end-user stand-in (no card, USB stick only). The filament
   cartridge system is not working under Klipper; PLA is normally loaded.
