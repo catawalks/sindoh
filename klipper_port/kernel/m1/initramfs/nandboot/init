@@ -1,0 +1,146 @@
+#!/bin/sh
+# /init of the NAND-boot image (VARIANT=nandboot): our kernel in mtd0,
+# booted by the stock U-Boot (docs/end_goal_install_plan.md, stage 3).
+#
+#  - revert: a Sindoh DP200 update stick (_update_rodin/update.she) or a
+#    revert stick (_update_rodin/dp200-revert), each confirmed by a touch,
+#    or the marker /.dp200-revert in our root (the screen app's "Back to
+#    stock", already confirmed there): dp200-revert.sh from RAM, then reboot.
+#    Stock comes back from mtd5, and boots and runs the stick's update;
+#  - normal: the root is a card or stick partition marked for the printer
+#    (/.dp200-root), else ubi0:filesystem on mtd6; then switch_root;
+#  - broken root: offer the recovery from mtd5 ("touch to recover").
+#
+# The command line opens the NAND write window for mtd6 only
+# (marvell_nand.write_window=1741,4091); dp200-revert.sh opens mtd0/mtd3
+# itself, around each write.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev 2>/dev/null
+mkdir -p /run /newroot && mount -t tmpfs -o mode=0755 tmpfs /run
+LOG=/run/dp200-initramfs.log
+WIN=/sys/module/marvell_nand/parameters/write_window
+STICK=/run/stick
+INIT=/etc/dp200/init.mainline
+
+# messages on the serial console, the panel (fbcon on tty0) and the log
+say() {
+	echo "dp200: $*" | tee -a $LOG > /dev/console
+	[ -c /dev/tty0 ] && echo "$*" > /dev/tty0
+}
+
+shell() {
+	say "$1: shell on the serial console"
+	setsid cttyhack sh
+}
+
+# A touch within $1 seconds? Any event from the touchscreen counts.
+touched() {
+	[ -c /dev/input/event0 ] || return 1
+	timeout "$1" dd if=/dev/input/event0 bs=16 count=1 of=/dev/null \
+		2>/dev/null
+}
+
+# Wait up to 6 s for the SD card and USB sticks to show up.
+i=0
+while [ $i -lt 12 ]; do
+	ls /dev/mmcblk0p* /dev/sd?1 >/dev/null 2>&1 && break
+	sleep 0.5; i=$((i + 1))
+done
+sleep 1
+
+# Sticks: a Sindoh update (update.she) or our revert marker
+SINDOH=false MARKED=false
+mkdir -p $STICK
+for d in /dev/sd?1 /dev/sd?; do
+	[ -b "$d" ] || continue
+	mount -t vfat -o ro "$d" $STICK 2>/dev/null || continue
+	if [ -f $STICK/_update_rodin/dp200-revert ]; then
+		MARKED=true; say "revert stick in $d"; break
+	fi
+	if [ -f $STICK/_update_rodin/update.she ]; then
+		SINDOH=true; say "Sindoh update stick in $d"; break
+	fi
+	umount $STICK
+done
+mountpoint -q $STICK && umount $STICK
+
+# mtd6: our root (UBI)
+ubiattach -m 6 -d 0 /dev/ubi_ctrl > /dev/null 2>&1 ||
+	ubiattach /dev/ubi_ctrl -m 6 -d 0 > /dev/null 2>&1 ||
+	say "mtd6: UBI attach failed"
+ROOTMARK=false
+if mount -t ubifs -o ro ubi0:filesystem /newroot 2>/dev/null; then
+	[ -f /newroot/.dp200-revert ] && ROOTMARK=true
+	umount /newroot
+fi
+
+revert() {
+	say "Returning this printer to stock (factory set from mtd5)."
+	say "Do not switch it off. This takes several minutes."
+	[ -e /dev/ubi0 ] && ubidetach -d 0
+	[ -w $WIN ] && echo none > $WIN
+	# the pipeline's status is tee's: the revert's own goes through a file
+	{ dp200-revert.sh 2>&1; echo $? > /run/revert.rc; } | tee -a $LOG
+	if [ "$(cat /run/revert.rc 2>/dev/null)" = 0 ]; then
+		sync
+		say "Done. Restarting into the stock firmware."
+		sleep 3
+		reboot -f
+	fi
+	say "The return to stock FAILED (log: $LOG)."
+	shell "revert failed"
+	# never on into a half-written root, nor a reboot into the next try
+	say "Stopped. Switch the printer off."
+	while :; do sleep 3600; done
+}
+
+if $ROOTMARK; then
+	revert
+elif $SINDOH || $MARKED; then
+	say "Return this printer to stock? Touch the screen within 30 s to"
+	say "confirm; otherwise it starts normally."
+	if touched 30; then revert; fi
+	say "not confirmed: normal start"
+fi
+
+# The root: a marked card/stick partition first, then mtd6
+use_root() {
+	[ -x "/newroot$INIT" ] || [ -x /newroot/sbin/init ] || return 1
+	[ -x "/newroot$INIT" ] || INIT=/sbin/init
+	say "root: $1"
+	return 0
+}
+ROOT=""
+for d in /dev/mmcblk0p* /dev/sd?1; do
+	[ -b "$d" ] || continue
+	mount -o ro "$d" /newroot 2>/dev/null || continue
+	if [ -f /newroot/.dp200-root ] && use_root "$d"; then
+		ROOT=$d; break
+	fi
+	umount /newroot
+done
+if [ -z "$ROOT" ] && mount -t ubifs -o ro ubi0:filesystem /newroot 2>/dev/null; then
+	if use_root ubi0:filesystem; then
+		ROOT=ubi0:filesystem
+	else
+		umount /newroot
+	fi
+fi
+
+if [ -z "$ROOT" ]; then
+	say "No working root file system found."
+	say "Touch the screen within 60 s to restore stock from the factory"
+	say "recovery set (mtd5)."
+	if touched 60; then revert; fi
+	shell "no root"
+	reboot -f
+fi
+
+cp $LOG /newroot/run/ 2>/dev/null
+umount /run /sys /proc
+mount --move /dev /newroot/dev 2>/dev/null || umount /dev
+exec switch_root /newroot "$INIT"

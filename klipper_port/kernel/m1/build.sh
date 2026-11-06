@@ -9,6 +9,8 @@
 #   VARIANT=sd              $OUT/m1-sd.uimg        SD socket, read-only use
 #   VARIANT=gpio            $OUT/m1-gpio.uimg      GPIO banks, nothing driven
 #   VARIANT=eth             $OUT/m1-eth.uimg       small Ethernet + kexec loader
+#   VARIANT=nandboot        $OUT/m1-nandboot.uimg  for mtd0: full + NAND
+#                           writes, root/revert initramfs, no 8782 firmware
 #
 # A variant merges variants/<v>.config after m1.config, uses
 # variants/<v>.dts (the base DTS with nodes enabled) if present, and adds
@@ -45,7 +47,8 @@ i2c)	USERSPACE="" ;;		# read-only bring-up images
 nand|ubi) USERSPACE="mtdraw" ;;
 full)	USERSPACE="iw uvcgrab wpa upctool mtdraw" ;;
 eth)	USERSPACE="kexec" ;;	# small loader: no Wi-Fi, no firmware
-*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand ubi full eth)" >&2; exit 1 ;;
+nandboot) USERSPACE="mtdutils upctool"; NANDW=1 ;;
+*)	echo "unknown VARIANT=$VARIANT (base net upc sd gpio i2c nand ubi full eth nandboot)" >&2; exit 1 ;;
 esac
 if [ "$VARIANT" = base ]; then
 	NAME=m1
@@ -73,7 +76,7 @@ fi
 # empty by default, of up to 4 block ranges inside mtd0 blocks 2-63, mtd3
 # and mtd6) instead of CONFIG_MTD_RAW_NAND_READ_ONLY, e.g. m1-debian-nandw.
 # VARIANT=nandboot always has it.
-if [ "${NANDW:-0}" = 1 ]; then
+if [ "${NANDW:-0}" = 1 ] && [ "$VARIANT" != nandboot ]; then
 	NAME=$NAME-nandw
 	KOUT=$KOUT-nandw
 fi
@@ -223,6 +226,33 @@ build_upctool() {	# host/upctool, the stock-compatible UPC tool
 		"$M1/../../host/upctool.c"
 	${CROSS}strip "$WORK/upctool"
 }
+# mtd-utils (ubiformat, flash_erase: not in BusyBox) for the nandboot
+# initramfs. The release tarball's sha256 (MTDSHA) must come from the signed
+# release (ftp.infradead.org/pub/mtd-utils) before use; without it the
+# image is built without them and dp200-revert.sh refuses to run.
+MTDVER=2.3.0
+MTDSHA=${MTDSHA:-}
+build_mtdutils() {
+	local t=$DL/mtd-utils/mtd-utils-$MTDVER.tar.bz2
+	MTDBIN=""
+	if [ ! -f "$t" ] || [ -z "$MTDSHA" ]; then
+		echo "WARNING: no checked $t (MTDSHA): no ubiformat/flash_erase" >&2
+		return 0
+	fi
+	check "$t" "$MTDSHA"
+	if [ ! -x "$WORK/mtd-utils-$MTDVER/ubiformat" ]; then
+		rm -rf "$WORK/mtd-utils-$MTDVER"
+		tar -C "$WORK" -xjf "$t"
+		(cd "$WORK/mtd-utils-$MTDVER" &&
+		 ./configure --host=arm-linux-gnueabihf CC="$MUSLCC" \
+			LDFLAGS=-static --without-zstd --without-lzo \
+			--without-zlib --without-xattr --without-selinux \
+			--without-crypto --disable-tests > /dev/null &&
+		 make -j"$JOBS" ubiformat flash_erase > /dev/null)
+		${CROSS}strip "$WORK/mtd-utils-$MTDVER"/{ubiformat,flash_erase}
+	fi
+	MTDBIN=$WORK/mtd-utils-$MTDVER
+}
 build_mtdraw() {	# raw (no-ECC) reads of /dev/mtdN, as nanddump --noecc
 	"$MUSLCC" -static -Os -Wall -o "$WORK/mtdraw" "$M1/tools/mtdraw.c"
 	${CROSS}strip "$WORK/mtdraw"
@@ -232,7 +262,7 @@ for u in $USERSPACE; do "build_$u"; done
 # 5. Wi-Fi firmware from the stock rootfs (a Marvell binary: never commit
 #    it, and don't publish the images that contain it)
 FW8782=${FW8782:-/mnt/d/DP200/backup/171114_4_open/lib/firmware/mrvl/usb8782_uapsta.bin}
-case $VARIANT in eth|i2c|nand|ubi) NOFW=1 ;; *) NOFW=0 ;; esac
+case $VARIANT in eth|i2c|nand|ubi|nandboot) NOFW=1 ;; *) NOFW=0 ;; esac
 if [ $NOFW = 0 ]; then
 	echo "6c11556fd22089c7f084613549a721e2  $FW8782" | md5sum -c --quiet
 fi
@@ -261,6 +291,11 @@ fi
 # eth: the fast path's defaults (the PC's HTTP server, the file name
 # tools/eth_kernel_boot.sh publishes the next test kernel under, and the
 # kexec watchdog in seconds: user-approved 2026-10-29, 0 turns it off)
+if [ "$VARIANT" = nandboot ]; then
+	for f in dp200-revert.sh recovery.md5; do
+		tr -d '\r' < "$M1/../../install/nand/$f" > "$IRFS/$f"
+	done
+fi
 if [ "$VARIANT" = eth ]; then
 	printf 'PC=%s\nPORT=%s\nFILE=%s\nWDT=%s\n' "${ETHLOAD_PC:-10.10.0.85}" \
 		"${ETHLOAD_PORT:-8099}" "${ETHLOAD_FILE:-next-zImage-dtb.bin}" \
@@ -302,6 +337,14 @@ fi
 		iw)	echo "file /usr/sbin/iw $IW/iw 0755 0 0" ;;
 		uvcgrab) echo "file /usr/bin/uvcgrab $WORK/uvcgrab 0755 0 0" ;;
 		mtdraw)	echo "file /usr/bin/mtdraw $WORK/mtdraw 0755 0 0" ;;
+		mtdutils)
+			# the revert (and its md5 list) from install/nand
+			echo "file /usr/sbin/dp200-revert.sh $IRFS/dp200-revert.sh 0755 0 0"
+			echo "file /usr/sbin/recovery.md5 $IRFS/recovery.md5 0644 0 0"
+			if [ -n "$MTDBIN" ]; then
+				echo "file /usr/sbin/ubiformat $MTDBIN/ubiformat 0755 0 0"
+				echo "file /usr/sbin/flash_erase $MTDBIN/flash_erase 0755 0 0"
+			fi ;;
 		wpa)	echo "file /usr/sbin/wpa_supplicant $WPA/wpa_supplicant 0755 0 0"
 			echo "file /usr/bin/wpa_passphrase $WPA/wpa_passphrase 0755 0 0"
 			echo "file /usr/bin/wifi-join $IRFS/wifi-join 0755 0 0"
@@ -326,6 +369,10 @@ mkdir -p "$KOUT"
 "${KMAKE[@]}" tinyconfig > /dev/null
 {
 	tr -d '\r' < "$M1/m1.config"
+	# nandboot = full + its own lines
+	if [ "$VARIANT" = nandboot ]; then
+		tr -d '\r' < "$M1/variants/full.config"
+	fi
 	if [ -f "$M1/variants/$VARIANT.config" ]; then
 		tr -d '\r' < "$M1/variants/$VARIANT.config"
 	fi

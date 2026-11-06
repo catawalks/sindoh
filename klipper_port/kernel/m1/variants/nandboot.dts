@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * m1-nandboot: our kernel in mtd0, booted by the stock U-Boot (bootargs come
+ * from CONFIG_CMDLINE_FORCE, variants/nandboot.config). mtd0 "kernel",
+ * mtd3 "boot-logo" and mtd6 "filesystem" writable; the driver's write
+ * window (patch 0010 v2) decides block by block and never allows U-Boot
+ * (mtd0's first 2 blocks), mtd1, mtd2, mtd4, mtd5 or the vendor BBT.
+ */
+#include "full.dts"
+
+&nand_controller {
+	nand@0 {
+		partitions {
+			partition@0 {
+				/delete-property/ read-only;
+			};
+			partition@8a0000 {
+				/delete-property/ read-only;
+			};
+			partition@d9a0000 {
+				/delete-property/ read-only;
+			};
+		};
+	};
+};
