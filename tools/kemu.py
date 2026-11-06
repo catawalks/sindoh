@@ -260,6 +260,15 @@ if FM:
     r = transact('stepper_get_position oid=0', 'stepper_position'); print('position', r['pos'], '(expected -175)')
     run_blocks('back-to-back constant', [(5000, 40, 0), (4400, 40, 0), (4003, 400, 0)], loops=400)
     r = transact('stepper_get_position oid=0', 'stepper_position'); print('position', r['pos'], '(expected -655)')
+    # A slow constant block (~2.3 ms per step, like a first-layer extruder),
+    # then a faster one at once: 2026-11-05 the batch build shut down here
+    # ("Stepper too far in past")
+    run_blocks('slow then fast', [(920000, 9, 0), (40000, 30, 0)], loops=2500)
+    r = transact('get_config', 'config')
+    print('after slow then fast: is_shutdown', r['is_shutdown'])
+    if r['is_shutdown']:
+        raise SystemExit('MCU SHUTDOWN after slow then fast')
+    r = transact('stepper_get_position oid=0', 'stepper_position'); print('position', r['pos'], '(expected -694)')
     # position read in the middle of a long constant block
     starts_at.clear()
     send('reset_step_clock oid=0 clock=%d' % (clock() + 300000))
@@ -268,7 +277,7 @@ if FM:
         run(100000); recv()
     r = transact('stepper_get_position oid=0', 'stepper_position')
     n = steps_done()
-    print('mid-move: %d steps done at the reply, position %d (-655 - steps = %d)' % (n, r['pos'], -655 - n))
+    print('mid-move: %d steps done at the reply, position %d (-694 - steps = %d)' % (n, r['pos'], -694 - n))
     for _ in range(120):
         run(100000); recv()
         if steps_done() >= 200:

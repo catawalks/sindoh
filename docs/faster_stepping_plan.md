@@ -276,6 +276,25 @@ into sindoh-dp200, `CONFIG_UPC_STEP_BATCH=y` in config/dp200_fm.config
 /opt/dp200/fm.bin (the previous build kept as fm_gcc.bin); the USB payload
 is rebuilt with it.
 
+### Bug found on the work printer (2026-11-05/06) and fixed
+
+A PrusaSlicer print shut the FM MCU down ~19 min in, on the first-layer
+solid infill: `Stepper too far in past`. At 20 mm/s the extruder steps at
+~425 steps/s (~2.3 ms per step); a batched block's engine move kept the
+STEP line high for half an interval (~1.2 ms) after its last rising edge,
+and only then did the next block load - its first step was then >1 ms in
+the past. The kemu tests had no slow block followed by a faster one.
+**Fix (fork 8d4fb4d8):** an engine move never includes the block's last
+step; that step is a normal one-step pulse at its time, and the next block
+loads as with stepping. The chaining shortcut (UPC_STEP_BATCH_LATE) went
+with it. New kemu test "slow then fast" (920000 x 9, then 40000 x 30):
+the old build shuts down, the new one runs it with every step on time.
+Side effect: a constant block right after a block must start its engine
+half an interval before its first step, after the previous one-step pulse
+has ended (4 x the half period + latency): below ~5,000-tick intervals
+(~80k steps/s) such blocks are stepped. Our fastest real case is 16.7k
+steps/s (X/Y at 208 mm/s).
+
 ### Next
 
 - Idle-loop counter in upc_step_stats for an on-printer load figure.

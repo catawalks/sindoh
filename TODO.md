@@ -9,10 +9,18 @@ the work; it is how open items survive between sessions.
 
 ## Next (user at a printer)
 
-1. **Work printer failed test print (user/logs):** the work printer is
-   upgraded to the latest build, but a test print failed. Get the logs from
-   the owner after the token reset, hand them to Claude for diagnosis, then
-   record the cause and fix here.
+1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
+   Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH
+   bug - `MCU 'mcu' shutdown: Stepper too far in past` ~19 min in, on the
+   first-layer solid infill (PrusaSlicer, 20 mm/s: the extruder at ~425
+   steps/s, ~2.3 ms per step). After a batched block's last rising edge the
+   STEP line stayed high for half an interval (~1.2 ms), so the next block
+   started >1 ms late. Fix (fork 8d4fb4d8): the engine move leaves out the
+   block's last step, which is stepped normally. kemu reproduces it (old
+   build: shutdown; new: clean) and the test printer runs the fix
+   (fm c313d379). **Left:** a real print on the test printer (user present),
+   then a new payload for the stick - the stick's 60316e4 payload has the
+   bug: don't print on the work printer with it.
 2. **Screen features not yet used on hardware (user):** the calibration
    wizards (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET),
    LOAD switching the heater off, OBJECTS (skip one object in a print with
@@ -80,7 +88,11 @@ still require the owner's explicit OK.
 
 12. **Wi-Fi stability and saved-network priority:** power saving reduced
     drops on the test printer (68 deauths before the change, none over about
-    a day as of 2026-11-03 08:40). Separate open bug: after falling back to
+    a day as of 2026-11-03 08:40). **2026-11-06: 125 deauths** (reason 15)
+    with power management still off, and the printer is on the
+    lower-priority Fios-kVGD7 (192.168.1.204) instead of Niholedotcom; its
+    Ethernet (10.10.0.147) is plugged in now, and 10.10.0.21 answers pings
+    from another device. Separate open bug: after falling back to
     a lower-priority SSID, the printer does not rejoin a higher-priority
     SSID when it becomes available. Reproduce and trace preference/watchdog
     reconnect logic; the displayed ordering alone does not verify priority.
