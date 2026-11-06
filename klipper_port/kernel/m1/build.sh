@@ -69,9 +69,10 @@ if [ "${SMP:-0}" = 1 ]; then
 	NAME=$NAME-smp
 	KOUT=$KOUT-smp
 fi
-# NANDW=1: NAND program/erase compiled in (patch 0010: a write window that
-# is empty by default, inside mtd6 only) instead of
-# CONFIG_MTD_RAW_NAND_READ_ONLY. Test images only, e.g. m1-debian-nandw.
+# NANDW=1: NAND program/erase compiled in (patch 0010 v2: a write window,
+# empty by default, of up to 4 block ranges inside mtd0 blocks 2-63, mtd3
+# and mtd6) instead of CONFIG_MTD_RAW_NAND_READ_ONLY, e.g. m1-debian-nandw.
+# VARIANT=nandboot always has it.
 if [ "${NANDW:-0}" = 1 ]; then
 	NAME=$NAME-nandw
 	KOUT=$KOUT-nandw

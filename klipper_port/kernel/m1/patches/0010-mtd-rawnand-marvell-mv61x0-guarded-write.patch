@@ -18,19 +18,24 @@
  };
  
  static inline struct marvell_nfc *to_marvell_nfc(struct nand_controller *ctrl)
-@@ -672,17 +676,125 @@
+@@ -672,17 +676,181 @@
  	return false;
  }
  
 +/*
-+ * bch_v1 (88PA6170) program/erase window, in erase blocks of the chip.
-+ * Empty by default: nothing is programmed or erased until it is set, e.g.
-+ *   echo 4000,4000 > /sys/module/marvell_nand/parameters/write_window
-+ * It never reaches outside three fixed areas of the stock layout: the
-+ * kernel part of mtd0 (after the 2 U-Boot blocks), the logo (mtd3) and the
-+ * root (mtd6) without the vendor BBT (main + mirror + 2 spare blocks) in
-+ * the last 4 blocks of the chip. U-Boot, the U-Boot env, the vendor BBT
-+ * partition, /backup and the factory recovery set are never written.
++ * bch_v1 (88PA6170) program/erase window, in erase blocks of the chip: up
++ * to BCH_V1_WIN_MAX ranges FIRST,LAST separated by ';'. Empty by default:
++ * nothing is programmed or erased until it is set, e.g.
++ *   echo '1741,4091;2,63' > /sys/module/marvell_nand/parameters/write_window
++ * or marvell_nand.write_window=1741,4091 on the command line (the NAND-boot
++ * image: its root in mtd6 is writable from boot on). Each range must lie
++ * inside one of three fixed areas of the stock layout, or the whole setting
++ * is refused: the kernel part of mtd0 (blocks 2-63, after the 2 U-Boot
++ * blocks), the logo (mtd3, 69-76) and the root (mtd6, 1741 up to the vendor
++ * BBT: main + mirror + 2 spare blocks in the last 4 blocks of the chip,
++ * 4092-4095). U-Boot, the U-Boot env (64), the bbt partition (65-68),
++ * /backup and the factory recovery set (77-1740) and the vendor BBT are
++ * never written; every command is checked against the areas again.
 + */
 +#define BCH_V1_KERNEL_FIRST	(0x40000 / SZ_128K)	/* mtd0 after U-Boot */
 +#define BCH_V1_KERNEL_LAST	(0x800000 / SZ_128K - 1)
@@ -47,42 +52,96 @@
 +MODULE_PARM_DESC(reread_ok, "88PA6170: pages read correctly after a retry");
 +static u32 bch_v1_last_ndsr;
 +
-+static bool bch_v1_block_writable(int block, int nblocks)
++/* the chip's blocks once probed; before (command line), the DP200's 4 Gb */
++static int bch_v1_nblocks = 4096;
++
++/* which fixed area a block is in: 1 kernel, 2 logo, 3 root, 0 none */
++static int bch_v1_area(int block, int nblocks)
 +{
-+	return (block >= BCH_V1_KERNEL_FIRST && block <= BCH_V1_KERNEL_LAST) ||
-+	       (block >= BCH_V1_LOGO_FIRST && block <= BCH_V1_LOGO_LAST) ||
-+	       (block >= BCH_V1_FIRST_WRITABLE &&
-+		block < nblocks - BCH_V1_BBT_BLOCKS);
++	if (block >= BCH_V1_KERNEL_FIRST && block <= BCH_V1_KERNEL_LAST)
++		return 1;
++	if (block >= BCH_V1_LOGO_FIRST && block <= BCH_V1_LOGO_LAST)
++		return 2;
++	if (block >= BCH_V1_FIRST_WRITABLE && block < nblocks - BCH_V1_BBT_BLOCKS)
++		return 3;
++	return 0;
 +}
 +
-+static int bch_v1_win_first = -1, bch_v1_win_last = -1;
++#define BCH_V1_WIN_MAX	4
++static struct {
++	int n;
++	int first[BCH_V1_WIN_MAX], last[BCH_V1_WIN_MAX];
++} bch_v1_win;
++static DEFINE_SPINLOCK(bch_v1_win_lock);
 +
 +static int bch_v1_win_set(const char *val, const struct kernel_param *kp)
 +{
-+	int first, last;
++	int first[BCH_V1_WIN_MAX], last[BCH_V1_WIN_MAX];
++	int n = 0, i, len, nb = READ_ONCE(bch_v1_nblocks);
++	const char *p = skip_spaces(val);
++	unsigned long flags;
 +
-+	if (sysfs_streq(val, "none") || sysfs_streq(val, "")) {
-+		WRITE_ONCE(bch_v1_win_first, -1);
-+		WRITE_ONCE(bch_v1_win_last, -1);
-+		return 0;
++	if (!*p || sysfs_streq(p, "none")) {
++		n = 0;
++	} else {
++		for (;;) {
++			if (n == BCH_V1_WIN_MAX ||
++			    sscanf(p, "%d,%d%n", &first[n], &last[n], &len) != 2 ||
++			    first[n] < 0 || last[n] < first[n] ||
++			    !bch_v1_area(first[n], nb) ||
++			    bch_v1_area(first[n], nb) != bch_v1_area(last[n], nb))
++				return -EINVAL;
++			n++;
++			p = skip_spaces(p + len);
++			if (!*p)
++				break;
++			if (*p != ';')
++				return -EINVAL;
++			p = skip_spaces(p + 1);
++		}
 +	}
-+	if (sscanf(val, "%d,%d", &first, &last) != 2 || first < 0 ||
-+	    last < first)
-+		return -EINVAL;
-+	WRITE_ONCE(bch_v1_win_first, -1);
-+	WRITE_ONCE(bch_v1_win_last, last);
-+	WRITE_ONCE(bch_v1_win_first, first);
-+	pr_warn("marvell_nand: program/erase window blocks %d-%d\n", first,
-+		last);
++	spin_lock_irqsave(&bch_v1_win_lock, flags);
++	for (i = 0; i < n; i++) {
++		bch_v1_win.first[i] = first[i];
++		bch_v1_win.last[i] = last[i];
++	}
++	bch_v1_win.n = n;
++	spin_unlock_irqrestore(&bch_v1_win_lock, flags);
++	if (!n)
++		pr_info("marvell_nand: program/erase window closed\n");
++	for (i = 0; i < n; i++)
++		pr_warn("marvell_nand: program/erase window blocks %d-%d\n",
++			first[i], last[i]);
 +	return 0;
 +}
 +
 +static int bch_v1_win_get(char *buf, const struct kernel_param *kp)
 +{
-+	if (READ_ONCE(bch_v1_win_first) < 0)
-+		return sysfs_emit(buf, "none\n");
-+	return sysfs_emit(buf, "%d,%d\n", READ_ONCE(bch_v1_win_first),
-+			  READ_ONCE(bch_v1_win_last));
++	unsigned long flags;
++	int i, len = 0;
++
++	spin_lock_irqsave(&bch_v1_win_lock, flags);
++	for (i = 0; i < bch_v1_win.n; i++)
++		len += sysfs_emit_at(buf, len, "%s%d,%d", i ? ";" : "",
++				     bch_v1_win.first[i], bch_v1_win.last[i]);
++	spin_unlock_irqrestore(&bch_v1_win_lock, flags);
++	if (!len)
++		len = sysfs_emit(buf, "none");
++	return len + sysfs_emit_at(buf, len, "\n");
++}
++
++static bool bch_v1_win_has(int block)
++{
++	unsigned long flags;
++	bool in = false;
++	int i;
++
++	spin_lock_irqsave(&bch_v1_win_lock, flags);
++	for (i = 0; i < bch_v1_win.n; i++)
++		if (block >= bch_v1_win.first[i] && block <= bch_v1_win.last[i])
++			in = true;
++	spin_unlock_irqrestore(&bch_v1_win_lock, flags);
++	return in;
 +}
 +
 +static const struct kernel_param_ops bch_v1_win_ops = {
@@ -91,7 +150,7 @@
 +};
 +module_param_cb(write_window, &bch_v1_win_ops, NULL, 0644);
 +MODULE_PARM_DESC(write_window,
-+		 "88PA6170: erase blocks FIRST,LAST that may be programmed or erased (default none)");
++		 "88PA6170: erase blocks FIRST,LAST[;FIRST,LAST...] that may be programmed or erased (default none)");
 +
 +/*
 + * May this flash-changing command go out? Only on bch_v1, only a complete
@@ -107,13 +166,11 @@
 +	u32 ndcb0 = op->ndcb[0];
 +	u8 cmd1 = ndcb0 & 0xff, cmd2 = (ndcb0 >> 8) & 0xff;
 +	unsigned int cyc = (ndcb0 >> 16) & 0x7;
-+	int first = READ_ONCE(bch_v1_win_first);
-+	int last = READ_ONCE(bch_v1_win_last);
 +	int nblocks, block;
 +	u32 row;
 +
 +	if (IS_ENABLED(CONFIG_MTD_RAW_NAND_READ_ONLY) || !nfc->caps->bch_v1 ||
-+	    nfc->no_write || first < 0 || !(ndcb0 & NDCB0_DBC))
++	    nfc->no_write || !(ndcb0 & NDCB0_DBC))
 +		return false;
 +	if (cmd1 == NAND_CMD_SEQIN && cmd2 == NAND_CMD_PAGEPROG && cyc == 5)
 +		row = (op->ndcb[1] >> 16) | ((op->ndcb[2] & 0xff) << 16);
@@ -124,8 +181,7 @@
 +
 +	block = row / BCH_V1_PAGES_PER_BLOCK;
 +	nblocks = nanddev_target_size(&chip->base) >> chip->phys_erase_shift;
-+	return block >= first && block <= last &&
-+	       bch_v1_block_writable(block, nblocks);
++	return bch_v1_area(block, nblocks) && bch_v1_win_has(block);
 +}
 +
  static void marvell_nfc_send_cmd(struct nand_chip *chip,
@@ -148,7 +204,7 @@
  		WARN_ON_ONCE(1);
  		return;
  	}
-@@ -1068,6 +1180,10 @@
+@@ -1068,6 +1236,10 @@
  			bf = 1;
  	}
  
@@ -159,7 +215,7 @@
  	/* Update the stats and max_bitflips */
  	mtd->ecc_stats.corrected += bf;
  	*max_bitflips = max_t(unsigned int, *max_bitflips, bf);
-@@ -1095,6 +1211,17 @@
+@@ -1095,6 +1267,17 @@
  	unsigned int oob_bytes = lt->spare_bytes + (raw ? lt->ecc_bytes : 0);
  	int ret;
  
@@ -177,7 +233,7 @@
  	/* NFCv2 needs more information about the operation being executed */
  	if (nfc->caps->is_nfcv2)
  		nfc_op.ndcb[0] |= NDCB0_CMD_XTYPE(XTYPE_MONOLITHIC_RW);
-@@ -1187,21 +1314,65 @@
+@@ -1187,21 +1370,65 @@
  }
  
  /*
@@ -216,7 +272,7 @@
 + * of the FIFO and shifts every later read by 4 bytes.
 + * stats (0644, write zeros to reset): clean corrected erased retried
 + * failed timeouts early_unc early_cor rdd_unc end_unc
-+ */
+  */
 +enum { ST_CLEAN, ST_COR, ST_ERASED, ST_RETRY, ST_FAILED, ST_TIMEOUT,
 +       ST_EARLY_UNC, ST_EARLY_COR, ST_RDD_UNC, ST_END_UNC, ST_N };
 +static uint bch_v1_st[ST_N];
@@ -241,7 +297,7 @@
 + * gap, the next read starts with the stale 4 bytes and all its data is
 + * shifted ("ramz" / 0xff before "UBI#", 2026-11-01). Only ever written
 + * here, before the controller is started.
-  */
++ */
 +static void bch_v1_stop(struct marvell_nfc *nfc)
 +{
 +	writel_relaxed(0xFFFFFFFF, nfc->regs + NDSR);
@@ -256,7 +312,7 @@
  {
  	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
  	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
-@@ -1215,35 +1386,70 @@
+@@ -1215,35 +1442,70 @@
  		.ndcb[1] = NDCB1_ADDRS_PAGE(page),
  		.ndcb[2] = NDCB2_ADDR5_PAGE(page),
  	};
@@ -338,7 +394,7 @@
  
  out:
  	if (ret) {
-@@ -1256,6 +1462,18 @@
+@@ -1256,6 +1518,18 @@
  	return ret;
  }
  
@@ -357,7 +413,7 @@
  static int marvell_nfc_bch_v1_read_page(struct nand_chip *chip, u8 *buf,
  					int oob_required, int page)
  {
-@@ -1263,58 +1481,124 @@
+@@ -1263,58 +1537,124 @@
  	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
  	const struct marvell_hw_ecc_layout *lt = marvell_nand->layout;
  	struct mtd_info *mtd = nand_to_mtd(chip);
@@ -521,7 +577,7 @@
  static int marvell_nfc_hw_ecc_hmg_do_write_page(struct nand_chip *chip,
  						const u8 *data_buf,
  						const u8 *oob_buf, bool raw,
-@@ -1341,6 +1625,9 @@
+@@ -1341,6 +1681,9 @@
  	/* NFCv2 needs more information about the operation being executed */
  	if (nfc->caps->is_nfcv2)
  		nfc_op.ndcb[0] |= NDCB0_CMD_XTYPE(XTYPE_MONOLITHIC_RW);
@@ -531,7 +587,7 @@
  
  	ret = marvell_nfc_prepare_cmd(chip);
  	if (ret)
-@@ -1363,6 +1650,9 @@
+@@ -1363,6 +1706,9 @@
  		marvell_nfc_xfer_data_out_pio(nfc, oob_buf, oob_bytes);
  	}
  
@@ -541,7 +597,7 @@
  	ret = marvell_nfc_wait_cmdd(chip);
  	if (ret)
  		return ret;
-@@ -2414,13 +2704,36 @@
+@@ -2414,13 +2760,36 @@
  	.free = marvell_nand_ooblayout_free,
  };
  
@@ -579,7 +635,7 @@
  static int marvell_nfc_ro_write_oob(struct nand_chip *chip, int page)
  {
  	return -EROFS;
-@@ -2484,7 +2797,8 @@
+@@ -2484,7 +2853,8 @@
  		 * three NDCB0 words, 2048 + 32 bytes with ECC on (+ 30 raw).
  		 * That is the Hamming helpers' transfer. The BCH chunk helpers
  		 * would need LEN_OVRD, which this controller does not have.
@@ -589,7 +645,7 @@
  		 */
  		chip->ecc.algo = NAND_ECC_ALGO_BCH;
  		ecc->strength = 16;
-@@ -2493,7 +2807,7 @@
+@@ -2493,7 +2863,7 @@
  		ecc->read_oob_raw = marvell_nfc_hw_ecc_hmg_read_oob_raw;
  		ecc->read_oob = ecc->read_oob_raw;
  		ecc->write_page_raw = marvell_nfc_ro_write_page;
@@ -598,7 +654,7 @@
  		ecc->write_oob_raw = marvell_nfc_ro_write_oob;
  		ecc->write_oob = marvell_nfc_ro_write_oob;
  	} else if (ecc->strength == 1) {
-@@ -2590,6 +2904,36 @@
+@@ -2590,6 +2960,36 @@
  	.pattern = bbt_mirror_pattern
  };
  
@@ -635,7 +691,7 @@
  static int marvell_nfc_setup_interface(struct nand_chip *chip, int chipnr,
  				       const struct nand_interface_config *conf)
  {
-@@ -2718,6 +3062,13 @@
+@@ -2718,6 +3118,13 @@
  		chip->bbt_md = &bbt_mirror_descr;
  	}
  
@@ -649,7 +705,7 @@
  	/* Save the chip-specific fields of NDCR */
  	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
  	if (chip->options & NAND_BUSWIDTH_16)
-@@ -2944,6 +3295,39 @@
+@@ -2944,6 +3351,41 @@
  		return ret;
  	}
  
@@ -666,6 +722,8 @@
 +			dev_info(dev, "vendor BBT at page %d (mirror %d)\n",
 +				 chip->bbt_td->pages[0],
 +				 chip->bbt_md ? chip->bbt_md->pages[0] : -1);
++			/* later window settings are checked against this */
++			WRITE_ONCE(bch_v1_nblocks, nblocks);
 +			/*
 +			 * The vendor kernel reserves the whole BBT area (the
 +			 * last 4 blocks: main, mirror and 2 spare), so stock
@@ -689,7 +747,7 @@
  	if (pdata)
  		/* Legacy bindings support only one chip */
  		ret = mtd_device_register(mtd, pdata->parts, pdata->nr_parts);
-@@ -3392,6 +3776,19 @@
+@@ -3392,6 +3834,19 @@
  };
  MODULE_DEVICE_TABLE(of, marvell_nfc_of_ids);
  
@@ -709,7 +767,7 @@
  static struct platform_driver marvell_nfc_driver = {
  	.driver	= {
  		.name		= "marvell-nfc",
-@@ -3401,6 +3798,7 @@
+@@ -3401,6 +3856,7 @@
  	.id_table = marvell_nfc_platform_ids,
  	.probe = marvell_nfc_probe,
  	.remove = marvell_nfc_remove,
