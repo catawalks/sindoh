@@ -38,7 +38,7 @@ with heaters and motors. It needs the user present and their OK.
 
 Things to settle first:
 - **Wi-Fi:** it uses Debian's wpa_supplicant with `/etc/dp200/wpa_supplicant.conf`, which holds the credentials; it's never published.
-- **The touch device** is `/dev/input/event0`, and the touchscreen driver itself is still pending (docs/kernel/touch_bu21029.md).
+- **The touch device** is `/dev/input/event0` (bu21029, patch 0008; taps checked in D2 round 2).
 - **Power-off:** `rc.dp200 stop` must hold the UPC cores before reboot or poweroff, as init.mainline's traps do.
 - **The RTC** keeps time across reboots on mainline now (vendor setup on). `hwclock -w` needs `marvell,set-time`, which is off until the user OKs it.
 

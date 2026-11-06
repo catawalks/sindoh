@@ -29,8 +29,12 @@ document says otherwise, they win:
 - **Items end_goal_install_plan.md expects here** (needed by stage 5 at the
   latest): read-write NAND in the DT for mtd0/mtd6 (patch 0010 v2 write
   window), a UBI wear readout, power-loss behaviour of the UBIFS root,
-  storage-tier card detection in the initramfs, and the touch event stream
-  and D2 Wi-Fi fix (909c509; not yet verified on hardware).
+  storage-tier card detection in the initramfs. (The touch driver and the
+  D2 Wi-Fi fix of 909c509 work on hardware: D2 round 2, 10-31, recorded in
+  docs/kernel/debian_root_boot.md: Wi-Fi joined, Klipper ready, taps at the
+  four corners map to the right screen corners with stock's calibration.)
+- **The stock U-Boot command line** for our kernel in mtd0, and the size
+  budget: docs/kernel/nand_boot_cmdline.md.
 
 Nothing here touched the printer. Every new fact comes from offline analysis
 of the vendor kernel image in our own NAND dump (`nand_images/mtd0.bin`),
