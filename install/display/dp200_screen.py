@@ -158,7 +158,8 @@ def draw_shutdown(d, what, step):
     if step > n:
         if what == 'reboot':
             d.text((PW // 2, 360), 'Restarting...', font=font(36), fill=C_TXT, anchor='mm')
-            d.text((PW // 2, 420), 'The Sindoh logo comes next.', font=font(22),
+            # (the boot logo may be the owner's own: no 'Sindoh logo')
+            d.text((PW // 2, 420), 'Rebooting now.', font=font(22),
                    fill=C_DIM, anchor='mm')
         else:
             # the old Windows 95 screen, in its colours
