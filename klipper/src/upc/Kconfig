@@ -97,16 +97,6 @@ config UPC_STEP_BATCH_ERR
       the remainder makes each step up to 3 timer ticks early. Longer
       blocks are split so this stays below the limit (400 = 1 us).
 
-config UPC_STEP_BATCH_LATE
-    int "Most timer ticks a chained engine move may start late"
-    depends on UPC_STEP_BATCH
-    default 800
-    help
-      A constant block right after an engine move starts when that one
-      has been seen to end; if that is later than its first step needs,
-      by at most this many ticks, its steps come that much late (a
-      stepped step comes ~840 ticks after its time); else it is stepped.
-
 config UPC_ADC_SETTLE_US
     int "Wait after selecting an ADC input before reading (microseconds)"
     depends on UPC_CORE_IO
