@@ -226,32 +226,34 @@ build_upctool() {	# host/upctool, the stock-compatible UPC tool
 		"$M1/../../host/upctool.c"
 	${CROSS}strip "$WORK/upctool"
 }
-# mtd-utils (ubiformat, flash_erase: not in BusyBox) for the nandboot
-# initramfs. The release tarball's sha256 (MTDSHA) must come from the signed
-# release (ftp.infradead.org/pub/mtd-utils) before use; without it the
-# image is built without them and dp200-revert.sh refuses to run.
+# mtd-utils for the nandboot initramfs: ubiformat and flash_erase are not
+# in BusyBox, and BusyBox's ubiattach/ubidetach/nandwrite take other
+# options than dp200-revert.sh uses. Debian trixie's mtd-utils 1:2.3.0-1
+# source (orig tarball; fetched 2026-11-06 by apt from deb.debian.org,
+# signed InRelease -> Sources -> .dsc -> this sha256). It has no configure
+# script, so the tools are compiled directly, without the optional libs.
 MTDVER=2.3.0
-MTDSHA=${MTDSHA:-}
+MTDTOOLS="ubiformat flash_erase nandwrite nanddump ubiattach ubidetach ubimkvol ubirmvol ubiupdatevol ubinfo mtdinfo"
 build_mtdutils() {
-	local t=$DL/mtd-utils/mtd-utils-$MTDVER.tar.bz2
-	MTDBIN=""
-	if [ ! -f "$t" ] || [ -z "$MTDSHA" ]; then
-		echo "WARNING: no checked $t (MTDSHA): no ubiformat/flash_erase" >&2
-		return 0
-	fi
-	check "$t" "$MTDSHA"
-	if [ ! -x "$WORK/mtd-utils-$MTDVER/ubiformat" ]; then
-		rm -rf "$WORK/mtd-utils-$MTDVER"
-		tar -C "$WORK" -xjf "$t"
-		(cd "$WORK/mtd-utils-$MTDVER" &&
-		 ./configure --host=arm-linux-gnueabihf CC="$MUSLCC" \
-			LDFLAGS=-static --without-zstd --without-lzo \
-			--without-zlib --without-xattr --without-selinux \
-			--without-crypto --disable-tests > /dev/null &&
-		 make -j"$JOBS" ubiformat flash_erase > /dev/null)
-		${CROSS}strip "$WORK/mtd-utils-$MTDVER"/{ubiformat,flash_erase}
-	fi
-	MTDBIN=$WORK/mtd-utils-$MTDVER
+	local t=$DL/mtd-utils/mtd-utils_$MTDVER.orig.tar.xz
+	local src=$WORK/mtd-utils-$MTDVER tool f
+	check "$t" d1242d44c5772394d159117f3aeaa352f4265a073cb6dc0d91ced13d9b3299df
+	MTDBIN=$WORK/mtd-utils-bin
+	[ -x "$MTDBIN/mtdinfo" ] && [ "$MTDBIN/mtdinfo" -nt "$t" ] && return 0
+	rm -rf "$src" "$MTDBIN" && mkdir -p "$MTDBIN"
+	tar -C "$WORK" -xJf "$t"
+	for tool in $MTDTOOLS; do
+		for f in "$src"/{ubi,misc,nand}-utils/$tool.c; do
+			[ -f "$f" ] && break
+		done
+		(cd "$src" && "$MUSLCC" -static -Os -D_GNU_SOURCE \
+			-DVERSION="\"$MTDVER\"" -DPACKAGE_VERSION="\"$MTDVER\"" \
+			-Iinclude -ffunction-sections -fdata-sections \
+			-Wl,--gc-sections -o "$MTDBIN/$tool" "$f" \
+			lib/libmtd.c lib/libmtd_legacy.c lib/libcrc32.c \
+			lib/common.c lib/libubi.c lib/libscan.c lib/libubigen.c)
+		${CROSS}strip "$MTDBIN/$tool"
+	done
 }
 build_mtdraw() {	# raw (no-ECC) reads of /dev/mtdN, as nanddump --noecc
 	"$MUSLCC" -static -Os -Wall -o "$WORK/mtdraw" "$M1/tools/mtdraw.c"
@@ -341,10 +343,9 @@ fi
 			# the revert (and its md5 list) from install/nand
 			echo "file /usr/sbin/dp200-revert.sh $IRFS/dp200-revert.sh 0755 0 0"
 			echo "file /usr/sbin/recovery.md5 $IRFS/recovery.md5 0644 0 0"
-			if [ -n "$MTDBIN" ]; then
-				echo "file /usr/sbin/ubiformat $MTDBIN/ubiformat 0755 0 0"
-				echo "file /usr/sbin/flash_erase $MTDBIN/flash_erase 0755 0 0"
-			fi ;;
+			for t in $MTDTOOLS; do
+				echo "file /usr/sbin/$t $MTDBIN/$t 0755 0 0"
+			done ;;
 		wpa)	echo "file /usr/sbin/wpa_supplicant $WPA/wpa_supplicant 0755 0 0"
 			echo "file /usr/bin/wpa_passphrase $WPA/wpa_passphrase 0755 0 0"
 			echo "file /usr/bin/wifi-join $IRFS/wifi-join 0755 0 0"
@@ -360,7 +361,12 @@ fi
 			done ;;
 		esac
 	done
-	grep -v '^/bin/busybox$' "$BB/busybox.links" | sort -u |
+	# BusyBox applets, except the tools mtd-utils provides (nandboot)
+	SKIP='^/bin/busybox$'
+	case " $USERSPACE " in *" mtdutils "*)
+		SKIP="$SKIP|/($(echo $MTDTOOLS | tr ' ' '|'))\$" ;;
+	esac
+	grep -v -E "$SKIP" "$BB/busybox.links" | sort -u |
 		while read -r l; do echo "slink $l /bin/busybox 0777 0 0"; done
 } > "$IRFS/initramfs.list"
 

@@ -394,8 +394,11 @@ revert from RAM for a Sindoh or revert stick (confirmed by a touch) or the
 root marker `/.dp200-revert`; otherwise the root is a card/stick partition
 with `/.dp200-root`, else ubi0:filesystem; a broken root offers the
 recovery from mtd5. `tools/test_nandboot_init.sh` runs its decisions
-offline with stubs. ubiformat/flash_erase need mtd-utils (`MTDSHA`, see
-build.sh). Not for writing to mtd0 until stage 3 has run from the SD
+offline with stubs, and checks the image's initramfs list for every tool
+the revert needs. The UBI/NAND tools (ubiformat, flash_erase, nandwrite,
+ubiattach, ...) are static builds of Debian's mtd-utils 2.3.0 source
+(`build_mtdutils`); BusyBox's versions take other options, so their links
+are left out. Not for writing to mtd0 until stage 3 has run from the SD
 fast path.
 
 ### sd: the SD socket, read-only
