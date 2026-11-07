@@ -214,6 +214,99 @@ The hard hang reported as T5's turned out to be unrelated to Wi-Fi:
 **All module commands on this root need `busybox`:** `busybox rmmod`,
 `busybox insmod`. The command lines in this doc are written that way.
 
+
+### T5, run properly (2026-11-07, NAND root, kernel 5b17e2ec)
+
+Run on the cold NAND-root boot where Wi-Fi had failed, with `busybox`,
+`debug_mask=0x20000037` and netconsole:
+
+1. **`busybox rmmod mwifiex_usb`, then `mwifiex`:** clean, rc 0.
+2. **Reload:**
+   - `USB is not the winner 0xf00dface`, then `FW download over, size 0
+     bytes`. The chip was running firmware, and the first word it sent
+     back was a **command-response header** (`MWIFIEX_USB_TYPE_CMD`).
+   - `WLAN FW is active`, then `DNLD_CMD: 0xa9 ... seqno 0x1`.
+   - After 10 s the timeout: no response, no event, and this time
+     **`cmd_sent=1`**. The bulk OUT never completed: the chip NAKs it.
+     That differs from the boot failure (`cmd_sent=0`, OUT accepted).
+3. **Unload, then `USBDEVFS_RESET` on 2-1.1:** 0.3 s later, an oops in
+   softirq context: "Unable to handle kernel paging request at virtual
+   address bf034ae4 when execute", PC inside the unloaded module.
+   "Fatal exception in interrupt", then `panic=10` rebooted it.
+4. **After that warm reboot the 8782 didn't enumerate at all** ("device
+   descriptor read/64, error -110", "device not accepting address, error
+   -110"). It needs a power cut.
+
+**The oops: a mainline mwifiex_usb bug.** Trace resolved against the
+errata build's vmlinux (5b17e2ec):
+
+| Address | Function |
+|---|---|
+| c0353adc (LR) | `__usb_hcd_giveback_urb` → calls `urb->complete`, which is `bf034ae4` in the unloaded mwifiex_usb |
+| c0353eb0 | `usb_giveback_urb_bh` |
+| c003aea0, c003b214 | `process_scheduled_works`, `bh_worker` (the BH workqueue) |
+| c002a7e8, c002a328, c002a560, c002a640 | `tasklet_action`, `handle_softirqs`, `__irq_exit_rcu`, `irq_exit` |
+| c0008ea8 | `__irq_svc` |
+| c005486c, c0054afc, c055ac6c, c067ef10 | `do_idle`, `cpu_startup_entry`, `rest_init`, `start_kernel` (CPU0 idle) |
+
+- r0/r4 is the URB (kmalloc-128), and r5 = `0xffffffb9` = **-71
+  (-EPROTO)**: the status of a transfer aborted by the port reset.
+- **Cause:** `mwifiex_usb_free()` (`usb.c`) kills the RX command URB, the
+  RX data URBs and the TX data URBs. For the **TX command URB** it only
+  calls `usb_free_urb(card->tx_cmd.urb)`, with **no `usb_kill_urb()`**.
+  `usb_free_urb` just drops the driver's reference: the host controller
+  keeps its own while the URB is queued.
+- In step 2 the FUNC_INIT OUT transfer was NAKed forever (`cmd_sent=1`).
+  So its URB was still queued when the failed init unregistered the
+  device and when the module was unloaded.
+- The port reset finally completed it (-EPROTO), and the HCD called
+  `mwifiex_usb_tx_complete` in freed module memory.
+- The suspend path (`mwifiex_usb_suspend`) does kill `tx_cmd.urb`. Only
+  the free path misses it.
+- **Fix (one line, upstream-worthy):** `usb_kill_urb(card->tx_cmd.urb)`
+  before `usb_free_urb(card->tx_cmd.urb)` in `mwifiex_usb_free()`.
+- A second, harmless leak on the same path: after a failed init,
+  `mwifiex_usb_disconnect()` returns early (`card->adapter` is NULL) and
+  skips `usb_put_dev()`.
+
+**What T5 says about the chip:**
+- **A reload doesn't recover it, and a USB port reset wedges it
+  further.** After the reset and a warm reboot it doesn't even answer
+  SET_ADDRESS. Only a power cut clears that. So the vendor-style
+  recovery (fix item 2's `usb_reset_device()` and re-download) is
+  **ruled out** for the 8782 as it stands.
+- **The firmware isn't completely dead, though.** It answered the reload's
+  probe block with a `0xf00dface` command-response header. Either the
+  response was stale, left in its EP1 IN FIFO since boot, or it was a
+  fresh reply to the probe. The header alone doesn't say which. Either
+  way its USB side moved data 30+ min after the failed boot.
+- **If it was stale** (for example the boot's FUNC_INIT response, seqno
+  1), then on the failing boot the firmware *did* start and answer,
+  and **the host never received the answer**. The RX URB on EP1 IN was
+  pending the whole 10 s and only completed when killed (`Card is
+  removed: -2`).
+  - That points at the USB link right after the firmware takes over
+    from the boot ROM, not at the firmware's start.
+  - The classic candidate is a **data-toggle mismatch**: the firmware
+    re-initialises its endpoints at DATA0, and the host's endpoint state
+    still carries the boot ROM's toggle. The host then silently drops the
+    first packet as a duplicate, or the exchange stalls.
+  - Whether it bites depends on how many packets each side exchanged
+    before the switch, which retries and timing can change. That could
+    give a 1-in-2 or 1-in-3 failure rate.
+  - The vendor driver would hide it: a failed FW_READY read fails the
+    probe, then `usb_reset_device()` re-enumerates the device. That
+    resets every toggle, and the re-probe finds the firmware running.
+- **If it was fresh**, the firmware answers probe blocks but not FUNC_INIT,
+  and NAKs the OUT that carries it: a firmware stuck early in its init.
+
+**The one log line that decides it:** the 16 bytes behind
+`0xf00dface` on a reload after a failed boot. The second word is the
+sequence number, and the command-response header that follows names the
+command (`0x80a9` = FUNC_INIT response). This needs the logging patch in
+section 5, item 0. It's a modules-only build, so it can be insmodded on
+the running 5b17e2ec kernel with no NAND write.
+
 ### The reason-7 drop (a separate issue)
 
 - Reason 7 is "Class 3 frame received from nonassociated STA". **The
@@ -533,6 +626,32 @@ Read the hub descriptor (in the open questions) once, anytime.
 
 In order of value. All of it is a 0004 follow-up and 8782-only. Items 1
 and 2 depend on T3 and T5.
+
+**After T5 (2026-11-07), first:**
+
+0. **Logging, modules only** (mwifiex.ko + mwifiex_usb.ko built against
+   5b17e2ec, insmodded with `busybox insmod`; the kernel in mtd0 is
+   unchanged):
+   - hex-dump the first 32 bytes of the winner-check response and of
+     every command response or event during init (MSG level);
+   - read EP1 right after a real download for up to 2 s, and log
+     whatever comes: INIT_DONE (`0xBEEFFACE`, cause 7), something
+     else, or nothing. This replaces `msleep(500)`, as in item 2;
+   - log the endpoint toggle/halt state (`usb_gettoggle`) for EP1 IN/OUT
+     before and after the download.
+
+   On the next failing boot this tells "the firmware answered and the host
+   lost it" from "the firmware never answered".
+1. **Fix the URB leak:** `usb_kill_urb(card->tx_cmd.urb)` in
+   `mwifiex_usb_free()`. Without it, any later USB reset or disconnect
+   after a failed init can oops.
+2. **If the host lost the answer (toggle):** after a real download, and
+   before the RX URBs go in, resynchronise EP1 IN/OUT (and the data
+   endpoints) with `usb_clear_halt()`. CLEAR_FEATURE(ENDPOINT_HALT)
+   resets the toggle on both sides, a far gentler step than a port reset.
+   Test it on failing boots first, as a module option.
+3. **Never `usb_reset_device()` the 8782** (T5 step 3 wedged it until a
+   power cut). Drop the vendor-style reset from fix item 2 and 4 below.
 
 **Revised order after the cold failure:**
 - **Item 2's INIT_DONE read comes first.** It's cheap and matches the
