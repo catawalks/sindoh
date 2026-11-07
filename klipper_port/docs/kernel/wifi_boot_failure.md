@@ -326,6 +326,115 @@ the running 5b17e2ec kernel with no NAND write.
 - The 4 s reconnect works, so this is a glitch in the network, not a boot
   failure.
 
+## Stock control: 11 of 11, so it's the host side (2026-11-07)
+
+Same printer, same 8782: the stock kernel 3.2.0-g67a8e16 (the rescue
+card's copy, RAM boot), the stock root copy, and `mlan.ko` + `usb8xxx.ko`
+loaded with no parameters by `install_wifi_drivers.sh`.
+- **11 of 11 boots brought Wi-Fi up:** 1 warm from our system (with our
+  mwifiex loaded), then 10 warm stock-to-stock reboots. Each scan found
+  16–20 networks, with no error, retry or reset line.
+- The stock reboot unloads nothing either.
+- Our system on the same hardware: cold 1 of 3 failed, warm 2 of 3
+  failed.
+
+**So the chip, its firmware and the board are cleared.** What's left is
+how our kernel starts the chip: mwifiex's sequence, or our EHCI setup.
+
+### The concrete differences right after the download
+
+From the vendor binaries (`mlan.ko` `wlan_dnld_fw`, `usb8xxx.ko`
+`woal_init_fw_dpc`, the 3.2 `Image` `mv61xx_ehci_run`) against mwifiex
+6.18 with patch 0004:
+
+| Step | Stock (USB8782, card type 2) | Ours |
+|---|---|---|
+| Before the image | **No winner probe:** `feature_control` is 0 for card type 2, so `check_winner` = bit 8 = 0 | A 2068-byte all-zero "pseudo block" on EP1 OUT, then a read of the reply on EP1 IN. That's an extra exchange with the boot ROM before the first real block |
+| The image | Blocks of header + data + 4 bytes, each followed by a sync read on EP1 (100 ms timeouts, 3 tries) | The same |
+| **Right after the last block** | **An EP1 IN read is posted at once:** `read_data_sync`, 2048 bytes, 2000 ms. It must return `0xBEEFFACE` with cause 7 (INIT_DONE), or the download counts as failed | **No IN read for ~500 ms** (`msleep(500)`). Then `rx_init` submits the RX URBs, and INIT_DONE (if it comes) is handled as an ignored event |
+| First command | FUNC_INIT after INIT_DONE has been read, and after the RX/TX URBs are set up | FUNC_INIT ~510 ms after the last block, right after the RX URBs |
+| Soft reset or USB reset | None on this path (`usb_reset_device` only for the 8797's boot PID, on a failed probe, and on disconnect) | None |
+| EHCI tuning | `mv61xx_ehci_run` ends with **`TXFILLTUNING` (controller +0x164) = `0x00100000`**: TX FIFO threshold 16 | generic-ehci leaves `TXFILLTUNING` at its reset value |
+| USBMODE | Host mode only (`|= 3`, in `tdi_reset`), no stream-disable | — (the controller runs in host mode) |
+
+The decisive one, given every failure's signature (the image is accepted,
+then nothing on EP1 IN, and in T5 a `0xf00dface` reply still waiting in
+the chip): **stock reads EP1 the moment the firmware starts, and ours
+doesn't for half a second.** The `TXFILLTUNING` difference is the only
+EHCI-side one found. A TX FIFO underrun would corrupt OUT packets under
+memory load, so it's worth testing alongside.
+
+### Patch 0013: the stock start sequence, measurable
+
+`kernel/m1/patches/0013-mwifiex-usb-8782-vendor-start.patch`, behind
+`CONFIG_MWIFIEX_USB_8782_START` (default **n**, so no other image
+changes):
+- **No winner probe for the 8782:** the whole image, as stock does.
+  `mwifiex_usb.usb8782_winner=1` brings the probe back.
+- **EP1 read right after the download, up to `usb8782_ready_ms`
+  (default 2000), instead of `msleep(500)`.** It logs one of:
+  - `8782: INIT_DONE after N ms`;
+  - `8782: after N ms, L bytes instead of INIT_DONE: <hex>`;
+  - `8782: no INIT_DONE in 2000 ms (-110)`.
+
+  FUNC_INIT follows in every case, so a missing INIT_DONE and a failed
+  FUNC_INIT can be told apart. `usb8782_ready_ms=0` brings the sleep back.
+- **The winner reply is logged** in hex when the probe is on (the
+  `0xf00dface` question from T5).
+- With the probe off, a failed download fails the probe instead of
+  "assuming the firmware runs".
+- **The URB-leak fix:** `usb_kill_urb(card->tx_cmd.urb)` in
+  `mwifiex_usb_free()`.
+
+Build: `VARIANT=nandboot HANGTEST=wifidbg ./build.sh`
+(`variants/nandboot-wifidbg.config`).
+- **Built 2026-11-07:** `m1-nandboot-wifidbg-modules.tar`, md5
+  `7b5e745747074cf3a834c1fefe3e0894` (317,440 bytes).
+  - `mwifiex_usb.ko` md5 `ef7100b4…`, `mwifiex.ko` md5 `4c2a8c4e…`.
+    Use both, as a pair.
+  - vermagic `6.18.59 SMP mod_unload ARMv7 p2v8`, the same as 5b17e2ec's.
+  - Its full config differs from the errata image's only in the new
+    option and the initramfs path.
+- Not loaded on the printer yet.
+- With the probe off, a chip that already runs firmware (as after T5) is
+  sent the whole image anyway, as stock would. The download then fails,
+  and the probe with it, cleanly (the URB fix covers the unload).
+
+Only the modules tar is needed. The
+kernel config is otherwise the mtd0 one (5b17e2ec) and there's no module
+versioning, so the modules `busybox insmod` on the running mtd0 kernel.
+No NAND kernel write is needed.
+
+**Measurement** (each run with `debug_mask=0x20000037`, serial capture,
+cold and warm mixed). Install the wifidbg `.ko`s next to, not over, the
+normal ones (e.g. `/lib/modules/6.18.59/wifidbg/`), and have init.mainline
+insmod from there with the parameters under test:
+
+| Run | Parameters | Expected if the missing EP1 read is the cause |
+|---|---|---|
+| W1 | defaults (stock sequence) | 0 failures in ≥ 10 boots, each with `8782: INIT_DONE after ~N ms` |
+| W2 | `usb8782_ready_ms=0` (sleep back, still no probe) | Failures return |
+| W3 | `usb8782_winner=1` (probe back, INIT_DONE read kept) | Shows whether the probe matters on its own |
+
+If W1 still fails, look at its log line:
+- `no INIT_DONE`: the firmware didn't start even when read the stock way.
+  Then the EHCI tuning is next.
+- INIT_DONE seen, then a 0xa9 timeout: the start is fine, and the first
+  command or its response is lost.
+
+**The EHCI tuning test needs no build.** The 8782 is on bus 2,
+`f9048100.usb`, so its controller base is 0xf9048000:
+
+```sh
+busybox devmem 0xf9048164        # read TXFILLTUNING first (read-only)
+busybox devmem 0xf9048164 32 0x00100000   # stock's value, before the insmod
+```
+
+The write changes a live USB controller register, so it gets the owner's OK
+like any hardware write. Stock does the same write in `mv61xx_ehci_run`,
+on every host controller at start. If it helps, it belongs in the DT or
+the EHCI glue, not in a script.
+
 ## 1. How the vendor driver handles the 8782 compared with mainline
 
 From the vendor binaries:

@@ -1,0 +1,156 @@
+--- a/drivers/net/wireless/marvell/mwifiex/Kconfig
++++ b/drivers/net/wireless/marvell/mwifiex/Kconfig
+@@ -42,5 +42,16 @@
+ 	  This adds support for wireless adapters based on Marvell
+ 	  8797/8997 chipset with USB interface.
+ 
++config MWIFIEX_USB_8782_START
++	bool "88W8782: start the firmware the vendor driver's way"
++	depends on MWIFIEX_USB
++	help
++	  The Marvell SDK driver downloads the 88W8782 firmware without
++	  probing for a running one first, then reads the firmware's
++	  INIT_DONE event (up to 2 s) before the first command. mwifiex
++	  probes first and sleeps instead. This option does it the SDK way,
++	  with module parameters to switch each step back, and logs what the
++	  chip sends at each step. Sindoh DP200 test option.
++
+ 	  If you choose to build it as a module, it will be called
+ 	  mwifiex_usb.
+--- a/drivers/net/wireless/marvell/mwifiex/usb.c
++++ b/drivers/net/wireless/marvell/mwifiex/usb.c
+@@ -12,6 +12,23 @@
+ 
+ static const struct mwifiex_if_ops usb_ops;
+ 
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++/*
++ * 88W8782 start-up as the Marvell SDK (usb8xxx/mlan, card type USB8782)
++ * does it: no winner probe, the whole image, then a read of EP1 for the
++ * firmware's INIT_DONE event (0xBEEFFACE, cause 7, up to 2 s) before any
++ * command. docs/kernel/wifi_boot_failure.md in the DP200 port.
++ */
++static bool usb8782_winner;
++module_param(usb8782_winner, bool, 0644);
++MODULE_PARM_DESC(usb8782_winner,
++		 "8782: probe for a running firmware before the download (mainline way)");
++static uint usb8782_ready_ms = 2000;
++module_param(usb8782_ready_ms, uint, 0644);
++MODULE_PARM_DESC(usb8782_ready_ms,
++		 "8782: wait up to this many ms for INIT_DONE after the download (0: sleep 500 ms)");
++#endif
++
+ static const struct usb_device_id mwifiex_usb_table[] = {
+ 	/* 8782 */
+ 	{USB_DEVICE(USB8XXX_VID, USB8782_PID)},
+@@ -374,6 +391,8 @@
+ 		}
+ 	}
+ 
++	/* a command the chip never took is still queued: kill it first */
++	usb_kill_urb(card->tx_cmd.urb);
+ 	usb_free_urb(card->tx_cmd.urb);
+ 	card->tx_cmd.urb = NULL;
+ 
+@@ -1391,6 +1410,11 @@
+ 	struct fw_sync_header sync_fw;
+ 	u8 check_winner = 1;
+ 
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++	if (le16_to_cpu(((struct usb_card_rec *)adapter->card)->udev->descriptor.idProduct) ==
++	    USB8782_PID && !usb8782_winner)
++		check_winner = 0;
++#endif
+ 	if (!firmware) {
+ 		mwifiex_dbg(adapter, ERROR,
+ 			    "No firmware image found! Terminating download\n");
+@@ -1471,6 +1495,12 @@
+ 
+ 			/* check 1st firmware block resp for highest bit set */
+ 			if (check_winner) {
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++				mwifiex_dbg(adapter, MSG,
++					    "winner reply, %u bytes: %*ph\n",
++					    len, (int)min_t(u32, len, 32),
++					    recv_buff);
++#endif
+ 				if (le32_to_cpu(sync_fw.cmd) & 0x80000000) {
+ 					mwifiex_dbg(adapter, WARN,
+ 						    "USB is not the winner %#x\n",
+@@ -1516,6 +1546,47 @@
+ 	return ret;
+ }
+ 
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++/*
++ * Read EP1 right after the download, as the SDK does, and log what comes:
++ * INIT_DONE, something else, or nothing. A failure here is only logged;
++ * FUNC_INIT follows either way, so the two cases can be compared.
++ */
++static void mwifiex_usb_8782_ready(struct mwifiex_adapter *adapter)
++{
++	ktime_t t0 = ktime_get();
++	u32 len = MWIFIEX_RX_CMD_BUF_SIZE;
++	u32 type, cause;
++	u8 *buf;
++	int ret;
++
++	buf = kzalloc(len, GFP_KERNEL);
++	if (!buf)
++		return;
++	ret = mwifiex_read_data_sync(adapter, buf, &len,
++				     MWIFIEX_USB_EP_CMD_EVENT,
++				     usb8782_ready_ms);
++	if (ret) {
++		mwifiex_dbg(adapter, MSG,
++			    "8782: no INIT_DONE in %u ms (%d)\n",
++			    usb8782_ready_ms, ret);
++	} else {
++		type = len >= 4 ? le32_to_cpup((__le32 *)buf) : 0;
++		cause = len >= 8 ? le32_to_cpup((__le32 *)(buf + 4)) : 0;
++		if (type == MWIFIEX_USB_TYPE_EVENT && (cause & 0xffff) == 7)
++			mwifiex_dbg(adapter, MSG,
++				    "8782: INIT_DONE after %lld ms\n",
++				    ktime_ms_delta(ktime_get(), t0));
++		else
++			mwifiex_dbg(adapter, MSG,
++				    "8782: after %lld ms, %u bytes instead of INIT_DONE: %*ph\n",
++				    ktime_ms_delta(ktime_get(), t0), len,
++				    (int)min_t(u32, len, 32), buf);
++	}
++	kfree(buf);
++}
++#endif
++
+ static int mwifiex_usb_dnld_fw(struct mwifiex_adapter *adapter,
+ 			struct mwifiex_fw_image *fw)
+ {
+@@ -1524,6 +1595,14 @@
+ 
+ 	if (card->usb_boot_state == USB8XXX_FW_DNLD) {
+ 		ret = mwifiex_prog_fw_w_helper(adapter, fw);
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++		if (ret && le16_to_cpu(card->udev->descriptor.idProduct) ==
++		    USB8782_PID && !usb8782_winner) {
++			mwifiex_dbg(adapter, ERROR,
++				    "8782: firmware download failed (%d)\n", ret);
++			return -1;
++		}
++#endif
+ 		if (ret && le16_to_cpu(card->udev->descriptor.idProduct) ==
+ 		    USB8782_PID) {
+ 			mwifiex_dbg(adapter, MSG,
+@@ -1540,7 +1619,12 @@
+ 		if (le16_to_cpu(card->udev->descriptor.idProduct) ==
+ 		    USB8782_PID) {
+ 			card->usb_boot_state = USB8XXX_FW_READY;
+-			msleep(500);
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++			if (usb8782_ready_ms)
++				mwifiex_usb_8782_ready(adapter);
++			else
++#endif
++				msleep(500);
+ 		}
+ 
+ 		/* Boot state changes after successful firmware download */
