@@ -7,10 +7,10 @@ their decisions were changed later. The live documents:
 - **TODO.md** - open items (update it in the same commit as the work);
 - **PROJECTS.md** - larger projects with status and decisions;
 - **docs/end_goal_install_plan.md** - the approved 9-stage sequence to the
-  end-goal install (stages 1-2 done 2026-11-07, stage 3 done; stage 4
-  blocked by a nandboot hard hang, TODO 17;
-  the card's raw gap holds m1-nandboot; the dev
-  printer is plain stock 2020 on NAND, Klipper only from the SD kernel);
+  end-goal install (stages 1-5 done 2026-11-07: mtd0 holds our
+  m1-nandboot-errata kernel, mtd6 our root; the marked 4 GB card is still
+  the root; next: a cold boot and the NAND-only boot, owner's OK;
+  the card's raw gap holds the same errata image);
 - **docs/internal_firmware_plan.md** - NAND layout, space, what a revert can
   restore; **docs/kernel/revert_to_stock_plan.md** - the revert;
 - **docs/faster_stepping_plan.md**, **docs/usb_installer.md**,

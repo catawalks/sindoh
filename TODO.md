@@ -199,7 +199,7 @@ still require the owner's explicit OK.
       maybe better wording for the second question (owner: fine for now). Wi-Fi: build mwifiex_usb
       as a module, loaded by init.mainline (owner prefers this over the
       re-enumerate, which may be tied to the 11-07 hang).
-    - **nandboot hard hang, twice: blocks stage 4.** (1) 11-06 ~22:10,
+    - **nandboot hard hang (plain image; errata image fixes it so far).** (1) 11-06 ~22:10,
       image 33d2e5d2: userspace, serial echo and Wi-Fi died, eth0 still
       pinged; after the 8782 re-enumerate, during Wi-Fi churn. (2) 11-07
       00:34, image fcba26da (watchdogs on, Wi-Fi as modules): at 1332 s
@@ -222,10 +222,12 @@ still require the owner's explicit OK.
       (~82 min of load, 65 GB), no hang and a clean dmesg. So the errata
       image has ~97 min of this load without a hang, plain nandboot hung
       within ~10 min both times: the missing PJ4B errata workarounds are
-      the likely cause. Next: make the errata patches the nandboot
-      default and use that image for stage 4 (owner's OK); the debug
-      image (hardware watchdog) is then only needed if it ever hangs;
-      docs/kernel/nandboot_hang_analysis.md.
+      the likely cause. The errata patches are the nandboot default now
+      (variants/nandboot.config) and the errata image is in mtd0 (stage
+      4, 11-07). Open: another thorough soak later (owner), e.g. with
+      Wi-Fi traffic; the debug image (hardware watchdog) only if it ever
+      hangs; recovery if it does: boot another kernel from the card via
+      U-Boot (tools/sd_raw_boot.sh); docs/kernel/nandboot_hang_analysis.md.
     - stage 3 normal path tested 2026-11-07 (end_goal_install_plan.md):
       root from the marked card, mtd-utils run read-only; Wi-Fi fixed in
       init.mainline. Open for the initramfs: keep its log (copy to a

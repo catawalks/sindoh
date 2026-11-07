@@ -1,5 +1,5 @@
 #!/bin/sh
-# End-goal stage 5 (2026-11-07, owner-approved for this night): this
+# End-goal stage 5 (owner-approved 2026-11-07 morning, autonomous): this
 # printer's root (the 4 GB card's Debian root, trimmed as the runtime
 # payload) into mtd6 as UBIFS. The stock 2020 mtd6 was dumped raw first
 # (nand_images/stage2/mtd6_raw_oob_stock2020_20261107.bin, md5 8f7a1abf).
@@ -30,11 +30,18 @@ cat >> $X <<'EOF'
 ./var/tmp/*
 ./var/backups
 ./payload_out
+./payload
+./alpine
 ./payload_stage.*
 ./lost+found
 ./.dp200-root
 ./.dp200-revert
+./bootrom
+./kb_out
 EOF
+# every plain file in / is the card's (stock images, tarballs, dumps, logs):
+# the Debian root needs none of them
+find / -maxdepth 1 -type f | sed 's|^/|./|' >> $X
 kb=$(( $(tar -C / --one-file-system --exclude-from=$X -cf - . | wc -c) / 1024 ))
 echo "tree to copy: $kb KiB unpacked"
 [ $kb -gt 50000 ] && [ $kb -lt 307200 ] || fail "unexpected size $kb KiB"
