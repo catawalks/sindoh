@@ -273,6 +273,20 @@ still require the owner's explicit OK.
       stat line to the PC (port 9006); netconsole on. First readings: the
       NAND controller raised 4 IRQs since boot (busy-polled), all device
       IRQs on CPU0, CPU1 takes ~3x CPU0's function-call IPIs.
+      Hang 6 (dc3b5f20, NAND root, 1337 s): the logger showed no NAND reads
+      for 820 s and no erases before it, steady counters, nothing on the
+      card after the PC's last line.
+      **Hang 7 caught by the nanddbg trace (e6cdb8a6, RAM-booted first per
+      the owner's rule):** watchdog checks passed (kicks keep it up, nokick
+      resets the board, the ring survives the reset); its second boot
+      froze at ~26 s, the watchdog reset it, and the next nanddbg boot
+      printed the ring. It ends inside a page read: cmd for page 0x1bd58
+      (mtd6 block 1781), then the RDDREQ wait ("rdd") with no end, not even
+      a timeout: a CPU stuck in the NDSR access itself (bus stall), all on
+      cpu0. Normal reads take ~150 us there. Kernel session analysing
+      (what the vendor driver does between stop and the next command).
+      mtd0 holds nanddbg for the hunt (owner's OK); dc3b5f20 goes back
+      after. nanddbg has no pstore fs (console ramoops not readable).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
