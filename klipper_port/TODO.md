@@ -248,6 +248,21 @@ still require the owner's explicit OK.
       back after; readback, U-Boot block and 0xff tail checked), modules
       948b3350 installed. First boot: NAND root, INIT_DONE after 56 ms,
       mlan0 10.10.0.21, Klipper ready.
+    - **NAND-root hard hang #2 (11-07 ~14:52), kernel dc3b5f20:** during
+      the NAND + Wi-Fi soak (tools/nand_wifi_soak.sh), ~23 min after boot,
+      near-idle; no ping, serial or panic; netconsole's last line a normal
+      soak ping. Both NAND-root hangs at ~23-30 min uptime; the card-root
+      SD soak (82 min) passed on the same errata code. Suspect: patch
+      0010's NAND path under UBIFS (PIO, busy-poll) or a periodic UBI/UBIFS
+      job. Kernel session analysing; no more NAND-root runs until it has a
+      proposal (watchdog + last-NAND-command record). Release blocker.
+    - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
+      (iw not installed): power save was ON, with drops every ~100 s
+      (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
+      on the dev printer by hand; with power save off: one drop (reason 34)
+      at once, then none for 650 s, but 2.8 MB downloads went from 0.6 s
+      to 15-18 s and pings lost 5-15%. Mixed; repeat once the hang is
+      understood. iw belongs in the root build's package list either way.
     - **Errata kernel hard hang on the NAND root (11-07 ~11:55):** about
       25-30 min after the first NAND-root boot, idle (Klipper ready, Wi-Fi
       down), no ping, no serial echo, no panic. First thought to be the
