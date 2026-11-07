@@ -364,3 +364,142 @@ Check order, with the owner present, before relying on it for a night:
    reset, then `dmesg-ramoops-0` should hold the panic.
 5. Only then the long run: the hang load in a loop. After each
    self-reset, save `/sys/fs/pstore/*` before anything else.
+
+## Hang 4: the errata kernel on its first NAND-root run (2026-11-07, offline notes)
+
+**What happened** (main session's report; no log exists):
+- 5b17e2ec from mtd0, root `ubi0:filesystem` (mtd6), the first NAND-only
+  boot, warm, ~11:28.
+- The printer was idle: Klipper ready, the screen app, Moonraker, nginx.
+  eth0 up; Wi-Fi down (it had failed at boot, wifi_boot_failure.md).
+- The last answered serial command was ~11:32. The hang was found at
+  ~11:58, at 25–30 min uptime: no ping, no serial echo, no panic, no
+  `panic=10` reset. The soft- and hard-lockup detectors were both built
+  in and stayed silent.
+- At first this looked like a Wi-Fi T5 step (rmmod/insmod) hanging it.
+  It wasn't: the Debian root has no kmod, so `rmmod` and `insmod` were
+  "not found" (rc 127), and the command was never even echoed. The board
+  was most likely already hung.
+- The next boot (cold, NAND root) said "UBIFS (ubi0:0): recovery needed",
+  as expected after a hard stop with the root rw.
+
+**What's new compared with the runs that passed.** The errata image passed
+~97 min of heavy SD load (E, E2) on the **card** root. On that root,
+mtd6 is detached and the write window closed: patch 0010's NAND paths
+only ran the boot-time UBI scan. The NAND-root run differs in this:
+
+| | Card root (E, E2: no hang) | NAND root (hang 4) |
+|---|---|---|
+| File reads | ext4 on SD, DMA (SDHCI) | UBIFS on mtd6: **PIO** reads through patch 0010's BCH path, busy-polling NDSR with `cpu_relax()` |
+| Writes | ext4 on SD | UBIFS journal, commits and GC: **program/erase** through the guarded write path (`AUTO_RS`, `wait_prog`), from the background threads and writeback even when idle (Klipper/Moonraker logs, the Moonraker database) |
+| Executables | page cache filled by DMA | page cache filled by **CPU copies out of the NAND FIFO**, then executed: every page goes through `flush_dcache_page` / the I-cache sync on first map |
+| Hours of this on mainline | many | none before: stage 5's 254 MB unpack ran with the root on the card (one large write burst, no hang); the 16 MB UBI write test (11-01) was on the Nov 1 tree |
+
+**Candidates, re-ranked for hang 4:**
+
+1. **Patch 0010 / the NAND controller under sustained mixed use.**
+   - A bus access that never completes stops a CPU without any lockup
+     report. If that's the NAND controller (or the peripheral bus
+     behind it), any later access from the other CPU, including the
+     UART for a panic message, stops too. That's exactly "nothing at
+     all".
+   - The PIO read takes all 2080 bytes (data + spare) out of NDDB after
+     a single RDDREQ. The program path pushes data into NDDB the same
+     way.
+   - The FIFO has known quirks: the stale 4 bytes after an idle gap
+     (`bch_v1_stop`). Also, a read of NDDB at the wrong moment pops a
+     word and shifts every later read; we found that ourselves.
+   - Whether an NDDB access on an empty or full FIFO can also *stall*
+     instead of returning junk isn't known. Nothing so far has exercised
+     reads and program/erase interleaved for half an hour.
+2. **What the errata work doesn't cover yet.**
+   - **Page-table cleaning.** The vendor 3.2 kernel cleans every PTE write
+     to memory (`set_pte_ext`, `cpu_v7_dcache_clean_area`). Mainline's
+     `cpu_v7_dcache_clean_area` is a no-op on SMP (`ALT_SMP(W(nop))`, "MP
+     extensions imply L1 PTW"): it trusts the table walker to read
+     through the L1 cache.
+     - If the PJ4B-MP walker on this SoC doesn't, a stale PTE can
+       translate to a wrong physical address. An access to an address
+       nothing decodes can stall the bus: a hang with no report.
+     - Not a NAND-specific path. The NAND root changes the
+       page-fault and exec pattern, though.
+   - `v7_clean_dcache_to_PoUIS` (the 8th vendor wrapper) has no mainline
+     counterpart. Patch 0011 wraps the 7 routines mainline has.
+   - Nothing in ours sets the equivalent of
+     `arm_errata_pj4b_force_clean_invalidate`.
+   - The SoC options `MACH_MV61X0_88PA6170_ERRATA_BZ_833` / `_BZ_664`
+     are still unidentified.
+   - The NAND root is the first workload that executes code the CPU
+     itself copied into the page cache. That needs D-cache clean plus
+     I-cache invalidate across both cores.
+3. **Plain chance.** One hang in ~30 min, against 0 in ~97 min of card-root
+   load, isn't a rate. But the plain kernel's hangs came at 30 s and
+   570 s under load, and this one came with the board idle. That looks
+   like a different trigger, not a rarer version of the same one.
+
+The Wi-Fi failures don't explain it either: Wi-Fi was down for the whole
+run.
+
+### What I'd want for the next NAND-root run
+
+In order of value. Items 1–3 need a build, offline; item 4 is a script.
+
+1. **ramoops in the mtd0 image itself, and a runtime-armable hang
+   watchdog.**
+   - The errata-dbg image can't be used as is on a NAND-only printer: it
+     would have to be kexec'd. After its watchdog reset, U-Boot boots the
+     mtd0 kernel, which has no pstore and doesn't reserve 0x1e000000, so
+     the log is lost or overwritten.
+   - Proposal: add the `ramoops@1e000000` reserved-memory node and
+     `PSTORE`/`PSTORE_RAM`/`PSTORE_CONSOLE`/`PSTORE_PMSG` to the
+     **nandboot default**. That costs 1 MB of RAM, and any later boot
+     from mtd0 shows the previous boot's console log in
+     `/sys/fs/pstore/`.
+   - Make `timer_mv61x0.hang_wdt` writable at run time (0644: writing N
+     arms it, 0 stops it). Then a test session arms the watchdog from
+     init.mainline or by hand, and normal boots never do. Arming still
+     needs the owner's OK per run.
+   - Updating mtd0 is a stage-4-style NAND write and needs the owner's
+     OK.
+2. **A NAND breadcrumb ring in that RAM.** A debug-only option in patch
+   0010 (off by default): before each controller step, write the
+   operation, page or block, phase (command sent / RDDREQ seen /
+   word *n* of the PIO transfer / CMDD / done), CPU and jiffies into a
+   small ring at a fixed RAM address (for example the pmsg zone, or 4 KB
+   right after ramoops).
+   - After a watchdog reset, the ring says whether a CPU died inside a
+     NAND operation, and in which phase. That's the one question no
+     log can answer for a bus stall.
+   - The cost is a few stores per page.
+3. **The errata gaps above, as a separate test image:** PTE cleaning back
+   on SMP (`cpu_v7_dcache_clean_area` doing its clean loop), so the walker
+   never sees a stale entry. The `BZ_833`/`_BZ_664` options need another
+   pass over the vendor image to identify first.
+4. **A heartbeat over netconsole** (already running) every 10 s, from a
+   shell loop started by init.mainline:
+
+   ```sh
+   while :; do
+     echo "hb $(cut -d' ' -f1 /proc/uptime) load $(cut -d' ' -f1-3 /proc/loadavg)" \
+          "nand $(cat /sys/module/marvell_nand/parameters/stats)" \
+          "irq $(awk '/nand|ehci|sdhci|eth/{printf "%s:%s/%s ", $NF, $2, $3}' /proc/interrupts)" \
+          > /dev/kmsg
+     sleep 10
+   done &
+   ```
+
+   Also `dmesg -n 8`, so the kernel's own NAND, UBI and UBIFS warnings
+   reach netconsole as they happen. The last heartbeat dates the hang to
+   10 s, and the counters show whether NAND traffic was running.
+5. **Isolation runs, all on the errata kernel** (each needs the owner's
+   OK, watchdog-backed if item 1 exists):
+
+   | Run | Root | Load | Hang points at |
+   |---|---|---|---|
+   | I1 | card | mtd6 attached, UBIFS mounted **rw**, a loop writing and reading back ~50 MB files in it, plus `sync` | patch 0010's program/erase and read paths, without the root on NAND |
+   | I2 | card | mtd6 UBIFS mounted **ro**, a loop `tar`-ing it to /dev/null | the PIO read path alone |
+   | I3 | NAND | idle as in hang 4, with the heartbeat | repeat and time-to-hang |
+   | I4 | card | idle, same services, 2 h | baseline: the errata kernel idle (not yet run) |
+
+   I1/I2 against I4 separates the NAND driver from "the root is on NAND".
+   If I1 or I2 hangs, the breadcrumbs (item 2) say where.
