@@ -1,0 +1,169 @@
+--- a/drivers/net/wireless/marvell/mwifiex/usb.c
++++ b/drivers/net/wireless/marvell/mwifiex/usb.c
+@@ -27,6 +27,36 @@
+ module_param(usb8782_ready_ms, uint, 0644);
+ MODULE_PARM_DESC(usb8782_ready_ms,
+ 		 "8782: wait up to this many ms for INIT_DONE after the download (0: sleep 500 ms)");
++static uint usb8782_trace = 24;
++module_param(usb8782_trace, uint, 0644);
++MODULE_PARM_DESC(usb8782_trace,
++		 "8782: log the first N command/event endpoint transfers after the download");
++static bool usb8782_clear_halt;
++module_param(usb8782_clear_halt, bool, 0644);
++MODULE_PARM_DESC(usb8782_clear_halt,
++		 "8782: clear EP1/EP2 halt (resets both data toggles) before the first command");
++static uint usb8782_cmd_delay_ms;
++module_param(usb8782_cmd_delay_ms, uint, 0644);
++MODULE_PARM_DESC(usb8782_cmd_delay_ms,
++		 "8782: wait this many ms after INIT_DONE before the first command");
++
++/*
++ * Where the first command dies: each transfer on the command/event
++ * endpoint is logged (submit and completion, status, length, first bytes)
++ * for the first usb8782_trace transfers after the download, and the URB
++ * state is dumped 3 s after the first command goes out.
++ */
++static atomic_t usb8782_trace_left = ATOMIC_INIT(0);
++static struct mwifiex_adapter *usb8782_dump_adapter;
++static bool usb8782_dump_armed;
++static void usb8782_dump_fn(struct work_struct *work);
++static DECLARE_DELAYED_WORK(usb8782_dump_work, usb8782_dump_fn);
++
++#define t8782(adapter, fmt, ...)					\
++do {									\
++	if (atomic_dec_if_positive(&usb8782_trace_left) >= 0)		\
++		dev_info((adapter)->dev, "8782 trace: " fmt, ##__VA_ARGS__); \
++} while (0)
+ #endif
+ 
+ static const struct usb_device_id mwifiex_usb_table[] = {
+@@ -177,6 +207,13 @@
+ 	int recv_length = urb->actual_length;
+ 	int size, status;
+ 
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++	if (adapter && adapter->card &&
++	    ((struct usb_card_rec *)adapter->card)->rx_cmd_ep == context->ep)
++		t8782(adapter, "EP%d IN done: status %d, %d bytes: %*ph\n",
++		      context->ep, urb->status, recv_length,
++		      min(recv_length, 16), urb->transfer_buffer);
++#endif
+ 	if (!adapter || !adapter->card) {
+ 		pr_err("mwifiex adapter or card structure is not valid\n");
+ 		return;
+@@ -269,6 +306,12 @@
+ 	struct usb_tx_data_port *port;
+ 	int i;
+ 
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++	if (context->ep == card->tx_cmd_ep)
++		t8782(adapter, "EP%d OUT done: status %d, %u of %u bytes\n",
++		      context->ep, urb->status, urb->actual_length,
++		      urb->transfer_buffer_length);
++#endif
+ 	mwifiex_dbg(adapter, INFO,
+ 		    "%s: status: %d\n", __func__, urb->status);
+ 
+@@ -357,6 +400,14 @@
+ 
+ 		return -1;
+ 	}
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++	if (card->rx_cmd_ep == ctx->ep)
++		t8782(adapter, "EP%d IN submitted (%s, %d bytes), pending cmd %d data %d\n",
++		      ctx->ep,
++		      card->rx_cmd_ep_type == USB_ENDPOINT_XFER_INT ? "int" : "bulk",
++		      size, atomic_read(&card->rx_cmd_urb_pending),
++		      atomic_read(&card->rx_data_urb_pending));
++#endif
+ 
+ 	return 0;
+ }
+@@ -391,6 +442,11 @@
+ 		}
+ 	}
+ 
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++	usb8782_dump_armed = false;
++	cancel_delayed_work_sync(&usb8782_dump_work);
++	usb8782_dump_adapter = NULL;
++#endif
+ 	/* a command the chip never took is still queued: kill it first */
+ 	usb_kill_urb(card->tx_cmd.urb);
+ 	usb_free_urb(card->tx_cmd.urb);
+@@ -865,6 +921,21 @@
+ 		ret = -ENOSR;
+ 	}
+ 
++#ifdef CONFIG_MWIFIEX_USB_8782_START
++	if (ep == card->tx_cmd_ep) {
++		t8782(adapter, "EP%d OUT submit (%s), %u bytes: %*ph; IN pending cmd %d data %d\n",
++		      ep,
++		      card->tx_cmd_ep_type == USB_ENDPOINT_XFER_INT ? "int" : "bulk",
++		      skb_send->len, (int)min_t(u32, skb_send->len, 16),
++		      skb_send->data, atomic_read(&card->rx_cmd_urb_pending),
++		      atomic_read(&card->rx_data_urb_pending));
++		if (usb8782_dump_armed && usb8782_dump_adapter == adapter) {
++			usb8782_dump_armed = false;
++			schedule_delayed_work(&usb8782_dump_work,
++					      msecs_to_jiffies(3000));
++		}
++	}
++#endif
+ 	if (usb_submit_urb(tx_urb, GFP_ATOMIC)) {
+ 		mwifiex_dbg(adapter, ERROR,
+ 			    "%s: usb_submit_urb failed\n", __func__);
+@@ -1584,6 +1655,53 @@
+ 				    (int)min_t(u32, len, 32), buf);
+ 	}
+ 	kfree(buf);
++
++	usb8782_dump_adapter = adapter;
++	usb8782_dump_armed = true;
++	atomic_set(&usb8782_trace_left, usb8782_trace);
++	if (usb8782_clear_halt) {
++		struct usb_card_rec *card = adapter->card;
++		struct usb_device *udev = card->udev;
++		static const char * const name[] = {
++			"EP1 IN", "EP1 OUT", "EP2 IN", "EP2 OUT" };
++		unsigned int pipe[] = {
++			usb_rcvbulkpipe(udev, MWIFIEX_USB_EP_CMD_EVENT),
++			usb_sndbulkpipe(udev, MWIFIEX_USB_EP_CMD_EVENT),
++			usb_rcvbulkpipe(udev, MWIFIEX_USB_EP_DATA),
++			usb_sndbulkpipe(udev, MWIFIEX_USB_EP_DATA) };
++		int i;
++
++		for (i = 0; i < ARRAY_SIZE(pipe); i++)
++			dev_info(adapter->dev, "8782: clear halt %s: %d\n",
++				 name[i], usb_clear_halt(udev, pipe[i]));
++	}
++	if (usb8782_cmd_delay_ms) {
++		dev_info(adapter->dev, "8782: %u ms before the first command\n",
++			 usb8782_cmd_delay_ms);
++		msleep(usb8782_cmd_delay_ms);
++	}
++}
++
++static void usb8782_dump_fn(struct work_struct *work)
++{
++	struct mwifiex_adapter *adapter = READ_ONCE(usb8782_dump_adapter);
++	struct usb_card_rec *card;
++	struct urb *in, *out;
++
++	if (!adapter || !adapter->card)
++		return;
++	card = adapter->card;
++	in = card->rx_cmd.urb;
++	out = card->tx_cmd.urb;
++	dev_info(adapter->dev,
++		 "8782 state 3 s after the first command: EP%d IN urb status %d, %d bytes, pending %d (data %d); EP%d OUT urb status %d, %d bytes, pending %d; cmd_sent %d, cmd_resp_received %d\n",
++		 card->rx_cmd_ep, in ? in->status : 1, in ? in->actual_length : -1,
++		 atomic_read(&card->rx_cmd_urb_pending),
++		 atomic_read(&card->rx_data_urb_pending),
++		 card->tx_cmd_ep, out ? out->status : 1,
++		 out ? out->actual_length : -1,
++		 atomic_read(&card->tx_cmd_urb_pending),
++		 adapter->cmd_sent, adapter->cmd_resp_received);
+ }
+ #endif
+ 
