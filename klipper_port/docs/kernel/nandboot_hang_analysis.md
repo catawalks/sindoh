@@ -723,3 +723,111 @@ Before relying on it (owner present, after the errata-dbg check order):
   (the other CPU frozen on the bus) would hang the sender in
   `csd_lock_wait()` with interrupts on. That's one more way both CPUs end
   up stopped once one stalls.
+
+## Hang 6: dc3b5f20, NAND root, 1337 s, caught by the hang logger (2026-11-07)
+
+**What the logger shows** (once a second, from 512 s on; last line at 1336.69 s):
+- **No NAND reads after 516.5 s.** The `stats` counters (29320 clean, 1485
+  erased) stayed frozen for the last 820 s.
+- **NFC IRQs stayed at 4**, so no erases at all.
+- nr_dirtied/nr_written ~1/s, mostly the logger's own SD file; at most small
+  UBIFS journal writes (programs) from Klipper/Moonraker. Dirty 4 kB.
+- mmc0 ~11/s, usb2 ~250/s, eth0 ~3/s, timer1 100/s; IPIs steady.
+- Nothing ramps before the stop.
+
+**So hang 6 wasn't a commit or an erase burst.** The commit/erase lead from
+hang 5 is weakened: the NAND sat read-idle and erase-free for 13 minutes,
+and the board stopped anyway.
+
+**Hang times so far** (NAND root, errata kernels, near idle):
+- hang 4: unknown, between ~4 and ~30 min (last answer at 4 min, found at
+  30);
+- hang 5: 1397 s;
+- hang 6: 1337 s.
+
+Card-root runs passed 5054 s.
+
+### (a) What on a NAND root could fire at a fixed ~22–23 min?
+
+**Kernel side, nothing found:**
+
+| Candidate | Period | Verdict |
+|---|---|---|
+| UBIFS write-buffer hrtimer | 3 s soft, +2 s | too short |
+| VFS writeback | 5 s, expiry 30 s | too short |
+| UBIFS background commit | journal fill, not time | none ran (no erases) |
+| UBI background thread, wear levelling, scrubbing | on demand | no erases, no bitflips |
+| Patch 0010 waits (`ktime` and `readl_*_poll_timeout`) | per operation | no long-lived state, no wrapping counter |
+| The mtd6 write window | static module parameter | — |
+| Hung-task detector / workqueue watchdog | 120 s / 30 s | same on the card root |
+| jiffies (HZ 100) | wraps 300 s after boot | no |
+| `sched_clock` / timer-2 clocksource (32 bit, 1 MHz) | 2147 s / 4295 s | no |
+
+**One numeric coincidence, checked:** 2^39 cycles of the UPC clocks are
+1386 s (FM, 396.6 MHz) and 1393 s (IO, 394.7 MHz). But the UPC firmware
+(`klipper/src/upc/timer.c`) keeps a 32-bit accumulator over a 32-bit
+down-counter that wraps every ~10.8 s. Nothing in it or in Klipper counts
+to 2^39, and the card-root runs ran the same Klipper past 5054 s. Most
+likely a coincidence. To close it, confirm the UPC firmware was actually
+running in E2.
+
+**What is NAND-root-only, then:** not a timer, but a *state*.
+- On a NAND root, a long **read-idle stretch with occasional programs**
+  (UBIFS journal writes) is normal: everything Klipper/Moonraker need is
+  cached after a few minutes.
+- So is **the first read after such a stretch**, when something evicts or
+  first touches a file.
+- Patch 0010 already documents one idle effect: after an idle gap, the
+  first read can start with 4 stale FIFO bytes (`bch_v1_stop()` was added
+  for it).
+- Whether a longer gap, or programs without reads in between, leave the
+  controller in a state where the next access stalls is exactly what the
+  trace answers.
+
+**A cheap discriminator, without the debug image** (owner's OK, NAND root):
+
+| Run | What | If the idle state matters |
+|---|---|---|
+| R1 "keep busy" | every 20 s: `echo 1 > /proc/sys/vm/drop_caches` and read a few root files (e.g. `cat /usr/lib/python3*/os.py >/dev/null`) | no hang past 40 min |
+| R2 "poke after idle" | leave it 15 min idle, then the same drop-and-read once | the hang comes at the poke, on demand |
+
+### (b) Can a page program, not only an erase, stall the bus?
+
+Yes, in principle. These are the only ways any NAND operation can stop a
+CPU for good:
+- **the PIO writes of the page into NDDB** (`marvell_nfc_xfer_data_out_pio`,
+  2112 bytes after a single WRDREQ);
+- **any NFC register access**, if the controller's bus interface wedges.
+
+Everything else in the program path is bounded:
+- the WRDREQ wait (`marvell_nfc_end_cmd`, `POLL_TIMEOUT`);
+- `bch_v1_wait_prog` (200 ms, a sleeping poll).
+
+The same goes for reads (NDDB reads after one RDDREQ) and erases (only
+register accesses and the R/B interrupt wait). Hang 6 had at most programs
+in flight, so (b) stays open. The trace's `pio-out` / `pio-out-end`
+entries are what decide it.
+
+### (c) The debug image
+
+Already fixed and rebuilt: `m1-nandboot-nanddbg.uimg` **e6cdb8a6**, modules
+**bfd2c0a7** (see "The first build didn't boot" above).
+- RAM-boot it from the 4GB-SD gap with the NAND root.
+- After a hang, its watchdog resets the board within ~30 s.
+- The evidence (pstore console, NAND step ring) is only read if **nanddbg
+  boots again** right after the reset. U-Boot's autoboot would start
+  dc3b5f20 from mtd0, which neither reserves 0x1e000000–0x1e1fffff nor
+  prints the ring, and may reuse that RAM.
+- So the PC side should stop U-Boot on serial after the reset and RAM-boot
+  nanddbg again, as for the first boot. Then: `dmesg | grep "trace #"` and
+  `ls /sys/fs/pstore/`.
+
+**Later, for unattended runs:** carry the "black box" in the default mtd0
+image:
+- both no-map areas, pstore, and the trace always on (a few uncached stores
+  per NAND step);
+- the hang watchdog armable at run time instead of on the command line;
+- after any reset, the next mtd0 boot prints the ring by itself.
+
+That's a new mtd0 kernel: RAM-boot test first (owner's rule), then the
+owner's OK.
