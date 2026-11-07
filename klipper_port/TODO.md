@@ -205,6 +205,26 @@ still require the owner's explicit OK.
       Root cause wanted, not a workaround (owner): offline driver
       comparison with the kernel session (docs/kernel/wifi_boot_failure.md),
       then a reboot-loop measurement here (owner's go-ahead first).
+      Later 11-07: a NAND-root cold boot failed too (cold 1 of 2, warm 2
+      of 3; card root 1 of 3, NAND root 2 of 2). T5 on that failed boot
+      (busybox rmmod/insmod: the Debian root has no kmod, plain
+      rmmod/insmod are "not found"; netconsole to the PC on UDP 6666):
+      unload clean; reload reuses the running firmware ("not the winner
+      0xf00dface", 0 bytes), which still doesn't answer cmd 0xa9;
+      USBDEVFS_RESET after the unload -> oops in IRQ context (PC in the
+      unloaded module: a leftover URB callback), panic, reboot by
+      panic=10; after that warm reboot the 8782 doesn't enumerate at all
+      (-110). So the chip keeps power and state across warm reboots, and
+      a reload or USB reset can't recover a failed start; the fix has to
+      make the first start reliable. Needs a power cycle to get Wi-Fi
+      back. T3 (clean shutdown before warm reboots) not run yet.
+    - **Errata kernel hard hang on the NAND root (11-07 ~11:55):** about
+      25-30 min after the first NAND-root boot, idle (Klipper ready, Wi-Fi
+      down), no ping, no serial echo, no panic. First thought to be the
+      T5 test, but its commands never ran (rmmod/insmod "not found", no
+      echo). The 82-min soak was on the card root; on the NAND root all
+      file I/O goes through patch 0010 (PIO, busy-poll): back in the
+      frame. Kernel session told; netconsole on for every run now.
     - **nandboot hard hang (plain image; errata image fixes it so far).** (1) 11-06 ~22:10,
       image 33d2e5d2: userspace, serial echo and Wi-Fi died, eth0 still
       pinged; after the 8782 re-enumerate, during Wi-Fi churn. (2) 11-07
