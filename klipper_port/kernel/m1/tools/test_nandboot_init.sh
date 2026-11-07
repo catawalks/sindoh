@@ -10,6 +10,7 @@ trap 'rm -rf "$T"' EXIT
 sed -e "s#/newroot#$T/newroot#g" -e "s#/run#$T/run#g" \
     -e "s#^PATH=.*#:#" -e 's#^exec switch_root#switch_root#' \
     -e 's#dp200-revert.sh 2>#dp200_revert 2>#' \
+    -e 's#dp200-hold #dp200_hold #' \
     -e 's#\[ -c /dev/input/event0 \]#:#' \
     -e 's#\[ -b "\$d" \]#isdev "$d"#' \
     -e 's#/dev/mmcblk0p\* /dev/sd?1#/dev/mmcblk0p1 /dev/sda1#' \
@@ -33,7 +34,9 @@ run() {	# $1 = scenario name, the rest: variables of the scenario
 				[ "$UBIROOT" = revert ] && : > "$m/.dp200-revert"
 				[ "$UBIROOT" = broken ] || { mkdir -p "$m/etc/dp200" "$m/run"
 				: > "$m/etc/dp200/init.mainline"; chmod +x "$m/etc/dp200/init.mainline"; } ;;
+			remount,rw) return 0 ;;
 			"${CARD:-none}") : > "$m/.dp200-root"; mkdir -p "$m/etc/dp200" "$m/run"
+				[ "${CARDREV:-}" ] && : > "$m/.dp200-revert"
 				: > "$m/etc/dp200/init.mainline"; chmod +x "$m/etc/dp200/init.mainline" ;;
 			*) return 1 ;;
 			esac
@@ -52,7 +55,8 @@ run() {	# $1 = scenario name, the rest: variables of the scenario
 	tee() { cat >> "$T/out"; }
 	ubiattach() { log "ubiattach $*"; }
 	ubidetach() { log "ubidetach $*"; }
-	timeout() { [ "${TOUCH:-no}" = yes ]; }
+	dp200_hold() { [ "${TOUCH:-no}" = yes ]; }
+	rm() { case "$*" in *.dp200-revert) log "MARKER REMOVED" ;; esac; command rm "$@"; }
 	isdev() { case $1 in "${CARD:-none}"|"${STICKDEV:-none}") return 0 ;; esac; return 1; }
 	dp200_revert() { log "REVERT window=$(cat "$T/win")"; return ${REVRC:-0}; }
 	reboot() { log "reboot $*"; exit 0; }
@@ -61,20 +65,35 @@ run() {	# $1 = scenario name, the rest: variables of the scenario
 	cp() { :; }
 	. "$T/init"
 	) > /dev/null 2>&1
-	printf '%-28s ' "$name"; grep -E "REVERT|switch_root|SHELL|reboot|STOPPED" "$T/out" | tr '\n' ' '; echo
+	got=$(grep -E "MARKER|REVERT|switch_root|SHELL|reboot|STOPPED" "$T/out" | sed "s#$T##g" | tr '\n' ' ')
+	case "$got" in "$want"*) r=ok ;; *) r=FAIL; FAILS=$((FAILS + 1)) ;; esac
+	printf '%-36s %-4s %s\n' "$name" "$r" "$got"
 }
 
 # the "printer's" devices: a card partition and a stick
 SD=/dev/mmcblk0p1 STK=/dev/sda1
+FAILS=0
+# want: the start of the outcome line
+want="switch_root /newroot /etc/dp200/init.mainline (root ubi0:filesystem)"
 run "mtd6 root" UBIROOT=ok
+want="switch_root /newroot /etc/dp200/init.mainline (root /dev/mmcblk0p1)"
 run "marked card first" UBIROOT=ok CARD="${SD:-x}"
-run "root marker -> revert" UBIROOT=revert
-run "Sindoh stick, touched" UBIROOT=ok STICKDEV="${STK:-x}" STICKFILE=update.she TOUCH=yes
-run "Sindoh stick, no touch" UBIROOT=ok STICKDEV="${STK:-x}" STICKFILE=update.she TOUCH=no
-run "revert stick, touched" UBIROOT=ok STICKDEV="${STK:-x}" STICKFILE=dp200-revert TOUCH=yes
-run "broken root, touched" UBIROOT=broken TOUCH=yes
-run "broken root, no touch" UBIROOT=broken TOUCH=no
+want="REVERT window=none reboot -f"
+run "mtd6 root marker -> revert" UBIROOT=revert
+want="MARKER REMOVED REVERT window=none reboot -f"
+run "card root marker -> removed, revert" UBIROOT=ok CARD="${SD:-x}" CARDREV=1
+# a healthy root never asks here, whatever is plugged in or touched
+want="switch_root /newroot /etc/dp200/init.mainline (root ubi0:filesystem)"
+run "Sindoh stick, held, healthy root" UBIROOT=ok STICKDEV="${STK:-x}" STICKFILE=update.she TOUCH=yes
+run "revert stick, held, healthy root" UBIROOT=ok STICKDEV="${STK:-x}" STICKFILE=dp200-revert TOUCH=yes
+want="REVERT window=none reboot -f"
+run "broken root, held" UBIROOT=broken TOUCH=yes
+run "broken root + Sindoh stick, held" UBIROOT=broken STICKDEV="${STK:-x}" STICKFILE=update.she TOUCH=yes
+want="SHELL reboot -f"
+run "broken root, not held" UBIROOT=broken TOUCH=no
+want="REVERT window=none SHELL STOPPED"
 run "revert fails" UBIROOT=revert REVRC=1
+[ $FAILS = 0 ] && echo "decisions: all as expected" || echo "decisions: $FAILS FAILED"
 
 # The built image's initramfs list (if there is one): every tool that
 # dp200-revert.sh checks for and that the init calls is in it, and the
@@ -84,7 +103,7 @@ if [ -f "$L" ]; then
 	bad=0
 	for t in ubiattach ubidetach ubiformat ubimkvol ubiupdatevol flash_erase \
 		 nandwrite bzip2 tar cmp od awk md5sum mountpoint switch_root \
-		 timeout tee setsid cttyhack dd dp200-revert.sh; do
+		 tee setsid cttyhack dirname id basename dp200-hold dp200-revert.sh; do
 		grep -qE "^(file|slink) /[a-z/]*/$t " "$L" || { echo "MISSING $t"; bad=1; }
 	done
 	for t in ubiattach ubidetach ubiformat ubimkvol ubiupdatevol flash_erase nandwrite; do

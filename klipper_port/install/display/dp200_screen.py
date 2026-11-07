@@ -64,6 +64,16 @@ SHUT_DIR = '/tmp/dp200-shutdown'
 SHUT_STEPS = ('Web page and camera', 'Moonraker', 'Klipper',
               'Heaters and motors off', 'Saving files')
 BOOTBAR_STOP = '/sys/module/dp200_bootbar/parameters/stop'
+# Back to stock with a Sindoh update stick (our kernel only: the guarded
+# NAND driver's write window exists; under the stock kernel stock handles
+# its sticks itself). A stick with _update_rodin/update.she plugged in ->
+# two confirmations -> REVERT_MARK in our root + reboot; the nandboot
+# initramfs then restores stock from mtd5, and stock runs the stick's
+# update (docs/end_goal_install_plan.md, stage 3).
+OUR_KERNEL = '/sys/module/marvell_nand/parameters/write_window'
+REVERT_MARK = '/.dp200-revert'
+STICK_MNT = '/run/dp200/stick'
+STICK_UPDATE = '_update_rodin/update.she'
 
 # Preheat presets (nozzle, bed); bed max_temp is 100, nozzle 260
 PRESETS = (('PLA', 200, 60), ('ABS', 240, 90))
@@ -493,6 +503,8 @@ class UI:
                    't0': 0.0, 'checked': 0.0, 'busy': False}
         # console page: the kernel log, refreshed while shown
         self.con = {'rev': 0, 'checked': 0.0, 'busy': False, 'lines': []}
+        # USB sticks seen (sdX names), and which of them hold a Sindoh update
+        self.stk = {'checked': 0.0, 'busy': False, 'seen': set(), 'sindoh': set(), 'asked': set()}
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
@@ -582,8 +594,8 @@ class UI:
             ok = save_settings(self.settings)
             self.flash('Screen timeout: %s%s' % (fmt_timeout(action[1]), '' if ok else ' (not saved!)'))
             self.screen = 'display'
-        elif kind == 'confirm':
-            self.confirm = with_bed_check(action[1], action[2], self.st)
+        elif kind == 'confirm':                        # (question, yes[, no])
+            self.confirm = with_bed_check(action[1], action[2], self.st) + tuple(action[3:4])
         elif kind == 'cancel':
             self.confirm = None
         elif kind == 'gcode':
@@ -603,6 +615,18 @@ class UI:
             self._bg('Sensor ' + ('on' if action[1] else 'off'), lambda: self.adxl_switch(action[1]))
         elif kind == 'power':
             self.power_request(action[1])
+        elif kind == 'revert_go':                      # second YES: marker, then reboot
+            try:
+                with open(REVERT_MARK, 'w') as f:
+                    f.write('screen app %s\n' % time.strftime('%Y-%m-%d %H:%M:%S'))
+                    f.flush()
+                    os.fsync(f.fileno())
+            except OSError as e:
+                self.flash('Back to stock failed: %s' % e)
+                return
+            self.power_request('reboot')
+        elif kind == 'revert_no':
+            self.stk['asked'] |= self.stk['sindoh']
         elif kind == 'screen_off':
             self.last_touch = 0.0              # black now (only while idle, see dimmed())
             self.screen = 'home'
@@ -854,6 +878,33 @@ class UI:
         nets = sorted(wifi.load_saved(), key=lambda n: -n['priority'])
         self.wf['saved_list'] = [(n['ssid'], n['priority']) for n in nets]
         self.wf['saved'] = len(nets)
+
+    def stick_tick(self):
+        """Every 3 s: a newly plugged-in USB stick with a Sindoh update asks
+        (once per plug-in, not while printing) whether to go back to stock."""
+        if not os.path.exists(OUR_KERNEL) or self.stk['busy'] or time.time() - self.stk['checked'] < 3:
+            return
+        self.stk['checked'] = time.time()
+        now = set(usb_disks())
+        new, self.stk['seen'] = now - self.stk['seen'], now
+        self.stk['sindoh'] &= now
+        self.stk['asked'] &= now                       # unplugged: ask again next time
+        if new:
+            self.stk['busy'] = True
+
+            def work():
+                try:
+                    self.stk['sindoh'] |= {d for d in new if sindoh_stick(d)}
+                finally:
+                    self.stk['busy'] = False
+            threading.Thread(target=work, daemon=True).start()
+        state = ((self.st or {}).get('print_stats') or {}).get('state')
+        if (self.stk['sindoh'] - self.stk['asked'] and not self.confirm
+                and state not in ('printing', 'paused') and not self.screen.startswith('powering')):
+            self.stk['asked'] |= self.stk['sindoh']
+            self.screen = 'home'
+            self.last_touch = time.time()              # wake the screen for it
+            self.confirm = revert_confirm()
 
     def wifi_tick(self):
         """Keep the WiFi page's status current while it is shown, and run the
@@ -2165,6 +2216,40 @@ HOMES_FIRST = ('_SINDOH_ENSURE_HOMED', 'CLEAN_NOZZLE', 'LOAD_FILAMENT', 'UNLOAD_
                'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCURACY', 'LV_PROBE_CALIBRATE',
                'FILAMENT_DRY')
 
+def revert_confirm():
+    """The two-step question for a Sindoh update stick (stick_tick)."""
+    return ('Sindoh update stick found. Return this printer to stock and run the update?',
+            ('confirm', 'Sure? This REMOVES Klipper and all its settings from the printer. '
+                        'It cannot be undone.', ('revert_go',), ('revert_no',)),
+            ('revert_no',))
+
+def usb_disks():
+    """Names of the USB disks (sda, sdb, ...)."""
+    try:
+        return sorted(n for n in os.listdir('/sys/block') if re.match(r'sd[a-z]+$', n))
+    except OSError:
+        return []
+
+def sindoh_stick(disk):
+    """Does this disk (its first partition, else the whole disk) hold a
+    Sindoh update? Mounted read-only, and unmounted again."""
+    import subprocess
+    for dev in ('/dev/%s1' % disk, '/dev/%s' % disk):
+        if not os.path.exists(dev):
+            continue
+        try:
+            os.makedirs(STICK_MNT, exist_ok=True)
+            if subprocess.run(['mount', '-t', 'vfat', '-o', 'ro,nosuid,nodev,noexec', dev, STICK_MNT],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20).returncode:
+                continue
+            try:
+                return os.path.isfile(os.path.join(STICK_MNT, STICK_UPDATE))
+            finally:
+                subprocess.run(['umount', STICK_MNT], timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return False
+
 def with_bed_check(question, act, st):
     """A confirm for a command that homes first while the printer isn't
     homed: ask about the bed in the same question, and send BED_CLEAR with
@@ -2289,6 +2374,7 @@ def main():
                 continue
             ui.on_touch(ev)
         ui.check_hold()
+        ui.stick_tick()
         ui.wifi_tick()
         ui.net_tick()
         ui.shaper_tick()

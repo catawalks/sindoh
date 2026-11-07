@@ -2,14 +2,16 @@
 # /init of the NAND-boot image (VARIANT=nandboot): our kernel in mtd0,
 # booted by the stock U-Boot (docs/end_goal_install_plan.md, stage 3).
 #
-#  - revert: a Sindoh DP200 update stick (_update_rodin/update.she) or a
-#    revert stick (_update_rodin/dp200-revert), each confirmed by a touch,
-#    or the marker /.dp200-revert in our root (the screen app's "Back to
-#    stock", already confirmed there): dp200-revert.sh from RAM, then reboot.
-#    Stock comes back from mtd5, and boots and runs the stick's update;
+#  - revert: the marker /.dp200-revert in the chosen root. Our screen app
+#    writes it after its own two-step confirmation (a Sindoh update stick
+#    plugged in, or "Back to stock"), then reboots. dp200-revert.sh runs
+#    from RAM, then reboot: stock comes back from mtd5, boots and runs the
+#    stick's update;
 #  - normal: the root is a card or stick partition marked for the printer
 #    (/.dp200-root), else ubi0:filesystem on mtd6; then switch_root;
-#  - broken root: offer the recovery from mtd5 ("touch to recover").
+#  - no working root: the only prompt here. "Press and hold the screen 3 s"
+#    (dp200-hold: queued events and the first 0.5 s don't count; 2026-11-07
+#    a queued event started a revert unasked) restores stock from mtd5.
 #
 # The command line opens the NAND write window for mtd6 only
 # (marvell_nand.write_window=1741,4091); dp200-revert.sh opens mtd0/mtd3
@@ -37,11 +39,10 @@ shell() {
 	setsid cttyhack sh
 }
 
-# A touch within $1 seconds? Any event from the touchscreen counts.
-touched() {
+# A fresh press held $2 seconds, starting within $1 seconds?
+held() {
 	[ -c /dev/input/event0 ] || return 1
-	timeout "$1" dd if=/dev/input/event0 bs=16 count=1 of=/dev/null \
-		2>/dev/null
+	dp200-hold /dev/input/event0 "$1" "$2" >> $LOG 2>&1
 }
 
 # Wait up to 6 s for the SD card and USB sticks to show up.
@@ -87,11 +88,6 @@ mountpoint -q $STICK && umount $STICK
 ubiattach -m 6 -d 0 /dev/ubi_ctrl > /dev/null 2>&1 ||
 	ubiattach /dev/ubi_ctrl -m 6 -d 0 > /dev/null 2>&1 ||
 	say "mtd6: UBI attach failed"
-ROOTMARK=false
-if mount -t ubifs -o ro ubi0:filesystem /newroot 2>/dev/null; then
-	[ -f /newroot/.dp200-revert ] && ROOTMARK=true
-	umount /newroot
-fi
 
 revert() {
 	say "Returning this printer to stock (factory set from mtd5)."
@@ -112,15 +108,6 @@ revert() {
 	say "Stopped. Switch the printer off."
 	while :; do sleep 3600; done
 }
-
-if $ROOTMARK; then
-	revert
-elif $SINDOH || $MARKED; then
-	say "Return this printer to stock? Touch the screen within 30 s to"
-	say "confirm; otherwise it starts normally."
-	if touched 30; then revert; fi
-	say "not confirmed: normal start"
-fi
 
 # The root: a marked card/stick partition first, then mtd6
 use_root() {
@@ -146,11 +133,26 @@ if [ -z "$ROOT" ] && mount -t ubifs -o ro ubi0:filesystem /newroot 2>/dev/null; 
 	fi
 fi
 
+# The screen app's marker (already confirmed twice there). On a card or
+# stick root it is removed first, so the next boot of this image doesn't
+# revert again; on mtd6 the revert replaces the root anyway.
+if [ -n "$ROOT" ] && [ -f /newroot/.dp200-revert ]; then
+	say "revert requested by the screen app"
+	if [ "$ROOT" != ubi0:filesystem ]; then
+		mount -o remount,rw /newroot && rm -f /newroot/.dp200-revert && sync ||
+			{ say "cannot remove the revert marker"; shell "marker"; }
+	fi
+	umount /newroot
+	revert
+fi
+
 if [ -z "$ROOT" ]; then
 	say "No working root file system found."
-	say "Touch the screen within 60 s to restore stock from the factory"
-	say "recovery set (mtd5)."
-	if touched 60; then revert; fi
+	$SINDOH && say "(A Sindoh update stick is plugged in.)"
+	$MARKED && say "(A revert stick is plugged in.)"
+	say "Press and HOLD the screen for 3 s (within 60 s) to restore stock"
+	say "from the factory recovery set (mtd5)."
+	if held 60 3; then revert; fi
 	shell "no root"
 	reboot -f
 fi

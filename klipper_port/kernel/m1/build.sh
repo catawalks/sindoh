@@ -239,6 +239,10 @@ build_mtdutils() {
 	local src=$WORK/mtd-utils-$MTDVER tool f
 	check "$t" d1242d44c5772394d159117f3aeaa352f4265a073cb6dc0d91ced13d9b3299df
 	MTDBIN=$WORK/mtd-utils-bin
+	# the initramfs's "recover?" prompt: a fresh press-and-hold only
+	# (tools/dp200-hold.c, tested by tools/test_dp200_hold.sh)
+	"$MUSLCC" -static -Os -Wall -o "$WORK/dp200-hold" "$M1/tools/dp200-hold.c"
+	${CROSS}strip "$WORK/dp200-hold"
 	[ -x "$MTDBIN/mtdinfo" ] && [ "$MTDBIN/mtdinfo" -nt "$t" ] && return 0
 	rm -rf "$src" "$MTDBIN" && mkdir -p "$MTDBIN"
 	tar -C "$WORK" -xJf "$t"
@@ -343,6 +347,7 @@ fi
 			# the revert (and its md5 list) from install/nand
 			echo "file /usr/sbin/dp200-revert.sh $IRFS/dp200-revert.sh 0755 0 0"
 			echo "file /usr/sbin/recovery.md5 $IRFS/recovery.md5 0644 0 0"
+			echo "file /usr/bin/dp200-hold $WORK/dp200-hold 0755 0 0"
 			for t in $MTDTOOLS; do
 				echo "file /usr/sbin/$t $MTDBIN/$t 0755 0 0"
 			done ;;
