@@ -36,7 +36,7 @@ upstream. In the vendor image there are two forms of them:
    the `strex`. That covers spinlocks, atomics, cmpxchg, bitops and the
    kuser helpers (`__kuser_pj4b_errata6011_cmpxchg32/64`,
    `pj4b_errata_6011_64` = an extra `dsb`). A scan of the image
-   (`exscan.py`, see below) finds **2097 runs of 5 and 9 single `ldrex`**
+   (`tools/ldrex_scan.py`, see below) finds **2097 runs of 5 and 9 single `ldrex`**
    (8 in init data, 1 in the stock `__kuser_cmpxchg64` that the 6011
    version replaces). **Our nandboot vmlinux: 1490 single `ldrex`, none
    doubled.**
@@ -113,6 +113,66 @@ test:
    gap. Do it only if test 3 passes, i.e. the load needs more than SD
    reads.
 
+### The test images (built 2026-11-07, not booted)
+
+`VARIANT=nandboot HANGTEST=<t> ./build.sh` builds 59134b5's nandboot plus
+`variants/nandboot-<t>.config`, under its own name. m1-nandboot.uimg
+(fcba26da) is not rebuilt. All three add the buddy hard-lockup detector
+with panic (`HARDLOCKUP_DETECTOR`, `BOOTPARAM_HARDLOCKUP_PANIC`). **Each
+image needs its own modules tar** in the root's /lib/modules: the
+`-errata` mwifiex has the erratum code too, and the vermagic doesn't tell
+the builds apart.
+
+| Image | md5 | Bytes | What changes |
+|---|---|---|---|
+| m1-nandboot-up.uimg | 0eff24319c75a52cd5895c87b5d70732 | 2,809,188 | `maxcpus=1` on the forced command line (test 1) |
+| m1-nandboot-wrap.uimg | d997f1297e502e88adc5ebe8043d7b4f | 2,808,212 | SMP + `PJ4B_MV61X0_CACHE_WRAP` (patch 0011) |
+| m1-nandboot-errata.uimg | 5b17e2ec0c90ae69c8bed2863c2675f0 | 2,814,412 | SMP + 0011 + `PJ4B_ERRATA_6011` (patch 0012) (test 2) |
+
+| Modules tar | md5 |
+|---|---|
+| m1-nandboot-up-modules.tar | a4b47ed340e59fcf4ca80c0bdf83d14f |
+| m1-nandboot-wrap-modules.tar | d8533156ea921151c6a6720c8bec08fb |
+| m1-nandboot-errata-modules.tar | fff05ae2c292611aad9bfb63415a1eb6 |
+
+- **Patch 0011** (`arch/arm/mm/cache-v7.S`; Kconfig options for both
+  patches in `arch/arm/mm/Kconfig`, off by default). It adds IRQs off,
+  `dsb` and the 50-loop delay, then the CPSR is restored at every exit, in:
+  - the set/way routines: `v7_flush_dcache_louis` and
+    `v7_flush_dcache_all`, with the CPSR in ip and every exit through
+    `finished`;
+  - `v7_coherent_user_range`: the vendor's single loop of D clean, `dsb`
+    and I invalidate per line; the fault fixup restores IRQs too;
+  - `v7_flush_kern_dcache_area` and the three `v7_dma_*_range` routines.
+
+  `cpu_v7_dcache_clean_area` isn't changed: on SMP mainline it returns
+  at once (the table walk reads L1). The vendor's 3.2 still cleaned PTE
+  lines there, and in `set_pte_ext`. That is a 3.2 behaviour, not an
+  erratum, and isn't copied.
+- **Patch 0012** plus the new header `src/arch/arm/include/asm/pj4b-6011.h`:
+  - Every `ldrex` gets four extra copies in front of it, at 35 sites:
+    atomic.h, cmpxchg.h, spinlock.h, futex.h, swp_emulate.c, lib/bitops.h
+    and the kuser helpers. edac.h is skipped; EDAC isn't built.
+  - The asm statements in atomic.h, cmpxchg.h and spinlock.h run inside
+    `arch_local_irq_save`/`restore`. In bitops the IRQs are off over the
+    five loads only, restored before the `strex`, as the vendor's
+    `_set_bit`. Futex and SWP emulation get no IRQ masking, as the
+    vendor's.
+  - The kuser cmpxchg helpers branch to five-load copies placed in front
+    of 0xffff0f60. The slot addresses and `__kuser_helper_version` (5)
+    stay as before.
+  - **User-space `ldrex` is not covered.** The armhf initramfs tools,
+    musl and armhf libraries have their own. The armel root's atomics
+    mostly go through the kuser cmpxchg, which is covered.
+- **Checked in the binaries** (objdump, `tools/ldrex_scan.py`):
+  - fcba26da 1490 single `ldrex`; -up 1492; -wrap 1492 single; -errata
+    **1273 runs of 5, none single**.
+  - The wrapper is in all 7 routines of -wrap and -errata, none of -up.
+  - In -errata's modules: mwifiex.ko 18 runs of 5, mwifiex_usb.ko 2,
+    each with `cpsid i`.
+  - The kuser helpers are 288 bytes; `__kuser_cmpxchg64` is 160 bytes
+    before the end, i.e. at 0xffff0f60.
+
 Optional, with no DMA at all: two `dd if=/dev/zero of=/dev/null bs=64k`
 plus a fork loop (`while :; do /bin/true; done`) on SMP. This exercises
 the exclusives, TLB IPIs and `v7_coherent_user_range` on exec. A hang
@@ -166,7 +226,7 @@ into a **warm reset**. In order of cost:
 
 ## Reproducing the scan
 
-`exscan.py` (session scratchpad; it reads only the images) counts runs of
+`kernel/m1/tools/ldrex_scan.py` (it reads only the images) counts runs of
 `ldrex` (`(w & 0x0f900fff) == 0x01900f9f`) and the wrapper prologue
 `f10c0080 f57ff04f e3a03032`:
 

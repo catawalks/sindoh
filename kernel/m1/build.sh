@@ -10,6 +10,7 @@
 #   VARIANT=gpio            $OUT/m1-gpio.uimg      GPIO banks, nothing driven
 #   VARIANT=eth             $OUT/m1-eth.uimg       small Ethernet + kexec loader
 #   VARIANT=nandboot        $OUT/m1-nandboot.uimg  for mtd0: full + NAND
+#     HANGTEST=up|wrap|errata  $OUT/m1-nandboot-<t>.uimg  hang test images
 #                           writes, root/revert initramfs, no 8782 firmware
 #
 # A variant merges variants/<v>.config after m1.config, uses
@@ -58,6 +59,19 @@ else
 	NAME=m1-$VARIANT
 	KOUT=$WORK/build-m1-$VARIANT
 	IRFS=$WORK/initramfs-m1-$VARIANT
+fi
+# HANGTEST=up|wrap|errata (VARIANT=nandboot only): the hang test images of
+# docs/kernel/nandboot_hang_analysis.md, variants/nandboot-$HANGTEST.config
+# on top of nandboot, e.g. $OUT/m1-nandboot-up.uimg; own build tree
+if [ -n "${HANGTEST:-}" ]; then
+	if [ "$VARIANT" != nandboot ] ||
+	   [ ! -f "$M1/variants/nandboot-$HANGTEST.config" ]; then
+		echo "HANGTEST=$HANGTEST: needs VARIANT=nandboot and variants/nandboot-$HANGTEST.config" >&2
+		exit 1
+	fi
+	NAME=$NAME-$HANGTEST
+	KOUT=$KOUT-$HANGTEST
+	IRFS=$IRFS-$HANGTEST
 fi
 
 NAME0=$NAME		# without the -t2/-smp/-nandw suffixes below
@@ -386,6 +400,9 @@ mkdir -p "$KOUT"
 	fi
 	if [ -f "$M1/variants/$VARIANT.config" ]; then
 		tr -d '\r' < "$M1/variants/$VARIANT.config"
+	fi
+	if [ -n "${HANGTEST:-}" ]; then
+		tr -d '\r' < "$M1/variants/nandboot-$HANGTEST.config"
 	fi
 	if [ "${THUMB2:-0}" = 1 ]; then
 		echo "CONFIG_THUMB2_KERNEL=y"
