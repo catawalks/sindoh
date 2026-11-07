@@ -264,6 +264,15 @@ still require the owner's explicit OK.
       gap, dc3b5f20 + modules 948b3350 put back with mtd0_kernel_update.sh;
       boots from mtd0 again (NAND root, Wi-Fi). Owner's rule since: RAM-boot
       every kernel before it goes to NAND. Kernel session fixing nanddbg.
+      Meanwhile (11-07 evening) tools/hang_logger.sh runs on dc3b5f20
+      (started by hand, stops at reboot): once a second it appends NAND
+      read stats, UBI max_ec/avail, dirty/writeback, nr_dirtied/written,
+      IRQ counts (nand, mmc, usb2, eth, timer1), IPI resched/function-call
+      per CPU and ctxt to the 4GB-SD (/var/log/dp200-hang/<boot>.stat,
+      fsynced each line) plus the live dmesg (.dmesg), and copies the
+      stat line to the PC (port 9006); netconsole on. First readings: the
+      NAND controller raised 4 IRQs since boot (busy-polled), all device
+      IRQs on CPU0, CPU1 takes ~3x CPU0's function-call IPIs.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
