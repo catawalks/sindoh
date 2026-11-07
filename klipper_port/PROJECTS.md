@@ -248,3 +248,18 @@ replacing the stock root, ~140-150 MB of mtd6 should be free (estimate:
 - Our kernel detects a card/stick marked for the printer at boot; the
   screen offers to format one; the installer reports what it found.
 **Next:** build it with the mtd0 kernel install (end-goal stage 4).
+
+## 12. Wi-Fi chip firmware: decompile / clean-room rewrite (low priority, after the release)
+
+The owner's idea (2026-11-07): take apart the 88W8782's firmware
+(mrvl/usb8782_uapsta.bin, the program that runs on the Wi-Fi chip's own
+CPU) and maybe write a clean-room replacement. Low priority, a "fun path"
+for after the release stage; not a fix for anything current. Notes:
+- It would not fix the boot-time Wi-Fi failure: that is in the host driver
+  (mwifiex_usb) and the chip's state across a warm reboot (TODO,
+  docs/kernel/wifi_boot_failure.md).
+- It covers only the 8782; other DP200 batches may have a different
+  Wi-Fi module.
+- A full rewrite (RTOS, 802.11 MAC, radio calibration) is a large
+  research project; a decompile for understanding is the realistic first
+  step. Nothing from the vendor binary gets published (Marvell firmware).
