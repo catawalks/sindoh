@@ -199,6 +199,12 @@ still require the owner's explicit OK.
       maybe better wording for the second question (owner: fine for now). Wi-Fi: build mwifiex_usb
       as a module, loaded by init.mainline (owner prefers this over the
       re-enumerate, which may be tied to the 11-07 hang).
+      Boot-time Wi-Fi failure, 11-07 tally: warm reboots (busybox reboot
+      -f) 2 of 3 failed (command 0xa9 timed out ~10 s after "WLAN FW is
+      active", then unregister / "Card is removed"); 1 cold boot fine.
+      Root cause wanted, not a workaround (owner): offline driver
+      comparison with the kernel session (docs/kernel/wifi_boot_failure.md),
+      then a reboot-loop measurement here (owner's go-ahead first).
     - **nandboot hard hang (plain image; errata image fixes it so far).** (1) 11-06 ~22:10,
       image 33d2e5d2: userspace, serial echo and Wi-Fi died, eth0 still
       pinged; after the 8782 re-enumerate, during Wi-Fi churn. (2) 11-07

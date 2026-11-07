@@ -247,6 +247,15 @@ replacing the stock root, ~140-150 MB of mtd6 should be free (estimate:
   it, full upstream updates (git/pip/compiler), timelapse, swap, backups.
 - Our kernel detects a card/stick marked for the printer at boot; the
   screen offers to format one; the installer reports what it found.
+- **Decided 2026-11-07 (owner): the card is storage, never the root.**
+  mtd6 is always the root. `/.dp200-root` (a card that IS the system,
+  replacing mtd6) stays for development and recovery only. Expanded
+  storage gets its own marker: the card is mounted for G-code, logs,
+  timelapse, swap, backups (and the full-update tier's git/pip/compiler
+  as a mounted /home/klipper or an overlay). A dead or pulled card then
+  can't stop the boot, and there is one system to update. The
+  initramfs/end_goal_install_plan.md stage 3 wording ("root = a marked
+  card") changes with this.
 **Next:** build it with the mtd0 kernel install (end-goal stage 4).
 
 ## 12. Wi-Fi chip firmware: decompile / clean-room rewrite (low priority, after the release)
