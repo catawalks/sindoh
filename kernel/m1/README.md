@@ -390,10 +390,17 @@ prints one line per block. Check each against that variant's own card.
 for mtd6 from the command line) + USB storage, without the 8782 firmware,
 with `CONFIG_CMDLINE_FORCE` so the stock U-Boot line is ignored
 (docs/kernel/nand_boot_cmdline.md). Its /init (`initramfs/nandboot/init`):
-revert from RAM for a Sindoh or revert stick (confirmed by a touch) or the
-root marker `/.dp200-revert`; otherwise the root is a card/stick partition
-with `/.dp200-root`, else ubi0:filesystem; a broken root offers the
-recovery from mtd5. `tools/test_nandboot_init.sh` runs its decisions
+revert from RAM for the root marker `/.dp200-revert` (written by the
+screen app's back-to-stock popup); otherwise the root is a card/stick
+partition with `/.dp200-root` (then mtd6 is detached and its write window
+closed), else ubi0:filesystem; a broken root offers the recovery from mtd5
+(press and hold 3 s, `tools/dp200-hold.c`). Every message also goes to
+/dev/kmsg ("dp200-init: ..."), so it is in dmesg after the switch.
+mwifiex is built as modules (`CONFIG_MODULES=y`): build.sh packs them as
+`$OUT/m1-nandboot-modules.tar` for the root's /lib/modules, and the root's
+init.mainline loads them once the 8782 firmware is there. Soft lockups
+panic (then `panic=10` reboots); netconsole can be set up through configfs.
+`tools/test_nandboot_init.sh` runs its decisions
 offline with stubs, and checks the image's initramfs list for every tool
 the revert needs. The UBI/NAND tools (ubiformat, flash_erase, nandwrite,
 ubiattach, ...) are static builds of Debian's mtd-utils 2.3.0 source

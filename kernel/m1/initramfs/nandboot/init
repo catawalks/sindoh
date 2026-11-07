@@ -28,10 +28,13 @@ WIN=/sys/module/marvell_nand/parameters/write_window
 STICK=/run/stick
 INIT=/etc/dp200/init.mainline
 
-# messages on the serial console, the panel (fbcon on tty0) and the log
+# messages on the serial console, the panel (fbcon on tty0), the log and
+# the kernel log: /run (with the log) is gone after switch_root, dmesg keeps
+# the lines (2026-11-07: init.mainline's tmpfs on /run hid the copy)
 say() {
 	echo "dp200: $*" | tee -a $LOG > /dev/console
 	[ -c /dev/tty0 ] && echo "$*" > /dev/tty0
+	[ -w /dev/kmsg ] && echo "dp200-init: $*" > /dev/kmsg
 }
 
 shell() {
@@ -155,6 +158,13 @@ if [ -z "$ROOT" ]; then
 	if held 60 3; then revert; fi
 	shell "no root"
 	reboot -f
+fi
+
+# A root on the card or a stick: nothing may touch mtd6 while it runs
+if [ "$ROOT" != ubi0:filesystem ]; then
+	[ -e /dev/ubi0 ] && ubidetach -d 0
+	[ -w $WIN ] && echo none > $WIN
+	say "mtd6: detached, write window closed (root $ROOT)"
 fi
 
 cp $LOG /newroot/run/ 2>/dev/null

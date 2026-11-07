@@ -16,11 +16,12 @@ sed -e "s#/newroot#$T/newroot#g" -e "s#/run#$T/run#g" \
     -e 's#/dev/mmcblk0p\* /dev/sd?1#/dev/mmcblk0p1 /dev/sda1#' \
     -e 's#/dev/sd?1 /dev/sd?;#/dev/sda1 /dev/sda;#' \
     -e "s#/sys/module/marvell_nand/parameters/write_window#$T/win#" \
+    -e "s#/dev/kmsg#$T/kmsg#g" -e 's#\[ -e /dev/ubi0 \]#:#' \
     "$M1/initramfs/nandboot/init" > "$T/init"
 
 run() {	# $1 = scenario name, the rest: variables of the scenario
 	name=$1; shift
-	rm -rf "$T/newroot" "$T/run" "$T/out"; mkdir -p "$T/newroot" "$T/run"
+	rm -rf "$T/newroot" "$T/run" "$T/out" "$T/detached"; : > "$T/kmsg"; mkdir -p "$T/newroot" "$T/run"
 	echo 1741,4091 > "$T/win"
 	(
 	export "$@"
@@ -54,19 +55,24 @@ run() {	# $1 = scenario name, the rest: variables of the scenario
 	mkdir() { command mkdir "$@" 2>/dev/null; return 0; }
 	tee() { cat >> "$T/out"; }
 	ubiattach() { log "ubiattach $*"; }
-	ubidetach() { log "ubidetach $*"; }
+	ubidetach() { log "ubidetach $*"; : > "$T/detached"; }
 	dp200_hold() { [ "${TOUCH:-no}" = yes ]; }
 	rm() { case "$*" in *.dp200-revert) log "MARKER REMOVED" ;; esac; command rm "$@"; }
 	isdev() { case $1 in "${CARD:-none}"|"${STICKDEV:-none}") return 0 ;; esac; return 1; }
 	dp200_revert() { log "REVERT window=$(cat "$T/win")"; return ${REVRC:-0}; }
 	reboot() { log "reboot $*"; exit 0; }
 	setsid() { log "SHELL"; }
-	switch_root() { log "switch_root $* (root $(cat "$T/mounted"))"; exit 0; }
+	switch_root() { [ -e "$T/detached" ] && det=detached || det=attached
+		log "switch_root $* (root $(cat "$T/mounted")) window=$(cat "$T/win") ubi0 $det"; exit 0; }
 	cp() { :; }
 	. "$T/init"
 	) > /dev/null 2>&1
 	got=$(grep -E "MARKER|REVERT|switch_root|SHELL|reboot|STOPPED" "$T/out" | sed "s#$T##g" | tr '\n' ' ')
-	case "$got" in "$want"*) r=ok ;; *) r=FAIL; FAILS=$((FAILS + 1)) ;; esac
+	# every say() line also goes to the kernel log
+	grep -q "^dp200-init: " "$T/kmsg" || got="$got (nothing in kmsg)"
+	case "$got" in "$want"*) r=ok ;; *) r=FAIL ;; esac
+	case "$got" in *"nothing in kmsg"*) r=FAIL ;; esac
+	[ $r = ok ] || FAILS=$((FAILS + 1))
 	printf '%-36s %-4s %s\n' "$name" "$r" "$got"
 }
 
@@ -74,10 +80,12 @@ run() {	# $1 = scenario name, the rest: variables of the scenario
 SD=/dev/mmcblk0p1 STK=/dev/sda1
 FAILS=0
 # want: the start of the outcome line
-want="switch_root /newroot /etc/dp200/init.mainline (root ubi0:filesystem)"
+# mtd6 root: attached, its window stays open; a card root: mtd6 closed
+want="switch_root /newroot /etc/dp200/init.mainline (root ubi0:filesystem) window=1741,4091 ubi0 attached"
 run "mtd6 root" UBIROOT=ok
-want="switch_root /newroot /etc/dp200/init.mainline (root /dev/mmcblk0p1)"
+want="switch_root /newroot /etc/dp200/init.mainline (root /dev/mmcblk0p1) window=none ubi0 detached"
 run "marked card first" UBIROOT=ok CARD="${SD:-x}"
+run "marked card, mtd6 root broken" UBIROOT=broken CARD="${SD:-x}"
 want="REVERT window=none reboot -f"
 run "mtd6 root marker -> revert" UBIROOT=revert
 want="MARKER REMOVED REVERT window=none reboot -f"
