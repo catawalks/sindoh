@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * m1-nandboot-errata-dbg: nandboot plus a ramoops area for pstore
+ * (docs/kernel/nandboot_hang_analysis.md). 1 MB at 0x1e000000, clear of
+ * what the stock U-Boot uses: the image load at 0x400000-0xbc0000, the boot
+ * logo at 0x18000000, env_temp 0x1f000000, malloc 0x1fbbc000 and up, the
+ * TLB at 0x1fff0000. ECC on each zone, so a record damaged by the reset
+ * shows up as such.
+ */
+#include "nandboot.dts"
+
+/ {
+	reserved-memory {
+		ramoops@1e000000 {
+			compatible = "ramoops";
+			reg = <0x1e000000 0x00100000>;
+			record-size = <0x00020000>;	/* 3 dmesg records */
+			console-size = <0x00080000>;
+			pmsg-size = <0x00020000>;
+			ecc-size = <16>;
+		};
+	};
+};
