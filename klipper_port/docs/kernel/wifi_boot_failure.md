@@ -64,8 +64,53 @@ What a failing boot's capture must show, to place it in section 3:
 - **`read_data_sync: failed` and "8782: no boot ROM answer".** A silent
   chip (hypothesis 3).
 
-The 11-07 warm failure was described without these lines. Its capture
-(if saved) answers the question directly.
+### The warm failure, captured (`nandroot1.log`, 2026-11-07)
+
+This was the first boot from the NAND root, after a warm `busybox reboot -f`,
+on the same kernel 5b17e2ec. Warm reboots that day: 2 of 3 failed. The one
+cold boot was fine.
+
+| Time | Line |
+|---|---|
+| 10.696 | `registered new interface driver mwifiex_usb` |
+| 10.780 | **`start to download FW...`** |
+| 11.289 | **`FW download over, size 253996 bytes`** |
+| 11.797 | `WLAN FW is active` (after the 500 ms sleep) |
+| 22.297 | `Timeout cmd id = 0xa9, act = 0x0`, `last_cmd_index = 1`, **`last_cmd_resp_index = 0`, `last_event_index = 0`**, `num_cmd_h2c_failure = 0`, `data_sent=0 cmd_sent=0`, `ps_mode=0` |
+| 22.370 | `_mwifiex_fw_dpc: unregister device`, then `Card is removed: -2` |
+
+**What this settles:**
+- **After the warm reboot the chip was back in the boot ROM.** The
+  boot ROM won the winner check and took the whole image, every block
+  without a CRC error, as on the cold boot. Up to "WLAN FW is active",
+  warm and cold boots log the same lines, with almost the same timing.
+  So **hypothesis 1 (a reused stale firmware) and hypothesis 3 (a silent
+  chip during the download) are ruled out** for this failure.
+- **After the download, the new firmware never says anything.**
+  - FUNC_INIT went out at USB level (no host-to-card failure,
+    `cmd_sent=0`).
+  - In 10.5 s there was no command response, and **no event of any
+    kind**: `last_event_index = 0`, so no INIT_DONE either. The RX URB
+    on EP1 was submitted before the command.
+  - So the downloaded firmware didn't start, or started without a working
+    USB side. It's not a command that came "too early": a firmware that
+    booted late would still have sent INIT_DONE or answered within 10 s.
+- **The difference between warm and cold is the chip's state before the
+  download.** On a cold boot the chip is freshly powered. On a warm
+  reboot it went back to the boot ROM without losing power, after the
+  old firmware ran with the radio on and was never shut down (no
+  FUNC_SHUTDOWN: no `.shutdown`, no rmmod).
+  - How it got back to the boot ROM isn't known: the old firmware
+    resetting itself on the USB suspend or bus reset, or something
+    in the boot path.
+  - Whatever did it leaves state behind (radio, clocks, power
+    management) that a soft restart doesn't clear. A newly downloaded
+    image then fails to start in about 2 of 3 cases.
+
+So **hypothesis 2, recast:** after a warm reboot, the firmware image
+downloads cleanly but often doesn't start. The earlier cold-boot
+failures (uniprocessor m1-net, D2) need their own logs to say whether
+they were the same thing.
 
 ### The reason-7 drop (a separate issue)
 
@@ -202,8 +247,10 @@ three places, and each one leads to exactly that symptom:
 - **The hard-hang errata.** The failures predate them and happen on
   boots that otherwise work.
 
-This is a **hypothesis until the reboot-loop test** separates (1), (2)
-and (3). The log lines below tell them apart.
+**Status after `nandroot1.log`:** (1) and (3) are ruled out for the
+warm failures seen so far: the download happened. (2) holds in its
+recast form: the image downloads cleanly, then the firmware never starts.
+(1) and (3) stay in the fix list, because 0004 still has those gaps.
 
 ## 4. Telling the hypotheses apart: logging, no rebuild needed
 
@@ -234,66 +281,69 @@ card or the USB stick (not NAND, to avoid the writes).
 
 ### The reboot-loop matrix
 
-The main session runs it. N is each test's run count, and each run
-records whether the boot logged `CMD_RESP: 0xa9`.
+The main session runs it. N is each test's run count. For each run, record
+whether `CMD_RESP: 0xa9` came, and whether `event_cause 0x7` came.
 
-| Test | How the previous boot ends | N | If (1) stale firmware | If (2) INIT_DONE race |
-|---|---|---|---|---|
-| T1 | Power cycle (cold) | 10 | All good | Some fail. `DNLD_CMD 0xa9` comes before `event_cause 0x7` |
-| T2 | `reboot -f` with mlan0 associated | 20 | Some fail. "not the winner", maybe stale `event_cause` lines | No change from T1 |
-| T3 | `ip link set mlan0 down; rmmod mwifiex_usb mwifiex; reboot -f` (FUNC_SHUTDOWN sent) | 20 | **All good** | Like T1 |
-| T4 | `reboot -f` with mlan0 down but the modules loaded | 10 | Between T2 and T3: shows whether association/power save matters | — |
+| Test | How the previous boot ends | N | Expected, if the leftover chip state is the cause |
+|---|---|---|---|
+| T1 | Power cycle (cold) | 10 | All good, with `event_cause 0x7` before or around the first command |
+| T2 | `reboot -f` with mlan0 associated | 20 | About 2 of 3 fail as in `nandroot1.log`: a full download, then no event and no response |
+| T3 | `ip link set mlan0 down; rmmod mwifiex_usb mwifiex; reboot -f` (FUNC_SHUTDOWN sent, radio off) | 20 | **All good, or clearly fewer failures** than T2 |
+| T4 | `reboot -f` with mlan0 down but the modules loaded | 10 | Between T2 and T3: shows whether association or power save matters |
+| T5 | **After a failed boot**, without rebooting: `rmmod mwifiex_usb mwifiex; insmod ...` (3 times), then the same with a USB reset of the 8782 in between (`USBDEVFS_RESET`, below) | each failure | Shows whether **a second download recovers** the chip, so whether a driver-level retry is a usable fix |
 
-T3 vs T2 is the decisive pair. Read the hub descriptor (below) once,
-anytime.
+T3 against T2 decides whether a clean shutdown prevents the failure. T5
+decides whether the driver can recover from it.
+
+The USB reset for T5 (read-only apart from the reset itself; device path
+from `cat /sys/bus/usb/devices/2-1.1/busnum devnum`):
+
+```python
+import fcntl
+fd = open("/dev/bus/usb/002/003", "wb", buffering=0)   # 2-1.1, check devnum
+fcntl.ioctl(fd, 0x5514)                                # USBDEVFS_RESET
+```
+
+Read the hub descriptor (in the open questions) once, anytime.
 
 ## 5. Proposed fix (not yet written or built)
 
-In order of value. Items 1 and 2 are patch-0004 follow-ups, small and
-8782-only.
+In order of value. All of it is a 0004 follow-up and 8782-only. Items 1
+and 2 depend on T3 and T5.
 
-1. **Shut the firmware down at reboot.**
+1. **Shut the firmware down at reboot** (if T3 confirms it).
    - Add `.shutdown = mwifiex_usb_shutdown` to `mwifiex_usb_driver`. It
-     does what disconnect does when the device is still attached:
+     does what disconnect does while the device is still attached:
      `mwifiex_deauthenticate_all()`, then FUNC_SHUTDOWN.
-   - `reboot`, `reboot -f` and `poweroff` all run `device_shutdown()`, so
-     the next probe finds a stopped firmware. That's the state the 8797's
-     PID_2 path (`insmod` after `rmmod`) uses every day.
-   - It doesn't cover a panic or watchdog reset; item 3 does.
-   - Until it's built: add
-     `ip link set mlan0 down; rmmod mwifiex_usb mwifiex` to init.mainline's
-     reboot and poweroff traps (`rc.dp200 stop` path). This is the same as
-     T3.
-2. **Wait for INIT_DONE instead of sleeping.** After a real download, read
-   EP1 with `mwifiex_read_data_sync()` for up to 2000 ms. Accept
-   `0xBEEFFACE` with cause 7, as the vendor does, and log anything else.
-   This replaces `msleep(500)`, and it also consumes the event before
-   the RX URBs start.
-3. **Make a reused firmware safe, or don't reuse it.**
-   - When the winner check says "not the winner":
-     1. log the header word (MSG level, not WARN);
-     2. drain EP1/EP2 IN with short reads until they time out, so
-        stale events and data don't pile up;
-     3. send FUNC_SHUTDOWN, then let the normal FUNC_INIT follow.
-   - If FUNC_INIT still times out on a reused firmware, try the
-     SDK-style soft reset once (back to the boot ROM, then a fresh
-     download), as long as the firmware still answers.
-4. **Drop the "assuming the firmware runs" fallback.**
-   - If the chip doesn't answer the probe block, fail the probe with a
-     clear message and `usb_reset_device()`, as the vendor does. Don't
-     claim success.
-   - If the hub turns out to switch port power, a port power-cycle can
-     go here as the last resort.
+   - `reboot`, `reboot -f` and `poweroff` all run `device_shutdown()`,
+     so the radio is off and the firmware stopped before the warm
+     restart.
+   - It doesn't cover a panic or watchdog reset; item 2 does.
+   - Until it's built: put
+     `ip link set mlan0 down; rmmod mwifiex_usb mwifiex` in init.mainline's
+     reboot and poweroff paths (`rc.dp200 stop`). That's T3.
+2. **Wait for INIT_DONE, and retry the download when it doesn't come.**
+   - After a real download, read EP1 with `mwifiex_read_data_sync()` for
+     up to 2000 ms. Accept `0xBEEFFACE` with cause 7, as the vendor
+     does. This replaces `msleep(500)`.
+   - On a miss, fail in 2 s instead of a 10 s command timeout. Then
+     `usb_reset_device()` (the vendor's reset on a failed probe) and
+     download again, at most 2–3 times, logging each attempt.
+   - Only worth it if T5 shows a second download can recover. If it can't,
+     the last resort is the hub's port power (if the hub switches it),
+     otherwise a clear "8782 needs a power cycle" message.
+3. **Make a reused firmware safe** (no failure seen this way yet). When
+   the winner check says "not the winner":
+   1. log the header word at MSG level;
+   2. drain EP1/EP2 IN until the reads time out;
+   3. send FUNC_SHUTDOWN, then the normal FUNC_INIT.
+4. **Drop the "assuming the firmware runs" fallback.** A chip that
+   doesn't answer the probe block fails the probe with a clear message
+   and `usb_reset_device()`, as the vendor does.
 5. **init.mainline:**
-   - Remove the `authorized` 0/1 re-enumerate. With modules,
-     the insmod always comes after the firmware is in place: the
-     stock-NAND copy happens before the insmod.
-   - Keep a short "8782: no mlan0 after 30 s" log line, so a failure
-     is visible.
-
-Items 1 and 2 are the vendor's behaviour (or mainline's own disconnect
-path) moved to the right moment. They aren't workarounds. Item 3 covers
-the resets that bypass shutdown.
+   - Remove the `authorized` 0/1 re-enumerate. With modules, the insmod
+     always comes after the firmware is in place.
+   - Log "8782: no mlan0 after 30 s", so a failure is visible.
 
 ## Open questions (for the printer, read-only)
 
