@@ -55,7 +55,7 @@ disks[:] = ['sdb']
 tick(ui)
 check('Sindoh stick: first question', ui.confirm is not None and 'Sindoh' in ui.confirm[0])
 tap(ui, 'yes')
-check('first YES: second question', ui.confirm is not None and 'REMOVES' in ui.confirm[0])
+check('first YES: second question', ui.confirm is not None and 'returns the printer' in ui.confirm[0])
 check('  nothing written yet', not os.path.exists(S.REVERT_MARK) and not powered)
 tap(ui, 'no')
 check('second NO: nothing written, no reboot', not os.path.exists(S.REVERT_MARK) and not powered)
