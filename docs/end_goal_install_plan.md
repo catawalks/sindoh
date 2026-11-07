@@ -95,6 +95,13 @@ gap, the 4 GB card marked with /.dp200-root):
   mtd6 before mtd0 gets our kernel), but the init could refuse a root
   without init.mainline.
 
+**Night of 2026-11-07 (owner allowed stages 4-5 if everything tested
+out):** not started. The image to go into mtd0 hard-hung during its soak
+(TODO 17), so mtd0 still holds the stock kernel and mtd6 the stock 2020
+root (raw dump nand_images/stage2/mtd6_raw_oob_stock2020_20261107.bin,
+md5 8f7a1abf). The scripts are ready: tools/end_goal_stage4.sh and
+tools/end_goal_stage5.sh (each checks first and stops at the first failure).
+
 **4. Our kernel in mtd0, root still on the SD card.** Write our kernel
 (+ initramfs) into mtd0's kernel area; U-Boot boots it with the stock
 bootargs, the initramfs picks the card. Check: cold boot to Klipper with

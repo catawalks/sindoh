@@ -199,11 +199,17 @@ still require the owner's explicit OK.
       maybe better wording for the second question (owner: fine for now). Wi-Fi: build mwifiex_usb
       as a module, loaded by init.mainline (owner prefers this over the
       re-enumerate, which may be tied to the 11-07 hang).
-    - **nandboot hang (2026-11-07, once):** userspace, serial echo and
-      Wi-Fi stopped, Ethernet still answered ping; power cycle. No kernel
-      message (no lockup detectors/netconsole in the image). Not seen again
-      in ~40 min of watched boots. Add SOFTLOCKUP/HUNG_TASK/WQ_WATCHDOG to
-      the image.
+    - **nandboot hard hang, twice: blocks stage 4.** (1) 11-06 ~22:10,
+      image 33d2e5d2: userspace, serial echo and Wi-Fi died, eth0 still
+      pinged; after the 8782 re-enumerate, during Wi-Fi churn. (2) 11-07
+      00:34, image fcba26da (watchdogs on, Wi-Fi as modules): at 1332 s
+      uptime, ~30 s into a whole-root tar of the card (heavy SD read) with
+      nc streams to the PC; everything died, no ping, no serial, no answer
+      to BREAK+SysRq, and no soft-lockup panic: a whole-SoC lockup (bus
+      stall?). The owner power-cycles in the morning; NAND was untouched
+      (mtd6 detached, window none), so stock boots. Offline analysis + test
+      plan handed to the kernel session (m1-debian under the same tar first;
+      m1-debian was never put under that load on mainline).
     - stage 3 normal path tested 2026-11-07 (end_goal_install_plan.md):
       root from the marked card, mtd-utils run read-only; Wi-Fi fixed in
       init.mainline. Open for the initramfs: keep its log (copy to a
