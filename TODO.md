@@ -239,9 +239,15 @@ still require the owner's explicit OK.
       INIT_DONE after 56 ms every time. The 0013 mwifiex_usb.ko
       (ef7100b4) is installed on the dev printer's NAND root (originals in
       /var/backups/mwifiex-5b17e2ec/). Next: CONFIG_MWIFIEX_USB_8782_START
-      on by default (kernel session), then cold boots with the owner and a
-      long Wi-Fi soak. TXFILLTUNING (stock 0x00100000, ours 0x00020000)
-      noted but not needed for this.
+      on by default (kernel session, 8c9bbd2), then cold boots with the
+      owner and a long Wi-Fi soak. TXFILLTUNING (stock 0x00100000, ours
+      0x00020000) noted but not needed for this.
+      **mtd0 now holds m1-nandboot dc3b5f20** (errata + the Wi-Fi fix as
+      defaults; owner's OK 11-07 afternoon), written from the NAND root
+      with the new tools/mtd0_kernel_update.sh (window 1741,4091;2,63, put
+      back after; readback, U-Boot block and 0xff tail checked), modules
+      948b3350 installed. First boot: NAND root, INIT_DONE after 56 ms,
+      mlan0 10.10.0.21, Klipper ready.
     - **Errata kernel hard hang on the NAND root (11-07 ~11:55):** about
       25-30 min after the first NAND-root boot, idle (Klipper ready, Wi-Fi
       down), no ping, no serial echo, no panic. First thought to be the
