@@ -503,3 +503,152 @@ In order of value. Items 1–3 need a build, offline; item 4 is a script.
 
    I1/I2 against I4 separates the NAND driver from "the root is on NAND".
    If I1 or I2 hangs, the breadcrumbs (item 2) say where.
+
+## Hang 5: dc3b5f20 (errata + 8782 fix), NAND root, ~23 min (2026-11-07)
+
+**What happened** (main session's report; logs `soak3_{dmesg,hb,netcon}.log`):
+- Warm boot ~14:29, right after the mtd0 write, root `ubi0:filesystem`.
+  A soak started at 448 s.
+- The heartbeat (every 5 s) stopped between **1396.7 s** and ~1400 s. The
+  last netconsole line was the soak's ping at 1371.5 s; no kernel
+  line after it.
+- No ping on eth0 or mlan0, no serial, no panic, no `panic=10` reset. Both
+  lockup detectors stayed silent.
+- The load: the soak loop sleeping between minute pings. Its whole-root
+  `tar` reads (262 MB in ~6 s, so mostly page cache) ran 3 times without
+  trouble, the last at 1325–1331 s. Klipper idle, Moonraker, the screen
+  app, wpa_supplicant. Wi-Fi up, with power save off since 746 s.
+- The dmesg is clean up to the hang: no NAND, BCH, UBI or UBIFS warning,
+  no "Timeout on".
+
+**The pattern now:**
+- Plain nandboot hung on the card root under SD load. The errata patches
+  fixed that (~97 min of SD load).
+- The errata kernels have hung **twice on the NAND root**, both at ~23–30
+  min uptime and both near idle.
+- **Hang 4 is no longer alone, and it's not a Wi-Fi effect:** hang 5 had
+  the 8782 fix in and Wi-Fi up.
+
+### What runs periodically on a NAND root
+
+| Mechanism | When | NAND operations |
+|---|---|---|
+| UBIFS write-buffer timer and VFS writeback (`dirty_writeback` 5 s, expire 30 s) | every few seconds while anything writes (Klipper and Moonraker logs, the Moonraker database, the screen app) | page **programs** into the journal |
+| **UBIFS background commit** | when the journal's buds reach `bg_bud_bytes` = 13/16 of `max_bud_bytes` (journal 13 MiB, so ~11 MiB), or on any `sync` (`ubifs_sync_fs()` calls `ubifs_run_commit()`) | index and LPT writes, then **old buds unmapped** |
+| **UBI background thread** (`ubi_bgt0d`) | after each unmap | **erases** of the freed PEBs |
+| UBIFS garbage collection | when free LEBs run low (not the case: 107 MB used of 273) | reads, programs, erases |
+| UBI wear levelling | erase-counter spread above the threshold (4096; max/mean 129/15 now) | — not now |
+| UBI scrubbing | after a corrected bitflip read | reads, programs, erase |
+| Patch 0010 | **no timers or periodic work**. Every wait is bounded (`POLL_TIMEOUT`, 200 ms for a program), with IRQs on | — |
+
+**The lead: the first background commit and the erase burst after it.**
+- The idle system writes a steady trickle. A background commit comes when
+  ~11 MiB of journal has been written since the last one. At a few KB/s
+  that's tens of minutes after boot, and it's the first time since boot
+  that UBI *erases* blocks.
+- On the card root (E, E2: 97 min, no hang) mtd6 is detached: no
+  programs, no commits, no erases, ever.
+- The large writes that worked on mainline (the stage 5 unpack, the 16 MB
+  UBI test) ran as single bursts on an otherwise quiet system. They never
+  had erases interleaved with the PIO reads that a running root does all
+  the time.
+- **Not ruled out:** the PTE-cleaning gap from hang 4 (a stale table walk
+  can freeze the bus just as silently). The NAND trace tells the two apart:
+  a hang inside a NAND step against a clean trace.
+
+**Clock wraps don't fit:**
+- jiffies wraps 5 min after boot (`INITIAL_JIFFIES`);
+- `sched_clock` (32 bit at 1 MHz) wraps at 2147 s;
+- the timer-2 clocksource wraps at 4295 s;
+- the two hangs came at ~1400 s and ~1500–1800 s.
+
+### Can a NAND access freeze the whole SoC without a lockup report?
+
+- **A CPU spinning is ruled out.** Our NAND waits spin with IRQs on, and
+  are bounded in time. A CPU stuck with IRQs off would be reported by the
+  other CPU (buddy hard-lockup detector), and the other CPU's
+  netconsole/serial would still work.
+- **A bus stall fits completely.**
+  - If a load or store to the NAND controller (NDSR, NDCB0, or the NDDB
+    FIFO) never completes, that CPU stops mid-instruction.
+  - The next access by the other CPU to the same peripheral bus stalls
+    too: the UART, the timers, the GMAC, the SD controller.
+  - Then nothing can report anything: no timer interrupt, no console, no
+    network.
+- Where it could happen:
+  - The PIO paths (mainline's and 0010's) move a whole page through NDDB
+    after a single RDDREQ/WRDREQ.
+  - Error and early-UNCERR paths abandon a transfer midway.
+  - `bch_v1_stop` drops ND_RUN between commands.
+  - An erase finishing while a read's PIO is in progress can't happen (the
+    NAND core serialises), but the controller's own state after an erase
+    hasn't been exercised in mixed use.
+- Whether the NFC stalls an NDDB access on an empty or full FIFO, instead
+  of returning junk, is unknown. The trace below answers that.
+
+### The debug build: m1-nandboot-nanddbg
+
+`VARIANT=nandboot HANGTEST=nanddbg` (`variants/nandboot-nanddbg.config`,
+`.dts`). It's the current nandboot (errata, 8782 fix) plus:
+1. **The timer-0 hang watchdog, armed** (`timer_mv61x0.hang_wdt=30`): a
+   bus stall resets the board within ~30 s instead of hanging until a
+   power cut.
+2. **pstore/ramoops**, 1 MB at 0x1e000000: the console log of the hung boot,
+   in `/sys/fs/pstore/` after the reset.
+3. **The NAND step trace (patch 0015)**, `marvell_nand.trace_phys=0x1e100000`,
+   4 KB no-map.
+   - The last 126 NAND controller steps go into the ring: each command
+     (NDCB0–2), PIO in and out (start and end, with the length), each
+     R/B wait and NDSR poll (start, end, result), the ISR (NDSR),
+     bch_v1's RDDREQ poll (page, NDSR) and `bch_v1_stop`.
+   - Each step has a µs timestamp, the CPU, and IRQs-off/interrupt flags.
+   - The writes go through an uncached mapping, so they reach RAM before
+     any following access.
+   - At the next probe, **the driver prints the previous boot's ring to
+     dmesg** ("trace #N ... cpuX step values"), then starts a new one.
+   - A hang inside a NAND step shows as a ring that ends on a "start"
+     with no "end" (e.g. `pio-in` without `pio-in-end`), on the hung CPU.
+   - Patch 0015 is in every build, but it does nothing unless
+     `trace_phys` is set.
+
+**Built 2026-11-07, not booted:**
+- `m1-nandboot-nanddbg.uimg` md5 `0685c98505a0cd1275a88a608b9a3844`
+  (2,822,976 bytes);
+- modules tar `7dbf295c2fdfb49b93379a2e45b7cba9`. Use these modules with
+  this image, not mtd0's.
+- The config differs from the mtd0 image's (dc3b5f20) only in the command
+  line, PSTORE (+ Reed-Solomon for its ECC) and the initramfs path. The
+  DTB carries both reserved areas.
+- dc3b5f20 itself is unchanged. Patch 0015 joins later nandboot
+  builds, inactive without `trace_phys`.
+
+**It only helps if this same image boots after the reset.** The default
+mtd0 kernel doesn't reserve these areas and doesn't print the ring.
+- **Option A:** write nanddbg to mtd0 for the hunt, and the normal
+  image back afterwards. That's a stage-4-type NAND write: owner's OK.
+- **Option B:** after each reset, stop U-Boot on serial and RAM-boot
+  nanddbg, as the rescue path does. That only works if someone is at the
+  serial port before autoboot, and the mtd0 kernel must not boot in
+  between, since it would reuse that RAM.
+
+Before relying on it (owner present, after the errata-dbg check order):
+1. the boot log shows the watchdog armed, ramoops, and
+   `trace: NAND steps to 0x1e100000 (boot 1)`;
+2. `echo 1 > /sys/module/timer_mv61x0/parameters/hang_wdt_nokick`: a reset
+   within ~30 s;
+3. after it, `dmesg | grep "trace #"` shows the steps of the boot before,
+   and `/sys/fs/pstore/console-ramoops-0` exists.
+
+**For the next NAND-root run:**
+- **Speed up the suspect:** a loop on the NAND root that writes ~1 MB
+  files, `sync`s (each sync forces a UBIFS commit) and deletes them
+  (frees LEBs, so UBI erases). If the hang is in the commit/erase path, it
+  should come in minutes instead of ~25 min.
+- **Extend the heartbeat** with
+  `/sys/module/marvell_nand/parameters/stats` and the UBI erase counters
+  (`/sys/class/ubi/ubi0/max_ec`, `mean_ec`), so the last line shows
+  whether erases were happening.
+- **The control, card root + mtd6 rw:** the same write/sync/delete loop
+  into UBIFS on mtd6 mounted from the card root (I1 in the hang-4
+  section). If that hangs too, it's the NAND write/erase path, not "root
+  on NAND".
