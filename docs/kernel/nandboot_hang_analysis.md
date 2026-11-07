@@ -251,6 +251,7 @@ streams on eth0, mlan0 up and Klipper idle.
 | B | m1-debian-nandw f370f49e (Nov 1 tree, NANDW DT) | 3 passes, no hang (870 s) |
 | E | m1-nandboot-errata 5b17e2ec (e1ee7e8) | 3 passes, no hang (874 s) |
 | N | m1-nandboot fcba26da (plain, again) | **hang 3** in pass 3: 668 s uptime, ~570 s into the load; no ping, no serial, no SysRq |
+| E2 (day, 11-07) | m1-nandboot-errata 5b17e2ec, its own modules | 20 passes, no hang (4943 s of load, 5054 s uptime); no oops, warning or SD error in dmesg |
 
 **Plain nandboot** hung in both runs under this load: ~30 s in (hang 2)
 and ~570 s in (hang 3). The errata image (0 of 1) and the Nov 1 images
@@ -258,6 +259,15 @@ and ~570 s in (hang 3). The errata image (0 of 1) and the Nov 1 images
 rule out a rarer hang. The next runs need to be longer, and should reset
 by themselves (a timer-0 watchdog in a debug image, owner's OK) so that
 one hang doesn't end a night.
+
+E2, the long run (2026-11-07 day): the errata image went through 20 passes
+(65 GB read, ~82 min of load), more than 8 times the load at which plain
+nandboot hung the second time. Together with E, the errata image has ~97
+min of this load without a hang; plain nandboot has hung in 2 of 2 runs
+inside ~10 min. That points strongly at the missing PJ4B errata
+workarounds, which the vendor kernel also carries. Stage 4 should use the
+errata image (or plain nandboot with e1ee7e8's patches as the default),
+after the owner's OK.
 
 ## What differs between the Nov 1 images and plain nandboot (offline, 2026-11-07)
 

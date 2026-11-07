@@ -218,9 +218,13 @@ still require the owner's explicit OK.
       done, **hung in pass 3** (668 s uptime, ~570 s into the load; no
       ping, serial or SysRq). So plain nandboot hung in 2 of 2 load runs
       (~30 s and ~570 s), the errata image 0 of 1, m1-debian 0 of 2 (each
-      ~13 min of load). Suggestive for the errata image, not proof. Next:
-      longer runs (1 h+) of the errata image and m1-debian, ideally with
-      a hardware watchdog in a debug image so a hang resets by itself;
+      ~13 min of load). Day run E2 (11-07): the errata image, 20 passes
+      (~82 min of load, 65 GB), no hang and a clean dmesg. So the errata
+      image has ~97 min of this load without a hang, plain nandboot hung
+      within ~10 min both times: the missing PJ4B errata workarounds are
+      the likely cause. Next: make the errata patches the nandboot
+      default and use that image for stage 4 (owner's OK); the debug
+      image (hardware watchdog) is then only needed if it ever hangs;
       docs/kernel/nandboot_hang_analysis.md.
     - stage 3 normal path tested 2026-11-07 (end_goal_install_plan.md):
       root from the marked card, mtd-utils run read-only; Wi-Fi fixed in
