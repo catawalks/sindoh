@@ -365,7 +365,7 @@ mtd5 + mtd4 + a Sindoh stick bring back 2020 stock with the printer's own
 identity, no files from us. The interim /klipper hook went with the old
 root, so the dev printer now runs Klipper only from our SD kernel.
 
-## The Sindoh update damages the stick's FAT (found 2026-11-07)
+## The Sindoh update stick's FAT was damaged (found 2026-11-07)
 
 After stage 2's RODIN_200730_2 update the stick's `_update_rodin` folder was
 gone (the stage-3 initramfs, mounting it read-only, saw every other folder
@@ -383,12 +383,19 @@ and what the update wrote onto the stick:
   copies of the kernel image (md5 945ecc0c = pa6170_rodin_nand.bin), a
   logo-sized file.
 
-So the stock update writes to the stick and then reboots without a clean
-unmount: auto_update.sh's `umount` comes only after update.sh returns. The
-directory updates that were still cached were lost. This is Sindoh's
-behaviour, so the user revert path inherits it: **tell users their Sindoh
-stick may need a Windows disk check (or a fresh copy of the update) after
-an update.** Our initramfs only ever mounts sticks read-only.
+**Cause not established.** After the update the owner moved the stick to the
+PC twice: renamed the folder to `_update_rodin_200730_2` (storage name),
+later back to `_update_rodin`, removing it from the PC each time. Neither
+name was on the stick when the printer read it. Candidates: the update
+reboots before auto_update.sh's `umount` (which comes only after update.sh
+returns) with directory writes still cached; or a Windows rename not
+flushed before removal; or something else. Certain: the update writes to
+the stick (the pieces above), and those files and the folder's data ended
+up as orphaned chains. Our initramfs only ever mounts sticks read-only.
+**For users:** a Windows disk check of the Sindoh stick after an update
+does no harm; worth testing whether an update alone leaves the stick
+dirty (eject it from the printer's side is not possible; check it on the
+PC right after the update, before any rename).
 
 Also seen in the recovered scripts: unmistakable_boot_arg_set's test
 `if [ $cmd='' ]` is always true, so every 2020 update rewrites
