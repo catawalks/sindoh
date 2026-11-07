@@ -35,6 +35,7 @@ blocks 2-63, write back the stock kernel from pa6170_rodin_nand.bin.
 Check: corrected read = file, raw + OOB = the 3a baseline, then a normal
 stock boot from NAND. Proves the mtd0 write path. Fallback: U-Boot is
 untouched; SD raw boot over serial, write again.
+**Done 2026-11-07** (results: kernel/revert_to_stock_plan.md, "3c / stage 1").
 
 **2. mtd6 full revert (3d).** Backup first: raw nanddump of mtd6 (308 MB)
 and a tar of /app/nvram, the Wi-Fi config and G-codes, to the PC. Then the
