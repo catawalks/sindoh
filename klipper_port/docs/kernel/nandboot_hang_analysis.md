@@ -682,3 +682,44 @@ Before relying on it (owner present, after the errata-dbg check order):
   into UBIFS on mtd6 mounted from the card root (I1 in the hang-4
   section). If that hangs too, it's the NAND write/erase path, not "root
   on NAND".
+
+### Reading the hang logger (`tools/hang_logger.sh`, 2026-11-07)
+
+**marvell-nfc IRQs (4 in ~8 min) are an erase counter.**
+- On this controller patch 0010's reads (the RDDREQ/CMDD loops) and
+  programs (`bch_v1_wait_prog`) poll NDSR.
+- Only the generic `exec_op` R/B waits (`marvell_nfc_wait_op()`) enable
+  the RDY interrupt. Those are block erases, resets and status waits.
+- So the per-second NFC IRQ delta in the logger counts erases. If the
+  commit/erase lead is right, the last lines before a hang show it
+  stepping, together with UBI's `max_ec`.
+
+**The function-call IPIs on CPU1 (~150/s) are not cache maintenance.**
+- On ARMv7 SMP, mainline never uses IPIs for cache maintenance:
+  `cache_ops_need_broadcast()` is compiled to 0 for `__LINUX_ARM_ARCH__ >= 7`.
+  The by-MVA and LoUIS operations rely on the hardware's broadcast. That's
+  where the PJ4B wrappers (patch 0011) sit, and they're local code, not IPIs.
+- Two things on ARM *do* send "Function call interrupts":
+  1. **Remote wakeups.** The scheduler queues a wakeup on the target CPU
+     with `__smp_call_single_queue()`, which ARM delivers as `IPI_CALL_FUNC`.
+     All device IRQs (and so the softirqs that wake tasks) run on CPU0, so
+     CPU0 wakes tasks that sleep on CPU1 all the time. That fits CPU1
+     receiving ~3× more.
+  2. **TLB maintenance by IPI**, if `tlb_ops_need_broadcast()` is true.
+     That happens when ID_MMFR3 bits [15:12] (maintenance broadcast) are
+     below 2 on this PJ4B, and nobody has read that field yet. Then every
+     `flush_tlb_mm/page/range` goes through `on_each_cpu_mask()`.
+     Fork/exec/exit and munmap are the big sources, and **the logger itself
+     forks several `cat`/`awk` per second.**
+- **To tell them apart:** compare the IPI rate with the logger paused for a
+  minute (only a `sleep`), and with it running. A big drop means fork/exit
+  traffic, so most likely TLB IPIs. Reading MMFR3 needs kernel code (an
+  `mrc p15, 0, rX, c0, c1, 7`): a one-line `pr_info` at boot in a later
+  debug build.
+- **Relevance to the hangs:** these IPIs go through the generic csd lock
+  and `smp_call_function` code, which uses atomics and spinlocks. Patch
+  0012 covers those. If TLB flushes go by IPI, a lost TLB flush can't
+  happen silently: the IPI path waits for the other CPU. A *stuck* IPI
+  (the other CPU frozen on the bus) would hang the sender in
+  `csd_lock_wait()` with interrupts on. That's one more way both CPUs end
+  up stopped once one stalls.
