@@ -297,6 +297,17 @@ still require the owner's explicit OK.
       interrupts counting, Klipper ready. 4-hour read soak running
       (tools/nand_read_soak.sh: drop_caches + full root read every 2 min),
       with nanddbg in mtd0 as the watchdog fallback.
+      **Result: nandirq froze too (~490 s), outside any NAND step.** The
+      ring ends on a complete read at the end of pass 1 (isr ~155 us after
+      cmd, every step balanced), NAND idle for ~1 min before the freeze
+      (heartbeat to 490.75 s, read stats unchanged). Like hang 6 (no NAND
+      reads for 820 s first). So the freezes aren't the read poll; hang 7's
+      ring ending in rdd was probably the read in flight during the boot
+      read storm. What separates hangs from no hangs: NAND root (UBI
+      attached, UBIFS mounted, mtd6 window open) vs card root (detached,
+      window none). Next tests proposed to the kernel session: NAND root
+      with the window none; card root with UBIFS on mtd6 mounted rw idle;
+      a trace of all controller accesses incl. program/erase.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
