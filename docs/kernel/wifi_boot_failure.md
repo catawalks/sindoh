@@ -435,6 +435,106 @@ like any hardware write. Stock does the same write in `mv61xx_ehci_run`,
 on every host controller at start. If it helps, it belongs in the DT or
 the EHCI glue, not in a script.
 
+## W1: INIT_DONE arrives, the first command still dies (2026-11-07)
+
+Patch 0013's modules (`mwifiex_usb.ko` ef7100b4), default parameters, NAND
+root, warm `busybox reboot -f`: **3 of 3 failed**. Every run showed:
+- `FW download over, size 253996 bytes`;
+- **`8782: INIT_DONE after 56 ms`** (56 ms all three times);
+- `WLAN FW is active`;
+- the 0xa9 timeout, then "Card is removed".
+
+The T3 runs before it (unpatched modules) failed 7 of 7 warm.
+
+- **Candidate A (the unread EP1 IN) is answered: no.** Read the stock
+  way, the firmware starts and reports INIT_DONE at once, on the same
+  boots that then fail.
+- So the firmware is alive. The loss is on the first-command path: the
+  0xa9 OUT doesn't reach the firmware's command handler, or its response
+  on EP1 IN doesn't reach the driver.
+- (The first command is 0xa9 = **FUNC_INIT**. GET_HW_SPEC, 0x03, comes
+  second.)
+- W2 (the sleep back) wasn't run, and isn't needed: the first-command
+  loss happens with the INIT_DONE read too.
+
+**What mlan does between INIT_DONE and its first command** (vendor
+binaries):
+1. `woal_init_fw_dpc` → (cal-data `request_firmware`, unused here) →
+   `woal_usb_rx_init`:
+   - the RX command URB on EP1, plus `woal_usb_submit_rx_data_urbs` on
+     EP2, both before init, as mainline does;
+   - then `woal_usb_tx_init`, `mlan_set_init_param`, `mlan_init_fw`.
+2. `wlan_adapter_init_cmd`: **FUNC_INIT (0xa9) first**, then 0x8f (cal
+   data, only if configured), GET_HW_SPEC (0x03), 0xd9, ... That's
+   mainline's order too.
+3. No delay, no command or ACK in reply to INIT_DONE, no extra request.
+4. Commands go out through `woal_write_data_async`: a **bulk** pipe on
+   EP1 (`PIPE_BULK | ep << 15 | devnum << 8`), **`URB_ZERO_PACKET`**, the
+   command length as is. That's mainline's `mwifiex_usb_construct_send_urb`
+   exactly.
+
+**So the driver sequences now match.** INIT_DONE is read the stock way, the
+same first command goes out the same way, and the same RX URBs are
+pending. Stock works 11/11 and ours fails ~100% warm. What still differs:
+- the **USB host side**: 6.18's generic EHCI with our PHY driver (patch
+  0003) against the vendor's `ehci_mv61xx` with
+  `TXFILLTUNING = 0x00100000`;
+- **USB data toggles after the firmware takes over its endpoints.** If
+  the firmware re-initialises EP1 after sending INIT_DONE (back to
+  DATA0), the host's next OUT on EP1 can be taken as a duplicate: the
+  device ACKs and drops it, which looks exactly like `cmd_sent=0` with
+  no answer. Or the response IN can be dropped the same way by the host.
+  Stock would hit this too unless its timing differs, so it's a
+  candidate to test, not a conclusion.
+
+### Patch 0014: where the first command dies (trace modules)
+
+`kernel/m1/patches/0014-mwifiex-usb-8782-first-command-trace.patch`, on
+top of 0013, under the same `CONFIG_MWIFIEX_USB_8782_START`.
+`HANGTEST=wifitrace` builds it (`variants/nandboot-wifitrace.config`).
+The wifidbg tar that W1 used stays as it was.
+- **Built 2026-11-07:** `m1-nandboot-wifitrace-modules.tar`, md5
+  `02595f17bffdaf215dda96314ff3d113`. It holds `mwifiex_usb.ko` md5
+  `8f941909e18ecd10ec8a004eb9894ace`, and `mwifiex.ko` `4c2a8c4e…`, the same
+  as wifidbg's.
+- vermagic as 5b17e2ec's, and the config is otherwise the errata one.
+  Not loaded on the printer yet.
+
+Logged with no `debug_mask` needed (`dev_info`, prefix `8782 trace:`), for
+the first `usb8782_trace` (default 24) EP1 transfers after the download:
+- every **EP1 IN submit**: bulk or int, size, pending RX command and data
+  URBs;
+- every **EP1 IN completion**: status, length, and the first 16 bytes
+  (`0c000000 ...` style; a response starts `ce fa 0d f0`);
+- every **EP1 OUT submit** (the command): bulk or int, length, first 16
+  bytes, pending IN URBs at that moment;
+- every **EP1 OUT completion**: status and `actual_length` against the
+  length;
+- **3 s after the first command**, the state: RX command URB status
+  (-115 = still queued), actual length, pending counts, TX command URB
+  status, `cmd_sent`, `cmd_resp_received`.
+
+Two experiments, off by default:
+- **`mwifiex_usb.usb8782_clear_halt=1`:** after INIT_DONE, before the
+  first command, CLEAR_FEATURE(ENDPOINT_HALT) on EP1 IN/OUT and EP2
+  IN/OUT. That resets the data toggle on both sides; each result is
+  logged.
+- **`mwifiex_usb.usb8782_cmd_delay_ms=N`:** a pause after INIT_DONE before
+  the first command (try 200 or 1000).
+
+The trace needs `usb8782_ready_ms` left at its default (it's armed by
+the INIT_DONE read).
+
+**How to read a failing run:**
+
+| Seen | Means |
+|---|---|
+| OUT done status 0, length 12 of 12, then no IN done until the 3 s dump shows the IN URB at -115 | The chip took the command at USB level and never answered: a toggle-dropped OUT, or a firmware-side wait. Try `clear_halt=1` next |
+| OUT done with an error (-71, -32, -110 ...) | The OUT failed on the bus: USB host/PHY side (TXFILLTUNING, PHY) |
+| OUT never completes (dump shows OUT -115) | The chip NAKs the command endpoint, as in T5 step 2 |
+| An IN done that's not a response (an event) or has a bad length | The response path, and the bytes say what came |
+| `clear_halt=1` makes the boot work | Data-toggle desync after the firmware takes over. The fix is the clear-halt step, 8782-only, after INIT_DONE |
+
 ## 1. How the vendor driver handles the 8782 compared with mainline
 
 From the vendor binaries:
