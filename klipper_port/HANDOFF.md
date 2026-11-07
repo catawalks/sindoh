@@ -19,6 +19,10 @@ their decisions were changed later. The live documents:
   **docs/hardware_notes.md** (measured facts).
 
 Decisions in force:
+- **Boot any kernel before writing it to NAND** (owner, 2026-11-07): RAM
+  boot from the 4GB-SD gap (tools/sd_raw_install.sh + sd_raw_boot.sh) to
+  userspace first, then tools/mtd0_kernel_update.sh. (The nanddbg image
+  went to mtd0 untested that day and didn't boot; recovered via the card.)
 - **End goal:** our mainline kernel in mtd0 (U-Boot block untouched), our
   root in mtd6, mtd5 (factory recovery set) and mtd4 (Sindoh's karas.db
   backup) never written, no U-Boot env change. Mainline 6.18 already runs
