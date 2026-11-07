@@ -287,6 +287,16 @@ still require the owner's explicit OK.
       (what the vendor driver does between stop and the next command).
       mtd0 holds nanddbg for the hunt (owner's OK); dc3b5f20 goes back
       after. nanddbg has no pstore fs (console ramoops not readable).
+      Polling vs interrupt: nanddbg (polling) in mtd0 reached trace boot 10
+      on its own (I caused boots 3 and 11 only): ~6 unobserved watchdog
+      resets in ~40-60 min idle on the NAND root, most likely freezes.
+      **Fix candidate: patch 0016** (kernel session, 709334c): reads sleep on
+      the controller's read-data/uncorrectable interrupts like the vendor
+      driver (it reads NDSR 4-6 times per page; we polled ~150 times).
+      nandirq 1f33eb43 RAM-booted from the 4GB-SD gap: rdd_irq Y,
+      interrupts counting, Klipper ready. 4-hour read soak running
+      (tools/nand_read_soak.sh: drop_caches + full root read every 2 min),
+      with nanddbg in mtd0 as the watchdog fallback.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
