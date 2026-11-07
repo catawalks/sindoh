@@ -256,6 +256,14 @@ still require the owner's explicit OK.
       0010's NAND path under UBIFS (PIO, busy-poll) or a periodic UBI/UBIFS
       job. Kernel session analysing; no more NAND-root runs until it has a
       proposal (watchdog + last-NAND-command record). Release blocker.
+      The nanddbg debug image (0685c985, watchdog + ramoops + NAND step
+      trace, owner's OK) went to mtd0 and **didn't boot**: it stops right
+      after "Uncompressing Linux... done" (no console line; the moved DTB
+      at 0xAE2748 lies inside the decompressor's target 0x833500-0xAE48A0).
+      Recovered: 4GB-SD swapped in, errata 5b17e2ec RAM-booted from its
+      gap, dc3b5f20 + modules 948b3350 put back with mtd0_kernel_update.sh;
+      boots from mtd0 again (NAND root, Wi-Fi). Owner's rule since: RAM-boot
+      every kernel before it goes to NAND. Kernel session fixing nanddbg.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
