@@ -435,27 +435,31 @@ like any hardware write. Stock does the same write in `mv61xx_ehci_run`,
 on every host controller at start. If it helps, it belongs in the DT or
 the EHCI glue, not in a script.
 
-## W1: INIT_DONE arrives, the first command still dies (2026-11-07)
+## W1: patch 0013 works so far (2026-11-07, corrected)
 
-Patch 0013's modules (`mwifiex_usb.ko` ef7100b4), default parameters, NAND
-root, warm `busybox reboot -f`: **3 of 3 failed**. Every run showed:
-- `FW download over, size 253996 bytes`;
-- **`8782: INIT_DONE after 56 ms`** (56 ms all three times);
-- `WLAN FW is active`;
-- the 0xa9 timeout, then "Card is removed".
+**Correction:** the first report of W1 ("3 of 3 failed") and the T3 tally
+("7 of 7") were grading errors. The loop's serial echo of its own check
+command contained "Card is removed", and that was counted as a failure.
+Re-graded on the kernel's own `[ time ]` lines only (FAIL = a real timeout
+or "Card is removed" line, OK = mlan0 present):
 
-The T3 runs before it (unpatched modules) failed 7 of 7 warm.
+| Run | Boots | Result |
+|---|---|---|
+| T3, unpatched, warm after a clean shutdown (r1–r5) | 5 | FAIL, FAIL, OK, FAIL, OK: **3 of 5 failed** (r0 after messy reboots, and the stock-to-ours boot, failed too) |
+| W1, patch 0013, default parameters | 3 | **3 of 3 OK**: `8782: INIT_DONE after 56 ms` each time, then mlan0 |
+| Patch 0014 trace modules | 2 | **2 of 2 OK**: FUNC_INIT (0xa9) answered within ~125 ms, then GET_HW_SPEC and the rest |
 
-- **Candidate A (the unread EP1 IN) is answered: no.** Read the stock
-  way, the firmware starts and reports INIT_DONE at once, on the same
-  boots that then fail.
-- So the firmware is alive. The loss is on the first-command path: the
-  0xa9 OUT doesn't reach the firmware's command handler, or its response
-  on EP1 IN doesn't reach the driver.
-- (The first command is 0xa9 = **FUNC_INIT**. GET_HW_SPEC, 0x03, comes
-  second.)
-- W2 (the sleep back) wasn't run, and isn't needed: the first-command
-  loss happens with the INIT_DONE read too.
+- **0013's start sequence: 5 of 5 OK so far, against about 50% failures
+  unpatched.** The stock sequence (no winner probe, an EP1 read for
+  INIT_DONE right after the download, no 500 ms sleep) looks like the
+  fix.
+- **The sample is small.** The main session is running ~15–20 patched
+  boots and a matched unpatched baseline before any further change.
+- The trace shows a normal exchange on good boots; no failing trace has
+  been caught yet.
+- Which of 0013's changes matters, the missing winner probe or the
+  immediate EP1 read, isn't separated yet. W3 (`usb8782_winner=1`) or W2
+  (`usb8782_ready_ms=0`) would tell, once the baseline is in.
 
 **What mlan does between INIT_DONE and its first command** (vendor
 binaries):
@@ -473,9 +477,10 @@ binaries):
    command length as is. That's mainline's `mwifiex_usb_construct_send_urb`
    exactly.
 
-**So the driver sequences now match.** INIT_DONE is read the stock way, the
-same first command goes out the same way, and the same RX URBs are
-pending. Stock works 11/11 and ours fails ~100% warm. What still differs:
+**So with 0013 the driver sequences match.** INIT_DONE is read the stock
+way, the same first command goes out the same way, and the same RX URBs
+are pending. If a failure still turns up with 0013, these are what still
+differ:
 - the **USB host side**: 6.18's generic EHCI with our PHY driver (patch
   0003) against the vendor's `ehci_mv61xx` with
   `TXFILLTUNING = 0x00100000`;
