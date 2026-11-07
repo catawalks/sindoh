@@ -319,3 +319,48 @@ nand_raw_oob_mtd0_before_stage1.bin, nand_raw_oob_mtd0_after_stage1.bin.
 **Note:** a rewrite refreshes the kernel area. The bit errors that build
 up between writes are within ECC, but the installer should rewrite mtd0 only
 when the kernel changes (as planned) and verify after.
+
+## 3d / stage 2: mtd6 full revert (2026-11-07, owner at the printer)
+
+**Backups, before anything was written** (on the PC in
+`D:\DP200\backup\nand_images\stage2\`, never published: the tar has the
+owner's Wi-Fi passwords):
+- `stock_settings_20261107.tgz` (43984 B, md5 c7a4ab6f), taken on the
+  running stock root: /app/nvram (karas.db, NET/WIF files), settings.xml,
+  /etc/wpa_supplicant.conf, /etc/profile + profile.stock, our
+  /etc/dp200-boot.sh hook, crontabs, /app/errorlog.
+- `mtd6_raw_oob_20261107.bin`, from our kernel with mtd6 unused
+  (`nanddump -n -o`): 317644800 B = 2350 blocks x 64 x 2112, md5 8aa9a8a8
+  on the printer and on the PC. nanddump skipped the 5 bad blocks (the
+  default with -o), so it restores with `nandwrite -n -o`, which skips them
+  the same way.
+- **Transfer note:** the first nc copy stalled after 1.6 MB: the route to the
+  PC went out over mlan0 (both interfaces on 10.10.0.0/24, Wi-Fi dropping).
+  `ip route add 10.10.0.85/32 dev eth0` fixed it.
+
+**Revert:** `dp200-revert.sh --part root` on m1-debian-nandw from the SD
+card: checks, window 1741,4091, `ubiformat -O 2048` (erase counters kept;
+max EC 128, mean 13), `ubimkvol -N filesystem -m` (2271 LEBs, 275 MiB),
+`ubiupdatevol` nandrootfs.ubifs, mount, untar update.tar.bz2, umount,
+window none. About 21 minutes. No ECC failures; the kernel log has only the
+read-only mtd5 mount and the UBIFS threads.
+
+**First stock boot** (`busybox reboot -f`, no serial interaction):
+- 3.2 kernel, UBIFS root on mtd6, the stock app (UIManager) and the FM/IO
+  firmware up;
+- karas.db missing at first ("unable to open database" x6 in the boot
+  log), then rebuilt by stock from /backup/karas_backup.db (mtd4):
+  INST_MACHINE 3DP200Q / serial 111770100050, CONF_MACHINE_OFFSET equal to
+  the backup; only INST_MACHINECOUNT moved on (one boot);
+- the console repeats "FULL Heater 0 is Enabled as 1000" from the stock app
+  (not looked into).
+
+**Then the owner ran the Sindoh USB update** (RODIN_200730_2): /app/update.log
+ends "RODIN_200730_2 / USB update ended"; after the reboot karas.db still
+has the model and serial; mtd0 = the 10-26 dump (298b7390), so the update
+didn't touch the kernel; root 210 MB used, 42 MB free.
+
+**Result:** the user's revert path works end to end on the dev printer:
+mtd5 + mtd4 + a Sindoh stick bring back 2020 stock with the printer's own
+identity, no files from us. The interim /klipper hook went with the old
+root, so the dev printer now runs Klipper only from our SD kernel.

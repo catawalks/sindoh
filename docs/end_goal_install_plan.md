@@ -43,6 +43,7 @@ mtd6 half of dp200-revert.sh from our kernel (root on SD). Check: stock
 boots to the touchscreen app; karas.db restored from mtd4 (model, serial);
 then the Sindoh 2020 USB update. Proves the revert half. Fallback: write
 the nanddump back.
+**Done 2026-11-07** (results: kernel/revert_to_stock_plan.md, "3d / stage 2").
 
 **3. Initramfs for our kernel** (busybox + mtd-utils, ~2 MB), tested from
 the SD fast path before anything uses it from NAND:

@@ -89,8 +89,11 @@ still require the owner's explicit OK.
 11e. **End-goal install sequence** (docs/end_goal_install_plan.md):
     stages 1-9 approved by the owner 11-03; owner at the printer for each
     write stage. **Stage 1 done 2026-11-07** (mtd0 kernel area rewritten
-    from our kernel, raw = baseline, stock boot OK). Next: stage 2 (mtd6
-    backup + full revert).
+    from our kernel, raw = baseline, stock boot OK). **Stage 2 done
+    2026-11-07** (mtd6 revert from mtd5, karas.db back from mtd4, then the
+    2020 Sindoh update). The dev printer is plain stock 2020 now: the
+    interim /klipper hook is gone, so Klipper runs only from our SD kernel.
+    Next: stage 3 (the nandboot initramfs from the SD card).
 11d. **End-goal revert = a Sindoh update stick** (owner, 11-03;
     kernel/revert_to_stock_plan.md): our system recognizes a Sindoh DP200
     update stick, asks, restores stock from mtd5 (mtd0 kernel part, mtd6
