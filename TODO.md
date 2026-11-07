@@ -217,7 +217,18 @@ still require the owner's explicit OK.
       (-110). So the chip keeps power and state across warm reboots, and
       a reload or USB reset can't recover a failed start; the fix has to
       make the first start reliable. Needs a power cycle to get Wi-Fi
-      back. T3 (clean shutdown before warm reboots) not run yet.
+      back.
+      Stock control (11-07 afternoon, 2GB-SD rescue card: the card's
+      stock kernel copy RAM-booted with tools/rescue_stock_boot.sh, the
+      stock root on the card, no NAND/env writes): **11 of 11 Wi-Fi
+      starts OK** (1 warm from ours, 10 warm stock-to-stock; scan 16-20
+      networks; no error lines). Same firmware and hardware, so the
+      firmware is cleared: the cause is our host side (mainline mwifiex's
+      start sequence or our USB). Ours right after: **7 of 7 warm boots
+      failed**, every one a full download then no answer (leftover chip
+      state ruled out for these); T3's clean shutdown untestable while
+      nothing starts. Kernel session asked for a measurable driver patch
+      (mlan's post-download sequence + the URB-kill fix).
     - **Errata kernel hard hang on the NAND root (11-07 ~11:55):** about
       25-30 min after the first NAND-root boot, idle (Klipper ready, Wi-Fi
       down), no ping, no serial echo, no panic. First thought to be the

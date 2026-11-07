@@ -125,6 +125,24 @@ def main():
             else:
                 sys.exit('stock bootargs not set as expected')
             return
+        if args and args[0] == '--rescue-bootargs':
+            # Stock kernel with the 2GB-SD rescue root (2026-11-07,
+            # install/rescue/README.txt): bootargs in RAM only, no saveenv.
+            # A fixed command; U-Boot's line is too short for the expanded
+            # mtdparts, hence its own variables.
+            con.command('setenv bootargs console=ttyS0,115200n8 ${mtdparts} '
+                        'root=/dev/mmcblk0p1 rootfstype=ext2 rootwait '
+                        '${bootargs_mv61X0_other} '
+                        'synopGMAC_Mem.ethaddr=${ethaddr_sdh}', timeout=5.0)
+            out = con.command('printenv bootargs', timeout=5.0).decode('latin1')
+            print(out)
+            need = ('root=/dev/mmcblk0p1', 'rootfstype=ext2',
+                    'mtdparts=mv61x0_nand:', 'synopGMAC_Mem.ethaddr=00:')
+            if all(n in out for n in need):
+                print('BOOTARGS OK')
+            else:
+                sys.exit('rescue bootargs not set as expected')
+            return
         if args and args[0] == '--bootm':
             # bootm ADDR: only after iminfo verifies the image in RAM; then
             # record the console for SECS seconds (nothing more is sent).
