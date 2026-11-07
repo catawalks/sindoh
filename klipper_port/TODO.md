@@ -166,6 +166,19 @@ still require the owner's explicit OK.
       mtd0's 7.75 MB. Their options were checked against the sources'
       getopt strings; qemu-arm can't run these static binaries under WSL,
       so they first run on the printer (stage 3).
+    - **stage 3 stick path (2026-11-07):** a queued input event started a
+      revert unasked; it failed at its first check (dirname/id missing),
+      nothing written. To do: revert popup + second confirmation in the
+      screen app (marker + reboot), initramfs prompt only for a broken
+      root (drain events, ~3 s hold), dirname/id in the initramfs, test
+      cases (end_goal_install_plan.md, stage 3). Wi-Fi: build mwifiex_usb
+      as a module, loaded by init.mainline (owner prefers this over the
+      re-enumerate, which may be tied to the 11-07 hang).
+    - **nandboot hang (2026-11-07, once):** userspace, serial echo and
+      Wi-Fi stopped, Ethernet still answered ping; power cycle. No kernel
+      message (no lockup detectors/netconsole in the image). Not seen again
+      in ~40 min of watched boots. Add SOFTLOCKUP/HUNG_TASK/WQ_WATCHDOG to
+      the image.
     - stage 3 normal path tested 2026-11-07 (end_goal_install_plan.md):
       root from the marked card, mtd-utils run read-only; Wi-Fi fixed in
       init.mainline. Open for the initramfs: keep its log (copy to a

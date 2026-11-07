@@ -71,8 +71,25 @@ gap, the 4 GB card marked with /.dp200-root):
   window (1741,4091) stays open with the root on the card. (4) The
   Ethernet MAC is random each boot (the stock line's ethaddr is ignored).
   (2)-(4) are initramfs/kernel items (TODO 17).
-- **Not tested yet:** the stick paths (a Sindoh stick, no touch: normal
-  start; with a touch: revert) and the broken-root path. Note: with no
+- **Stick path tested 2026-11-07, two bugs, nothing written:**
+  (a) the init scanned for sticks 1 s after the card appeared; a stick's
+  sda1 comes ~2 s after /init starts, so it was missed. Fixed in
+  initramfs/nandboot/init (wait for every usb-storage disk, >= 7 s
+  uptime, <= 15 s; build 76125889): the stick was found.
+  (b) the 30 s prompt took a queued input event as a touch after 0.15 s
+  and started the revert unasked. dp200-revert.sh then stopped at its
+  first check (`dirname` and `id` missing from the initramfs BusyBox):
+  "FAIL: run as root" before any erase/write; the window was closed.
+- **Decided (owner, 2026-11-07):** the revert prompt moves out of the
+  initramfs. Our screen app (or a watcher beside it) sees a stick with
+  `_update_rodin/update.she`, shows a popup, then a second confirmation
+  ("removes Klipper and its settings"); on yes it writes /.dp200-revert
+  and reboots, and the initramfs reverts from that marker. The initramfs
+  asks only when no working root is found (Sindoh or revert stick ->
+  "recover?"): drain queued events, then a real finger-down held ~3 s.
+  Add dirname/id (and check every command dp200-revert.sh uses) and an
+  offline-test case "queued event is not a touch".
+- **Not tested yet:** the broken-root path. Note: with no
   marked card and a stock root in mtd6, the normal path would start the
   stock /sbin/init on our kernel; harmless in the end goal (our root is in
   mtd6 before mtd0 gets our kernel), but the init could refuse a root

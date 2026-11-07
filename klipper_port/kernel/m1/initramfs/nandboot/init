@@ -50,7 +50,22 @@ while [ $i -lt 12 ]; do
 	ls /dev/mmcblk0p* /dev/sd?1 >/dev/null 2>&1 && break
 	sleep 0.5; i=$((i + 1))
 done
-sleep 1
+# USB sticks: usb-storage binds a stick about 0.3 s after /init starts and
+# its sda1 appears 1.5-2 s later (2026-11-07: /init 4.15 s, sda1 6.02 s;
+# the old "sleep 1" missed it). Wait until every usb-storage interface has
+# its disk, and at least until 7 s uptime (devices still enumerating);
+# never past 15 s.
+uptime_s() { cut -d. -f1 /proc/uptime; }
+while [ "$(uptime_s)" -lt 15 ]; do
+	pend=false
+	for u in /sys/bus/usb/drivers/usb-storage/*:*; do
+		[ -e "$u" ] || continue
+		ls -d "$u"/host*/target*/*/block/* >/dev/null 2>&1 || pend=true
+	done
+	if ! $pend && [ "$(uptime_s)" -ge 7 ]; then break; fi
+	sleep 0.5
+done
+sleep 0.5
 
 # Sticks: a Sindoh update (update.she) or our revert marker
 SINDOH=false MARKED=false
