@@ -1,0 +1,723 @@
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Subject: [PATCH] ARM: PJ4B 88PA61x0: erratum 6011 (five LDREX, IRQs off)
+
+Test options for the DP200 nandboot hangs, off by default
+(docs/kernel/nandboot_hang_analysis.md).
+---
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -14,6 +14,7 @@
+ #include <linux/irqflags.h>
+ #include <asm/barrier.h>
+ #include <asm/cmpxchg.h>
++#include <asm/pj4b-6011.h>
+ 
+ #ifdef __KERNEL__
+ 
+@@ -40,15 +41,15 @@
+ 	int result;							\
+ 									\
+ 	prefetchw(&v->counter);						\
+-	__asm__ __volatile__("@ atomic_" #op "\n"			\
+-"1:	ldrex	%0, [%3]\n"						\
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_" #op "\n"			\
++"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"						\
+ "	" #asm_op "	%0, %0, %4\n"					\
+ "	strex	%1, %0, [%3]\n"						\
+ "	teq	%1, #0\n"						\
+ "	bne	1b"							\
+ 	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
+ 	: "r" (&v->counter), "Ir" (i)					\
+-	: "cc");							\
++	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
+ }									\
+ 
+ #define ATOMIC_OP_RETURN(op, c_op, asm_op)				\
+@@ -59,15 +60,15 @@
+ 									\
+ 	prefetchw(&v->counter);						\
+ 									\
+-	__asm__ __volatile__("@ atomic_" #op "_return\n"		\
+-"1:	ldrex	%0, [%3]\n"						\
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_" #op "_return\n"		\
++"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"						\
+ "	" #asm_op "	%0, %0, %4\n"					\
+ "	strex	%1, %0, [%3]\n"						\
+ "	teq	%1, #0\n"						\
+ "	bne	1b"							\
+ 	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
+ 	: "r" (&v->counter), "Ir" (i)					\
+-	: "cc");							\
++	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
+ 									\
+ 	return result;							\
+ }
+@@ -80,15 +81,15 @@
+ 									\
+ 	prefetchw(&v->counter);						\
+ 									\
+-	__asm__ __volatile__("@ atomic_fetch_" #op "\n"			\
+-"1:	ldrex	%0, [%4]\n"						\
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_fetch_" #op "\n"			\
++"1:	" __PJ4B_LDREX("ldrex	%0, [%4]") "ldrex	%0, [%4]\n"						\
+ "	" #asm_op "	%1, %0, %5\n"					\
+ "	strex	%2, %1, [%4]\n"						\
+ "	teq	%2, #0\n"						\
+ "	bne	1b"							\
+ 	: "=&r" (result), "=&r" (val), "=&r" (tmp), "+Qo" (v->counter)	\
+ 	: "r" (&v->counter), "Ir" (i)					\
+-	: "cc");							\
++	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
+ 									\
+ 	return result;							\
+ }
+@@ -111,14 +112,14 @@
+ 	prefetchw(&ptr->counter);
+ 
+ 	do {
+-		__asm__ __volatile__("@ atomic_cmpxchg\n"
+-		"ldrex	%1, [%3]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_cmpxchg\n"
++		"" __PJ4B_LDREX("ldrex	%1, [%3]") "ldrex	%1, [%3]\n"
+ 		"mov	%0, #0\n"
+ 		"teq	%1, %4\n"
+ 		"strexeq %0, %5, [%3]\n"
+ 		    : "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
+ 		    : "r" (&ptr->counter), "Ir" (old), "r" (new)
+-		    : "cc");
++		    : "cc"); pj4b_6011_restore(__pj4b_f); }
+ 	} while (res);
+ 
+ 	return oldval;
+@@ -133,8 +134,8 @@
+ 	smp_mb();
+ 	prefetchw(&v->counter);
+ 
+-	__asm__ __volatile__ ("@ atomic_add_unless\n"
+-"1:	ldrex	%0, [%4]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__ ("@ atomic_add_unless\n"
++"1:	" __PJ4B_LDREX("ldrex	%0, [%4]") "ldrex	%0, [%4]\n"
+ "	teq	%0, %5\n"
+ "	beq	2f\n"
+ "	add	%1, %0, %6\n"
+@@ -144,7 +145,7 @@
+ "2:"
+ 	: "=&r" (oldval), "=&r" (newval), "=&r" (tmp), "+Qo" (v->counter)
+ 	: "r" (&v->counter), "r" (u), "r" (a)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	if (oldval != u)
+ 		smp_mb();
+@@ -283,11 +284,11 @@
+ {
+ 	s64 result;
+ 
+-	__asm__ __volatile__("@ atomic64_read\n"
+-"	ldrexd	%0, %H0, [%1]"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_read\n"
++"	" __PJ4B_LDREX("ldrexd	%0, %H0, [%1]") "ldrexd	%0, %H0, [%1]"
+ 	: "=&r" (result)
+ 	: "r" (&v->counter), "Qo" (v->counter)
+-	);
++	); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	return result;
+ }
+@@ -297,14 +298,14 @@
+ 	s64 tmp;
+ 
+ 	prefetchw(&v->counter);
+-	__asm__ __volatile__("@ atomic64_set\n"
+-"1:	ldrexd	%0, %H0, [%2]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_set\n"
++"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%2]") "ldrexd	%0, %H0, [%2]\n"
+ "	strexd	%0, %3, %H3, [%2]\n"
+ "	teq	%0, #0\n"
+ "	bne	1b"
+ 	: "=&r" (tmp), "=Qo" (v->counter)
+ 	: "r" (&v->counter), "r" (i)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ }
+ #endif
+ 
+@@ -315,8 +316,8 @@
+ 	unsigned long tmp;						\
+ 									\
+ 	prefetchw(&v->counter);						\
+-	__asm__ __volatile__("@ atomic64_" #op "\n"			\
+-"1:	ldrexd	%0, %H0, [%3]\n"					\
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_" #op "\n"			\
++"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"					\
+ "	" #op1 " %Q0, %Q0, %Q4\n"					\
+ "	" #op2 " %R0, %R0, %R4\n"					\
+ "	strexd	%1, %0, %H0, [%3]\n"					\
+@@ -324,7 +325,7 @@
+ "	bne	1b"							\
+ 	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
+ 	: "r" (&v->counter), "r" (i)					\
+-	: "cc");							\
++	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
+ }									\
+ 
+ #define ATOMIC64_OP_RETURN(op, op1, op2)				\
+@@ -336,8 +337,8 @@
+ 									\
+ 	prefetchw(&v->counter);						\
+ 									\
+-	__asm__ __volatile__("@ atomic64_" #op "_return\n"		\
+-"1:	ldrexd	%0, %H0, [%3]\n"					\
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_" #op "_return\n"		\
++"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"					\
+ "	" #op1 " %Q0, %Q0, %Q4\n"					\
+ "	" #op2 " %R0, %R0, %R4\n"					\
+ "	strexd	%1, %0, %H0, [%3]\n"					\
+@@ -345,7 +346,7 @@
+ "	bne	1b"							\
+ 	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
+ 	: "r" (&v->counter), "r" (i)					\
+-	: "cc");							\
++	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
+ 									\
+ 	return result;							\
+ }
+@@ -359,8 +360,8 @@
+ 									\
+ 	prefetchw(&v->counter);						\
+ 									\
+-	__asm__ __volatile__("@ atomic64_fetch_" #op "\n"		\
+-"1:	ldrexd	%0, %H0, [%4]\n"					\
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_fetch_" #op "\n"		\
++"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%4]") "ldrexd	%0, %H0, [%4]\n"					\
+ "	" #op1 " %Q1, %Q0, %Q5\n"					\
+ "	" #op2 " %R1, %R0, %R5\n"					\
+ "	strexd	%2, %1, %H1, [%4]\n"					\
+@@ -368,7 +369,7 @@
+ "	bne	1b"							\
+ 	: "=&r" (result), "=&r" (val), "=&r" (tmp), "+Qo" (v->counter)	\
+ 	: "r" (&v->counter), "r" (i)					\
+-	: "cc");							\
++	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
+ 									\
+ 	return result;							\
+ }
+@@ -416,15 +417,15 @@
+ 	prefetchw(&ptr->counter);
+ 
+ 	do {
+-		__asm__ __volatile__("@ atomic64_cmpxchg\n"
+-		"ldrexd		%1, %H1, [%3]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_cmpxchg\n"
++		"" __PJ4B_LDREX("ldrexd		%1, %H1, [%3]") "ldrexd		%1, %H1, [%3]\n"
+ 		"mov		%0, #0\n"
+ 		"teq		%1, %4\n"
+ 		"teqeq		%H1, %H4\n"
+ 		"strexdeq	%0, %5, %H5, [%3]"
+ 		: "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
+ 		: "r" (&ptr->counter), "r" (old), "r" (new)
+-		: "cc");
++		: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 	} while (res);
+ 
+ 	return oldval;
+@@ -438,14 +439,14 @@
+ 
+ 	prefetchw(&ptr->counter);
+ 
+-	__asm__ __volatile__("@ atomic64_xchg\n"
+-"1:	ldrexd	%0, %H0, [%3]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_xchg\n"
++"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"
+ "	strexd	%1, %4, %H4, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+ 	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
+ 	: "r" (&ptr->counter), "r" (new)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	return result;
+ }
+@@ -459,8 +460,8 @@
+ 	smp_mb();
+ 	prefetchw(&v->counter);
+ 
+-	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
+-"1:	ldrexd	%0, %H0, [%3]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_dec_if_positive\n"
++"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"
+ "	subs	%Q0, %Q0, #1\n"
+ "	sbc	%R0, %R0, #0\n"
+ "	teq	%R0, #0\n"
+@@ -471,7 +472,7 @@
+ "2:"
+ 	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+ 	: "r" (&v->counter)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	smp_mb();
+ 
+@@ -487,8 +488,8 @@
+ 	smp_mb();
+ 	prefetchw(&v->counter);
+ 
+-	__asm__ __volatile__("@ atomic64_add_unless\n"
+-"1:	ldrexd	%0, %H0, [%4]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_add_unless\n"
++"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%4]") "ldrexd	%0, %H0, [%4]\n"
+ "	teq	%0, %5\n"
+ "	teqeq	%H0, %H5\n"
+ "	beq	2f\n"
+@@ -500,7 +501,7 @@
+ "2:"
+ 	: "=&r" (oldval), "=&r" (newval), "=&r" (tmp), "+Qo" (v->counter)
+ 	: "r" (&v->counter), "r" (u), "r" (a)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	if (oldval != u)
+ 		smp_mb();
+--- a/arch/arm/include/asm/cmpxchg.h
++++ b/arch/arm/include/asm/cmpxchg.h
+@@ -6,6 +6,7 @@
+ #include <linux/prefetch.h>
+ #include <asm/barrier.h>
+ #include <linux/cmpxchg-emu.h>
++#include <asm/pj4b-6011.h>
+ 
+ #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
+ /*
+@@ -44,35 +45,35 @@
+ #if __LINUX_ARM_ARCH__ >= 6
+ #ifndef CONFIG_CPU_V6 /* MIN ARCH >= V6K */
+ 	case 1:
+-		asm volatile("@	__xchg1\n"
+-		"1:	ldrexb	%0, [%3]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@	__xchg1\n"
++		"1:	" __PJ4B_LDREX("ldrexb	%0, [%3]") "ldrexb	%0, [%3]\n"
+ 		"	strexb	%1, %2, [%3]\n"
+ 		"	teq	%1, #0\n"
+ 		"	bne	1b"
+ 			: "=&r" (ret), "=&r" (tmp)
+ 			: "r" (x), "r" (ptr)
+-			: "memory", "cc");
++			: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
+ 		break;
+ 	case 2:
+-		asm volatile("@	__xchg2\n"
+-		"1:	ldrexh	%0, [%3]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@	__xchg2\n"
++		"1:	" __PJ4B_LDREX("ldrexh	%0, [%3]") "ldrexh	%0, [%3]\n"
+ 		"	strexh	%1, %2, [%3]\n"
+ 		"	teq	%1, #0\n"
+ 		"	bne	1b"
+ 			: "=&r" (ret), "=&r" (tmp)
+ 			: "r" (x), "r" (ptr)
+-			: "memory", "cc");
++			: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
+ 		break;
+ #endif
+ 	case 4:
+-		asm volatile("@	__xchg4\n"
+-		"1:	ldrex	%0, [%3]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@	__xchg4\n"
++		"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
+ 		"	strex	%1, %2, [%3]\n"
+ 		"	teq	%1, #0\n"
+ 		"	bne	1b"
+ 			: "=&r" (ret), "=&r" (tmp)
+ 			: "r" (x), "r" (ptr)
+-			: "memory", "cc");
++			: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
+ 		break;
+ #elif defined(swp_is_buggy)
+ #ifdef CONFIG_SMP
+@@ -170,39 +171,39 @@
+ #else /* min ARCH > ARMv6 */
+ 	case 1:
+ 		do {
+-			asm volatile("@ __cmpxchg1\n"
+-			"	ldrexb	%1, [%2]\n"
++			{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@ __cmpxchg1\n"
++			"	" __PJ4B_LDREX("ldrexb	%1, [%2]") "ldrexb	%1, [%2]\n"
+ 			"	mov	%0, #0\n"
+ 			"	teq	%1, %3\n"
+ 			"	strexbeq %0, %4, [%2]\n"
+ 				: "=&r" (res), "=&r" (oldval)
+ 				: "r" (ptr), "Ir" (old), "r" (new)
+-				: "memory", "cc");
++				: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
+ 		} while (res);
+ 		break;
+ 	case 2:
+ 		do {
+-			asm volatile("@ __cmpxchg1\n"
+-			"	ldrexh	%1, [%2]\n"
++			{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@ __cmpxchg1\n"
++			"	" __PJ4B_LDREX("ldrexh	%1, [%2]") "ldrexh	%1, [%2]\n"
+ 			"	mov	%0, #0\n"
+ 			"	teq	%1, %3\n"
+ 			"	strexheq %0, %4, [%2]\n"
+ 				: "=&r" (res), "=&r" (oldval)
+ 				: "r" (ptr), "Ir" (old), "r" (new)
+-				: "memory", "cc");
++				: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
+ 		} while (res);
+ 		break;
+ #endif
+ 	case 4:
+ 		do {
+-			asm volatile("@ __cmpxchg4\n"
+-			"	ldrex	%1, [%2]\n"
++			{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@ __cmpxchg4\n"
++			"	" __PJ4B_LDREX("ldrex	%1, [%2]") "ldrex	%1, [%2]\n"
+ 			"	mov	%0, #0\n"
+ 			"	teq	%1, %3\n"
+ 			"	strexeq %0, %4, [%2]\n"
+ 				: "=&r" (res), "=&r" (oldval)
+ 				: "r" (ptr), "Ir" (old), "r" (new)
+-				: "memory", "cc");
++				: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
+ 		} while (res);
+ 		break;
+ 	default:
+@@ -256,8 +257,8 @@
+ 
+ 	prefetchw(ptr);
+ 
+-	__asm__ __volatile__(
+-"1:	ldrexd		%1, %H1, [%3]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++"1:	" __PJ4B_LDREX("ldrexd		%1, %H1, [%3]") "ldrexd		%1, %H1, [%3]\n"
+ "	teq		%1, %4\n"
+ "	teqeq		%H1, %H4\n"
+ "	bne		2f\n"
+@@ -267,7 +268,7 @@
+ "2:"
+ 	: "=&r" (res), "=&r" (oldval), "+Qo" (*ptr)
+ 	: "r" (ptr), "r" (old), "r" (new)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	return oldval;
+ }
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -9,6 +9,7 @@
+ #include <linux/prefetch.h>
+ #include <asm/barrier.h>
+ #include <asm/processor.h>
++#include <asm/pj4b-6011.h>
+ 
+ /*
+  * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
+@@ -60,15 +61,15 @@
+ 	arch_spinlock_t lockval;
+ 
+ 	prefetchw(&lock->slock);
+-	__asm__ __volatile__(
+-"1:	ldrex	%0, [%3]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
+ "	add	%1, %0, %4\n"
+ "	strex	%2, %1, [%3]\n"
+ "	teq	%2, #0\n"
+ "	bne	1b"
+ 	: "=&r" (lockval), "=&r" (newval), "=&r" (tmp)
+ 	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	while (lockval.tickets.next != lockval.tickets.owner) {
+ 		wfe();
+@@ -85,15 +86,15 @@
+ 
+ 	prefetchw(&lock->slock);
+ 	do {
+-		__asm__ __volatile__(
+-		"	ldrex	%0, [%3]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++		"	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
+ 		"	mov	%2, #0\n"
+ 		"	subs	%1, %0, %0, ror #16\n"
+ 		"	addeq	%0, %0, %4\n"
+ 		"	strexeq	%2, %0, [%3]"
+ 		: "=&r" (slock), "=&r" (contended), "=&r" (res)
+ 		: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
+-		: "cc");
++		: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 	} while (res);
+ 
+ 	if (!contended) {
+@@ -141,8 +142,8 @@
+ 	unsigned long tmp;
+ 
+ 	prefetchw(&rw->lock);
+-	__asm__ __volatile__(
+-"1:	ldrex	%0, [%1]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++"1:	" __PJ4B_LDREX("ldrex	%0, [%1]") "ldrex	%0, [%1]\n"
+ "	teq	%0, #0\n"
+ 	WFE("ne")
+ "	strexeq	%0, %2, [%1]\n"
+@@ -150,7 +151,7 @@
+ "	bne	1b"
+ 	: "=&r" (tmp)
+ 	: "r" (&rw->lock), "r" (0x80000000)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	smp_mb();
+ }
+@@ -161,14 +162,14 @@
+ 
+ 	prefetchw(&rw->lock);
+ 	do {
+-		__asm__ __volatile__(
+-		"	ldrex	%0, [%2]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++		"	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
+ 		"	mov	%1, #0\n"
+ 		"	teq	%0, #0\n"
+ 		"	strexeq	%1, %3, [%2]"
+ 		: "=&r" (contended), "=&r" (res)
+ 		: "r" (&rw->lock), "r" (0x80000000)
+-		: "cc");
++		: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 	} while (res);
+ 
+ 	if (!contended) {
+@@ -209,9 +210,9 @@
+ 	unsigned long tmp, tmp2;
+ 
+ 	prefetchw(&rw->lock);
+-	__asm__ __volatile__(
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
+ "	.syntax unified\n"
+-"1:	ldrex	%0, [%2]\n"
++"1:	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
+ "	adds	%0, %0, #1\n"
+ "	strexpl	%1, %0, [%2]\n"
+ 	WFE("mi")
+@@ -219,7 +220,7 @@
+ "	bmi	1b"
+ 	: "=&r" (tmp), "=&r" (tmp2)
+ 	: "r" (&rw->lock)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	smp_mb();
+ }
+@@ -231,15 +232,15 @@
+ 	smp_mb();
+ 
+ 	prefetchw(&rw->lock);
+-	__asm__ __volatile__(
+-"1:	ldrex	%0, [%2]\n"
++	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++"1:	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
+ "	sub	%0, %0, #1\n"
+ "	strex	%1, %0, [%2]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+ 	: "=&r" (tmp), "=&r" (tmp2)
+ 	: "r" (&rw->lock)
+-	: "cc");
++	: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 
+ 	if (tmp == 0)
+ 		dsb_sev();
+@@ -251,14 +252,14 @@
+ 
+ 	prefetchw(&rw->lock);
+ 	do {
+-		__asm__ __volatile__(
+-		"	ldrex	%0, [%2]\n"
++		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++		"	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
+ 		"	mov	%1, #0\n"
+ 		"	adds	%0, %0, #1\n"
+ 		"	strexpl	%1, %0, [%2]"
+ 		: "=&r" (contended), "=&r" (res)
+ 		: "r" (&rw->lock)
+-		: "cc");
++		: "cc"); pj4b_6011_restore(__pj4b_f); }
+ 	} while (res);
+ 
+ 	/* If the lock is negative, then it is already held for write. */
+--- a/arch/arm/include/asm/futex.h
++++ b/arch/arm/include/asm/futex.h
+@@ -7,6 +7,7 @@
+ #include <linux/futex.h>
+ #include <linux/uaccess.h>
+ #include <asm/errno.h>
++#include <asm/pj4b-6011.h>
+ 
+ #define __futex_atomic_ex_table(err_reg)			\
+ 	"3:\n"							\
+@@ -29,7 +30,7 @@
+ 	prefetchw(uaddr);					\
+ 	__ua_flags = uaccess_save_and_enable();			\
+ 	__asm__ __volatile__(					\
+-	"1:	ldrex	%1, [%3]\n"				\
++	"1:	" __PJ4B_LDREX("ldrex	%1, [%3]") "ldrex	%1, [%3]\n"				\
+ 	"	" insn "\n"					\
+ 	"2:	strex	%2, %0, [%3]\n"				\
+ 	"	teq	%2, #0\n"				\
+@@ -58,7 +59,7 @@
+ 	prefetchw(uaddr);
+ 	__ua_flags = uaccess_save_and_enable();
+ 	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
+-	"1:	ldrex	%1, [%4]\n"
++	"1:	" __PJ4B_LDREX("ldrex	%1, [%4]") "ldrex	%1, [%4]\n"
+ 	"	teq	%1, %2\n"
+ 	"	ite	eq	@ explicit IT needed for the 2b label\n"
+ 	"2:	strexeq	%0, %3, [%4]\n"
+--- a/arch/arm/kernel/swp_emulate.c
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -28,6 +28,7 @@
+ #include <asm/system_info.h>
+ #include <asm/traps.h>
+ #include <linux/uaccess.h>
++#include <asm/pj4b-6011.h>
+ 
+ /*
+  * Error-checking SWP macros implemented using ldrex{b}/strex{b}
+@@ -35,7 +36,7 @@
+ #define __user_swpX_asm(data, addr, res, temp, B)		\
+ 	__asm__ __volatile__(					\
+ 	".arch armv7-a\n"					\
+-	"0:	ldrex"B"	%2, [%3]\n"			\
++	"0:	" __PJ4B_LDREX("ldrex"B"	%2, [%3]") "ldrex"B"	%2, [%3]\n"			\
+ 	"1:	strex"B"	%0, %1, [%3]\n"			\
+ 	"	cmp		%0, #0\n"			\
+ 	"	moveq		%1, %2\n"			\
+--- a/arch/arm/lib/bitops.h
++++ b/arch/arm/lib/bitops.h
+@@ -18,7 +18,18 @@
+ 	ALT_UP(W(nop))
+ #endif
+ 	mov	r3, r2, lsl r3
+-1:	ldrex	r2, [r1]
++1:
++#ifdef CONFIG_PJ4B_ERRATA_6011
++	mrs	ip, cpsr
++	cpsid	i
++	.rept	4
++	ldrex	r2, [r1]
++	.endr
++	ldrex	r2, [r1]
++	msr	cpsr_c, ip
++#else
++	ldrex	r2, [r1]
++#endif
+ 	\instr	r2, r2, r3
+ 	strex	r0, r2, [r1]
+ 	cmp	r0, #0
+@@ -44,7 +55,18 @@
+ 	ALT_SMP(W(pldw)	[r1])
+ 	ALT_UP(W(nop))
+ #endif
+-1:	ldrex	r2, [r1]
++1:
++#ifdef CONFIG_PJ4B_ERRATA_6011
++	mrs	ip, cpsr
++	cpsid	i
++	.rept	4
++	ldrex	r2, [r1]
++	.endr
++	ldrex	r2, [r1]
++	msr	cpsr_c, ip
++#else
++	ldrex	r2, [r1]
++#endif
+ 	ands	r0, r2, r3		@ save old value of bit
+ 	\instr	r2, r2, r3		@ toggle bit
+ 	strex	ip, r2, [r1]
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -685,6 +685,46 @@
+ 	.globl	__kuser_helper_start
+ __kuser_helper_start:
+ 
++#ifdef CONFIG_PJ4B_ERRATA_6011
++/*
++ * 88PA61x0 PJ4B-MP erratum 6011: the cmpxchg helpers with five LDREX,
++ * out of line (they don't fit in their slots); the slots branch here.
++ * Copied with the helpers, below 0xffff0f60.
++ */
++__kuser_cmpxchg64_6011:
++	stmfd	sp!, {r4, r5, r6, r7}
++	ldrd	r4, r5, [r0]			@ load old val
++	ldrd	r6, r7, [r1]			@ load new val
++	smp_dmb	arm
++1:	.rept	5
++	ldrexd	r0, r1, [r2]			@ load current val
++	.endr
++	eors	r3, r0, r4			@ compare with oldval (1)
++	eorseq	r3, r1, r5			@ compare with oldval (2)
++	strexdeq r3, r6, r7, [r2]		@ store newval if eq
++	teqeq	r3, #1				@ success?
++	beq	1b				@ if no then retry
++	smp_dmb	arm
++	rsbs	r0, r3, #0			@ set returned val and C flag
++	ldmfd	sp!, {r4, r5, r6, r7}
++	usr_ret	lr
++
++__kuser_cmpxchg_6011:
++	smp_dmb	arm
++1:	.rept	5
++	ldrex	r3, [r2]
++	.endr
++	subs	r3, r3, r0
++	strexeq	r3, r1, [r2]
++	teqeq	r3, #1
++	beq	1b
++	rsbs	r0, r3, #0
++	smp_dmb	arm
++	usr_ret	lr
++
++	.align	5
++#endif
++
+ /*
+  * Due to the length of some sequences, __kuser_cmpxchg64 spans 2 regular
+  * kuser "slots", therefore 0xffff0f80 is not used as a valid entry point.
+@@ -692,7 +732,11 @@
+ 
+ __kuser_cmpxchg64:				@ 0xffff0f60
+ 
+-#if defined(CONFIG_CPU_32v6K)
++#if defined(CONFIG_PJ4B_ERRATA_6011)
++
++	b	__kuser_cmpxchg64_6011
++
++#elif defined(CONFIG_CPU_32v6K)
+ 
+ 	stmfd	sp!, {r4, r5, r6, r7}
+ 	ldrd	r4, r5, [r0]			@ load old val
+@@ -809,6 +853,10 @@
+ 	usr_ret	lr
+ #endif
+ 
++#elif defined(CONFIG_PJ4B_ERRATA_6011)
++
++	b	__kuser_cmpxchg_6011
++
+ #else
+ 
+ 	smp_dmb	arm
+@@ -836,7 +884,11 @@
+ 	.endr				@ pad up to __kuser_helper_version
+ 
+ __kuser_helper_version:				@ 0xffff0ffc
++#ifdef CONFIG_PJ4B_ERRATA_6011
++	.word	((__kuser_helper_end - __kuser_cmpxchg64) >> 5)
++#else
+ 	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
++#endif
+ 
+ 	.globl	__kuser_helper_end
+ __kuser_helper_end:

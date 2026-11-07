@@ -210,6 +210,12 @@ still require the owner's explicit OK.
       (mtd6 detached, window none), so stock boots. Offline analysis + test
       plan handed to the kernel session (m1-debian under the same tar first;
       m1-debian was never put under that load on mainline).
+      Night tests 11-07, each 3 passes of the whole-root tar (3.27 GB, ~4.3
+      min each) with the nc streams and Wi-Fi up, all PASSED: A m1-debian
+      5df089a9 (Nov 1 tree), B m1-debian-nandw f370f49e, E
+      m1-nandboot-errata 5b17e2ec (e1ee7e8: the vendor PJ4B cache wrapper +
+      erratum 6011). Next: plain m1-nandboot fcba26da again (did it hang
+      by chance, or reproducibly?); docs/kernel/nandboot_hang_analysis.md.
     - stage 3 normal path tested 2026-11-07 (end_goal_install_plan.md):
       root from the marked card, mtd-utils run read-only; Wi-Fi fixed in
       init.mainline. Open for the initramfs: keep its log (copy to a
