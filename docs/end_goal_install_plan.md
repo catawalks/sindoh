@@ -111,8 +111,10 @@ after the errata kernel's 82-minute soak, TODO 17).**
   readback md5 matches, U-Boot block unchanged (dac6729a), 0xff after the
   image, 0 ECC failures. A warm reboot (busybox reboot -f, no serial
   input) went through the stock U-Boot to our kernel from mtd0, root from
-  the marked card, Klipper/Moonraker up. **Not yet checked: a cold boot**
-  (power cycle by the owner).
+  the marked card, Klipper/Moonraker up. Cold boot (the owner's power
+  cycle, 11-07 ~11:15, no serial input): U-Boot -> our kernel from mtd0,
+  mtd6 attached and detached, root from the card, Klipper ready, Wi-Fi
+  associated at 23 s, eth0 .147 and mlan0 .21.
 - Stage 5: the card root into mtd6 as UBIFS (ubi0:filesystem), 254 MB
   unpacked, 107 MB used, 140 MB free, 13,559 files, 0 ECC failures; the
   next boot attached it cleanly (2350 good PEBs, 5 bad, 0 corrupted, max
