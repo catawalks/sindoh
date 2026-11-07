@@ -1,0 +1,75 @@
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -629,6 +629,15 @@
+ MODULE_PARM_DESC(trace_phys,
+ 		 "88PA6170 debug: physical address of a 4 KB no-map RAM area for the NAND step trace (0: off)");
+ 
++/*
++ * bch_v1 reads wait for RDDREQ by interrupt, as the vendor driver does
++ * (default since 2026-11-07); 0 brings back the NDSR busy-poll.
++ */
++static bool bch_v1_rdd_irq = true;
++module_param_named(rdd_irq, bch_v1_rdd_irq, bool, 0644);
++MODULE_PARM_DESC(rdd_irq,
++		 "88PA6170: wait for RDDREQ by interrupt like the vendor driver (0: busy-poll NDSR)");
++
+ #define BT_MAGIC	0x3152544e	/* "NTR1" */
+ #define BT_N		126
+ 
+@@ -1142,6 +1151,8 @@
+ 
+ 	if (st & (NDSR_RDY(0) | NDSR_RDY(1)))
+ 		complete(&nfc->complete);
++	else if (st & ien & (NDSR_RDDREQ | NDSR_UNCERR))
++		complete(&nfc->complete);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -1578,8 +1589,38 @@
+ 	ret = marvell_nfc_prepare_cmd(chip);
+ 	if (ret)
+ 		goto out;
++	if (bch_v1_rdd_irq) {
++		init_completion(&nfc->complete);
++		marvell_nfc_enable_int(nfc, NDSR_RDDREQ | NDSR_UNCERR);
++	}
+ 	marvell_nfc_send_cmd(chip, &nfc_op);
+-	bt_log(BT_RDD, page, 0, 0);
++	bt_log(BT_RDD, page, bch_v1_rdd_irq, 0);
++	if (bch_v1_rdd_irq) {
++		/*
++		 * As the vendor driver does: sleep until the controller raises
++		 * RDDREQ (or UNCERR with no data), and read NDSR once. Polling
++		 * NDSR through the whole page load hung the SoC: the 2026-11-07
++		 * trace ends in this wait with no rdd-end, both CPUs stopped.
++		 */
++		if (!wait_for_completion_timeout(&nfc->complete,
++				msecs_to_jiffies(POLL_TIMEOUT / 1000)))
++			bt_log(BT_RDD_END, -ETIMEDOUT, 0, 1);
++		marvell_nfc_disable_int(nfc, NDSR_RDDREQ | NDSR_UNCERR);
++		ndsr = readl_relaxed(nfc->regs + NDSR);
++		if (!(ndsr & NDSR_RDDREQ)) {
++			if (ndsr & NDSR_UNCERR) {
++				*flags |= F_EARLY_UNC;
++				bch_v1_st[ST_EARLY_UNC]++;
++				ret = -EBADMSG;
++			} else {
++				bch_v1_st[ST_TIMEOUT]++;
++				ret = -ETIMEDOUT;
++			}
++			bt_log(BT_RDD_END, ret, ndsr, 1);
++			goto out;
++		}
++		goto rdd;
++	}
+ 	end = ktime_add_us(ktime_get(), POLL_TIMEOUT);
+ 	for (;;) {
+ 		ndsr = readl_relaxed(nfc->regs + NDSR);
+@@ -1603,6 +1644,7 @@
+ 		}
+ 		cpu_relax();
+ 	}
++rdd:
+ 	bt_log(BT_RDD_END, 0, ndsr, 0);
+ 	bch_v1_last_ndsr = ndsr;
+ 	if (ndsr & NDSR_UNCERR)

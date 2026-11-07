@@ -831,3 +831,130 @@ image:
 
 That's a new mtd0 kernel: RAM-boot test first (owner's rule), then the
 owner's OK.
+
+## Hang 7: the NAND step trace names the step (2026-11-07)
+
+nanddbg (e6cdb8a6) RAM-booted from the 4GB-SD gap:
+- **Boot 1** was up for more than 100 s; the `hang_wdt_nokick` test reset
+  it, so the watchdog reset works.
+- **Boot 2** froze at ~26 s uptime (last console line 26.04 s, Wi-Fi
+  EAPOL), and the watchdog reset it.
+- The normal mtd0 kernel booted once in between without overwriting the
+  ring.
+- nanddbg then went to mtd0 (owner's OK). Its boot 3 printed boot 2's
+  ring: 126 steps, all on cpu0. The end of it:
+
+```
+#158348 25874934 us cpu0 poll 00000100              (CMDD after the PIO)
+#158349 25874936 us cpu0 poll-end 00000000 00001d02
+#158350 25882344 us cpu0 stop                       (7.4 ms later)
+#158351 25882356 us cpu0 cmd 000d3000 bd580000 00000001   page 0x1bd58 (block 1781, page 24, mtd6)
+#158352 25882359 us cpu0 rdd 0001bd58               <- last step: no rdd-end
+```
+
+The ~120 reads before it look normal: `rdd` → `rdd-end` in ~150 µs, the
+two PIO bursts, a ~2 µs CMDD poll.
+
+### What the ring says
+
+- **The CPU never came out of bch_v1's RDDREQ wait.**
+  - That wait is bounded: `ktime` against `POLL_TIMEOUT`, then
+    `rdd-end` with -ETIMEDOUT or -EBADMSG. Every exit logs `rdd-end`, and
+    none was logged.
+  - So the CPU stopped inside one access in the loop:
+    `readl_relaxed(NDSR)`, or the timer-2 read inside `ktime_get()`.
+  - It's a **bus stall**, not a loop, as the hang signature (both CPUs
+    silent, no detector) already suggested.
+- **The command before it went through.**
+  - `bch_v1_stop`, then `prepare_cmd` (ND_RUN poll, NDSR clear, ND_RUN set,
+    WRCMDREQ poll) all completed. The `cmd` entry is logged after them,
+    just before the three NDCB0 writes.
+  - The stall can be the first NDSR read after those writes. Since the
+    writes are posted, it can also be the NDCB0 write itself, surfacing
+    on the next read.
+- **The 7.4 ms gap before `stop`** is the NAND core lock being released and
+  re-taken: the caller (UBIFS/UBI read path) did other work, or cpu0 ran
+  something else. Only NAND steps are traced, so the ring can't say what.
+  All 126 steps ran on cpu0. Gaps of 0.5–0.7 ms between pages appear
+  elsewhere in the ring, so 7.4 ms is long but not unique to the failure.
+- **Why the NAND root, and why only sometimes:** every page read polls NDSR
+  in a tight loop for ~150 µs, plus a `ktime_get()` per turn. That's
+  roughly 100–150 register reads per page while the controller loads the
+  page and runs the BCH engine.
+  - A NAND root does this for every file it reads. The card root does it
+    only during the boot-time UBI scan.
+  - If the controller's register interface can wedge when it's read at the
+    wrong moment of that internal sequence, the odds grow with the number
+    of reads polled. That fits hangs anywhere from 26 s (boot, many reads)
+    to ~23 min (idle, few reads).
+
+### What the vendor driver does instead (`mv61x0_nand_do_cmd`, `mv61x0_nand_irq`)
+
+From the 3.2 image:
+1. **Before each command:**
+   - write NDSR = `0x001f9fff` (clear everything);
+   - clear ND_RUN (NDCR bit 28);
+   - read NDSR (dummy);
+   - set NDECCCTRL (0x21 with ECC, 0 without);
+   - write NDCR = setup | ND_RUN | ECC_EN;
+   - read NDSR (dummy);
+   - write NDSR = clear again.
+2. **WRCMDREQ:** up to 11 tries. Each try reads NDSR once; if WRCMDREQ is
+   set, clear it and write NDCB0 three times, otherwise **`udelay` and try
+   again**. So it's a slow poll, not a tight one.
+3. **Then it unmasks** the interrupts for this command in NDCR (for a read:
+   RDDREQ, CORERR, UNCERR) and **sleeps in `wait_for_completion_timeout()`**
+   (20 jiffies).
+4. **The ISR** reads NDSR once and handles one condition:
+   - RDDREQ (with UNCERR/CORERR as errors): mask bits 1, 3, 4;
+   - or WRDREQ: mask bit 2;
+   - or CMDD/BBD: mask 0x140.
+
+   Then it clears NDSR (writing the value read back) and completes.
+5. **Back in the caller, for a read:**
+   - `__raw_readsl` of the data from NDDB;
+   - one NDSR read for UNCERR;
+   - write it back to clear;
+   - done. **No CMDD poll after a read.**
+
+**So the vendor reads NDSR about 4–6 times per page and never polls it
+while the controller works.** Ours polls it ~150 times per page in the
+RDDREQ wait, plus tight `POLL_PERIOD 0` polls for WRCMDREQ and CMDD. Upstream
+marvell_nand polls the same way. That's fine on the PXA/Armada NFCs it was
+written for, but evidently not here.
+
+### Patch 0016: RDDREQ by interrupt (m1-nandboot-nandirq)
+
+`kernel/m1/patches/0016-mtd-rawnand-marvell-mv61x0-rddreq-irq.patch`:
+- **The wait:** bch_v1 reads now unmask RDDREQ and UNCERR before sending
+  the command, sleep in `wait_for_completion_timeout()` (100 ms), and read
+  NDSR once afterwards.
+- **The ISR** completes on RDDREQ/UNCERR, as well as on R/B as before.
+- **Unchanged:** the error handling (an early UNCERR means "no data, read
+  again"; a timeout is counted) and the trace. `rdd` now logs `1` in its
+  second value; the interrupt shows as an `isr` step between `rdd` and
+  `rdd-end`.
+- `marvell_nand.rdd_irq=0` (0644, also at run time) brings the busy-poll
+  back, for an A/B run.
+- **Default on**, in every later build. The short WRCMDREQ and CMDD polls
+  (~2 µs each in the trace) are unchanged for now. If hangs remain, the
+  trace will show whether they move there; the vendor's slow WRCMDREQ poll
+  and its missing CMDD wait are the next step.
+
+`HANGTEST=nandirq` builds nanddbg + 0016: watchdog, ramoops and the trace,
+the same reserved areas (`variants/nandboot-nandirq.config`, `.dts`).
+**Built 2026-11-07, not booted:**
+- `m1-nandboot-nandirq.uimg` md5 `1f33eb4394d3dea7f132215f481d0fe6`
+  (2,821,612 bytes);
+- modules tar `c0185b50c3886192699924d3b2e253d7`;
+- the config is nanddbg's; the code differs by patch 0016 (`rdd_irq` is in
+  the kernel; nanddbg e6cdb8a6 doesn't have it).
+
+**RAM-boot it from the 4GB-SD gap first**, then judge by hours of NAND root
+against hangs at 26 s–23 min.
+
+**pstore:** boot 2's console shows ramoops registered ("Registered ramoops as
+persistent store backend", "using 0x100000@0x1e000000"). The "unknown
+filesystem type 'pstore'" error most likely came from a mount under the
+normal mtd0 kernel, which has no PSTORE. Under nanddbg/nandirq, use `mount -t
+pstore pstore /sys/fs/pstore`.
