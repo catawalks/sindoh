@@ -229,6 +229,19 @@ still require the owner's explicit OK.
       state ruled out for these); T3's clean shutdown untestable while
       nothing starts. Kernel session asked for a measurable driver patch
       (mlan's post-download sequence + the URB-kill fix).
+      **Correction (same day): my test loops graded wrongly**: the serial
+      echo of the check command contains "Card is removed", so every boot
+      counted as FAIL. Re-graded on kernel lines only: unpatched warm boots
+      ~7 of 10 failed (t3c r1-r5: 3 of 5), not 7 of 7.
+      **Fixed by patch 0013** (stock-like start: no winner probe, EP1
+      read right after the download, FUNC_INIT after INIT_DONE, plus the
+      URB-kill fix): **19 of 19 warm boots OK** (0013: 13, 0014 trace: 6),
+      INIT_DONE after 56 ms every time. The 0013 mwifiex_usb.ko
+      (ef7100b4) is installed on the dev printer's NAND root (originals in
+      /var/backups/mwifiex-5b17e2ec/). Next: CONFIG_MWIFIEX_USB_8782_START
+      on by default (kernel session), then cold boots with the owner and a
+      long Wi-Fi soak. TXFILLTUNING (stock 0x00100000, ours 0x00020000)
+      noted but not needed for this.
     - **Errata kernel hard hang on the NAND root (11-07 ~11:55):** about
       25-30 min after the first NAND-root boot, idle (Klipper ready, Wi-Fi
       down), no ping, no serial echo, no panic. First thought to be the
