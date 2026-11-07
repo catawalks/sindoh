@@ -611,16 +611,46 @@ In order of value. Items 1–3 need a build, offline; item 4 is a script.
    - Patch 0015 is in every build, but it does nothing unless
      `trace_phys` is set.
 
-**Built 2026-11-07, not booted:**
-- `m1-nandboot-nanddbg.uimg` md5 `0685c98505a0cd1275a88a608b9a3844`
-  (2,822,976 bytes);
-- modules tar `7dbf295c2fdfb49b93379a2e45b7cba9`. Use these modules with
+**The first build (0685c985) didn't boot** (2026-11-07, from mtd0, warm and
+cold alike):
+- **What it showed:** after "Uncompressing Linux... done, booting the
+  kernel.", nothing: no console line, no watchdog reset.
+- **The decompressor layout was normal.** 5b17e2ec's banner shows the same
+  pattern: relocated code below the kernel's `_end`, and the merged DTB at
+  the top of the relocated range.
+- **The cause is the 4 KB no-map hole at 0x1e100000.**
+  - On 2-level ARM, one first-level entry pair covers 2 MB.
+  - `map_lowmem()` section-mapped 0x1e000000–0x1e0fffff (whole 1 MB). Then
+    0x1e101000–0x1e1fffff needed a page table in the same pair.
+  - `arm_pte_alloc()` found the section in the pair's first entry and hit
+    **`BUG_ON(pmd_bad(*pmd))`**. That's before `console_init()` (ttyS0
+    comes up at ~0.17 s), so nothing was ever printed.
+- A model of `map_lowmem()`'s rules (`kernel/m1/tools/lowmem_check.py`) gives "BUG at
+  0x1e101000" for that layout, and "ok" for dc3b5f20, errata-dbg and the
+  fixed layout.
+- **Fix:** ramoops (1 MB at 0x1e000000) and the trace area (now 1 MB at
+  0x1e100000; the driver uses its first 4 KB) are both no-map. Together
+  they fill the aligned 2 MB pair, so no pair mixes a section with a page
+  table. ramoops on a no-map area maps itself with `ioremap`, as it's
+  meant to.
+- **Rule for later DTs:** a no-map hole in lowmem must not leave part of a
+  2 MB-aligned pair mapped. Make it a multiple of 2 MB, aligned, or put it
+  next to another hole (the framebuffer works because its pair starts
+  with the hole).
+
+**Rebuilt 2026-11-07, not booted:**
+- `m1-nandboot-nanddbg.uimg` md5 `e6cdb8a6616f4d15a37232b73bb59391`
+  (2,823,460 bytes);
+- modules tar `bfd2c0a7ffd2f8031356cfb885dde29c`. Use these modules with
   this image, not mtd0's.
-- The config differs from the mtd0 image's (dc3b5f20) only in the command
-  line, PSTORE (+ Reed-Solomon for its ECC) and the initramfs path. The
-  DTB carries both reserved areas.
-- dc3b5f20 itself is unchanged. Patch 0015 joins later nandboot
-  builds, inactive without `trace_phys`.
+- The config differs from the mtd0 image's (dc3b5f20) only in the
+  command line, PSTORE (+ Reed-Solomon for its ECC) and the initramfs
+  path. The DTB carries both no-map areas.
+- **RAM-boot it first** (4GB-SD gap), before it goes into mtd0 again.
+  Check that the console comes up, then `dmesg | grep -e ramoops -e
+  "trace:" -e "hang watchdog"`.
+- dc3b5f20 itself is unchanged. Patch 0015 joins later nandboot builds,
+  inactive without `trace_phys`.
 
 **It only helps if this same image boots after the reset.** The default
 mtd0 kernel doesn't reserve these areas and doesn't print the ring.
