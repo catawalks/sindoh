@@ -9,7 +9,7 @@ their decisions were changed later. The live documents:
 - **docs/end_goal_install_plan.md** - the approved 9-stage sequence to the
   end-goal install (stages 1-5 done 2026-11-07: mtd0 holds our
   m1-nandboot-errata kernel, mtd6 our root; the marked 4 GB card is still
-  the root; next: a cold boot and the NAND-only boot, owner's OK;
+  the root; cold boot checked; next: the NAND-only boot, owner's OK;
   the card's raw gap holds the same errata image);
 - **docs/internal_firmware_plan.md** - NAND layout, space, what a revert can
   restore; **docs/kernel/revert_to_stock_plan.md** - the revert;
