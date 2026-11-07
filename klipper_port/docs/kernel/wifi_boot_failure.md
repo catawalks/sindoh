@@ -32,6 +32,60 @@ The 0xa9 timeout isn't new. It was seen:
 So one explanation has to cover both cases: the chip just downloaded and
 booted, and the chip already running firmware.
 
+**The question, then:** why do the first commands after "WLAN FW is
+active" get no answer on some boots, warm or cold?
+
+### A good cold boot for comparison (`coldboot1.log`, 2026-11-07)
+
+Power cycle, our mtd0 kernel:
+
+| Time | Line | Note |
+|---|---|---|
+| 10.957 | `registered new interface driver mwifiex_usb` | insmod from init.mainline |
+| 10.987 | `start to download FW...` | The boot ROM won the winner check: a real download |
+| 11.493 | `FW download over, size 253996 bytes` | 0.5 s download |
+| 12.007 | `WLAN FW is active` | Patch 0004's `msleep(500)` after the last block |
+| 12.085 | `host_mlme: disable, key_api: 0` | The init commands **are answered**: FUNC_INIT, then the GET_HW_SPEC response gives the key API |
+| 12.093 | `CMD_RESP: cmd 0x242 error, result=0x2` | `HostCmd_CMD_CHAN_REGION_CFG` (GET), sent unconditionally at init. FP69 (14.69.12.p50) predates it and refuses it. **Harmless**: the result is ignored and init goes on. It's on every good boot (also m1_boot7.log) |
+| 23.357–23.466 | associate, EAPOL | Joined |
+| 120.888 | `CMD_RESP: cmd 0x23f error, result=0x2` | `HostCmd_CMD_STA_CONFIGURE` (GET): `mwifiex_get_chan_info()`, run when userspace asks for the channel (cfg80211 `get_channel`, e.g. `iw dev mlan0 info`). FP69 doesn't have it either. **Harmless**: userspace just gets no channel |
+| 126.001–126.010 | `Have pending ack frames!` ×2, then `successfully disconnected ...: reason code 7` | See "The reason-7 drop" below. It's not the boot failure |
+| 129.950 | associated again | 4 s later |
+
+The capture's first lines (`[4563.57]`, from the session before this
+boot) show the same reason-7 drop and re-association 4 s later.
+
+What a failing boot's capture must show, to place it in section 3:
+- **"start to download FW..." present.** The download happened, as on
+  this boot. Then the cold or warm difference is only the
+  firmware's boot (hypothesis 2).
+- **Absent, with "FW download over, size 0 bytes".** The firmware was
+  reused (hypothesis 1).
+- **`read_data_sync: failed` and "8782: no boot ROM answer".** A silent
+  chip (hypothesis 3).
+
+The 11-07 warm failure was described without these lines. Its capture
+(if saved) answers the question directly.
+
+### The reason-7 drop (a separate issue)
+
+- Reason 7 is "Class 3 frame received from nonassociated STA". **The
+  access point** deauthenticated or disassociated us because it no longer
+  had us as associated while we sent data. The firmware reports it as a
+  deauth/disassoc event (`sta_event.c` → `mwifiex_reset_connect_state`).
+- "Have pending ack frames!" is mwifiex freeing frames still waiting for
+  TX status at that reset. It's a consequence, not the cause.
+- 102.6 s after the association. The 0x23f refusal 5 s earlier is
+  probably unrelated: it's a local GET that never reaches the air.
+- Usual causes are the AP's power-save or inactivity handling of a
+  station in IEEE power save. mwifiex turns power save on by default,
+  and it's not known whether stock does.
+- **Test:** run `iw dev mlan0 set power_save off` after the join, then
+  log with `iw event -t`. Does the drop still come about 100 s after each
+  association? Is it periodic, e.g. the AP's group rekey?
+- The 4 s reconnect works, so this is a glitch in the network, not a boot
+  failure.
+
 ## 1. How the vendor driver handles the 8782 compared with mainline
 
 From the vendor binaries:
@@ -109,10 +163,12 @@ printer.
   in software points to one. It would need a look at the board (the
   Mainboard_Photos folder) or a continuity test.
 
-## 3. The most likely root cause
+## 3. Why the first commands time out: the candidates
 
-Patch 0004 strays from the vendor's 8782 sequence in three places, and
-together they explain both the warm and the cold failures:
+"WLAN FW is active" is the normal message after a download (see the good
+cold boot above). The fault is that the first command (0xa9) after it
+gets no answer. Patch 0004 strays from the vendor's 8782 sequence in
+three places, and each one leads to exactly that symptom:
 
 1. **It reuses a firmware in an unknown state (the warm reboot).**
    - Nothing shuts the firmware down at reboot: there's no `.shutdown`
