@@ -1075,3 +1075,30 @@ of 0016, only active with `marvell_nand.trace_phys`:
      prints both the ring and the samples;
    - or keep nanddbg in mtd0, and right after the reset run
      `python3 -I pcs_dump.py` (root) before anything else.
+
+### More nanddbg (polling) rings, 2026-11-07 (passive serial capture)
+
+| Boot that printed it | Ring ends at | CPU | Last steps |
+|---|---|---|---|
+| 12 | 21.09 s | cpu1 | `cmd` (read, page 0x2bfe6), `rdd`, no `rdd-end` |
+| 13 | 69.31 s | cpu1 | a **program**: `pio-out` 0x800 / end, `pio-out` 0x20 / end, then nothing |
+| 14 | 30.15 s | cpu1 | `cmd` (read, page 0x3bb45), `rdd`, no `rdd-end` |
+| 15 | alive at 121 s (capture stopped) | | |
+
+In boot 13 the ring stops after the program data. The program-done wait
+(`bch_v1_wait_prog`, bounded at 200 ms) isn't a traced step, so the stall
+was in or after it, before the next command.
+
+**Reading:**
+- With the polling driver, the freezes come 20–70 s after boot, during the
+  startup I/O, on either CPU (hang 7 was cpu0).
+- With interrupt-driven reads (nandirq), the one freeze came at ~490 s,
+  with the NAND idle.
+- That fits **a stall source independent of the NAND step, which catches
+  whatever is on the bus.**
+  - The polling driver is on the bus nearly all the time during boot, so
+    the ring usually shows a NAND step.
+  - The stall rate is highest during heavy boot I/O: NAND, SD and the
+    Wi-Fi start at once.
+- The PC samples (patch 0017, nandpcs) and test 1 above (card root, UBIFS
+  rw on mtd6, the read soak) are the next steps.
