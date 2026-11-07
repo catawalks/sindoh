@@ -10,7 +10,8 @@ their decisions were changed later. The live documents:
   end-goal install (stages 1-5 done 2026-11-07: mtd0 holds our
   m1-nandboot-errata kernel, mtd6 our root; the marked 4 GB card is still
   the root no more: the NAND-only boot works (11-07, marker renamed to
-  /.dp200-root.off); Wi-Fi at boot is the open problem;
+  /.dp200-root.off); mtd0 holds m1-nandboot dc3b5f20 (errata + the 8782
+  Wi-Fi start fix, 19/19 warm boots); kernel updates: tools/mtd0_kernel_update.sh;
   the card's raw gap holds the same errata image);
 - **docs/internal_firmware_plan.md** - NAND layout, space, what a revert can
   restore; **docs/kernel/revert_to_stock_plan.md** - the revert;
