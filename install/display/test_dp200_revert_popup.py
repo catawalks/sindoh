@@ -90,6 +90,20 @@ ui.st = {'print_stats': {'state': 'complete'}}
 tick(ui)
 check('after the print: asked', ui.confirm is not None)
 
+ui = new_ui()                             # POWER -> TO STOCK
+ui.run(S.back_to_stock_confirm())
+check('TO STOCK: first question', ui.confirm is not None and 'stock Sindoh' in ui.confirm[0])
+tap(ui, 'yes')
+check('TO STOCK YES: second question', ui.confirm is not None and 'returns the printer' in ui.confirm[0])
+tap(ui, 'no')
+check('TO STOCK, second NO: nothing written', not os.path.exists(S.REVERT_MARK) and not powered)
+ui.run(S.back_to_stock_confirm())
+tap(ui, 'yes')
+tap(ui, 'yes')
+check('TO STOCK YES, YES: marker + reboot', os.path.exists(S.REVERT_MARK) and powered == ['reboot'])
+os.remove(S.REVERT_MARK)
+powered.clear()
+
 ui = new_ui()
 S.OUR_KERNEL = os.path.join(T, 'absent')  # the stock kernel (interim install)
 disks[:] = []

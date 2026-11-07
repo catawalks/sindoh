@@ -29,11 +29,21 @@ the work; it is how open items survive between sessions.
    never publish it), and the generic reboot text ("Rebooting now." instead
    of "The Sindoh logo comes next." - the logo may be the owner's own).
    Both edits are committed, not yet on a printer.
+   **Built 2026-11-07 (night):** payload 5f3336e1 (84,402,575 B, unpacked
+   241,909 KiB, BUILD 59134b5): fm.bin c313d379 (the batch fix), no Wi-Fi
+   networks (checked: no etc/dp200/wpa_supplicant.conf), the new screen
+   app; with a fresh unmistakable_klipper_install.she (d41963d2), on the
+   stick in _update_rodin_KlipperInstall (old 60316e4 overwritten). Not yet
+   installed anywhere; the stepping fix still needs its real print test.
 1c. **Ethernet doesn't recover after a switch outage (work printer,
    2026-11-06):** the switch lost power/its uplink overnight; after it came
    back other devices got IPs, the printer only after a reboot. Check
    dp200-netd.sh: link down/up handling and DHCP retry (udhcpc restart on
    carrier up, lease renewal when the DHCP server was gone).
+   No network log was kept on the work printer. 2026-11-07: dp200-netd.sh
+   now restarts udhcpc when eth0 has a cable, DHCP mode and no IPv4
+   address for 30 s (whatever the cause); syntax-checked, on the dev card,
+   not yet exercised (an outage test needs the owner or a cable pull).
 2. **Screen features not yet used on hardware (user):** the calibration
    wizards (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET),
    LOAD switching the heater off, OBJECTS (skip one object in a print with
@@ -115,12 +125,18 @@ still require the owner's explicit OK.
     a lower-priority SSID, the printer does not rejoin a higher-priority
     SSID when it becomes available. Reproduce and trace preference/watchdog
     reconnect logic; the displayed ordering alone does not verify priority.
+    (2026-11-07: on Niholedotcom, priority 22; Fios-kVGD7 not in the scan,
+    so the fallback couldn't be reproduced from here.)
     Check stability on the upgraded work printer too.
 13. **Wi-Fi summary page accuracy:** SYSTEM -> NETWORK -> WIFI can show
     inaccurate data; the owner saw the Ethernet IP displayed on the WIFI
     summary page on the test printer. Trace the page's data source and state
     updates, then clean it up to display Wi-Fi information only and avoid
     presenting stale or Ethernet values as Wi-Fi details.
+    **Fixed 2026-11-07:** the page's Address came from self.ip (the main
+    address, Ethernet's with a cable in); it is now wpa_supplicant's own
+    ip_address, "-" when not connected. test_dp200_wifi_screen.py and
+    test_dp200_screen.py: 0 failures on the printer.
 14. **Faster stepping** (docs/faster_stepping_plan.md, phases 1-3 approved
     11-02): done so far: engine register map (COM_STP +0x78 candidate),
     `CONFIG_UPC_STEP_SINGLE` (fork branch fast-stepping, default off) halves
