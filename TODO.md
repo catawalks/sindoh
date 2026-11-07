@@ -168,10 +168,15 @@ still require the owner's explicit OK.
       so they first run on the printer (stage 3).
     - **stage 3 stick path (2026-11-07):** a queued input event started a
       revert unasked; it failed at its first check (dirname/id missing),
-      nothing written. To do: revert popup + second confirmation in the
-      screen app (marker + reboot), initramfs prompt only for a broken
-      root (drain events, ~3 s hold), dirname/id in the initramfs, test
-      cases (end_goal_install_plan.md, stage 3). Wi-Fi: build mwifiex_usb
+      nothing written. Built 11-07 (m1-nandboot 33d2e5d2): the screen app
+      asks on a Sindoh stick (two confirmations -> /.dp200-revert +
+      reboot; test_dp200_revert_popup.py, 13 checks, run on the printer's
+      Python); the initramfs reverts on the marker (removed first on a
+      card root) and asks only with no working root (dp200-hold: drained,
+      armed after 0.3 s quiet, 2 frames, 3 s hold; test_dp200_hold.sh 11
+      cases); dirname/id/basename added; test_nandboot_init.sh 10
+      scenarios + the tool list. Open: the hardware test (hold on the
+      real panel, the popup), and a "Back to stock" button. Wi-Fi: build mwifiex_usb
       as a module, loaded by init.mainline (owner prefers this over the
       re-enumerate, which may be tied to the 11-07 hang).
     - **nandboot hang (2026-11-07, once):** userspace, serial echo and
