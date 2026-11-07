@@ -258,3 +258,99 @@ and ~570 s in (hang 3). The errata image (0 of 1) and the Nov 1 images
 rule out a rarer hang. The next runs need to be longer, and should reset
 by themselves (a timer-0 watchdog in a debug image, owner's OK) so that
 one hang doesn't end a night.
+
+## What differs between the Nov 1 images and plain nandboot (offline, 2026-11-07)
+
+Builds: m1-debian #22 and m1-debian-nandw #24 (Nov 1, 18:42/18:43) and
+m1-nandboot #7 (fcba26da, Nov 7 00:05). The toolchain is the same
+(Debian gcc 14.2.0-19, binutils 2.44).
+
+- **Kernel source: only patch 0010 changed.** `git diff a6e0188 59134b5`
+  over `kernel/m1/src`, `patches`, `m1.config` and `variants/full.*`
+  shows nothing else: no change in arch, mm or other drivers. Patch 0010
+  changed in two ways:
+  - **Write guard v2** (11-06): the window became up to 4 ranges under a
+    spinlock, plus the area table. It runs only on program/erase, and
+    there is no NAND write during the tar.
+  - **The BCH read path** (4838d55, 11-01 19:21, *after* the Nov 1
+    builds): a corrected read now takes the bit count from ERRCNT instead
+    of re-reading the page raw, and an early UNCERR re-reads. This runs
+    on NAND reads: in nandboot only during the boot-time UBI attach of
+    mtd6 (then detached), not during the card tar.
+  - So **test B (f370f49e) had guard v1 and the old read path.** It
+    didn't test patch 0010 as it is now.
+- **Config** (`m1-full-nandw-full.config` Nov 1 against
+  `m1-nandboot-full.config`, DVB and tuner lines left out):
+  - added: `MODULES`, `MODULE_UNLOAD`, `STRICT_MODULE_RWX`,
+    `ARM_MODULE_PLTS`, `EXECMEM`, mwifiex `=m`;
+  - added: `SCSI`, `BLK_DEV_SD`, `USB_STORAGE`, BSG, `SG_POOL`;
+  - added: `NETPOLL`, `NET_POLL_CONTROLLER`, `NETCONSOLE` (+ dynamic),
+    `CONFIGFS_FS`;
+  - added: `LOCKUP_DETECTOR`, `SOFTLOCKUP_DETECTOR` (+ panic),
+    `DETECT_HUNG_TASK` (120 s), `WQ_WATCHDOG`;
+  - added: `MEDIA_SUBDRV_AUTOSELECT`, which drops the ~140 DVB drivers
+    that were built in; `I2C_MUX`, `MEDIA_ATTACH`;
+  - gone: `REGMAP_I2C`;
+  - command line: `CMDLINE_FORCE` with our own line, so no `console=tty0`,
+    no `ubi.mtd=filesystem` and no stock extras. The memory size still
+    comes from the ATAG.
+- **Elsewhere:** the nandboot initramfs (attach mtd6, detach it for a
+  card root, close the window, switch_root), mwifiex loaded as a module
+  after the root is up, and the NANDW DT (nandboot.dts).
+- **The errata image (E, passed) has every one of these** differences
+  from the Nov 1 images. It differs from N only by patches 0011/0012 and
+  the hard-lockup detector. So if E keeps passing on longer runs, the
+  errata fix is the cause, not a tree change. If the Nov 1 images also
+  keep passing, one of the config additions (most likely candidates: the
+  per-CPU lockup-watchdog hrtimers and stopper kicks, or modules and
+  STRICT_MODULE_RWX) makes the erratum window easier to hit, rather than
+  being a bug of its own.
+
+## The debug image: m1-nandboot-errata-dbg (built, not booted)
+
+**Debug image only. It arms a hardware watchdog, so every run needs the
+owner's OK first.** `VARIANT=nandboot HANGTEST=errata-dbg ./build.sh`
+gives the -errata image plus the two items below. `m1-nandboot-errata-dbg.uimg` md5
+`d4350cf0e66005610bd4736320c8017f`, 2,821,420 bytes; its modules tar
+`m1-nandboot-errata-dbg-modules.tar` md5 `4f9b91070ae164abed5ab28668074f57`.
+Checked in the build: 1273 LDREX runs of 5, the PSTORE options set, the
+ramoops node in the DTB, the hang watchdog code present.
+
+
+- **A hang watchdog on timer 0** (timer-mv61x0.c, opt-in by
+  `timer_mv61x0.hang_wdt=30` on the forced command line; the default 0
+  changes nothing in other images):
+  - at late_initcall it arms timer 0 with U-Boot's `reset_cpu` sequence
+    and a 30 s count;
+  - a kworker kicks it every 5 s, the vendor's way
+    (`service_watchdog_timer`: toggle the low nibble, enable set);
+  - a hard hang (both CPUs, or the workqueues) resets the board after
+    ≤ 30 s, a warm reset like every `reboot`;
+  - the boot log shows `mv61x0-timer: hang watchdog armed: reset after
+    30 s ...`.
+  - Not verified on the hardware: that a kick restarts the count. The
+    kexec loader's 60 s arm and the stop at boot work (kexec_test2.md),
+    but no long count has ever been allowed to run out.
+  - `echo 1 > /sys/module/timer_mv61x0/parameters/hang_wdt_nokick` stops
+    the kicks, so the reset can be tested.
+  - After `poweroff` the board resets again 30 s later. Use the power
+    switch.
+- **pstore/ramoops**, 1 MB at 0x1e000000 (`nandboot-errata-dbg.dts`,
+  with ECC): the console log (512 KB), 3 panic/oops records and pmsg. The
+  area is clear of everything the stock U-Boot uses (see the DTS
+  comment). It survives only if U-Boot's DDR init after a warm reset
+  doesn't scramble RAM. A power cycle always loses it.
+
+Check order, with the owner present, before relying on it for a night:
+
+1. Boot it. `dmesg | grep -e "hang watchdog" -e ramoops` shows the
+   watchdog armed and ramoops at 0x1e000000. Still up at 60 s uptime
+   means the kicks restart the count.
+2. `echo 1 > .../hang_wdt_nokick`: the board must reset by itself
+   within ~30 s, through U-Boot and back into this image.
+3. After that reset: `ls /sys/fs/pstore/`. `console-ramoops-0` holding
+   the previous boot's log means RAM survived a watchdog reset.
+4. `echo c > /proc/sysrq-trigger` (a panic): `panic=10`, then a warm
+   reset, then `dmesg-ramoops-0` should hold the panic.
+5. Only then the long run: the hang load in a loop. After each
+   self-reset, save `/sys/fs/pstore/*` before anything else.

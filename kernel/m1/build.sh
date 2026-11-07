@@ -10,7 +10,7 @@
 #   VARIANT=gpio            $OUT/m1-gpio.uimg      GPIO banks, nothing driven
 #   VARIANT=eth             $OUT/m1-eth.uimg       small Ethernet + kexec loader
 #   VARIANT=nandboot        $OUT/m1-nandboot.uimg  for mtd0: full + NAND
-#     HANGTEST=up|wrap|errata  $OUT/m1-nandboot-<t>.uimg  hang test images
+#     HANGTEST=up|wrap|errata|errata-dbg  $OUT/m1-nandboot-<t>.uimg  hang tests
 #                           writes, root/revert initramfs, no 8782 firmware
 #
 # A variant merges variants/<v>.config after m1.config, uses
@@ -60,7 +60,7 @@ else
 	KOUT=$WORK/build-m1-$VARIANT
 	IRFS=$WORK/initramfs-m1-$VARIANT
 fi
-# HANGTEST=up|wrap|errata (VARIANT=nandboot only): the hang test images of
+# HANGTEST=up|wrap|errata|errata-dbg (VARIANT=nandboot only): the hang test images of
 # docs/kernel/nandboot_hang_analysis.md, variants/nandboot-$HANGTEST.config
 # on top of nandboot, e.g. $OUT/m1-nandboot-up.uimg; own build tree
 if [ -n "${HANGTEST:-}" ]; then
@@ -433,12 +433,17 @@ fi
 
 # 8. The DTB: the base board, or the variant's DTS on top of it
 DTB=$KOUT/arch/arm/boot/dts/marvell/88pa6170-dp200.dtb
-if [ -f "$M1/variants/$VARIANT.dts" ]; then
+VDTS=$M1/variants/$VARIANT.dts
+# a hang test's own DTS, if it has one (on top of nandboot.dts)
+if [ -n "${HANGTEST:-}" ] && [ -f "$M1/variants/nandboot-$HANGTEST.dts" ]; then
+	VDTS=$M1/variants/nandboot-$HANGTEST.dts
+fi
+if [ -f "$VDTS" ]; then
 	DTB=$KOUT/$NAME.dtb
 	cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
 		-I "$KSRC/include" -I "$KSRC/scripts/dtc/include-prefixes" \
 		-I "$KSRC/arch/arm/boot/dts/marvell" \
-		"$M1/variants/$VARIANT.dts" |
+		"$VDTS" |
 		"$KOUT/scripts/dtc/dtc" -q -I dts -O dtb -o "$DTB" -
 fi
 

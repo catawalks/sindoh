@@ -37,6 +37,7 @@
 #include <linux/of_irq.h>
 #include <linux/reboot.h>
 #include <linux/sched_clock.h>
+#include <linux/workqueue.h>
 
 #define MV61X0_WDT_CTRL		0x00
 #define MV61X0_LOAD(n)		(0x04 + 0x10 * (n))
@@ -213,6 +214,60 @@ static struct notifier_block mv61x0_restart_nb = {
 	.priority	= 128,
 };
 
+/*
+ * Hang watchdog, for debug images only (docs/kernel/nandboot_hang_analysis.md;
+ * each run needs the owner's OK): timer_mv61x0.hang_wdt=SECONDS arms the
+ * watchdog on timer 0 at late_initcall, and a kworker kicks it every 5 s the
+ * way the vendor's service_watchdog_timer does (low nibble toggled, enable
+ * set). A hard hang then resets the board by itself after SECONDS. Off (0)
+ * by default. hang_wdt_nokick=1 stops the kicks, to test the reset.
+ * Note: after "poweroff" the board resets again once SECONDS are up.
+ */
+static unsigned int mv61x0_hang_wdt;
+module_param_named(hang_wdt, mv61x0_hang_wdt, uint, 0444);
+static bool mv61x0_hang_wdt_nokick;
+module_param_named(hang_wdt_nokick, mv61x0_hang_wdt_nokick, bool, 0644);
+static u32 mv61x0_rate;
+static struct delayed_work mv61x0_wdt_work;
+
+#define MV61X0_HANG_WDT_KICK	(5 * HZ)
+
+static void mv61x0_wdt_kick(struct work_struct *work)
+{
+	void __iomem *wdt = mv61x0_base + MV61X0_WDT_CTRL;
+
+	if (!READ_ONCE(mv61x0_hang_wdt_nokick))
+		writel((readl(wdt) ^ 0xf) | MV61X0_WDT_ENABLE, wdt);
+	schedule_delayed_work(&mv61x0_wdt_work, MV61X0_HANG_WDT_KICK);
+}
+
+static int __init mv61x0_hang_wdt_init(void)
+{
+	void __iomem *wdt = mv61x0_base + MV61X0_WDT_CTRL;
+	unsigned int secs = mv61x0_hang_wdt;
+
+	if (!mv61x0_base || !secs)
+		return 0;
+	/* a 32-bit count of timer ticks; at least two kicks per period */
+	secs = clamp(secs, 15U, U32_MAX / mv61x0_rate);
+	mv61x0_hang_wdt = secs;
+
+	/* U-Boot's reset_cpu sequence (mv61x0_restart) with a long count */
+	writel(readl(wdt) ^ 0xf, wdt);
+	writel(0, mv61x0_base + MV61X0_CTRL(MV61X0_WDT_TIMER));
+	writel(secs * mv61x0_rate, mv61x0_base + MV61X0_LOAD(MV61X0_WDT_TIMER));
+	writel(MV61X0_CTRL_ENABLE | MV61X0_CTRL_RELOAD,
+	       mv61x0_base + MV61X0_CTRL(MV61X0_WDT_TIMER));
+	writel((readl(wdt) ^ 0xf) | MV61X0_WDT_ENABLE, wdt);
+
+	INIT_DELAYED_WORK(&mv61x0_wdt_work, mv61x0_wdt_kick);
+	schedule_delayed_work(&mv61x0_wdt_work, MV61X0_HANG_WDT_KICK);
+	pr_warn("mv61x0-timer: hang watchdog armed: reset after %u s without a kick (every 5 s)\n",
+		secs);
+	return 0;
+}
+late_initcall(mv61x0_hang_wdt_init);
+
 /* Returns 1 for up, -1 for down, 0 if the counter does not move */
 static int __init mv61x0_count_direction(u32 *first, u32 *second)
 {
@@ -265,6 +320,7 @@ static int __init mv61x0_timer_init(struct device_node *np)
 		pr_err("mv61x0-timer: no clock rate\n");
 		return -EINVAL;
 	}
+	mv61x0_rate = rate;
 
 	/* What the boot loader left behind, for the bring-up log */
 	pr_info("mv61x0-timer: wdt %08x ctrl %08x %08x %08x %08x status %08x prescale %u\n",
