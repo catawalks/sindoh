@@ -280,3 +280,42 @@ mtd0 U-Boot block, mtd6 UBI geometry).
 
 The owner's custom logo is kept on the 4 GB card as
 /var/backups/mtd3_logo_768000.bin (md5 aed9faa1), for writing back.
+
+## 3c / stage 1: mtd0 kernel area rewritten (2026-11-07, owner at the printer)
+
+End-goal stage 1 (end_goal_install_plan.md). Written from m1-debian-nandw
+f370f49e (raw SD boot, root on the 4 GB card) with
+`dp200-revert.sh --part kernel` (md5 b2e1c8fc, recovery.md5 ee8bb20e).
+
+**Before (read-only):**
+- `--check`: recovery set = recovery.md5, update.tar.bz2 bzip2 OK, mtd0
+  U-Boot block and kernel = pa6170_rodin_nand.bin, mtd6 UBI VID 2048 /
+  data 4096, 2355 blocks, 1 bad.
+- Raw read (data + OOB) against the 11-01 baseline: **5 pages with one
+  flipped data bit each** (pages 767, 1317, 1385, 1996, 3370 = blocks 11,
+  20, 21, 31, 52, all in the kernel area). Ordinary bit errors in 6 days,
+  corrected by the BCH ECC (the corrected read was still the file).
+
+**Write:** window 2,63; `flash_erase /dev/mtd0 0x40000 62`;
+`nandwrite -p -s 0x40000` with blocks 2-54 of pa6170_rodin_nand.bin
+(7208960 bytes = 55 blocks); window none. The script's verify (corrected
+read = file) passed. nandwrite warned that 8 of the blocks it wrote hold
+only 0xff; they are programmed pages, as in the stock-written baseline
+(the raw compare below is exact).
+
+**After:**
+
+| Check | Result |
+|---|---|
+| Raw data + OOB, all 4096 pages, against the 11-01 baseline | **0 bits different** (the 5 bit errors are gone) |
+| Pages | 3520 programmed (0-3519, contiguous), 576 erased, as before |
+| ecc_failures | 0 |
+| Kernel log (klog.sh) | no NAND messages; only Wi-Fi and the read-only mtd5 mount |
+| Stock boot from NAND (`busybox reboot -f`, no serial interaction) | 3.2.0-g67a8e16, UBIFS root on mtd6, karas backup (mtd4) mounted, FCERT OK, "Booting Done", Klipper ready; dmesg has no NAND errors; stock's UBI shows 5 bad PEBs, as in vendor_hw_snapshot.txt |
+
+Raw dumps on the 4 GB card, /var/backups:
+nand_raw_oob_mtd0_before_stage1.bin, nand_raw_oob_mtd0_after_stage1.bin.
+
+**Note:** a rewrite refreshes the kernel area. The bit errors that build
+up between writes are within ECC, but the installer should rewrite mtd0 only
+when the kernel changes (as planned) and verify after.

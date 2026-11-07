@@ -87,8 +87,10 @@ still require the owner's explicit OK.
     keeps the live karas.db + network files on the stick for the latest
     calibration and Wi-Fi. mtd4 stays never-written.
 11e. **End-goal install sequence** (docs/end_goal_install_plan.md):
-    stages 1-9 approved by the owner 11-03; **start after the weekly token
-    refresh**; owner at the printer for each write stage.
+    stages 1-9 approved by the owner 11-03; owner at the printer for each
+    write stage. **Stage 1 done 2026-11-07** (mtd0 kernel area rewritten
+    from our kernel, raw = baseline, stock boot OK). Next: stage 2 (mtd6
+    backup + full revert).
 11d. **End-goal revert = a Sindoh update stick** (owner, 11-03;
     kernel/revert_to_stock_plan.md): our system recognizes a Sindoh DP200
     update stick, asks, restores stock from mtd5 (mtd0 kernel part, mtd6

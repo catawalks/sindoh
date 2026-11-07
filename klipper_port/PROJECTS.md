@@ -94,12 +94,13 @@ mtd5: that would erase the factory recovery set), removing Sindoh's app
 (backed up to the stick per printer and firmware) and Qt WebKit. Install,
 upgrade, cancel and remove (stick backup or the mtd5 fallback) tested on
 the test printer; installs on the work printer from 160505 and 191210
-firmware. Open: our kernel in mtd0 (step 3c, not approved), NAND space for
+firmware. Open: our kernel in mtd0 (the mtd0 write path is proven: end-goal
+stage 1, 2026-11-07), NAND space for
 upstream updates (#10).
 End goal (our kernel in mtd0, our root in mtd6, mtd5 untouched): revert by
 plugging in a Sindoh update stick (decided 2026-11-03, TODO 11d).
 The sequence to get there: [docs/end_goal_install_plan.md](docs/end_goal_install_plan.md)
-(all stages approved 2026-11-03; start after the weekly token refresh).
+(all stages approved 2026-11-03; stage 1 done 2026-11-07).
 
 ## 4. Object-on-bed check with the camera
 
@@ -246,4 +247,4 @@ replacing the stock root, ~140-150 MB of mtd6 should be free (estimate:
   it, full upstream updates (git/pip/compiler), timelapse, swap, backups.
 - Our kernel detects a card/stick marked for the printer at boot; the
   screen offers to format one; the installer reports what it found.
-**Next:** build it with the mtd0 kernel install (step 3c, pending OK).
+**Next:** build it with the mtd0 kernel install (end-goal stage 4).
