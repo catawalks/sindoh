@@ -1,0 +1,232 @@
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -617,6 +617,121 @@
+  * specialized functions responsible for executing the actual NAND
+  * operations do not have to replicate the same code blocks.
+  */
++/*
++ * Debug trace (88PA6170, DP200): the last NAND controller steps, written to
++ * a 4 KB RAM area that the DT reserves as no-map, so that they survive a
++ * warm reset (the timer-0 hang watchdog) and the next boot can print them.
++ * Off unless marvell_nand.trace_phys is set. Each entry: sequence number,
++ * time (us, monotonic), step, CPU, IRQs-off flag and up to three values.
++ */
++static ulong bch_v1_tr_phys;
++module_param_named(trace_phys, bch_v1_tr_phys, ulong, 0444);
++MODULE_PARM_DESC(trace_phys,
++		 "88PA6170 debug: physical address of a 4 KB no-map RAM area for the NAND step trace (0: off)");
++
++#define BT_MAGIC	0x3152544e	/* "NTR1" */
++#define BT_N		126
++
++struct bt_ent {
++	u32 seq, us, step, a, b, c, d, pad;
++};
++
++struct bt_ring {
++	u32 magic, seq, boot, pad[13];
++	struct bt_ent e[BT_N];
++};
++
++enum {
++	BT_CMD = 1,	/* a, b, c = NDCB0..2 */
++	BT_IN,		/* PIO from NDDB starts: a = length */
++	BT_IN_END,
++	BT_OUT,		/* PIO to NDDB starts: a = length */
++	BT_OUT_END,
++	BT_WAIT,	/* wait_op (R/B interrupt): a = timeout ms */
++	BT_WAIT_END,	/* a = completion result, b = pending NDSR bits */
++	BT_POLL,	/* end_cmd polling NDSR: a = flag */
++	BT_POLL_END,	/* a = ret, b = NDSR */
++	BT_ISR,		/* a = NDSR */
++	BT_RDD,		/* bch_v1 read: polling for RDDREQ, a = page */
++	BT_RDD_END,	/* a = ret, b = NDSR */
++	BT_STOP,	/* bch_v1_stop: a = NDCR before */
++};
++
++static const char * const bt_name[] = {
++	"?", "cmd", "pio-in", "pio-in-end", "pio-out", "pio-out-end",
++	"wait", "wait-end", "poll", "poll-end", "isr", "rdd", "rdd-end", "stop",
++};
++
++static struct bt_ring __iomem *bt;
++static atomic_t bt_seq = ATOMIC_INIT(0);
++
++static void bt_log(u32 step, u32 a, u32 b, u32 c)
++{
++	struct bt_ent __iomem *e;
++	u32 seq;
++
++	if (!bt)
++		return;
++	seq = atomic_inc_return(&bt_seq);
++	e = &bt->e[seq % BT_N];
++	writel_relaxed(0, &e->seq);
++	writel_relaxed((u32)(ktime_get_mono_fast_ns() >> 10), &e->us);
++	writel_relaxed(step | raw_smp_processor_id() << 8 |
++		       !!irqs_disabled() << 12 | !!in_interrupt() << 13,
++		       &e->step);
++	writel_relaxed(a, &e->a);
++	writel_relaxed(b, &e->b);
++	writel_relaxed(c, &e->c);
++	writel(seq, &e->seq);
++	writel(seq, &bt->seq);
++}
++
++/* At probe: print what the boot before left, then start a new ring */
++static void bt_init(struct device *dev)
++{
++	u32 last, seq, step, i, n = 0;
++	struct bt_ent __iomem *e;
++
++	if (!bch_v1_tr_phys)
++		return;
++	bt = ioremap(bch_v1_tr_phys, sizeof(*bt));
++	if (!bt) {
++		dev_err(dev, "trace: cannot map %#lx\n", bch_v1_tr_phys);
++		return;
++	}
++	if (readl(&bt->magic) == BT_MAGIC) {
++		last = readl(&bt->seq);
++		dev_warn(dev, "trace of boot %u, last step #%u:\n",
++			 readl(&bt->boot), last);
++		for (i = last >= BT_N ? last - BT_N + 1 : 1; i <= last; i++) {
++			e = &bt->e[i % BT_N];
++			seq = readl(&e->seq);
++			if (seq != i)
++				continue;
++			step = readl(&e->step);
++			dev_warn(dev, "trace #%u %u us cpu%u%s%s %s %08x %08x %08x\n",
++				 seq, readl(&e->us), (step >> 8) & 0xf,
++				 step & BIT(12) ? " irqoff" : "",
++				 step & BIT(13) ? " intr" : "",
++				 bt_name[(step & 0xff) < ARRAY_SIZE(bt_name) ?
++					 (step & 0xff) : 0],
++				 readl(&e->a), readl(&e->b), readl(&e->c));
++			n++;
++		}
++		dev_warn(dev, "trace: %u steps shown\n", n);
++		writel(readl(&bt->boot) + 1, &bt->boot);
++	} else {
++		dev_info(dev, "trace: no earlier trace at %#lx\n",
++			 bch_v1_tr_phys);
++		writel(1, &bt->boot);
++	}
++	memset_io(bt->e, 0, sizeof(bt->e));
++	writel(0, &bt->seq);
++	writel(BT_MAGIC, &bt->magic);
++	dev_info(dev, "trace: NAND steps to %#lx (boot %u)\n",
++		 bch_v1_tr_phys, readl(&bt->boot));
++}
++
+ static int marvell_nfc_prepare_cmd(struct nand_chip *chip)
+ {
+ 	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
+@@ -860,6 +975,7 @@
+ 		(u32)readl_relaxed(nfc->regs + NDCR), nfc_op->ndcb[0],
+ 		nfc_op->ndcb[1], nfc_op->ndcb[2], nfc_op->ndcb[3]);
+ 
++	bt_log(BT_CMD, nfc_op->ndcb[0], nfc_op->ndcb[1], nfc_op->ndcb[2]);
+ 	writel_relaxed(to_nand_sel(marvell_nand)->ndcb0_csel | nfc_op->ndcb[0],
+ 		       nfc->regs + NDCB0);
+ 	writel_relaxed(nfc_op->ndcb[1], nfc->regs + NDCB0);
+@@ -883,9 +999,11 @@
+ 	u32 val;
+ 	int ret;
+ 
++	bt_log(BT_POLL, flag, 0, 0);
+ 	ret = readl_relaxed_poll_timeout(nfc->regs + NDSR, val,
+ 					 val & flag,
+ 					 POLL_PERIOD, POLL_TIMEOUT);
++	bt_log(BT_POLL_END, ret, val, 0);
+ 
+ 	if (ret) {
+ 		dev_err(nfc->dev, "Timeout on %s (NDSR: 0x%08x)\n",
+@@ -946,6 +1064,7 @@
+ 	/* Timeout is expressed in ms */
+ 	if (!timeout_ms)
+ 		timeout_ms = IRQ_TIMEOUT;
++	bt_log(BT_WAIT, timeout_ms, 0, 0);
+ 
+ 	if (mtd->oops_panic_write) {
+ 		ret = marvell_nfc_poll_status(nfc, NDSR_RDY(0),
+@@ -960,6 +1079,7 @@
+ 		marvell_nfc_disable_int(nfc, NDCR_RDYM);
+ 	}
+ 	pending = marvell_nfc_clear_int(nfc, NDSR_RDY(0) | NDSR_RDY(1));
++	bt_log(BT_WAIT_END, ret, pending, 0);
+ 
+ 	/*
+ 	 * In case the interrupt was not served in the required time frame,
+@@ -1007,6 +1127,7 @@
+ 	u32 st = readl_relaxed(nfc->regs + NDSR);
+ 	u32 ien = (~readl_relaxed(nfc->regs + NDCR)) & NDCR_ALL_INT;
+ 
++	bt_log(BT_ISR, st, ien, 0);
+ 	/*
+ 	 * RDY interrupt mask is one bit in NDCR while there are two status
+ 	 * bit in NDSR (RDY[cs0/cs2] and RDY[cs1/cs3]).
+@@ -1129,6 +1250,7 @@
+ 	unsigned int last_full_offset = round_down(len, FIFO_DEPTH);
+ 	int i;
+ 
++	bt_log(BT_IN, len, 0, 0);
+ 	for (i = 0; i < last_full_offset; i += FIFO_DEPTH)
+ 		ioread32_rep(nfc->regs + NDDB, in + i, FIFO_REP(FIFO_DEPTH));
+ 
+@@ -1138,6 +1260,7 @@
+ 		ioread32_rep(nfc->regs + NDDB, tmp_buf, FIFO_REP(FIFO_DEPTH));
+ 		memcpy(in + last_full_offset, tmp_buf, last_len);
+ 	}
++	bt_log(BT_IN_END, len, 0, 0);
+ 
+ 	return 0;
+ }
+@@ -1149,6 +1272,7 @@
+ 	unsigned int last_full_offset = round_down(len, FIFO_DEPTH);
+ 	int i;
+ 
++	bt_log(BT_OUT, len, 0, 0);
+ 	for (i = 0; i < last_full_offset; i += FIFO_DEPTH)
+ 		iowrite32_rep(nfc->regs + NDDB, out + i, FIFO_REP(FIFO_DEPTH));
+ 
+@@ -1158,6 +1282,7 @@
+ 		memcpy(tmp_buf, out + last_full_offset, last_len);
+ 		iowrite32_rep(nfc->regs + NDDB, tmp_buf, FIFO_REP(FIFO_DEPTH));
+ 	}
++	bt_log(BT_OUT_END, len, 0, 0);
+ 
+ 	return 0;
+ }
+@@ -1421,6 +1546,7 @@
+  */
+ static void bch_v1_stop(struct marvell_nfc *nfc)
+ {
++	bt_log(BT_STOP, 0, 0, 0);
+ 	writel_relaxed(0xFFFFFFFF, nfc->regs + NDSR);
+ 	writel_relaxed(readl_relaxed(nfc->regs + NDCR) & ~NDCR_ND_RUN,
+ 		       nfc->regs + NDCR);
+@@ -1453,6 +1579,7 @@
+ 	if (ret)
+ 		goto out;
+ 	marvell_nfc_send_cmd(chip, &nfc_op);
++	bt_log(BT_RDD, page, 0, 0);
+ 	end = ktime_add_us(ktime_get(), POLL_TIMEOUT);
+ 	for (;;) {
+ 		ndsr = readl_relaxed(nfc->regs + NDSR);
+@@ -1476,6 +1603,7 @@
+ 		}
+ 		cpu_relax();
+ 	}
++	bt_log(BT_RDD_END, 0, ndsr, 0);
+ 	bch_v1_last_ndsr = ndsr;
+ 	if (ndsr & NDSR_UNCERR)
+ 		*flags |= F_RDD_UNC;
+@@ -3591,6 +3719,7 @@
+ 		return -ENOMEM;
+ 
+ 	nfc->dev = dev;
++	bt_init(dev);
+ 	nand_controller_init(&nfc->controller);
+ 	nfc->controller.ops = &marvell_nand_controller_ops;
+ 	INIT_LIST_HEAD(&nfc->chips);
