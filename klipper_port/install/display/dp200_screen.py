@@ -2219,8 +2219,8 @@ HOMES_FIRST = ('_SINDOH_ENSURE_HOMED', 'CLEAN_NOZZLE', 'LOAD_FILAMENT', 'UNLOAD_
 def revert_confirm():
     """The two-step question for a Sindoh update stick (stick_tick)."""
     return ('Sindoh update stick found. Return this printer to stock and run the update?',
-            ('confirm', 'Sure? This REMOVES Klipper and all its settings from the printer. '
-                        'It cannot be undone.', ('revert_go',), ('revert_no',)),
+            ('confirm', 'Are you sure? This removes Klipper and returns the printer '
+                        'completely to stock.', ('revert_go',), ('revert_no',)),
             ('revert_no',))
 
 def usb_disks():

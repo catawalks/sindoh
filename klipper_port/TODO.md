@@ -175,8 +175,12 @@ still require the owner's explicit OK.
       card root) and asks only with no working root (dp200-hold: drained,
       armed after 0.3 s quiet, 2 frames, 3 s hold; test_dp200_hold.sh 11
       cases); dirname/id/basename added; test_nandboot_init.sh 10
-      scenarios + the tool list. Open: the hardware test (hold on the
-      real panel, the popup), and a "Back to stock" button. Wi-Fi: build mwifiex_usb
+      scenarios + the tool list. Hardware, 11-07: dp200-hold on the real
+      panel (no touch: timeout; 0.4 s tap: not counted; hold: "held" after
+      3.0 s); the popup with the stick: both questions shown, NO leaves no
+      marker and no reboot request. Open: the full YES-YES revert (stage
+      7), the broken-root prompt on hardware, a "Back to stock" button,
+      maybe better wording for the second question (owner: fine for now). Wi-Fi: build mwifiex_usb
       as a module, loaded by init.mainline (owner prefers this over the
       re-enumerate, which may be tied to the 11-07 hang).
     - **nandboot hang (2026-11-07, once):** userspace, serial echo and
