@@ -167,14 +167,34 @@ failed exactly like the warm one:
   - **Two NAND-root failures and one SD success are not proof.** The
     morning boots need their root recorded.
 
-**New candidate order:**
+**Correction (full 11-07 tally from the main session).** All five boots
+ran kernel 5b17e2ec from mtd0:
+
+| # | Time | Start | Root | Capture | Wi-Fi |
+|---|---|---|---|---|---|
+| 1 | ~09:35 | warm | card | `nandboot1.log` (from 21 s on: the same 0xa9 dump, `last_event_index = 0`) | **failed** |
+| 2 | ~10:05 | warm | card | `nandboot2.log` (nearly empty) | good |
+| 3 | ~11:15 | cold | card | `coldboot1.log` | good |
+| 4 | ~11:28 | warm | NAND | `nandroot1.log` | **failed** |
+| 5 | ~12:05 | cold | NAND | `after_t5hang_boot.log` | **failed** |
+
+- **The card root failed too** (boot 1). So the NAND root isn't the
+  common factor. Card root: 1 of 3 failed; NAND root: 2 of 2; warm 2 of
+  3; cold 1 of 2.
+- Every boot, card roots included, attached and scanned mtd6 at
+  ~7–8 s. So some NAND load comes before every insmod. The NAND root
+  only adds more (UBIFS recovery, file reads).
+- All three failures have the same signature: full download, then no
+  command response and **no event of any kind**.
+
+**Candidate order (re-ranked):**
 
 | | Candidate | Fits | Test |
 |---|---|---|---|
-| B | NAND/UBI activity during the firmware's first second (PIO busy-poll, bus or supply load) | Both captured failures were NAND-root; D2 coincided with the UBI scan; the uniprocessor kernel failed every time | Cold boots: SD root against NAND root, 5 each. NAND root with the insmod delayed until the NAND is idle (`sleep 20` after UBIFS recovery, or `sync` and wait for `ubi_bgt0d` to go idle) |
-| A | Mainline doesn't read EP1 right after the download. The vendor reads INIT_DONE at once (2 s), mainline leaves EP1 IN without a pending read for ~500 ms | Explains a random race, and a firmware stuck on an unserviced IN transfer would show exactly "no event, no response". The timing alone doesn't explain why it's NAND-root only | The INIT_DONE read (fix item 2), which also logs whether INIT_DONE comes |
-| C | Leftover chip state (rail not cut) | Warm 2 of 3; weakened by the cold failure | How the owner powered off; with the `debug_mask` log, whether a cold failure looks any different |
-| D | Power-rail droop during RF start-up | Speculative | A scope on the module's 3.3 V; nothing offline |
+| **A** | **EP1 IN not serviced after the download.** The vendor reads EP1 at once and waits up to 2 s for INIT_DONE. Mainline sleeps ~500 ms with no IN read pending, then submits the RX URB and sends FUNC_INIT | Card and NAND root, warm and cold: a race, about 50% here. "No event at all" in 10 s fits a firmware whose INIT_DONE wasn't collected in time and that went no further | **The INIT_DONE read (fix item 2), built as a test kernel.** It logs whether INIT_DONE comes, and when. If the failures stop, A is the cause; if INIT_DONE never comes on a failing boot, the firmware didn't start (go to B/C/D) |
+| B | Load during the firmware's first second: NAND PIO busy-poll, UBI/UBIFS work, bus or supply load | NAND root 2 of 2 against card root 1 of 3. Too few boots to separate it from chance; at most a contributing factor | T0 below: cold boots on each root. A NAND-root boot with the Wi-Fi insmod delayed until the NAND is idle |
+| C | Leftover chip state (a rail not cut) | Cold 1 of 2 failed: weak | How the owner powered off (mains or front key) |
+| D | Supply droop during RF start-up | Speculative | A scope on the module's 3.3 V |
 
 ### The T5 hang
 
@@ -341,10 +361,10 @@ three places, and each one leads to exactly that symptom:
 warm failures seen so far: the download happened. (2) holds in its
 recast form: the image downloads cleanly, then the firmware never starts.
 (1) and (3) stay in the fix list, because 0004 still has those gaps.
-**A cold failure followed (`after_t5hang_boot.log`).** The leading
-correlation is now the NAND root (candidate B, see "Revised after a cold failure" above),
-with the missing INIT_DONE read (A) as the code-side suspect. Leftover
-chip state (C) is weakened.
+**A cold failure followed (`after_t5hang_boot.log`), and a card-root
+failure was found in the tally.** The leading suspect is the missing
+INIT_DONE read (candidate A). NAND load (B) is at most a contributing
+factor, and leftover chip state (C) is weak.
 
 ## 4. Telling the hypotheses apart: logging, no rebuild needed
 
@@ -372,6 +392,71 @@ console):
 Keep each boot's log across the reboot: the serial capture, or init.mainline
 appending `dmesg | grep -E 'usb 2-1.1|mwifiex|mlan0'` to a file on the SD
 card or the USB stick (not NAND, to avoid the writes).
+
+### Exact settings for the next test boots
+
+Nothing here needs a rebuild: kernel 5b17e2ec has `NETCONSOLE=y`,
+`NETCONSOLE_DYNAMIC=y`, `CONFIGFS_FS=y`, `MAGIC_SYSRQ=y` and
+`MAGIC_SYSRQ_SERIAL=y`.
+
+1. **Serial capture of the whole boot, from U-Boot on.** This is the
+   primary record:
+   - The kernel log buffer is only 32 KB, and a boot already fills ~30 KB.
+     `CMDLINE_FORCE` rules out `log_buf_len=`, so `dmesg` afterwards can
+     lose the early lines.
+   - mwifiex's lines are `dev_info`. They reach the console at the default
+     console log level (7).
+2. **mwifiex debug mask.** In init.mainline, for the test boots only:
+
+   ```sh
+   echo "dp200-init: wifi: insmod (debug_mask 0x20000037)" > /dev/kmsg
+   insmod .../mwifiex.ko debug_mask=0x20000037   # MSG FATAL ERROR CMD EVENT WARN
+   insmod .../mwifiex_usb.ko
+   echo "dp200-init: wifi: insmod done" > /dev/kmsg
+   ```
+
+   On every boot, good or bad, that adds:
+   - `cmd: DNLD_CMD: 0xa9 ...` and `cmd: CMD_RESP: 0xa9 ...`;
+   - each `event_cause 0x...`, in particular whether `0x7` (INIT_DONE)
+     ever comes on a good boot, and when;
+   - the winner-check value if the firmware is ever reused.
+
+   The good boots matter as much as the failures: candidate A predicts
+   that a good boot shows `event_cause 0x7` right after the RX URB goes
+   in.
+3. **A small per-boot Wi-Fi log that survives the reboot.** About 60 s after
+   the insmod, init.mainline appends
+   `dmesg | grep -E 'usb 2-1|mwifiex|dp200-init|ubi0|UBIFS'` to
+   `/var/log/dp200-wifi.log`, with a header line giving the date, the root,
+   and how the previous boot ended (written by the reboot path, or
+   "unknown" after a power cycle). That's a few KB per boot on the root.
+4. **Netconsole**, set up in init.mainline as soon as eth0 has its address:
+
+   ```sh
+   mount -t configfs none /sys/kernel/config 2>/dev/null
+   d=/sys/kernel/config/netconsole/pc
+   mkdir -p $d
+   echo eth0           > $d/dev_name
+   echo <printer eth0 IP> > $d/local_ip
+   echo <PC IP>        > $d/remote_ip
+   echo 6666           > $d/remote_port
+   # remote_mac stays ff:ff:ff:ff:ff:ff (broadcast) unless set
+   echo 1              > $d/enabled
+   dmesg -n 8                       # every level to the consoles
+   echo 1 > /proc/sys/kernel/sysrq
+   ```
+
+   On the PC, a UDP listener on port 6666 writing to a file (e.g. `ncat -u
+   -l 6666 > netcon.log`, or a 5-line Python socket loop).
+   - **Limitation:** eth0's link comes up only at ~19–24 s, after the
+     Wi-Fi window (insmod ~10.7 s, timeout ~22 s), and netconsole sends
+     only messages logged after it's enabled. So for the boot failure,
+     items 1–3 are the record. Netconsole is for the later rmmod/insmod
+     steps and for hangs, as long as the CPU and GMAC still run.
+   - Don't move the Wi-Fi insmod after eth0 to get it on netconsole: that
+     changes the timing under test.
+5. **For each boot, note:** warm or cold (and for cold, mains or front
+   key), the root, and the result (mlan0 address or the 0xa9 dump).
 
 ### Before any more rmmod/insmod tests (after the T5 hang)
 
@@ -462,7 +547,7 @@ and 2 depend on T3 and T5.
   vendor. It services EP1 IN from the moment the download ends
   (candidate A), and its log line says whether the firmware ever
   started: no INIT_DONE within 2 s means it didn't.
-- Then, if T0 confirms candidate B, defer the Wi-Fi insmod until the
+- Then, only if T0 shows a clear root difference (candidate B), defer the Wi-Fi insmod until the
   NAND root is idle (init.mainline), as a workaround with a known cause,
   and look at the NAND path's load.
 - Item 1 (shutdown hook) stays worth doing, but it no longer explains

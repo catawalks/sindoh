@@ -256,6 +256,19 @@ replacing the stock root, ~140-150 MB of mtd6 should be free (estimate:
   can't stop the boot, and there is one system to update. The
   initramfs/end_goal_install_plan.md stage 3 wording ("root = a marked
   card") changes with this.
+- **Update path, direction set 2026-11-07 (owner; to discuss again
+  later):** build on the card, run from NAND. With a storage card or
+  stick, Klipper, Moonraker and Mainsail update from the upstream main
+  channel: the git checkouts, the Python environments and the compiler
+  live on the card; after a successful build an install step copies the
+  result into NAND (Mainsail's release files need no build), ideally
+  keeping the previous version until the new one starts (~70 MB of apps,
+  ~143 MB free). NAND always runs the newest installed version, so a
+  pulled or dead card changes nothing that runs. Moonraker's update
+  manager updates checkouts in place, so it needs our glue: update the
+  card's copies, then our deploy step. NAND-only users update with our
+  prebuilt images. Open for the later discussion: A/B space on NAND, how
+  the screen and Mainsail show a pending deploy, rollback.
 **Next:** build it with the mtd0 kernel install (end-goal stage 4).
 
 ## 12. Wi-Fi chip firmware: decompile / clean-room rewrite (low priority, after the release)
