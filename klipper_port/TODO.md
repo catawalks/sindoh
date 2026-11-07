@@ -214,8 +214,14 @@ still require the owner's explicit OK.
       min each) with the nc streams and Wi-Fi up, all PASSED: A m1-debian
       5df089a9 (Nov 1 tree), B m1-debian-nandw f370f49e, E
       m1-nandboot-errata 5b17e2ec (e1ee7e8: the vendor PJ4B cache wrapper +
-      erratum 6011). Next: plain m1-nandboot fcba26da again (did it hang
-      by chance, or reproducibly?); docs/kernel/nandboot_hang_analysis.md.
+      erratum 6011). Then N, plain m1-nandboot fcba26da again: passes 1-2
+      done, **hung in pass 3** (668 s uptime, ~570 s into the load; no
+      ping, serial or SysRq). So plain nandboot hung in 2 of 2 load runs
+      (~30 s and ~570 s), the errata image 0 of 1, m1-debian 0 of 2 (each
+      ~13 min of load). Suggestive for the errata image, not proof. Next:
+      longer runs (1 h+) of the errata image and m1-debian, ideally with
+      a hardware watchdog in a debug image so a hang resets by itself;
+      docs/kernel/nandboot_hang_analysis.md.
     - stage 3 normal path tested 2026-11-07 (end_goal_install_plan.md):
       root from the marked card, mtd-utils run read-only; Wi-Fi fixed in
       init.mainline. Open for the initramfs: keep its log (copy to a
