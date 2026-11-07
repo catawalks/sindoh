@@ -112,6 +112,96 @@ downloads cleanly but often doesn't start. The earlier cold-boot
 failures (uniprocessor m1-net, D2) need their own logs to say whether
 they were the same thing.
 
+### Revised after a cold failure and the T5 hang (`after_t5hang_boot.log`)
+
+After the T5 hang the owner power-cycled the printer. That **cold** boot
+failed exactly like the warm one:
+- `start to download FW...` at 10.741 s, a full 253,996 bytes by
+  11.266 s;
+- `WLAN FW is active` at 11.777 s;
+- a 0xa9 timeout at 22.317 s, with no response and no event.
+
+**Today's boots:**
+
+| Capture | Start | Root | Download → "active" | Wi-Fi |
+|---|---|---|---|---|
+| (morning, first report) | warm | ? | ? | failed |
+| (morning) | warm | ? | ? | good |
+| `coldboot1.log` | cold | **SD** (`/dev/mmcblk0p1`) | 11.493 → 12.007 | **good** |
+| `nandroot1.log` | warm | **NAND** (`ubi0:filesystem`) | 11.289 → 11.797 | failed |
+| `after_t5hang_boot.log` | cold | **NAND** | 11.266 → 11.777 | failed |
+
+**What changes:**
+- **Leftover chip state is no longer the lead.** A power cycle of the
+  printer takes the 8782's supply with it unless the module sits on a
+  standby rail. Nothing in software or the vendor files suggests one, but
+  section 2 found no power control at all, so it can't be ruled out
+  offline.
+  - Did the owner switch off at the mains, or with the front power key?
+    A soft-off could leave rails up.
+  - The chip comes back in its boot ROM either way (both failures did a
+    full download). So a remaining rail would only matter if the RF or
+    power-management side keeps state the boot ROM doesn't reset.
+- **Firmware timing isn't the difference either.** Failed and good boots
+  have the same 0.5 s download and the same ~510 ms from the last block to
+  the first command. Nothing on the host side looks slower on the failing
+  boots.
+- **What the failures share: the NAND root.** Both captured failures
+  booted from mtd6; the only captured success booted from SD. It's an
+  old pattern: the D2 failure coincided with the boot-time UBI scan
+  (nand_boot_cmdline.md), and the uniprocessor m1-net, where the CPU is
+  busier, failed every time.
+  - On a NAND-root boot, the minutes around the insmod are full of NAND
+    work: UBI attach and scan (7.0–8.2 s), UBIFS "recovery needed" and
+    deferred recovery (8.3–9.9 s), then every file init reads.
+  - Our NAND read path (patch 0010) moves data by **PIO** and
+    **busy-polls** NDSR in a `cpu_relax()` loop. That costs a lot of CPU,
+    plus SoC bus traffic to the NAND controller, for every page.
+  - How that would stop a firmware *on the chip* from starting isn't
+    known. Possible paths:
+    - a host-side USB timing duty, e.g. a late SOF or a slow IN token
+      just as the firmware brings up its USB side;
+    - contention on the SoC bus or memory affecting the EHCI;
+    - supply droop when NAND programs coincide with the 8782's RF
+      calibration.
+  - **Two NAND-root failures and one SD success are not proof.** The
+    morning boots need their root recorded.
+
+**New candidate order:**
+
+| | Candidate | Fits | Test |
+|---|---|---|---|
+| B | NAND/UBI activity during the firmware's first second (PIO busy-poll, bus or supply load) | Both captured failures were NAND-root; D2 coincided with the UBI scan; the uniprocessor kernel failed every time | Cold boots: SD root against NAND root, 5 each. NAND root with the insmod delayed until the NAND is idle (`sleep 20` after UBIFS recovery, or `sync` and wait for `ubi_bgt0d` to go idle) |
+| A | Mainline doesn't read EP1 right after the download. The vendor reads INIT_DONE at once (2 s), mainline leaves EP1 IN without a pending read for ~500 ms | Explains a random race, and a firmware stuck on an unserviced IN transfer would show exactly "no event, no response". The timing alone doesn't explain why it's NAND-root only | The INIT_DONE read (fix item 2), which also logs whether INIT_DONE comes |
+| C | Leftover chip state (rail not cut) | Warm 2 of 3; weakened by the cold failure | How the owner powered off; with the `debug_mask` log, whether a cold failure looks any different |
+| D | Power-rail droop during RF start-up | Speculative | A scope on the module's 3.3 V; nothing offline |
+
+### The T5 hang
+
+The command was `rmmod mwifiex_usb; rmmod mwifiex; insmod mwifiex.ko
+debug_mask=...; insmod mwifiex_usb.ko`, 30 min after the failure. The
+driver code doesn't explain a hard hang:
+- **rmmod mwifiex_usb.** After the failed init, `mwifiex_unregister_dev()`
+  set `card->adapter = NULL` and `fw_done` had completed. So
+  `mwifiex_usb_disconnect()` returns at once. It only leaks the
+  `usb_get_dev` reference (no `usb_put_dev`), which is harmless.
+- **rmmod mwifiex.** Nothing left registered.
+- **insmod mwifiex_usb.** This probes the 8782 again. With the chip in
+  an unknown state that means bulk transfers that time out, then
+  `usb_kill_urb`, then the EHCI unlink handshake. At worst 0004's
+  fallback leads to another 10 s command timeout. Each step is a timeout,
+  not a lockup.
+- Nothing fired: no soft-lockup panic, no buddy hard-lockup panic, no
+  `panic=10` reboot, and serial was gone. That points the way the nandboot
+  hard hangs did: **both CPUs stuck in a bus access that never
+  completes**, here possibly an EHCI register access or DMA against a
+  controller in a bad state. It's not a driver deadlock, which the
+  detectors would catch.
+- Note the hang-1 load in nandboot_hang_analysis.md: "Wi-Fi:
+  re-enumerate". **USB/8782 activity is now in two of the hard hangs.**
+  The errata kernel fixed the SD-load hangs, but this may be a separate
+  hang in the USB path.
+
 ### The reason-7 drop (a separate issue)
 
 - Reason 7 is "Class 3 frame received from nonassociated STA". **The
@@ -251,6 +341,10 @@ three places, and each one leads to exactly that symptom:
 warm failures seen so far: the download happened. (2) holds in its
 recast form: the image downloads cleanly, then the firmware never starts.
 (1) and (3) stay in the fix list, because 0004 still has those gaps.
+**A cold failure followed (`after_t5hang_boot.log`).** The leading
+correlation is now the NAND root (candidate B, see "Revised after a cold failure" above),
+with the missing INIT_DONE read (A) as the code-side suspect. Leftover
+chip state (C) is weakened.
 
 ## 4. Telling the hypotheses apart: logging, no rebuild needed
 
@@ -279,6 +373,57 @@ Keep each boot's log across the reboot: the serial capture, or init.mainline
 appending `dmesg | grep -E 'usb 2-1.1|mwifiex|mlan0'` to a file on the SD
 card or the USB stick (not NAND, to avoid the writes).
 
+### Before any more rmmod/insmod tests (after the T5 hang)
+
+A hang leaves no log unless something gets it off the board before the
+CPUs stop. In order of value:
+
+1. **The `m1-nandboot-errata-dbg` image** (5685822, md5 `d4350cf0…`):
+   - Its timer-0 watchdog warm-resets the board 30 s after a hang.
+   - Its ramoops keeps the console log in RAM across that reset, so after
+     the reboot `/sys/fs/pstore/console-ramoops-0` holds the hung boot's
+     log up to its last line.
+   - It's the only option that survives a bus stall: printk writes into
+     RAM synchronously, and netconsole needs a working CPU and GMAC to
+     send.
+   - **It's a debug image with a hardware watchdog, so the owner's OK
+     comes first.** Run nandboot_hang_analysis.md's 5-step check first
+     (watchdog fires with `hang_wdt_nokick`, and pstore survives).
+   - It's a different kernel from mtd0's, booted from the SD card or by
+     kexec. Its modules tar must match it, so don't reuse mtd0's
+     modules.
+2. **Netconsole to the PC** (planned), plus `dmesg -n 8` so every level
+   goes out, and `echo 1 > /proc/sys/kernel/sysrq`. If serial still takes
+   a BREAK, send BREAK + `l` (backtrace of all CPUs) and BREAK + `w` before
+   power-cycling.
+3. **One step per command, each marked in the kernel log**, waiting and
+   checking that the board still answers before the next:
+
+   ```sh
+   m() { echo "T5: $*" > /dev/kmsg; }
+   m "state"; cat /sys/bus/usb/devices/2-1.1/bcdDevice \
+       /sys/bus/usb/devices/2-1.1/authorized; grep -i ehci /proc/interrupts
+   m "rmmod mwifiex_usb"; rmmod mwifiex_usb; m "rmmod mwifiex_usb done"; sleep 3
+   m "rmmod mwifiex";     rmmod mwifiex;     m "rmmod mwifiex done";     sleep 3
+   m "insmod mwifiex";    insmod mwifiex.ko debug_mask=0x20000037; m "done"; sleep 3
+   m "insmod mwifiex_usb"; insmod mwifiex_usb.ko; m "insmod mwifiex_usb returned"
+   ```
+
+   Ping over Ethernet between steps from the PC. Then the last marker
+   in the log, and whether the ping stopped, say which step hung.
+4. **Separate USB from the driver** in a second run. Before any mwifiex
+   step, take the 8782 off and back on the bus with `echo 0 >
+   /sys/bus/usb/devices/2-1.1/authorized` and `echo 1`, with the modules
+   not loaded. If that alone hangs, the hang is in the USB host/hub path,
+   not in mwifiex.
+
+Not wanted until a hang log exists: the `USBDEVFS_RESET` part of T5 (a
+port reset on a chip that just failed is the riskiest step).
+
+For the Wi-Fi failure itself, the most informative cheap test is
+**candidate B: cold boots from the SD root against the NAND root**, with
+`debug_mask=0x20000037`. It needs no rmmod at all.
+
 ### The reboot-loop matrix
 
 The main session runs it. N is each test's run count. For each run, record
@@ -286,6 +431,7 @@ whether `CMD_RESP: 0xa9` came, and whether `event_cause 0x7` came.
 
 | Test | How the previous boot ends | N | Expected, if the leftover chip state is the cause |
 |---|---|---|---|
+| T0 | **Cold boots, SD root against NAND root** (candidate B), no rmmod | 5 + 5 | Tests B, not leftover state: if only the NAND-root boots fail, B. A delayed insmod on the NAND root (after the UBIFS recovery, NAND idle) is the follow-up |
 | T1 | Power cycle (cold) | 10 | All good, with `event_cause 0x7` before or around the first command |
 | T2 | `reboot -f` with mlan0 associated | 20 | About 2 of 3 fail as in `nandroot1.log`: a full download, then no event and no response |
 | T3 | `ip link set mlan0 down; rmmod mwifiex_usb mwifiex; reboot -f` (FUNC_SHUTDOWN sent, radio off) | 20 | **All good, or clearly fewer failures** than T2 |
@@ -310,6 +456,17 @@ Read the hub descriptor (in the open questions) once, anytime.
 
 In order of value. All of it is a 0004 follow-up and 8782-only. Items 1
 and 2 depend on T3 and T5.
+
+**Revised order after the cold failure:**
+- **Item 2's INIT_DONE read comes first.** It's cheap and matches the
+  vendor. It services EP1 IN from the moment the download ends
+  (candidate A), and its log line says whether the firmware ever
+  started: no INIT_DONE within 2 s means it didn't.
+- Then, if T0 confirms candidate B, defer the Wi-Fi insmod until the
+  NAND root is idle (init.mainline), as a workaround with a known cause,
+  and look at the NAND path's load.
+- Item 1 (shutdown hook) stays worth doing, but it no longer explains
+  the failures by itself.
 
 1. **Shut the firmware down at reboot** (if T3 confirms it).
    - Add `.shutdown = mwifiex_usb_shutdown` to `mwifiex_usb_driver`. It
