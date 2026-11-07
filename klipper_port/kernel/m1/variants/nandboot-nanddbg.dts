@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * m1-nandboot-nanddbg: nandboot plus a ramoops area for pstore (1 MB at
- * 0x1e000000, as in nandboot-errata-dbg.dts) and, right after it, 4 KB of
- * no-map RAM for the NAND step trace (marvell_nand.trace_phys, patch
- * 0015). Both are clear of what the stock U-Boot uses (see
- * nandboot-errata-dbg.dts).
+ * 0x1e000000, as in nandboot-errata-dbg.dts) and, right after it, the NAND
+ * step trace (marvell_nand.trace_phys, patch 0015). Both are clear of what
+ * the stock U-Boot uses (see nandboot-errata-dbg.dts).
+ *
+ * Both are no-map and together fill the 2 MB pair 0x1e000000-0x1e1fffff.
+ * On ARM without LPAE one first-level table entry pair covers 2 MB: if one
+ * 1 MB half is section-mapped and the other needs page tables (a no-map
+ * hole that isn't a whole 1 MB), map_lowmem() hits BUG_ON(pmd_bad()) in
+ * arm_pte_alloc() before the console is up. The first nanddbg image
+ * (0685c985, a 4 KB no-map at 0x1e100000) died exactly so, silently, after
+ * "Uncompressing Linux... done" (2026-11-07). The driver maps only the first
+ * 4 KB of its area.
  */
 #include "nandboot.dts"
 
@@ -13,6 +21,7 @@
 		ramoops@1e000000 {
 			compatible = "ramoops";
 			reg = <0x1e000000 0x00100000>;
+			no-map;
 			record-size = <0x00020000>;	/* 3 dmesg records */
 			console-size = <0x00080000>;
 			pmsg-size = <0x00020000>;
@@ -20,7 +29,7 @@
 		};
 
 		nandtrace@1e100000 {
-			reg = <0x1e100000 0x00001000>;
+			reg = <0x1e100000 0x00100000>;
 			no-map;
 		};
 	};
