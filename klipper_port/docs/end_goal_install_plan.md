@@ -122,9 +122,17 @@ after the errata kernel's 82-minute soak, TODO 17).**
   writing anything: the card root also holds /alpine (513 MB), /payload
   (131 MB), /bootrom, /kb_out and plain files in / (stock images,
   tarballs, dumps), now all excluded.
-- The card keeps its /.dp200-root marker, so the card is still the root.
-  **Next (owner's OK):** boot with the mtd6 root (remove the marker or the
-  card) and check Klipper, Wi-Fi and the screen from NAND only.
+- **NAND-only boot, 11-07 ~11:28 (owner's OK):** the card's marker
+  renamed to /.dp200-root.off (the card stays inside; renaming it back
+  returns to the card root). Warm reboot -> dp200-init: root
+  ubi0:filesystem; / is UBIFS rw (110 MB used, 143 MB free), the card
+  only probed and unmounted, mtd6 window 1741,4091 as intended, 0 ECC
+  failures. Klipper ready, Moonraker and Mainsail (200) answer, the
+  screen app runs. Wi-Fi did not come up (command 0xa9 timeout, then
+  "Card is removed"): the boot-time Wi-Fi failure, TODO 17 /
+  docs/kernel/wifi_boot_failure.md, not a NAND-root problem.
+- Decided the same day: `/.dp200-root` is for development and recovery
+  only; an end-user card is storage, mtd6 always the root (PROJECTS 10).
 
 **4. Our kernel in mtd0, root still on the SD card.** Write our kernel
 (+ initramfs) into mtd0's kernel area; U-Boot boots it with the stock
