@@ -364,3 +364,38 @@ didn't touch the kernel; root 210 MB used, 42 MB free.
 mtd5 + mtd4 + a Sindoh stick bring back 2020 stock with the printer's own
 identity, no files from us. The interim /klipper hook went with the old
 root, so the dev printer now runs Klipper only from our SD kernel.
+
+## The Sindoh update damages the stick's FAT (found 2026-11-07)
+
+After stage 2's RODIN_200730_2 update the stick's `_update_rodin` folder was
+gone (the stage-3 initramfs, mounting it read-only, saw every other folder
+but that one). Windows `chkdsk` (read-only) found the volume dirty,
+109,880 KB of lost chains in 58 pieces, and one other broken entry. A copy
+of the stick was taken first (D:\DP200\backup\usb_stick_copy_20261107, local
+only), then `chkdsk /f`. The recovered FOUND.000 pieces are the lost folder
+and what the update wrote onto the stick:
+- image.app and image.bin (prefix-equal to the zip's), their .md5 files;
+- the decrypted update scripts (update util 1.01, unmistakable_boot_arg_set,
+  delete_unused, rm_unused_util) and an `ls -al` file list of the root
+  (rm_unused_util `--get-filelist` writes ./fileList.txt in the stick
+  folder);
+- ~30 zoneinfo files (the update's temporary tree), two 7,208,960-byte
+  copies of the kernel image (md5 945ecc0c = pa6170_rodin_nand.bin), a
+  logo-sized file.
+
+So the stock update writes to the stick and then reboots without a clean
+unmount: auto_update.sh's `umount` comes only after update.sh returns. The
+directory updates that were still cached were lost. This is Sindoh's
+behaviour, so the user revert path inherits it: **tell users their Sindoh
+stick may need a Windows disk check (or a fresh copy of the update) after
+an update.** Our initramfs only ever mounts sticks read-only.
+
+Also seen in the recovered scripts: unmistakable_boot_arg_set's test
+`if [ $cmd='' ]` is always true, so every 2020 update rewrites
+`setbootargs_nand` in the U-Boot env (with the stock value). Our system
+never writes the env; a Sindoh update does.
+
+One file on the stick, Sindoh_backup_20251206_213531/rodin_20160505_1/backup.tar
+(a stick backup from 2025-12), was unreadable before the repair and is
+truncated after it (3873 entries, then "Unexpected EOF"); kept as
+backup.tar.after_chkdsk in the copy.
