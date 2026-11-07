@@ -10,6 +10,82 @@ Offline analysis, 2026-11-07. Inputs:
 
 Nothing here was run on the printer.
 
+## Conclusion (2026-11-07)
+
+**Root cause:** mainline mwifiex's post-download sequence for the 8782,
+which patch 0004 carried over from the other USB chips. It differs from the
+Marvell SDK's (mlan/usb8xxx) in two places:
+1. a "winner" probe block sent before the image;
+2. `msleep(500)` after the last block, with EP1 IN left unread, where the
+   SDK reads the firmware's INIT_DONE event right away.
+
+On about half the boots, warm or cold, the first command after that
+(FUNC_INIT, 0xa9) then got no answer, and mwifiex gave the device up after
+10 s.
+
+**Fix:** patch 0013 starts the 8782 the SDK's way:
+- no winner probe;
+- an EP1 read for INIT_DONE right after the download (up to 2 s);
+- the first command right after it.
+
+It also fixes a mainline URB leak (`mwifiex_usb_free()` freed the TX
+command URB without killing it, which caused the T5 oops). Patch 0014
+adds a short trace of the first EP1 transfers. Both are under
+`CONFIG_MWIFIEX_USB_8782_START`, **on in `variants/nandboot.config` since
+2026-11-07**.
+
+**Numbers** (5b17e2ec mtd0 kernel, NAND root, graded on kernel log lines
+only):
+
+| | Boots | Wi-Fi up |
+|---|---|---|
+| Unpatched mwifiex (baseline, corrected) | 10 warm, 3 cold | about 3 of 10 warm, 2 of 3 cold |
+| Patch 0013 (wifidbg `mwifiex_usb.ko` ef7100b4, defaults) | 13 warm | **13 of 13** |
+| Patches 0013 + 0014 (wifitrace `mwifiex_usb.ko` 8f941909) | 6 warm | **6 of 6** |
+| Stock 3.2 + mlan/usb8xxx (control) | 11 warm | 11 of 11 |
+
+With the patch, INIT_DONE came 56 ms after the download every time, and
+FUNC_INIT was answered within ~125 ms. No failing trace was caught.
+
+**History, briefly:**
+- The analysis below went through several wrong leads before the stock
+  control (11/11) pointed at the host side, and W1 at the start sequence:
+  - leftover chip state across warm reboots;
+  - NAND-root load;
+  - the "T5 hang", which was hang 4 (nandboot_hang_analysis.md), not
+    Wi-Fi.
+- For a while W1 and T3 looked like 100% failures. That was a grading
+  bug in the test loop: it matched "Card is removed" in the serial echo of
+  its own check command. All numbers in this section are re-graded on the
+  kernel's `[ time ]` lines.
+- The USB host-side differences (TXFILLTUNING, data toggles) aren't needed
+  to explain the failure. They stay documented below in case it ever
+  returns.
+
+**Build with the fix on** (`VARIANT=nandboot`, 2026-11-07):
+- `m1-nandboot.uimg` md5 `dc3b5f20d8c7a46b870632184aec5276` (2,813,596
+  bytes);
+- `m1-nandboot-modules.tar` md5 `948b3350b8884417986fb4314b027079`;
+- `mwifiex_usb.ko` md5 `8f941909…`, **byte-identical to the tested wifitrace
+  module**, and `mwifiex.ko` `4c2a8c4e…`;
+- the full config differs from 5b17e2ec's (`m1-nandboot-errata`) only in
+  this option and the initramfs path.
+
+The image is a new build of the same kernel, not 5b17e2ec itself. On the
+printer, the modules are what matter (they load on 5b17e2ec). The old
+plain-nandboot outputs (fcba26da) are kept in `out/keep-fcba26da/`.
+
+**Not separated:** which half of 0013 matters, the missing winner probe or
+the immediate INIT_DONE read. 5 boots each with
+`mwifiex_usb.usb8782_ready_ms=0` and with `mwifiex_usb.usb8782_winner=1`
+would tell. That isn't needed for the fix, but it matters for an upstream
+submission.
+
+**Still worth upstreaming as is:** the URB-kill fix in `mwifiex_usb_free()`
+(any USB device, any failed init).
+
+The rest of this document is the investigation in the order it happened.
+
 ## The failure
 
 From the main session's description of the failing boot (2026-11-07),
@@ -367,7 +443,7 @@ memory load, so it's worth testing alongside.
 ### Patch 0013: the stock start sequence, measurable
 
 `kernel/m1/patches/0013-mwifiex-usb-8782-vendor-start.patch`, behind
-`CONFIG_MWIFIEX_USB_8782_START` (default **n**, so no other image
+`CONFIG_MWIFIEX_USB_8782_START` (default **n**; on in nandboot since the conclusion; at first no other image
 changes):
 - **No winner probe for the 8782:** the whole image, as stock does.
   `mwifiex_usb.usb8782_winner=1` brings the probe back.
@@ -448,6 +524,8 @@ or "Card is removed" line, OK = mlan0 present):
 | T3, unpatched, warm after a clean shutdown (r1–r5) | 5 | FAIL, FAIL, OK, FAIL, OK: **3 of 5 failed** (r0 after messy reboots, and the stock-to-ours boot, failed too) |
 | W1, patch 0013, default parameters | 3 | **3 of 3 OK**: `8782: INIT_DONE after 56 ms` each time, then mlan0 |
 | Patch 0014 trace modules | 2 | **2 of 2 OK**: FUNC_INIT (0xa9) answered within ~125 ms, then GET_HW_SPEC and the rest |
+
+Final counts: see the conclusion at the top (19 of 19 patched).
 
 - **0013's start sequence: 5 of 5 OK so far, against about 50% failures
   unpatched.** The stock sequence (no winner probe, an EP1 read for
@@ -836,7 +914,7 @@ fcntl.ioctl(fd, 0x5514)                                # USBDEVFS_RESET
 
 Read the hub descriptor (in the open questions) once, anytime.
 
-## 5. Proposed fix (not yet written or built)
+## 5. Fix proposals during the investigation (superseded: see the conclusion)
 
 In order of value. All of it is a 0004 follow-up and 8782-only. Items 1
 and 2 depend on T3 and T5.
