@@ -1,0 +1,129 @@
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -90,6 +90,8 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dma/pxa-dma.h>
+ #include <linux/platform_data/mtd-nand-pxa3xx.h>
++#include <linux/hrtimer.h>
++#include <asm/irq_regs.h>
+ 
+ /* Data FIFO granularity, FIFO reads/writes must be a multiple of this length */
+ #define FIFO_DEPTH		8
+@@ -674,6 +676,98 @@
+ static struct bt_ring __iomem *bt;
+ static atomic_t bt_seq = ATOMIC_INIT(0);
+ 
++/*
++ * PC samples (debug, with the trace): every 10 ms an hrtimer on each CPU
++ * records the interrupted PC, LR, SP and CPSR in the page after the ring.
++ * A CPU stuck in a bus access takes no more interrupts, so its last
++ * sample is from at most 10 ms before it stopped. Resolve the PCs with
++ * the System.map of the kernel that wrote them.
++ */
++#define BS_MAGIC	0x3153434e	/* "NCS1" */
++#define BS_CPUS		2
++#define BS_N		60
++
++struct bs_ent {
++	u32 seq, us, jif, pc, lr, sp, cpsr, pad;
++};
++
++struct bs_page {
++	u32 magic, boot, pad[14];
++	struct bs_ent e[BS_CPUS][BS_N];
++};
++
++static struct bs_page __iomem *bs;
++static u32 bs_seq[BS_CPUS];
++static DEFINE_PER_CPU(struct hrtimer, bs_timer);
++
++static enum hrtimer_restart bs_sample(struct hrtimer *t)
++{
++	struct pt_regs *regs = get_irq_regs();
++	unsigned int cpu = raw_smp_processor_id();
++	struct bs_ent __iomem *e;
++	u32 seq;
++
++	if (bs && cpu < BS_CPUS) {
++		seq = ++bs_seq[cpu];
++		e = &bs->e[cpu][seq % BS_N];
++		writel_relaxed(0, &e->seq);
++		writel_relaxed((u32)(ktime_get_mono_fast_ns() >> 10), &e->us);
++		writel_relaxed((u32)jiffies, &e->jif);
++		writel_relaxed(regs ? regs->ARM_pc : 0, &e->pc);
++		writel_relaxed(regs ? regs->ARM_lr : 0, &e->lr);
++		writel_relaxed(regs ? regs->ARM_sp : 0, &e->sp);
++		writel_relaxed(regs ? regs->ARM_cpsr : 0, &e->cpsr);
++		writel(seq, &e->seq);
++	}
++	hrtimer_forward_now(t, ms_to_ktime(10));
++	return HRTIMER_RESTART;
++}
++
++static void bs_start(void *unused)
++{
++	struct hrtimer *t = this_cpu_ptr(&bs_timer);
++
++	hrtimer_setup(t, bs_sample, CLOCK_MONOTONIC,
++		      HRTIMER_MODE_REL_PINNED_HARD);
++	hrtimer_start(t, ms_to_ktime(10), HRTIMER_MODE_REL_PINNED_HARD);
++}
++
++static void bs_init(struct device *dev)
++{
++	u32 cpu, i, last, seq, n;
++	struct bs_ent __iomem *e;
++
++	if (readl(&bs->magic) == BS_MAGIC) {
++		for (cpu = 0; cpu < BS_CPUS; cpu++) {
++			last = 0;
++			for (i = 0; i < BS_N; i++)
++				last = max(last, readl(&bs->e[cpu][i].seq));
++			n = 0;
++			for (seq = last > 7 ? last - 7 : 1; seq && seq <= last; seq++) {
++				e = &bs->e[cpu][seq % BS_N];
++				if (readl(&e->seq) != seq)
++					continue;
++				dev_warn(dev, "pcs boot %u cpu%u #%u %u us jif %08x pc %08x lr %08x sp %08x cpsr %08x\n",
++					 readl(&bs->boot), cpu, seq, readl(&e->us),
++					 readl(&e->jif), readl(&e->pc),
++					 readl(&e->lr), readl(&e->sp),
++					 readl(&e->cpsr));
++				n++;
++			}
++			if (!n)
++				dev_warn(dev, "pcs: no samples for cpu%u\n", cpu);
++		}
++		writel(readl(&bs->boot) + 1, &bs->boot);
++	} else {
++		writel(1, &bs->boot);
++	}
++	memset_io(bs->e, 0, sizeof(bs->e));
++	writel(BS_MAGIC, &bs->magic);
++	on_each_cpu(bs_start, NULL, 1);
++	dev_info(dev, "pcs: PC samples every 10 ms to %#lx\n",
++		 bch_v1_tr_phys + sizeof(*bt));
++}
++
+ static void bt_log(u32 step, u32 a, u32 b, u32 c)
+ {
+ 	struct bt_ent __iomem *e;
+@@ -703,7 +797,8 @@
+ 
+ 	if (!bch_v1_tr_phys)
+ 		return;
+-	bt = ioremap(bch_v1_tr_phys, sizeof(*bt));
++	BUILD_BUG_ON(sizeof(*bt) != SZ_4K || sizeof(*bs) > SZ_4K);
++	bt = ioremap(bch_v1_tr_phys, 2 * SZ_4K);
+ 	if (!bt) {
+ 		dev_err(dev, "trace: cannot map %#lx\n", bch_v1_tr_phys);
+ 		return;
+@@ -739,6 +834,8 @@
+ 	writel(BT_MAGIC, &bt->magic);
+ 	dev_info(dev, "trace: NAND steps to %#lx (boot %u)\n",
+ 		 bch_v1_tr_phys, readl(&bt->boot));
++	bs = (void __iomem *)bt + SZ_4K;
++	bs_init(dev);
+ }
+ 
+ static int marvell_nfc_prepare_cmd(struct nand_chip *chip)

@@ -958,3 +958,120 @@ persistent store backend", "using 0x100000@0x1e000000"). The "unknown
 filesystem type 'pstore'" error most likely came from a mount under the
 normal mtd0 kernel, which has no PSTORE. Under nanddbg/nandirq, use `mount -t
 pstore pstore /sys/fs/pstore`.
+
+## Hang 8: nandirq (interrupt-driven reads) froze outside any NAND step (2026-11-07)
+
+nandirq (1f33eb43) was RAM-booted with the NAND root and ran
+`tools/nand_read_soak.sh` (drop_caches + a full root `tar` every 2 min):
+- Two passes went fine (155–229 s, 350–424 s).
+- The heartbeat ran until 490.75 s, with no NAND reads after pass 1.
+- It froze at ~490–495 s, in the idle sleep before pass 3. The watchdog
+  reset it into nanddbg (mtd0), which printed the ring.
+
+**The ring ends on a complete read:** `cmd` → `rdd` → `isr` (~155 µs) →
+`rdd-end` → the two PIO bursts → the CMDD poll and `poll-end`, ~66 s
+before the freeze. All 126 steps are on cpu0, every step type balanced, and
+only reads.
+
+**What this changes:**
+- **Patch 0016 works as designed** (the read waits on the interrupt), and
+  it **doesn't stop the freezes**.
+- **The freeze doesn't come from the NAND controller being driven at that
+  moment.**
+  - Every command the driver issues goes through `marvell_nfc_send_cmd()`
+    (all 11 call sites), which logs `cmd`: reads, programs, erases,
+    resets, status reads.
+  - Program data goes through the traced PIO-out, erases through the
+    traced R/B wait, and every NFC interrupt through the traced ISR.
+  - Not traced on their own are only the short polls inside a step
+    (ND_RUN, WRCMDREQ, `bch_v1_wait_prog`). Each of them comes right
+    after a logged `cmd` or `stop`.
+  - The ring entries are written through an uncached mapping, in order.
+  - So for ~66 s before the freeze, nothing issued a NAND command: no UBIFS
+    program, no UBI erase, nothing.
+- **Hang 7's ring**, which ended inside the RDDREQ wait, was most likely
+  just the read in flight when the stall hit, during the boot read storm.
+- **The write window and guard** (`marvell_nfc_write_allowed`) only run in
+  `send_cmd`, for program/erase commands. With no command, they don't run.
+  An open window does nothing on its own.
+- **A non-NAND bus master** (USB/Wi-Fi, GMAC, SDHCI) can't be excluded by
+  the ring. But all of them ran in the card-root soaks too (84 and 82 min,
+  Wi-Fi up).
+
+### What is NAND-root-specific, if not the controller?
+
+The difference is the **state the NAND root leaves in memory and the MMU**,
+not controller activity:
+1. **Page-cache pages filled by the CPU.**
+   - On the NAND root, every file page (and so every executable and
+     library page) is written by the CPU: PIO from NDDB into a buffer,
+     then a memcpy into the page.
+   - On the card root, SDHCI DMA writes it, and the DMA API's
+     maintenance invalidates the CPU caches.
+   - CPU-written pages that are then executed need a D-cache clean to the
+     point of unification, plus an I-cache invalidate seen by both cores.
+   - The soak's `drop_caches` makes every running program refault its
+     text from NAND every 2 min.
+2. **UBI/UBIFS's vmalloc buffers.** UBI reads go through LEB-sized vmalloc
+   buffers. `vfree()` is lazy: the kernel page-table entries and the TLB
+   flush for them are purged in batches later, from a worker. That's
+   kernel-TLB maintenance on both CPUs at arbitrary later times. Whether
+   it goes by IPI depends on this PJ4B's ID_MMFR3 (not read yet; see the
+   logger notes).
+3. **Both of these lean on the PJ4B errata area that isn't ported yet:**
+   - page-table cleaning: the vendor cleans PTE writes, while mainline
+     trusts the table walker on SMP;
+   - the vendor's PoUIS clean;
+   - `BZ_833` / `BZ_664`.
+
+### Splitting it: tests in order
+
+1. **Card root, UBIFS on mtd6 mounted rw, the same read soak on the mtd6
+   mount** (drop_caches + `tar` of the UBIFS mount every 2 min, then
+   idle). This is the main session's option 2, plus load.
+   - **Hangs:** UBI/UBIFS/NAND activity alone is enough, with executables
+     still from SD. Look at UBI's vmalloc and TLB side and at the
+     controller.
+   - **No hangs over ≥ 1–2 h:** it's *running from* NAND that matters
+     (CPU-filled executable pages). Look at D/I-cache and TLB coherency.
+2. **NAND root with the window closed** (option 1). It needs a writable
+   overlay for Klipper/Moonraker, otherwise they fail, so it's harder to
+   set up. It separates programs from reads, but the ring already shows
+   no programs near the freeze, so it's lower value.
+3. **A full register trace** (option 3) adds little now: the controller
+   was idle. What's needed is *what the CPUs were running*. Hence:
+
+### Patch 0017: PC samples of both CPUs (m1-nandboot-nandpcs)
+
+`kernel/m1/patches/0017-mtd-rawnand-marvell-mv61x0-pc-samples.patch`, on top
+of 0016, only active with `marvell_nand.trace_phys`:
+- **A pinned hard hrtimer on each CPU, every 10 ms**, records the
+  interrupted PC, LR, SP, CPSR, jiffies and µs time.
+- The samples go into the 4 KB page after the NAND ring (0x1e101000): 60
+  per CPU, uncached.
+- A CPU stalled in a bus access takes no more interrupts, so its last
+  sample is from ≤ 10 ms before it stopped. The other CPU's last samples
+  show what it was doing too, e.g. spinning on a lock or waiting for an
+  IPI.
+- **The next boot of a 0017 kernel prints the last 8 samples per CPU**
+  ("pcs boot N cpuX #seq ... pc ... lr ...").
+- **Under any other kernel that leaves the page alone** (nanddbg maps only
+  the first 4 KB), `kernel/m1/tools/pcs_dump.py` reads it from /dev/mem,
+  read-only.
+- Resolve the PCs with `m1-nandboot-nandpcs-System.map`.
+
+`HANGTEST=nandpcs` = nandirq + 0017:
+- `m1-nandboot-nandpcs.uimg` md5 `3ec9c45b26d47be26e43bc9b84a1bcd4`
+  (2,824,116 bytes);
+- modules `c181d7beebc48f067837f53acb496c53`;
+- the config is nandirq's. Built, not booted.
+
+**Run plan:**
+1. RAM-boot it first. Check that `pcs: PC samples every 10 ms` and the
+   trace line appear, and that the board stays up for a few minutes (the
+   sampler adds 200 interrupts/s).
+2. Then either:
+   - with the owner's OK, put it in mtd0, so the reset lands in it and it
+     prints both the ring and the samples;
+   - or keep nanddbg in mtd0, and right after the reset run
+     `python3 -I pcs_dump.py` (root) before anything else.
