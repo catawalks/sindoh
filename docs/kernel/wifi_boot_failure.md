@@ -112,9 +112,9 @@ downloads cleanly but often doesn't start. The earlier cold-boot
 failures (uniprocessor m1-net, D2) need their own logs to say whether
 they were the same thing.
 
-### Revised after a cold failure and the T5 hang (`after_t5hang_boot.log`)
+### Revised after a cold failure (`after_t5hang_boot.log`)
 
-After the T5 hang the owner power-cycled the printer. That **cold** boot
+After hang 4 (nandboot_hang_analysis.md) the owner power-cycled the printer. That **cold** boot
 failed exactly like the warm one:
 - `start to download FW...` at 10.741 s, a full 253,996 bytes by
   11.266 s;
@@ -196,31 +196,23 @@ ran kernel 5b17e2ec from mtd0:
 | C | Leftover chip state (a rail not cut) | Cold 1 of 2 failed: weak | How the owner powered off (mains or front key) |
 | D | Supply droop during RF start-up | Speculative | A scope on the module's 3.3 V |
 
-### The T5 hang
+### The "T5 hang" was not T5 (correction)
 
-The command was `rmmod mwifiex_usb; rmmod mwifiex; insmod mwifiex.ko
-debug_mask=...; insmod mwifiex_usb.ko`, 30 min after the failure. The
-driver code doesn't explain a hard hang:
-- **rmmod mwifiex_usb.** After the failed init, `mwifiex_unregister_dev()`
-  set `card->adapter = NULL` and `fw_done` had completed. So
-  `mwifiex_usb_disconnect()` returns at once. It only leaks the
-  `usb_get_dev` reference (no `usb_put_dev`), which is harmless.
-- **rmmod mwifiex.** Nothing left registered.
-- **insmod mwifiex_usb.** This probes the 8782 again. With the chip in
-  an unknown state that means bulk transfers that time out, then
-  `usb_kill_urb`, then the EHCI unlink handshake. At worst 0004's
-  fallback leads to another 10 s command timeout. Each step is a timeout,
-  not a lockup.
-- Nothing fired: no soft-lockup panic, no buddy hard-lockup panic, no
-  `panic=10` reboot, and serial was gone. That points the way the nandboot
-  hard hangs did: **both CPUs stuck in a bus access that never
-  completes**, here possibly an EHCI register access or DMA against a
-  controller in a bad state. It's not a driver deadlock, which the
-  detectors would catch.
-- Note the hang-1 load in nandboot_hang_analysis.md: "Wi-Fi:
-  re-enumerate". **USB/8782 activity is now in two of the hard hangs.**
-  The errata kernel fixed the SD-load hangs, but this may be a separate
-  hang in the USB path.
+The hard hang reported as T5's turned out to be unrelated to Wi-Fi:
+- The Debian root has no kmod, so `rmmod` and `insmod` were "not found"
+  (rc 127); only `busybox rmmod/insmod` exist. Nothing touched the
+  driver.
+- The serial command was never even echoed, so the board was most likely
+  hung already. It was the errata kernel's first NAND-root run, idle,
+  ~25–30 min after boot.
+- That hang is analysed as hang 4 in nandboot_hang_analysis.md: patch
+  0010's NAND paths and the remaining errata gaps, not USB.
+- The earlier claim here that "USB/8782 activity is in two of the hard
+  hangs" is withdrawn. Hang 1's Wi-Fi churn is the only such case.
+- T5 itself (does a second download recover the chip?) is still untested.
+
+**All module commands on this root need `busybox`:** `busybox rmmod`,
+`busybox insmod`. The command lines in this doc are written that way.
 
 ### The reason-7 drop (a separate issue)
 
@@ -373,8 +365,8 @@ parameter is enough:
 
 ```sh
 # init.mainline, for the test boots only (instead of the plain insmod):
-insmod mwifiex.ko debug_mask=0x20000037   # MSG|FATAL|ERROR|CMD|EVENT|WARN
-insmod mwifiex_usb.ko
+busybox insmod mwifiex.ko debug_mask=0x20000037   # MSG|FATAL|ERROR|CMD|EVENT|WARN
+busybox insmod mwifiex_usb.ko
 ```
 
 Logged at those levels (all `dev_info`, so they reach the serial
@@ -410,8 +402,8 @@ Nothing here needs a rebuild: kernel 5b17e2ec has `NETCONSOLE=y`,
 
    ```sh
    echo "dp200-init: wifi: insmod (debug_mask 0x20000037)" > /dev/kmsg
-   insmod .../mwifiex.ko debug_mask=0x20000037   # MSG FATAL ERROR CMD EVENT WARN
-   insmod .../mwifiex_usb.ko
+   busybox insmod .../mwifiex.ko debug_mask=0x20000037   # MSG FATAL ERROR CMD EVENT WARN
+   busybox insmod .../mwifiex_usb.ko
    echo "dp200-init: wifi: insmod done" > /dev/kmsg
    ```
 
@@ -458,7 +450,7 @@ Nothing here needs a rebuild: kernel 5b17e2ec has `NETCONSOLE=y`,
 5. **For each boot, note:** warm or cold (and for cold, mains or front
    key), the root, and the result (mlan0 address or the 0xa9 dump).
 
-### Before any more rmmod/insmod tests (after the T5 hang)
+### Before any more rmmod/insmod tests
 
 A hang leaves no log unless something gets it off the board before the
 CPUs stop. In order of value:
@@ -488,10 +480,10 @@ CPUs stop. In order of value:
    m() { echo "T5: $*" > /dev/kmsg; }
    m "state"; cat /sys/bus/usb/devices/2-1.1/bcdDevice \
        /sys/bus/usb/devices/2-1.1/authorized; grep -i ehci /proc/interrupts
-   m "rmmod mwifiex_usb"; rmmod mwifiex_usb; m "rmmod mwifiex_usb done"; sleep 3
-   m "rmmod mwifiex";     rmmod mwifiex;     m "rmmod mwifiex done";     sleep 3
-   m "insmod mwifiex";    insmod mwifiex.ko debug_mask=0x20000037; m "done"; sleep 3
-   m "insmod mwifiex_usb"; insmod mwifiex_usb.ko; m "insmod mwifiex_usb returned"
+   m "busybox rmmod mwifiex_usb"; busybox rmmod mwifiex_usb; m "busybox rmmod mwifiex_usb done"; sleep 3
+   m "busybox rmmod mwifiex";     busybox rmmod mwifiex;     m "busybox rmmod mwifiex done";     sleep 3
+   m "busybox insmod mwifiex";    busybox insmod mwifiex.ko debug_mask=0x20000037; m "done"; sleep 3
+   m "busybox insmod mwifiex_usb"; busybox insmod mwifiex_usb.ko; m "busybox insmod mwifiex_usb returned"
    ```
 
    Ping over Ethernet between steps from the PC. Then the last marker
@@ -519,9 +511,9 @@ whether `CMD_RESP: 0xa9` came, and whether `event_cause 0x7` came.
 | T0 | **Cold boots, SD root against NAND root** (candidate B), no rmmod | 5 + 5 | Tests B, not leftover state: if only the NAND-root boots fail, B. A delayed insmod on the NAND root (after the UBIFS recovery, NAND idle) is the follow-up |
 | T1 | Power cycle (cold) | 10 | All good, with `event_cause 0x7` before or around the first command |
 | T2 | `reboot -f` with mlan0 associated | 20 | About 2 of 3 fail as in `nandroot1.log`: a full download, then no event and no response |
-| T3 | `ip link set mlan0 down; rmmod mwifiex_usb mwifiex; reboot -f` (FUNC_SHUTDOWN sent, radio off) | 20 | **All good, or clearly fewer failures** than T2 |
+| T3 | `ip link set mlan0 down; busybox rmmod mwifiex_usb mwifiex; reboot -f` (FUNC_SHUTDOWN sent, radio off) | 20 | **All good, or clearly fewer failures** than T2 |
 | T4 | `reboot -f` with mlan0 down but the modules loaded | 10 | Between T2 and T3: shows whether association or power save matters |
-| T5 | **After a failed boot**, without rebooting: `rmmod mwifiex_usb mwifiex; insmod ...` (3 times), then the same with a USB reset of the 8782 in between (`USBDEVFS_RESET`, below) | each failure | Shows whether **a second download recovers** the chip, so whether a driver-level retry is a usable fix |
+| T5 | **After a failed boot**, without rebooting: `busybox rmmod mwifiex_usb mwifiex; insmod ...` (3 times), then the same with a USB reset of the 8782 in between (`USBDEVFS_RESET`, below) | each failure | Shows whether **a second download recovers** the chip, so whether a driver-level retry is a usable fix |
 
 T3 against T2 decides whether a clean shutdown prevents the failure. T5
 decides whether the driver can recover from it.
@@ -562,7 +554,7 @@ and 2 depend on T3 and T5.
      restart.
    - It doesn't cover a panic or watchdog reset; item 2 does.
    - Until it's built: put
-     `ip link set mlan0 down; rmmod mwifiex_usb mwifiex` in init.mainline's
+     `ip link set mlan0 down; busybox rmmod mwifiex_usb mwifiex` in init.mainline's
      reboot and poweroff paths (`rc.dp200 stop`). That's T3.
 2. **Wait for INIT_DONE, and retry the download when it doesn't come.**
    - After a real download, read EP1 with `mwifiex_read_data_sync()` for
