@@ -1,0 +1,180 @@
+# The nandboot hard hangs (11-06, 11-07): analysis and test plan
+
+Offline analysis, 2026-11-07. Nothing here touched the printer. Inputs: the
+two hangs as the main session reported them, the vendor 3.2 kernel image
+(`Image` md5 a416b1bc..., `tools/kernel_re/`), our 6.18.59 tree and the
+m1-nandboot build of 59134b5 (fcba26da).
+
+## The two hangs
+
+| | Hang 1 (11-06 ~22:10, 33d2e5d2) | Hang 2 (11-07 00:34, fcba26da) |
+|---|---|---|
+| Load | Wi-Fi: re-enumerate, deauth/reassoc churn | whole-root `tar` from the SD card (~30 s in), nc streams on eth0, mlan0 up |
+| Ping on eth0 | **yes** | no |
+| Serial echo, SysRq | no | no (BREAK + l/w ignored) |
+| Lockup detectors | not built in yet | soft lockup built in with panic: **did not fire** |
+
+A soft lockup is caught by each CPU's own hrtimer interrupt. If it doesn't
+fire, and the UART interrupt (routed to CPU0) isn't served either, then
+either **both CPUs have IRQs masked and are spinning**, or **a CPU is stuck
+in a bus or memory access** that never completes. Hang 2 is one of those.
+Hang 1 is milder: CPU0 still served the GMAC interrupt and softirqs, but
+the tty layer and userspace were dead. One CPU stuck with IRQs off, and
+the other blocked behind it once it needs that CPU (an IPI, a lock, a
+kworker), fits that.
+
+## The main finding: the vendor's PJ4B errata workarounds are not in our kernel
+
+The vendor config enables `ARM_ERRATA_PJ4B_6075`, `_6011`, `_6315`,
+`_5727`, `_5756`, `_FORCE_CLEAN_INVALIDATE` and the SoC options
+`MACH_MV61X0_88PA6170_ERRATA_BZ_833` / `_BZ_664`
+(vendor_3.2.0-g67a8e16.config, lines 316-383). Marvell never sent these
+upstream. In the vendor image there are two forms of them:
+
+1. **Erratum 6011: every exclusive load is issued five times.** Each
+   `ldrex` in the vendor kernel is a run of five identical `ldrex`, then
+   the `strex`. That covers spinlocks, atomics, cmpxchg, bitops and the
+   kuser helpers (`__kuser_pj4b_errata6011_cmpxchg32/64`,
+   `pj4b_errata_6011_64` = an extra `dsb`). A scan of the image
+   (`exscan.py`, see below) finds **2097 runs of 5 and 9 single `ldrex`**
+   (8 in init data, 1 in the stock `__kuser_cmpxchg64` that the 6011
+   version replaces). **Our nandboot vmlinux: 1490 single `ldrex`, none
+   doubled.**
+2. **D-cache maintenance by MVA: IRQs off, `dsb`, a 50-loop delay, then
+   the operation.** `v7_dma_inv_range`, `v7_dma_clean_range`,
+   `v7_dma_flush_range`, `v7_flush_kern_dcache_area`,
+   `v7_coherent_user_range`, `v7_flush_dcache_all`,
+   `v7_clean_dcache_to_PoUIS` and `cpu_v7_dcache_clean_area` all start
+   with `mrs ip, apsr; cpsid i; dsb sy; mov r3, #0x32; 1: subs r3, #1;
+   bne 1b`, and end with `dsb sy; msr cpsr_c, ip`. `v7_dma_clean_range`
+   also turns each clean (`c7, c10, 1`) into clean+invalidate
+   (`c7, c14, 1`) when `arm_errata_pj4b_force_clean_invalidate` is set.
+   That flag is in .bss, so it is 0 unless something sets it at run time;
+   whatever sets it isn't identified yet. **Ours (cache-v7.S, unmodified):
+   none of this.** The scan finds 8 wrappers in the vendor image and 0 in
+   ours.
+
+Which erratum number each form belongs to is unknown beyond the symbol
+names (6011 = the exclusives). The other options are most likely the c15
+auxiliary-register bits of `__v7_pj4bmp_setup`, which patch 0001 already
+copies bit for bit (Debug 0 bit 12, Debug 2 bit 29 / ~bit 23, Debug 1
+~bit 25, Functional 0 ~bit 7, ACTLR SMP+FW).
+
+Why this fits:
+- Hang 2 came under heavy SD reads. Each completed request is unmapped
+  with `v7_dma_inv_range` over its pages, so by-MVA invalidates run
+  constantly while the SD, USB and GMAC interrupts arrive on top. That is
+  exactly the window the vendor closes with `cpsid i` and the
+  `dsb`+delay.
+- Hang 1 came under Wi-Fi churn: USB DMA (mwifiex_usb rx/tx URBs), the
+  same cache maintenance, and lock-heavy cfg80211/mwifiex paths.
+- A lost or corrupted exclusive (6011) breaks a spinlock or an atomic.
+  Two CPUs then spin forever in `raw_spin_lock_irqsave`: IRQs masked on
+  both, no soft-lockup report, no UART. That is hang 2's signature.
+- m1-debian has the same gap and has not hung, but it never ran a
+  sustained DMA load on mainline (the payloads were built under stock).
+  Its record doesn't clear it.
+
+## Other candidates (less likely, and what would point at each)
+
+| Candidate | For | Against / test |
+|---|---|---|
+| SDHCI DMA (SDMA/ADMA2 from the capabilities; the vendor driver's mode is unknown) wedging the AXI bus | heavy SD read in hang 2 | hang 1 had no SD load. Test: PIO only, `sdhci.debug_quirks=0x2000c060` (it *replaces* the driver's quirks, so ours 0x2000c000 + `BROKEN_DMA` 0x20 + `BROKEN_ADMA` 0x40), under the same tar |
+| A bus stall on an MMIO access (an ungated or absent block, the second SD slot at 0xf9080200, EHCI) | everything dies at once | nothing enabled here touches unknown blocks; the second slot isn't in the DT |
+| GIC / SIC (patch 0002) losing an interrupt | UART and eth both dead | a lost interrupt hangs one device, not the CPUs' own timers |
+| What the nandboot config adds (modules, usb-storage/SCSI, netpoll, the watchdogs) | hang 2 only seen on nandboot | none of these touch the CPU or the bus; test (c) below |
+| PREEMPT_NONE (ours) vs PREEMPT (vendor) | | a scheduling difference, not a SoC hang |
+
+## Morning test plan (each test with the owner nearby to power-cycle)
+
+The m1-nandboot command line is forced (`CMDLINE_FORCE`), so a different
+command line needs a rebuilt image. Each test runs the hang-2 load: loop
+the whole-root `tar ... | wc -c` for 20 min, or until it hangs (hang 2
+came ~30 s in). Run Klipper idle as before. Ranked by information per
+test:
+
+1. **(d) `maxcpus=1`**, otherwise as hang 2. The PJ4B errata above are
+   about coherency between the two cores (the exclusive monitor, snoops
+   during maintenance). If UP survives 20 min where SMP hung in 30 s, the
+   cause is SMP or errata. If UP hangs too, the cause is a device, bus or
+   DMA problem, so go to test 3.
+2. **Errata image** (new, offline work): nandboot plus the vendor's
+   cache-op wrapper in `arch/arm/mm/cache-v7.S` (8 routines, small), then
+   the 6011 `ldrex` runs (atomic.h, spinlock.h, cmpxchg.h, futex.h,
+   bitops, entry-armv.S kuser helpers: mechanical, through one macro).
+   SMP and hang-2 load. A pass is both the diagnosis and the fix. If
+   test 1 passed, this decides between "errata" and "some other SMP bug".
+3. **(b)+(c) together: SD only.** SMP, Wi-Fi down (`ip link set mlan0
+   down`, modules unloaded), no nc streams, eth0 idle; serial only. If it
+   still hangs, Wi-Fi, USB and eth are cleared at once. If not, add one
+   back per run: the nc streams first (GMAC DMA), then Wi-Fi.
+4. **(a) m1-debian + the same tar.** This checks nandboot's config
+   additions. It says little about the SoC: m1-debian has the same errata
+   gap. Do it only if test 3 passes, i.e. the load needs more than SD
+   reads.
+
+Optional, with no DMA at all: two `dd if=/dev/zero of=/dev/null bs=64k`
+plus a fork loop (`while :; do /bin/true; done`) on SMP. This exercises
+the exclusives, TLB IPIs and `v7_coherent_user_range` on exec. A hang
+here points at the CPU errata without any device involved.
+
+## Evidence that survives the power cycle (cheap, for a debug image)
+
+A **power cycle wipes DRAM**: unrefreshed DDR decays, and U-Boot's DDR
+init runs on every boot. So pstore alone won't help unless the hang turns
+into a **warm reset**. In order of cost:
+
+1. **Kernel netconsole instead of the busybox nc streams.** It's already
+   built in (configfs). netpoll sends from the CPU that prints, with IRQs
+   off, so an oops, panic or lockup report still reaches the PC. The nc
+   stream dies with userspace. Set it up once per boot:
+
+   ```
+   mkdir /sys/kernel/config/netconsole/pc
+   echo <PC IP> > .../remote_ip; echo <PC MAC> > .../remote_mac
+   echo 1 > .../enabled
+   dmesg -n 8
+   ```
+
+   Then on the PC: `nc -lu 6666`.
+2. **The buddy hard-lockup detector:** `CONFIG_HARDLOCKUP_DETECTOR=y`
+   (the buddy flavour is available, `HAVE_HARDLOCKUP_DETECTOR_BUDDY=y`)
+   and `CONFIG_BOOTPARAM_HARDLOCKUP_PANIC=y`. Each CPU checks that the
+   other's hrtimer still ticks. One CPU stuck with IRQs off (hang 1's
+   shape) gets a backtrace and a panic, then `panic=10` reboots. It can't
+   help when both CPUs are stuck.
+3. **A hang watchdog on timer 0**, the vendor's watchdog, which our
+   restart handler already fires (`mv61x0_restart`,
+   timer-mv61x0.c:195). Load it with ~30 s (the 1 MHz tick) and pet it
+   from the watchdog core (`WDOG_HW_RUNNING`, petted by a kworker) or a
+   pinned hrtimer. A full hang then gives a warm reset, the same path as
+   every `reboot`, instead of needing the owner. **Debug images only:** a
+   reset during a NAND write is the one thing the end-goal image must not
+   do, and arming a hardware watchdog needs the owner's OK.
+4. **ramoops in reserved RAM, useful only together with 3:**
+   `CONFIG_PSTORE=y`, `PSTORE_RAM`, `PSTORE_CONSOLE` (the whole printk
+   stream, so the last lines before a silent hang are kept even without
+   a panic), plus a DT node, e.g.
+   `ramoops@1e000000 { compatible = "ramoops"; reg = <0x1e000000
+   0x100000>; console-size = <0x80000>; record-size = <0x20000>; }`.
+   Keep it clear of U-Boot's RAM: the load at 0x400000-0xbc0000,
+   env_temp 0x1f000000, malloc 0x1fbbc000+, TLB 0x1fff0000, and the logo
+   at 0x18000000. 0x1e000000 avoids all of them. Check it once before
+   relying on it: `echo c > /proc/sysrq-trigger` → panic → warm reboot →
+   `/sys/fs/pstore/dmesg-ramoops-0` present. If U-Boot's DDR init
+   scrambles RAM, it won't be there.
+
+## Reproducing the scan
+
+`exscan.py` (session scratchpad; it reads only the images) counts runs of
+`ldrex` (`(w & 0x0f900fff) == 0x01900f9f`) and the wrapper prologue
+`f10c0080 f57ff04f e3a03032`:
+
+| Image | ldrex runs | wrappers |
+|---|---|---|
+| vendor `Image` (a416b1bc) | 2097 × 5, 9 × 1 | 8 |
+| m1-nandboot-vmlinux (59134b5) | 1490 × 1 | 0 |
+
+Disassembly: `tools/kernel_re/kdis.py Image vendor_System.map
+v7_dma_inv_range do_raw_spin_lock __kuser_pj4b_errata6011_cmpxchg32
+__v7_pj4bmp_setup`.
