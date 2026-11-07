@@ -63,6 +63,7 @@ fi
 
 ip link set eth0 up 2>/dev/null
 LAST_CARRIER=
+NOIP=0
 while true; do
     if [ -f $TRIGGER ]; then
         rm -f $TRIGGER
@@ -73,6 +74,22 @@ while true; do
     if [ "$C" != "$LAST_CARRIER" ]; then           # cable plugged in / pulled
         LAST_CARRIER=$C
         apply eth0
+    fi
+    # Recovery (2026-11-07; the work printer stayed without an address after a
+    # switch outage until a reboot): cable in, DHCP mode, no IPv4 address for
+    # 30 s -> restart udhcpc (a dead client, a missed carrier flap, or a lease
+    # that ran out while the DHCP server was gone)
+    if [ "$C" = 1 ] && [ "$(get eth0 mode)" != static ] &&
+            ! ip -4 addr show dev eth0 2>/dev/null | grep -q 'inet '; then
+        NOIP=$((NOIP + 1))
+        if [ $NOIP -ge 10 ]; then
+            echo "dp200-netd: eth0 has no address for 30 s: restarting DHCP"
+            dhcp_stop eth0
+            apply eth0
+            NOIP=0
+        fi
+    else
+        NOIP=0
     fi
     # keep the chroot's DNS in step with DHCP renewals
     cmp -s /etc/resolv.conf $ROOT/etc/resolv.conf || cp /etc/resolv.conf $ROOT/etc/resolv.conf 2>/dev/null

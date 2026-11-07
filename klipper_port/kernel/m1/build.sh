@@ -405,6 +405,14 @@ mkdir -p "$KOUT"
 "${KMAKE[@]}" olddefconfig > /dev/null
 python3 -I "$M1/checkconfig.py" "$KOUT/.config" "$KOUT/m1.config"
 "${KMAKE[@]}" -j"$JOBS" zImage dtbs
+# loadable modules (nandboot: mwifiex), packed for the root's /lib/modules
+if grep -q "^CONFIG_MODULES=y" "$KOUT/.config"; then
+	"${KMAKE[@]}" -j"$JOBS" modules
+	rm -rf "$WORK/mods-$NAME"
+	"${KMAKE[@]}" INSTALL_MOD_PATH="$WORK/mods-$NAME" INSTALL_MOD_STRIP=1 \
+		modules_install > /dev/null
+	tar -C "$WORK/mods-$NAME" -cf "$OUT/$NAME-modules.tar" lib/modules
+fi
 
 # 8. The DTB: the base board, or the variant's DTS on top of it
 DTB=$KOUT/arch/arm/boot/dts/marvell/88pa6170-dp200.dtb

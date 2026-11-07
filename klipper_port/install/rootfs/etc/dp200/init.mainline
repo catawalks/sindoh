@@ -41,6 +41,21 @@ echo "==== dp200 init $(date) kernel $(uname -r)"
 
 hostname -F /etc/hostname 2>/dev/null || hostname dp200
 
+# Ethernet MAC: the stock U-Boot passes ethaddr_sdh to the vendor kernel;
+# ours ignores that command line (nandboot) or never gets it, so stmmac
+# picks a random MAC and DHCP hands out a new address every boot
+# (2026-11-07). Read it from the U-Boot env in mtd1 (read-only) and set it
+# before the network comes up.
+MAC=$(head -c 131072 /dev/mtd1 2>/dev/null | tr '\000' '\n' |
+    sed -n 's/^ethaddr_sdh=//p' | head -n 1)
+if echo "$MAC" | grep -qiE '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' &&
+        [ -e /sys/class/net/eth0 ]; then
+    ip link set dev eth0 down 2>/dev/null
+    ip link set dev eth0 address "$MAC" && echo "eth0 MAC $MAC (U-Boot env)"
+else
+    echo "no ethaddr_sdh in mtd1: eth0 keeps $(cat /sys/class/net/eth0/address 2>/dev/null)"
+fi
+
 # The 8782 firmware: dp200-start.sh copies it into this root at each stock
 # boot. A root that never ran under stock takes it from the stock NAND root,
 # read-only (NAND and UBI are read-only on mainline), and then the 8782 is
@@ -76,6 +91,15 @@ if [ "${REENUM:-false}" = true ]; then
         [ "$(cat $d/idVendor 2>/dev/null):$(cat $d/idProduct 2>/dev/null)" = 1286:2040 ] || continue
         echo 0 > $d/authorized; sleep 1; echo 1 > $d/authorized
         echo "8782 re-enumerated ($d)"
+    done
+fi
+# Wi-Fi as modules (the nandboot image): loaded now that this root and its
+# firmware are there, so the first download works (built in, mwifiex probed
+# from the initramfs and needed the re-enumerate above)
+if [ ! -d /sys/module/mwifiex ]; then
+    for m in mwifiex mwifiex_usb; do
+        ko=$(find /lib/modules/$(uname -r) -name "$m.ko" 2>/dev/null | head -n 1)
+        [ -n "$ko" ] && busybox insmod "$ko" && echo "loaded $m"
     done
 fi
 ifconfig lo 127.0.0.1 up

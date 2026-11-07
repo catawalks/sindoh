@@ -1186,8 +1186,11 @@ class UI:
         state = {'COMPLETED': 'connected', 'SCANNING': 'searching', 'DISCONNECTED': 'not connected',
                  'INACTIVE': 'idle', 'INTERFACE_DISABLED': 'radio off'}.get(
                      s.get('wpa_state', ''), 'connecting' if s.get('wpa_state') else '...')
+        # Wi-Fi's own address (wpa_supplicant STATUS), not self.ip: that is
+        # the main address and was Ethernet's with a cable in (2026-11-06)
+        wip = s.get('ip_address', '') if name else ''
         lines = [('Network', name or 'not connected'),
-                 ('Address', 'http://%s/' % self.ip if self.ip != '?' else '-'),
+                 ('Address', 'http://%s/' % wip if wip else '-'),
                  ('State', state),
                  ('Saved', '%d network%s' % (wf['saved'], '' if wf['saved'] == 1 else 's'))]
         for i, (k, v) in enumerate(lines):
@@ -2102,6 +2105,8 @@ class UI:
             items.append(('KLIPPER', ('confirm', 'Restart Klipper host?' + warn,
                                       ('post', '/printer/restart', 'Restart')), C_BTN, 28, 'restart'))
         items.append(('SCREEN OFF', ('screen_off',), C_BTN, 26, 'tap to wake'))
+        if os.path.exists(OUR_KERNEL):          # our kernel only (see REVERT_MARK)
+            items.append(('TO STOCK', back_to_stock_confirm(warn), C_RED, 26, 'factory firmware'))
         self.grid(d, items, top=y + 100)
 
     def page_key_held(self, d):
@@ -2216,12 +2221,19 @@ HOMES_FIRST = ('_SINDOH_ENSURE_HOMED', 'CLEAN_NOZZLE', 'LOAD_FILAMENT', 'UNLOAD_
                'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCURACY', 'LV_PROBE_CALIBRATE',
                'FILAMENT_DRY')
 
+REVERT_SURE = 'Are you sure? This removes Klipper and returns the printer completely to stock.'
+
 def revert_confirm():
     """The two-step question for a Sindoh update stick (stick_tick)."""
     return ('Sindoh update stick found. Return this printer to stock and run the update?',
-            ('confirm', 'Are you sure? This removes Klipper and returns the printer '
-                        'completely to stock.', ('revert_go',), ('revert_no',)),
+            ('confirm', REVERT_SURE, ('revert_go',), ('revert_no',)),
             ('revert_no',))
+
+def back_to_stock_confirm(warn=''):
+    """POWER -> TO STOCK: the same two steps, without a stick (stock comes
+    back from the factory recovery set; a Sindoh update can follow later)."""
+    return ('confirm', 'Return this printer to the stock Sindoh firmware?' + warn,
+            ('confirm', REVERT_SURE, ('revert_go',)))
 
 def usb_disks():
     """Names of the USB disks (sda, sdb, ...)."""
