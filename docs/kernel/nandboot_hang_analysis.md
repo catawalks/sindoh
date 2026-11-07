@@ -238,3 +238,23 @@ into a **warm reset**. In order of cost:
 Disassembly: `tools/kernel_re/kdis.py Image vendor_System.map
 v7_dma_inv_range do_raw_spin_lock __kuser_pj4b_errata6011_cmpxchg32
 __v7_pj4bmp_setup`.
+
+## Night tests on the printer (2026-11-07, main session)
+
+The same load each time: three passes of `tar -C / --one-file-system -cf -
+. | wc -c` (3.27 GB from the card, about 4.3 min each), with the busybox nc
+streams on eth0, mlan0 up and Klipper idle.
+
+| Run | Image | Result |
+|---|---|---|
+| A | m1-debian 5df089a9 (Nov 1 tree) | 3 passes, no hang (886 s) |
+| B | m1-debian-nandw f370f49e (Nov 1 tree, NANDW DT) | 3 passes, no hang (870 s) |
+| E | m1-nandboot-errata 5b17e2ec (e1ee7e8) | 3 passes, no hang (874 s) |
+| N | m1-nandboot fcba26da (plain, again) | **hang 3** in pass 3: 668 s uptime, ~570 s into the load; no ping, no serial, no SysRq |
+
+**Plain nandboot** hung in both runs under this load: ~30 s in (hang 2)
+and ~570 s in (hang 3). The errata image (0 of 1) and the Nov 1 images
+(0 of 2) didn't, but each had only ~13 min of load, which isn't enough to
+rule out a rarer hang. The next runs need to be longer, and should reset
+by themselves (a timer-0 watchdog in a debug image, owner's OK) so that
+one hang doesn't end a night.
