@@ -93,7 +93,8 @@ still require the owner's explicit OK.
     2026-11-07** (mtd6 revert from mtd5, karas.db back from mtd4, then the
     2020 Sindoh update). The dev printer is plain stock 2020 now: the
     interim /klipper hook is gone, so Klipper runs only from our SD kernel.
-    Next: stage 3 (the nandboot initramfs from the SD card).
+    Stage 3 normal path done 11-07 (the card's raw gap now holds
+    m1-nandboot; m1-debian-nandw goes back with tools/sd_raw_install.sh).
 11d. **End-goal revert = a Sindoh update stick** (owner, 11-03;
     kernel/revert_to_stock_plan.md): our system recognizes a Sindoh DP200
     update stick, asks, restores stock from mtd5 (mtd0 kernel part, mtd6
@@ -165,7 +166,14 @@ still require the owner's explicit OK.
       mtd0's 7.75 MB. Their options were checked against the sources'
       getopt strings; qemu-arm can't run these static binaries under WSL,
       so they first run on the printer (stage 3).
-    - open: stage 3's test from the SD fast path (owner at the printer);
+    - stage 3 normal path tested 2026-11-07 (end_goal_install_plan.md):
+      root from the marked card, mtd-utils run read-only; Wi-Fi fixed in
+      init.mainline. Open for the initramfs: keep its log (copy to a
+      place init.mainline's /run doesn't cover), close the mtd6 window
+      when the root isn't mtd6, the MAC from mtd1 (below), maybe refuse a
+      root without init.mainline; then the stick and broken-root paths
+      (owner at the printer).
+    - open:
       the screen app's "Back to stock" button (writes /.dp200-revert);
       Ethernet MAC from mtd1 (the stock line's ethaddr is ignored now).
 

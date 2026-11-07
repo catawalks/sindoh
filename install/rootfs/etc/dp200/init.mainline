@@ -65,6 +65,13 @@ if [ ! -f $FW ] && [ -e /dev/ubi0 ]; then
         fi
         umount /run/stockroot
     fi
+    REENUM=true
+fi
+# The nandboot image (our kernel in mtd0) probes the 8782 from its
+# initramfs, before this root and its firmware are there (2026-11-07): the
+# download fails and mwifiex gives the device up. Re-enumerate then too.
+[ -f $FW ] && dmesg | grep -q "Failed to get firmware mrvl/usb8782" && REENUM=true
+if [ "${REENUM:-false}" = true ]; then
     for d in /sys/bus/usb/devices/*; do
         [ "$(cat $d/idVendor 2>/dev/null):$(cat $d/idProduct 2>/dev/null)" = 1286:2040 ] || continue
         echo 0 > $d/authorized; sleep 1; echo 1 > $d/authorized

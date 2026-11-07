@@ -53,6 +53,31 @@ the SD fast path before anything uses it from NAND:
   run dp200-revert.sh from RAM;
 - broken root: offer the recovery from mtd5 ("touch to recover").
 
+**Normal path tested 2026-11-07** (m1-nandboot eea44879 from the card's raw
+gap, the 4 GB card marked with /.dp200-root):
+- the forced command line replaced U-Boot's; the initramfs attached mtd6
+  with the static ubiattach, found no revert marker, picked
+  /dev/mmcblk0p1 and switch_root'ed to init.mainline; Klipper ready.
+- the 11 static mtd-utils 2.3.0 tools run on the printer (copies of the
+  initramfs binaries, write window closed): all print their version;
+  mtdinfo, ubinfo, ubiattach/ubidetach (mtd5 read-only) work; nanddump's
+  raw mtd0 equals the stage-1 dump. The write tools (ubiformat,
+  flash_erase, nandwrite, ubimkvol, ubiupdatevol) first write in stage 5.
+- **Found:** (1) Wi-Fi: mwifiex probes the 8782 from the initramfs, before
+  the root's firmware is there, and gives the device up. Fixed in
+  init.mainline (re-enumerates the 8782 when the boot log has the failed
+  download); tested, mlan0 up. (2) The initramfs log is copied to
+  /newroot/run, which init.mainline's tmpfs then covers. (3) The mtd6
+  window (1741,4091) stays open with the root on the card. (4) The
+  Ethernet MAC is random each boot (the stock line's ethaddr is ignored).
+  (2)-(4) are initramfs/kernel items (TODO 17).
+- **Not tested yet:** the stick paths (a Sindoh stick, no touch: normal
+  start; with a touch: revert) and the broken-root path. Note: with no
+  marked card and a stock root in mtd6, the normal path would start the
+  stock /sbin/init on our kernel; harmless in the end goal (our root is in
+  mtd6 before mtd0 gets our kernel), but the init could refuse a root
+  without init.mainline.
+
 **4. Our kernel in mtd0, root still on the SD card.** Write our kernel
 (+ initramfs) into mtd0's kernel area; U-Boot boots it with the stock
 bootargs, the initramfs picks the card. Check: cold boot to Klipper with
