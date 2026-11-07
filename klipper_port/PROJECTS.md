@@ -100,7 +100,7 @@ upstream updates (#10).
 End goal (our kernel in mtd0, our root in mtd6, mtd5 untouched): revert by
 plugging in a Sindoh update stick (decided 2026-11-03, TODO 11d).
 The sequence to get there: [docs/end_goal_install_plan.md](docs/end_goal_install_plan.md)
-(all stages approved 2026-11-03; stage 1 done 2026-11-07).
+(all stages approved 2026-11-03; stages 1-2 done 2026-11-07).
 
 ## 4. Object-on-bed check with the camera
 

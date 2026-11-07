@@ -7,7 +7,8 @@ their decisions were changed later. The live documents:
 - **TODO.md** - open items (update it in the same commit as the work);
 - **PROJECTS.md** - larger projects with status and decisions;
 - **docs/end_goal_install_plan.md** - the approved 9-stage sequence to the
-  end-goal install (stage 1 done 2026-11-07; stage 2 next);
+  end-goal install (stages 1-2 done 2026-11-07; stage 3 next; the dev
+  printer is plain stock 2020 on NAND, Klipper only from the SD kernel);
 - **docs/internal_firmware_plan.md** - NAND layout, space, what a revert can
   restore; **docs/kernel/revert_to_stock_plan.md** - the revert;
 - **docs/faster_stepping_plan.md**, **docs/usb_installer.md**,
