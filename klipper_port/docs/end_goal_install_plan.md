@@ -102,6 +102,28 @@ root (raw dump nand_images/stage2/mtd6_raw_oob_stock2020_20261107.bin,
 md5 8f7a1abf). The scripts are ready: tools/end_goal_stage4.sh and
 tools/end_goal_stage5.sh (each checks first and stops at the first failure).
 
+**Stages 4 and 5 done 2026-11-07 (morning; the owner renewed the go-ahead
+after the errata kernel's 82-minute soak, TODO 17).**
+- Before: mtd0 (the stock 2020 kernel area) dumped raw-less with dd,
+  md5 298b7390, on the card (/var/backups/mtd0_stock2020_before_stage4.bin)
+  and the PC (nand_images/stage2/, local only).
+- Stage 4: m1-nandboot-errata 5b17e2ec (e1ee7e8) into blocks 2-63:
+  readback md5 matches, U-Boot block unchanged (dac6729a), 0xff after the
+  image, 0 ECC failures. A warm reboot (busybox reboot -f, no serial
+  input) went through the stock U-Boot to our kernel from mtd0, root from
+  the marked card, Klipper/Moonraker up. **Not yet checked: a cold boot**
+  (power cycle by the owner).
+- Stage 5: the card root into mtd6 as UBIFS (ubi0:filesystem), 254 MB
+  unpacked, 107 MB used, 140 MB free, 13,559 files, 0 ECC failures; the
+  next boot attached it cleanly (2350 good PEBs, 5 bad, 0 corrupted, max
+  erase count 129). The first two tries stopped at the size check before
+  writing anything: the card root also holds /alpine (513 MB), /payload
+  (131 MB), /bootrom, /kb_out and plain files in / (stock images,
+  tarballs, dumps), now all excluded.
+- The card keeps its /.dp200-root marker, so the card is still the root.
+  **Next (owner's OK):** boot with the mtd6 root (remove the marker or the
+  card) and check Klipper, Wi-Fi and the screen from NAND only.
+
 **4. Our kernel in mtd0, root still on the SD card.** Write our kernel
 (+ initramfs) into mtd0's kernel area; U-Boot boots it with the stock
 bootargs, the initramfs picks the card. Check: cold boot to Klipper with
