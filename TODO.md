@@ -404,6 +404,14 @@ still require the owner's explicit OK.
       nandfa modules, its old set is in /var/backups/mods-card-06f000a0.tar
       on the card. Rename the marker to .dp200-root.off afterwards to go
       back to the NAND root.
+      **Hang 16 (11-08 03:51): the card-root run froze too, at 106 s,** with
+      NAND untouched since the boot reads (9.4 s; UBI detached, window
+      closed). So the NAND root isn't required: two CPUs froze in 8 of 8
+      runs on either root, and one CPU ran 2 h clean. cpu1's last samples
+      were ehci_urb_enqueue / pcpu_alloc. The earlier clean card-root soaks
+      were on 5b17e2ec / dc3b5f20, without the debug additions. The printer
+      is left on the card root (marker .dp200-root) until the kernel
+      session picks the next test. Logs in the shared notes (hang16_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
