@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * m1-nandboot-nandrmv: nanddbg's two no-map 1 MB areas, ramoops included,
+ * moved from 0x1e000000 to 0x10000000 (a whole 2 MB pair again; see
+ * nandboot-nanddbg.dts for why). Nothing else uses that range: the logo is
+ * at 0x18000000, U-Boot's areas start at 0x1f000000.
+ */
+#include "nandboot.dts"
+
+/ {
+	reserved-memory {
+		ramoops@10000000 {
+			compatible = "ramoops";
+			reg = <0x10000000 0x00100000>;
+			no-map;
+			record-size = <0x00020000>;	/* 3 dmesg records */
+			console-size = <0x00080000>;
+			pmsg-size = <0x00020000>;
+			ecc-size = <16>;
+		};
+
+		pad@10100000 {
+			reg = <0x10100000 0x00100000>;
+			no-map;
+		};
+	};
+};
