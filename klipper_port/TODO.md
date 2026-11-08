@@ -472,6 +472,12 @@ still require the owner's explicit OK.
       code runs, so a kernel layout shift (about 10 KB) is a candidate:
       every fast-freezing build is a bigger one. Sent to the kernel session
       with a padding test idea. Logs in the shared notes (hang24_*).
+      **nandpad 0863cdc0 (nandres plus zero padding that gives nandps0's
+      exact layout, no pstore): 2 h clean** (11-08 10:42-12:50, RAM boot,
+      card root, two CPUs; 12 passes, the console answered throughout). So
+      the layout isn't it: pstore's own init is the trigger (compression,
+      the fs registration, console/pmsg hooks, or the kmsg dumper). Next
+      split is the kernel session's call.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
