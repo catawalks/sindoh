@@ -2221,3 +2221,15 @@ Two images, built 2026-11-08, not booted:
   - **nandps2 freezes:** pstore's filesystem registration itself.
   - **nandps2 is clean:** the ramoops platform driver registration (with
     PSTORE_RAM).
+
+**nandpad2: 2 h clean** (ac97d361, RAM boot, card root, two CPUs, Wi-Fi
+and camera on; 12 passes; the probe never missed; ping lost 135 of 7557
+to the network). **With all of `.text` at nandps0's addresses and no
+pstore, no freeze: the layout is ruled out.** nandps2 (`CONFIG_PSTORE`
+alone) is running.
+
+One thing to check on the device side: with `CONFIG_PSTORE`,
+`/sys/fs/pstore` exists. Does any of our userspace (`init.mainline`,
+`rc.dp200`, the hang logger, the soak script) test for it, mount
+`pstore`, or read it periodically? If so, that's the run-time difference,
+not the kernel's init.
