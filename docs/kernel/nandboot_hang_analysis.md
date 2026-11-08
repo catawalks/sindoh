@@ -2233,3 +2233,22 @@ One thing to check on the device side: with `CONFIG_PSTORE`,
 `rc.dp200`, the hang logger, the soak script) test for it, mount
 `pstore`, or read it periodically? If so, that's the run-time difference,
 not the kernel's init.
+
+**Soak length from now on: 45 min** (the owner: "I feel 45 minutes is
+more than enough for this current testing"). The pstore-class builds
+freeze in 20 s – 7 min. If one froze every 7 min on average, 45 min
+clean would have odds of e^−6.4 (0.2 %).
+
+Pre-built for the next split: **`HANGTEST=nandps3`**, nandps0 without
+CONSOLE, PMSG and COMPRESS: PSTORE and PSTORE_RAM only, no backend
+probed. md5 `237dde132fe6eb03a6f65db62b3bd46d`, modules
+`7565bc8fe6c0f5013c307efe2734e736`.
+- **nandps2 freezes:** pstore's filesystem registration alone is enough.
+  nandps3 isn't needed; next is a patch that skips the
+  `/sys/fs/pstore` mount point or the `register_filesystem`.
+- **nandps2 is clean:** run nandps3.
+  - **nandps3 freezes:** the ramoops platform driver registration or
+    Reed-Solomon.
+  - **nandps3 is clean:** CONSOLE, PMSG or COMPRESS. Each is compiled in
+    but unused without a backend, so their code or data, or an initcall
+    of theirs, is what matters.
