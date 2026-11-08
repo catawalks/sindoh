@@ -15,6 +15,7 @@
 	extern char name[]
 
 MV61X0_PAD(mv61x0_pad_fs_text, ".text, \"ax\", %progbits", CONFIG_MV61X0_PAD_FS_TEXT);
+MV61X0_PAD(mv61x0_pad_fs_text_unlikely, ".text.unlikely, \"ax\", %progbits", CONFIG_MV61X0_PAD_FS_TEXT_UNLIKELY);
 MV61X0_PAD(mv61x0_pad_fs_rodata, ".rodata.mv61x0_pad, \"a\", %progbits", CONFIG_MV61X0_PAD_FS_RODATA);
 /* one string of that many bytes, so that the linker's string merging keeps it */
 asm(".pushsection .rodata.str1.1, \"aMS\", %progbits, 1\n"
@@ -29,7 +30,8 @@ static int __init mv61x0_pad_fs_keep(void)
 {
 	asm volatile("" : : "r" (mv61x0_pad_fs_text), "r" (mv61x0_pad_fs_rodata),
 		     "r" (mv61x0_pad_fs_data), "r" (mv61x0_pad_fs_bss),
-		     "r" (mv61x0_pad_fs_init_text), "r" (mv61x0_pad_fs_str));
+		     "r" (mv61x0_pad_fs_init_text), "r" (mv61x0_pad_fs_str),
+		     "r" (mv61x0_pad_fs_text_unlikely));
 	return 0;
 }
 core_initcall(mv61x0_pad_fs_keep);
