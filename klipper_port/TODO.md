@@ -465,6 +465,13 @@ still require the owner's explicit OK.
       0x10000000) froze in its RAM boot,** idle, at about 26-50 s. So it
       isn't the 0x1e000000 range: what pstore/ramoops sets up is the
       trigger. (Not written to mtd0.) Logs in the shared notes (hang23_*).
+      **Hang 24 (11-08 10:22): nandps0 ee5721ca (nandram's pstore config
+      with no ramoops backend probed) froze at about 95 s** in its RAM-boot
+      run. Compared with the clean nandres it adds only the PSTORE*,
+      PSTORE_RAM and REED_SOLOMON options. With no backend, little of that
+      code runs, so a kernel layout shift (about 10 KB) is a candidate:
+      every fast-freezing build is a bigger one. Sent to the kernel session
+      with a padding test idea. Logs in the shared notes (hang24_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
