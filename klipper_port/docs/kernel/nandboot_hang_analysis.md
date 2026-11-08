@@ -1225,3 +1225,107 @@ pcs_dump.py` twice, a few seconds apart, shows whether cpu1's samples
 advance at ~100/s. If they don't, CPU1 gets no tick of its own (there is
 only one clockevent, timer 1, and no TWD), and the sampler only ever ran
 on cpu0.
+
+## Hang 9: nandpcs froze too, with samples (2026-11-07, ~22:30)
+
+The same nandpcs image (3ec9c45b), written to mtd0 with the owner's OK and
+booted by U-Boot from NAND, **froze at ~143 s**, in the read soak's idle
+gap. The watchdog reset it into the same image, which printed the ring and
+the samples (console: `hang9_mtd0_nandpcs_serial.txt` in the shared
+notes).
+- **So the sampler doesn't stop the hang.** The 4 h run above was luck or
+  the boot path (it came from the SD-gap mmc boot). The boot path alone
+  doesn't explain it: nanddbg's boot 2 (hang 7, 26 s) and nandirq (hang 8,
+  490 s) were RAM boots from the gap too. **R1–R4 above are dropped**; the
+  switches stay in nandab and in every later build.
+- **The ring:** the last NAND step is a complete read, ~24 s before the
+  freeze, as in hang 8.
+- **The samples** (resolved with `m1-nandboot-nandpcs-System.map`):
+  - cpu0, last #14327 at 142970944 us: `do_idle+0x88`, the return from
+    WFI (`lr ct_kernel_enter+0x40`). Before it, the same idle point, one
+    user-mode sample and `filemap_map_pages+0xfc`.
+  - cpu1, last #14321 at 142970930 us: `xas_next_entry+0x80` (a page-cache
+    fault-around, SVC mode, IRQs on), after a run of idle samples.
+  - Both take one sample per jiffy, the two within 13–67 µs of each other
+    on the same jiffy.
+
+### The samples fit a lost tick as well as a stalled bus
+
+There is only one clock event device: timer 1 (GIC SPI 21), with no TWD.
+CPU0 owns it, and **CPU1's tick is a broadcast IPI from CPU0's timer
+interrupt** (`tick_do_broadcast()` sends the IPI, then runs CPU0's own
+handler). The paired samples on every jiffy are that broadcast. So:
+- **Both CPUs stopping on the same tick is no evidence that both
+  stalled.** It's what happens if CPU0 stops taking timer 1's interrupt.
+- **A lost timer 1 interrupt** (the timer stops, its status isn't cleared
+  in time, or SPI 21 stays active/pending in the GIC) stops every timer on
+  both CPUs:
+  - the console heartbeat and every sleep;
+  - the hang watchdog's kicks (a delayed work), so timer 0 resets the
+    board 30 s later;
+  - the buddy hard-lockup detector, which runs from hrtimers, so the
+    tick, on the other CPU. That's why no detector ever fired.
+
+  The CPUs would still take other interrupts (Ethernet, USB, UART) and
+  run their softirqs.
+- **A bus stall** looks the same from the console, the watchdog and the
+  samples.
+
+Every hang so far fits both. The NAND-root link would then be in what
+makes timer 1's interrupt get lost (an irq-off or masked window, or a GIC
+active state never ended), not only in a bus access.
+
+### Telling them apart
+
+1. **Free, with the image in mtd0 now:** during the soak, `ping -t` the
+   board's Ethernet address from the PC with timestamps, and leave a
+   serial terminal open.
+   - When the heartbeat stops, are there still ping replies for the ~30 s
+     until the watchdog resets it? Does a key on the serial console still
+     echo? (tty echo and ICMP need no timer.)
+   - **Replies:** the CPUs are alive and the tick is lost.
+   - **No replies:** a stall, or both CPUs stuck with interrupts off.
+2. **m1-nandboot-nandtick: an independent tick watchdog**
+   (`timer_mv61x0.tick_check=MS`, in `timer-mv61x0.c`, 0 = off by
+   default):
+   - Timer 3, otherwise unused and only acknowledged, runs every 100 ms,
+     with its interrupt (SPI 23) routed to **CPU1**. It watches the count
+     of timer 1 interrupts.
+   - **After 200 ms without one**, it prints, at `KERN_EMERG`, then once a
+     second:
+     - timer 1's ctrl/load/count, the timer status, timer 2;
+     - SPI 21's GIC enable/pending/active bits, target and priority,
+       GICD_CTLR;
+     - CPU1's GICC ctlr/PMR/RPR/HPPIR;
+     - jiffies;
+     - how many of its IPI pings CPU0 has answered.
+   - **At 2 s:** `trigger_all_cpu_backtrace()`, which gives CPU0's stack
+     if CPU0 still takes IPIs.
+   - **At 3 s:** a panic, so the log lands in pstore (dmesg-ramoops)
+     before the watchdog's 30 s.
+
+   What the output means:
+   - **Nothing printed** (the watchdog resets as before): CPU1 stalled too,
+     on its first register read. That's a bus stall.
+   - **Reports with timer 1 still counting and status set, or SPI 21
+     pending/active:** the interrupt was lost between the timer, the GIC
+     and CPU0. The pongs and the backtrace show whether CPU0 runs, and
+     where.
+   - **Timer 1 stopped (ctrl without enable, count still):** something
+     wrote the timer, or it was never re-armed.
+
+`HANGTEST=nandtick` = nandab + `timer_mv61x0.tick_check=100`
+(`variants/nandboot-nandtick.config`, the same reserved areas). DEBUG
+IMAGE: it arms the hardware watchdog, and it panics on a lost tick, so
+each run needs the owner's OK. RAM-boot it first. **Built 2026-11-07, not
+booted:**
+- `m1-nandboot-nandtick.uimg` md5 `9586a6d3c30dcb8b4310b2a5431c1c2d`
+  (2,825,020 bytes);
+- modules tar `37b536ff355f8889cc459b8f7754943a`.
+
+The boot log should show `mv61x0-timer: tick check every 100 ms on timer 3
+(irq N, cpu1)`. In a running system, nothing more: timer 1 never misses
+200 ms. After a freeze, read `/sys/fs/pstore/` (mount it under nandtick or
+nanddbg) as well as the console. nandab (557a3939) was built before this
+change and has no tick check. The default image is unaffected until it
+is rebuilt (the check is off without the parameter).
