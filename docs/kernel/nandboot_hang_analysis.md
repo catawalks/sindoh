@@ -2028,3 +2028,33 @@ Reading the results:
 - **Both freeze:** it's ramoops' setup apart from the mapping type. Look
   at what else it does at boot: ECC/RS init, zapping old records, the
   `request_mem_region`.
+
+## Hangs 20–21: nandrso (strongly-ordered ramoops) freezes too (2026-11-08)
+
+nandrso (ecc0aa6e, `mem-type = <1>`, console on), card root, two CPUs,
+from mtd0:
+- **hang 20:** at ~10–50 s, idle, before the network came up;
+- **hang 21:** at ~360 s, 4 min into TAR 0.
+
+The reset boots of nandram and nandrnc also froze while idle. **So the
+mapping type doesn't matter between write-combine and
+strongly-ordered.** nandrwb (cacheable) is running next.
+
+**Constraint worth keeping in mind:** nandup (one CPU, with ramoops,
+the trace and the sampler) ran 2 h clean. So ramoops accelerates the
+freeze only with two CPUs.
+
+**Built for the case nandrwb freezes too: `HANGTEST=nandrmv`**, nandram
+with both no-map areas moved to 0x10000000 (ramoops at 0x10000000,
+console on, write-combine as by default; a no-map pad at 0x10100000).
+Nothing else uses that range: the logo is at 0x18000000, and U-Boot's
+areas start at 0x1f000000.
+- `m1-nandboot-nandrmv.uimg` md5 `d91228427fed3284cb3ead52b6f87a19`;
+- modules `83ab38db2cc225951d2960693bd7e268`;
+- DTB checked.
+
+Reading it:
+- **It freezes as fast:** ramoops itself (what it does at boot), not its
+  address.
+- **It doesn't:** the range 0x1e000000 is special; something else reads
+  or writes there.
