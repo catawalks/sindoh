@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * m1-nandboot-nandrso: nanddbg's reserved areas, with ramoops mapping its
+ * area strongly-ordered (mem-type 1) instead of write-combine (0).
+ */
+#include "nandboot-nanddbg.dts"
+
+&{/reserved-memory/ramoops@1e000000} {
+	mem-type = <1>;
+};

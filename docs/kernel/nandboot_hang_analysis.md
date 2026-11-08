@@ -1950,3 +1950,39 @@ console and pmsg sizes as described.
 
 The pstore console ending 60 s before the freeze already argues against
 the writes alone.
+
+## nandres: 2 h clean, so it's ramoops (2026-11-08)
+
+nandres (70bcc0cf: nandwdt plus the two no-map areas, no PSTORE), card
+root, two CPUs, Wi-Fi and camera on:
+- 12 passes, no reset, oops or mmc error;
+- the probe answered throughout;
+- ping lost only in the usual ~20 min network clusters.
+
+**The reserved areas aren't it; ramoops is.** nandram also froze a second
+time at **idle**, ~7 min after its reset boot, with no soak running. Its
+pstore console had nothing after 115.9 s. So **ramoops doesn't need to be
+writing**: having it set up, or its mapping, seems to be enough.
+
+**How ramoops maps the area here:** this kernel is FLATMEM, so
+`pfn_valid()` is true for a no-map hole inside RAM.
+`persistent_ram_buffer_map()` therefore takes the `vmap` path, with the
+default `mem_type` 0: `pgprot_writecombine(PAGE_KERNEL)`, i.e. a Normal
+non-cacheable, shareable mapping of DDR in the vmalloc area. The NAND
+trace and the sampler use `ioremap` (Device) of the area next to it, and
+their builds froze no faster than nandram.
+
+**Next: nandrnc** (4cdb1676: no console or pmsg zone) as planned.
+- **No freeze:** the console writes matter after all.
+- **A freeze:** it's ramoops' setup or its mapping. Then **`HANGTEST=nandrso`**
+  (built): nandram with `mem-type = <1>`, so ramoops `vmap`s the area
+  strongly-ordered (`pgprot_noncached`) instead of write-combine,
+  console on.
+  - `m1-nandboot-nandrso.uimg` md5 `ecc0aa6e4fcf504d441cb0bc49f00100`;
+  - modules `8c7442010390755518c3142de900b0c7`;
+  - DTB checked: `mem-type = <0x01>`.
+
+  **No freeze with nandrso** would point at the Normal non-cacheable
+  mapping type on this SMP PJ4B/SCU. That's the same type the DMA
+  coherent allocator uses (`ARM_DMA_MEM_BUFFERABLE`), so it would
+  matter for the drivers too.
