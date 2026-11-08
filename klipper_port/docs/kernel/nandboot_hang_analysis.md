@@ -1768,3 +1768,32 @@ on both CPUs.
 - **Removed:** patch 0020, `CONFIG_PJ4B_MV61X0_VENDOR_SETUP` and the
   nandvs variant. The register print stays, without the
   "vendor/mainline" label.
+
+## Hang 15: nandfa froze in 70 s; fault-around is ruled out (2026-11-08)
+
+nandfa (fd2eb360, `fault_around_pages` 1, checked on the running system)
+from mtd0 froze at 69.64 s, 15 s into TAR 0, silent as before.
+- **The ring ends at a read's ISR entry** (`isr 00001802`, all on cpu0),
+  as in hangs 11, 12 and 14. **That's 4 of 7 two-CPU runs.**
+- **The last samples:**
+  - cpu0: `wake_up_new_task` (a fork), after a PIO read;
+  - cpu1: VMA code (`vma_iter_store_overwrite`, `vma_complete`; before
+    that `do_wp_page`, `unmap_vmas`).
+
+  So the other CPU is in mm code in general (fork, COW, exec teardown),
+  not in fault-around in particular.
+
+**Ruled out with two CPUs:** the camera, the PTE clean, the DDR drain, a
+lost tick, fault-around. The CPU setup is the vendor's in every build.
+
+**Next, no build: the card-root two-CPU soak with nandfa** (UBI not
+attached, so after the boot reads nothing touches the NAND controller).
+- **It freezes:** NAND isn't needed. It's an SMP problem of the SoC under
+  this kernel's load: look at the SCU/GIC setup against the vendor's, and
+  at the unported PoUIS clean and `BZ_833`/`BZ_664`.
+- **No freeze in 2 h:** NAND is needed. Then the original test 1: card
+  root, UBI attached, the same read soak on an mtd6 mount. It separates
+  NAND controller traffic (with executables still from SD) from running
+  from NAND. Then a build that traces the ISR step by step (`isr` after
+  each of its NDCR read, NDCR write and `complete()`), since 4 of 7 runs
+  stop right there.
