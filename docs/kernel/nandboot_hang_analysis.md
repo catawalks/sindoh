@@ -1591,3 +1591,76 @@ What remains on the SMP side:
 config is a stable NAND-root kernel today, at the cost of the second
 core. Klipper's host process doesn't need two cores, but the owner
 should decide on that.
+
+## Hang 13: the drain is ruled out; the CPU setup differs from the vendor's (2026-11-08)
+
+nandmb (5f696673, `mc_drain=0`) from mtd0 froze at 172.1 s, silent as
+before.
+- **The last samples:** both CPUs on the same tick in mm code. cpu0 was in
+  `___slab_alloc`, cpu1 in `do_page_fault` from a prefetch abort.
+- **The NAND** was idle for 22 s. The last step is a page program's data
+  (`pio-out-end`). The program's completion wait (`bch_v1_wait_prog`)
+  isn't traced, but the SD log shows its write-back finished (dirty down to
+  4 kB, writeback 0).
+
+**Two CPUs from mtd0: 5 of 5 froze (98 s – 14 min). One CPU: 2 h clean.**
+Ruled out so far: the camera, the PTE clean, the DDR drain, a lost tick.
+
+### The vendor kernel programs the PJ4B differently
+
+The vendor 3.2 image has its own proc_info entry for this CPU (match
+`560f5840`/`ff0ffff0`; ours is MIDR 562f5841) with its own setup function
+(at 0xc041ae60, before `__v7_ca9mp_setup`). Mainline matches the same CPU
+with `__v7_pj4b_proc_info` and runs `__v7_pj4b_setup`, which was written
+for the Armada XP. The two differ in every register they touch:
+
+| Register | Vendor 3.2 (both CPUs) | Mainline `__v7_pj4b_setup` |
+|---|---|---|
+| Aux Debug Modes 0 (`p15,1,c15,c1,0`) | set bit 12 | set bit 22 (`PJ4B_WFI_WFE`: WFI/WFE serve DVM) |
+| Aux Debug Modes 1 (`c15,c1,1`) | clear bit 25 | set 16 (`CLEAN_LINE`), 8 (`INTER_PARITY`); clear 2 (`STATIC_BP`) |
+| Aux Debug Modes 2 (`c15,c1,2`) | set 29 (`OUTSDNG_NC`); clear 23 (`FAST_LDR`) | set 25 (`SNOOP_DATA`), 27 (`CWF`), 29, 30 (`L1_REP_RR`); clear 23 |
+| Aux Functional Modes 0 (`c15,c2,0`) | clear bit 7 | set 1 (`SMP_CFB`: join the coherency fabric), 2 (`L1_PAR_CHK`), 8 (`BROADCAST_CACHE`) |
+| ACTLR (`p15,0,c1,c0,1`) | set bit 6 (SMP); set bit 0 (FW) if ID_MMFR3 says broadcast (it does: 2) | not touched |
+
+- The vendor also reads 0xf8000000 and compares bits 7:4 with 2, but
+  nothing uses the result.
+- These are the bits that decide how a core joins the coherency fabric,
+  snoops, and serves DVM (broadcast TLB/cache maintenance) while it
+  idles. Only SMP freezes. That makes this the strongest lead yet, more
+  than any one driver.
+
+### Patch 0020 and m1-nandboot-nandvs
+
+`kernel/m1/patches/0020-arm-pj4b-mv61x0-vendor-setup.patch`: the option
+`CONFIG_PJ4B_MV61X0_VENDOR_SETUP` (off by default). With it,
+`__v7_pj4b_setup` runs the vendor's sequence instruction for instruction
+instead of mainline's, on both CPUs: CPU0 at boot, CPU1 from
+`secondary_startup` through the same proc_info.
+
+`mach-mv61x0/mv61x0.c` now prints, in every build, each CPU's ACTLR, aux
+function 0 and aux debug 0/1/2 at late init:
+`mv61x0: cpuN ACTLR ... aux func0 ... dbg0 ... dbg1 ... dbg2 ...
+(vendor|mainline PJ4B setup)`. Under any mainline-setup image, these lines
+also show what U-Boot/the boot ROM left plus mainline's bits.
+
+`HANGTEST=nandvs` = nandtick (DDR drain on, as stock) + the option. DEBUG
+IMAGE: the owner's standing OK for these tests, a RAM boot first, then
+mtd0, 2 h.
+**Built 2026-11-08, not booted:**
+- `m1-nandboot-nandvs.uimg` md5 `1dd5f02cd8bec758b01348cd5291f4d8`
+  (2,824,420 bytes);
+- modules tar `f7a9453d9cafc22f398719ede3685fd1`.
+
+The config is nandtick's plus the option. The compiled
+`__v7_pj4b_setup` (0xc0022dd4) has the vendor's encodings instruction for
+instruction (`orr #0x20000000`, `bic #0x2000000`, `bic #0x80`,
+`bic #0x800000`, MMFR3 test, ACTLR `orreq #1`, `orr #0x40`).
+
+**Run:** RAM boot, send the two `mv61x0: cpuN ACTLR ...` lines, then mtd0
+and 2 h.
+- **No freeze:** the CPU setup is the cause. Bisect the five differences
+  afterwards (ACTLR SMP/FW against `SMP_CFB`/`BROADCAST_CACHE` first,
+  then `WFI_WFE`, `SNOOP_DATA`/`CWF`/`L1_REP_RR`), and make the vendor
+  setup the nandboot default.
+- **A freeze:** next the SCU setup (the vendor's `scu_enable` against
+  mainline's) and the unported PoUIS clean and `BZ_833`/`BZ_664`.

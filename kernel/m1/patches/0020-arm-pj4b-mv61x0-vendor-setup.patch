@@ -1,0 +1,71 @@
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Subject: [PATCH] ARM: PJ4B 88PA61x0: the vendor kernel's CPU setup instead of Armada XP's
+
+Test option for the DP200 NAND-root hangs, off by default
+(docs/kernel/nandboot_hang_analysis.md, hang 13).
+---
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -393,6 +393,18 @@
+ 	  flush_pmd_entry), as mainline does on UP. Test option for the
+ 	  NAND-root hangs (docs/kernel/nandboot_hang_analysis.md).
+ 
++config PJ4B_MV61X0_VENDOR_SETUP
++	bool "88PA61x0 PJ4B-MP: the vendor kernel's CPU setup instead of Armada XP's"
++	depends on CPU_PJ4B && ARCH_MV61X0
++	help
++	  Mainline's __v7_pj4b_setup sets the PJ4B auxiliary debug and
++	  functional mode registers for the Armada XP. The Marvell 3.2 vendor
++	  kernel of the 88PA6170 runs a different sequence on both CPUs:
++	  aux debug 0 bit 12, aux debug 2 bit 29 set; aux debug 1 bit 25, aux
++	  function 0 bit 7, aux debug 2 bit 23 cleared; then ACTLR SMP (bit 6)
++	  and, with broadcast maintenance in ID_MMFR3, FW (bit 0). Test
++	  option for the NAND-root hangs (docs/kernel/nandboot_hang_analysis.md).
++
+ config PJ4B_ERRATA_6011
+ 	bool "88PA61x0 PJ4B-MP erratum 6011: five LDREX, IRQs off"
+ 	depends on CPU_PJ4B && ARCH_MV61X0
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -492,6 +492,33 @@
+ /* Auxiliary Debug Modes Control 0 Register */
+ #define PJ4B_WFI_WFE (1 << 22) /* WFI/WFE - serve the DVM and back to idle */
+ 
++#ifdef CONFIG_PJ4B_MV61X0_VENDOR_SETUP
++	/* The 88PA6170 vendor 3.2 kernel's PJ4B setup, as it is */
++	mrc	p15, 1, r0, c15, c1, 0		@ aux debug 0
++	orr	r0, r0, #(1 << 12)
++	mcr	p15, 1, r0, c15, c1, 0
++	mrc	p15, 1, r0, c15, c1, 2		@ aux debug 2
++	orr	r0, r0, #(1 << 29)
++	mcr	p15, 1, r0, c15, c1, 2
++	mrc	p15, 1, r0, c15, c1, 1		@ aux debug 1
++	bic	r0, r0, #(1 << 25)
++	mcr	p15, 1, r0, c15, c1, 1
++	mrc	p15, 1, r0, c15, c2, 0		@ aux function 0
++	bic	r0, r0, #(1 << 7)
++	mcr	p15, 1, r0, c15, c2, 0
++	mrc	p15, 1, r0, c15, c1, 2		@ aux debug 2
++	bic	r0, r0, #(1 << 23)
++	mcr	p15, 1, r0, c15, c1, 2
++	dsb
++	isb
++	mrc	p15, 0, r0, c0, c1, 7		@ ID_MMFR3
++	and	r0, r0, #0xf000
++	cmp	r0, #0x2000			@ maintenance broadcast?
++	mrc	p15, 0, r0, c1, c0, 1		@ ACTLR
++	orreq	r0, r0, #1			@ FW
++	orr	r0, r0, #(1 << 6)		@ SMP
++	mcr	p15, 0, r0, c1, c0, 1
++#else
+ 	/* Auxiliary Debug Modes Control 1 Register */
+ 	mrc	p15, 1,	r0, c15, c1, 1
+ 	orr     r0, r0, #PJ4B_CLEAN_LINE
+@@ -518,6 +545,7 @@
+ 	mrc	p15, 1,	r0, c15, c1, 0
+ 	orr	r0, r0, #PJ4B_WFI_WFE
+ 	mcr	p15, 1,	r0, c15, c1, 0
++#endif /* CONFIG_PJ4B_MV61X0_VENDOR_SETUP */
+ 
+ #endif /* CONFIG_CPU_PJ4B */
+ 
