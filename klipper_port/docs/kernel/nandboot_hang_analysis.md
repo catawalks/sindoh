@@ -2058,3 +2058,32 @@ Reading it:
   address.
 - **It doesn't:** the range 0x1e000000 is special; something else reads
   or writes there.
+
+## Hang 22: nandrwb (cacheable ramoops) freezes too (2026-11-08)
+
+nandrwb (6b077d2a, `mem-type = <2>`, console on) froze at ~210 s on the
+card root, two CPUs, and most likely in its RAM boot too.
+
+| ramoops mapping | Results |
+|---|---|
+| write-combine, console (nandram) | 175 s; ~7 min idle |
+| write-combine, no console (nandrnc) | 123 s; an idle reset |
+| strongly-ordered (nandrso) | ~20–50 s idle; ~6 min |
+| cacheable (nandrwb) | 210 s; the RAM boot |
+
+The reserved areas alone (nandres) and the plain image (nandwdt) ran 2 h
+clean each. **So the mapping type isn't the trigger.** It's ramoops/pstore
+being registered at all, or the range it writes at boot.
+- **Also noted:** a kupdate (mtd0 write) under nandrso froze before
+  "checks ok", and mtd0 was left untouched.
+- **New rule on the main side:** mtd0 is written only from a stable
+  kernel (nandwdt RAM boot).
+
+**Next: nandrmv** (d9122842: nandram with both areas at 0x10000000),
+the same setup.
+- **It freezes as fast:** what pstore/ramoops sets up is the cause. Next,
+  bisect inside it: PSTORE_RAM without PSTORE_CONSOLE/PMSG/COMPRESS, then
+  ramoops without ECC (`ecc-size` 0), then a ramoops with only one dmesg
+  record.
+- **It doesn't:** 0x1e000000–0x1e1fffff is used by something else in the
+  system, and ramoops' boot writes there (headers, ECC, zap) set it off.
