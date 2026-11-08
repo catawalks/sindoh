@@ -2306,3 +2306,31 @@ reserves the DTB where it finds it.
   reserves, for a small and a big image, and look for an overlap.
 - **It's clean:** PSTORE_RAM itself. Next, PSTORE_RAM with
   `ramoops_init` not registering its driver, against Reed-Solomon alone.
+
+## nandsz: a big image without pstore, 45 min clean (2026-11-08)
+
+nandsz (acac7064, 2,826,244 bytes: nandres + 10 KB of incompressible
+padding, no pstore), RAM boot, card root, two CPUs, Wi-Fi and camera on:
+4 passes in 45 min, no reset or error; the probe never missed. **So the
+image size isn't the trigger; PSTORE_RAM is.** The size table above was
+a coincidence of PSTORE_RAM's ~4 KB compressed.
+
+**What PSTORE_RAM brings, with no device and no `ramoops.*`
+parameters:**
+- the ramoops code;
+- Reed-Solomon (selected, no initcall);
+- `ramoops_init` (postcore), which skips its dummy device (no
+  `mem_size`) and calls only `platform_driver_register(&ramoops_driver)`.
+
+Two images, built 2026-11-08, not booted:
+
+| Image | md5 / modules | What |
+|---|---|---|
+| **nandrs** | `4764112c6d838f77de3f2837a7a11174` / `7768121301a6b21c884ce7c2ff567d9c` | nandres + Reed-Solomon alone (`CONFIG_MV61X0_FORCE_REED_SOLOMON`, no pstore). 2,817,836 bytes; `encode_rs8`/`decode_rs8`/`init_rs_gfp` present |
+| **nandps4** | `1c85512a419f02985996939fa783d388` / `980496a14a5e30cfd46dc460c28b13fd` | nandps3 (PSTORE + PSTORE_RAM, no CONSOLE/PMSG/COMPRESS, no device) with `CONFIG_MV61X0_RAMOOPS_NO_INIT` (patch 0023): `ramoops_init` returns at once (checked: it compiles to a bare return), so no driver is registered. 2,819,112 bytes |
+
+| nandrs | nandps4 | Meaning |
+|---|---|---|
+| freezes | — | Reed-Solomon's presence |
+| clean | freezes | the ramoops code's presence (it's never called) |
+| clean | clean | registering the ramoops platform driver |
