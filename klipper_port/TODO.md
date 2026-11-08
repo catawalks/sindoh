@@ -493,9 +493,13 @@ still require the owner's explicit OK.
       nandwdt cf897cd8** (stable; written from a RAM-booted nandwdt), as
       does the card gap. Logs in the shared notes (hang25_*).
       **nandsz acac7064 (nandres, no pstore, padded with incompressible data
-      to 2,826,244 bytes, bigger than every freezer): 45 min clean.** So
-      image size isn't it; PSTORE_RAM itself is. Next: PSTORE_RAM without
-      the driver registration vs Reed-Solomon alone (the kernel session).
+      to 2,826,244 bytes, bigger than every freezer): clean at the 45-min
+      check, but it froze at about 49 min** (the SD log ends at 2955.8 s;
+      the watchdog rebooted into nandwdt). So it's a slow freeze, unlike
+      the PSTORE_RAM builds (20 s to 7 min). Size or placement may raise the
+      rate a little, or this is the plain base rate. A 45-min clean means
+      "no fast freeze", not "no freeze". Next: PSTORE_RAM without the driver
+      registration (nandps4) vs Reed-Solomon alone (nandrs).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
