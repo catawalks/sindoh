@@ -1986,3 +1986,45 @@ their builds froze no faster than nandram.
   mapping type on this SMP PJ4B/SCU. That's the same type the DMA
   coherent allocator uses (`ARM_DMA_MEM_BUFFERABLE`), so it would
   matter for the drivers too.
+
+## Hang 19: ramoops without console still freezes (2026-11-08)
+
+nandrnc (4cdb1676: ramoops with no console or pmsg zone; no
+"legacy console [ramoops-1]" line at boot) froze at ~123 s on the card
+root, two CPUs, Wi-Fi and camera on. Its RAM-boot check most likely reset
+once too (not captured).
+
+| Build | Result |
+|---|---|
+| nandwdt | 2 h clean |
+| nandres (no-map areas only) | 2 h clean |
+| nandram (ramoops + console) | 175 s, and ~7 min idle |
+| nandrnc (ramoops, no console) | 123 s |
+
+**So ramoops' setup and its mapping are enough; its run-time writes
+aren't needed.**
+
+**But ramoops is an accelerator, not the root cause.** The first
+NAND-root hangs (hang 5 at ~23 min, hang 6 at ~22 min) were on the
+default dc3b5f20, which has no PSTORE. The plain image's base rate is
+just low enough that the nandwdt/nandres card-root runs passed 2 h. That
+makes nandram a **fast reproducer** (2–7 min) for testing fixes, and
+why it accelerates says something about the mechanism.
+
+**Next: nandrso** (ecc0aa6e, `mem-type = <1>`: strongly-ordered instead
+of write-combine), the same setup, 2 h. Also built, for after it:
+**`HANGTEST=nandrwb`**, nandram with `mem-type = <2>` (cacheable
+`PAGE_KERNEL` vmap):
+- `m1-nandboot-nandrwb.uimg` md5 `6b077d2a7b5fa1f7ec6dccb980f5ed77`;
+- modules `66d9f18ee7c65ef729f533201a40bc9c`;
+- DTB checked: `mem-type = <0x02>`.
+
+Reading the results:
+- **nandrso and nandrwb both clean:** it's the write-combine (Normal
+  non-cacheable) mapping. The DMA coherent buffers of every driver here
+  have the same type (`ARM_DMA_MEM_BUFFERABLE`), which would explain the
+  base rate. The fix candidate is then `ARM_DMA_MEM_BUFFERABLE` off, or
+  the vendor's way of mapping coherent memory.
+- **Both freeze:** it's ramoops' setup apart from the mapping type. Look
+  at what else it does at boot: ECC/RS init, zapping old records, the
+  `request_mem_region`.
