@@ -10,7 +10,7 @@
 #   VARIANT=gpio            $OUT/m1-gpio.uimg      GPIO banks, nothing driven
 #   VARIANT=eth             $OUT/m1-eth.uimg       small Ethernet + kexec loader
 #   VARIANT=nandboot        $OUT/m1-nandboot.uimg  for mtd0: full + NAND
-#     HANGTEST=up|wrap|errata|errata-dbg|wifidbg|wifitrace|nanddbg|nandirq|nandpcs  $OUT/m1-nandboot-<t>.uimg  hang tests
+#     HANGTEST=up|wrap|errata|errata-dbg|wifidbg|wifitrace|nanddbg|nandirq|nandpcs|nandab  $OUT/m1-nandboot-<t>.uimg  hang tests
 #                           writes, root/revert initramfs, no 8782 firmware
 #
 # A variant merges variants/<v>.config after m1.config, uses
@@ -60,7 +60,7 @@ else
 	KOUT=$WORK/build-m1-$VARIANT
 	IRFS=$WORK/initramfs-m1-$VARIANT
 fi
-# HANGTEST=up|wrap|errata|errata-dbg|wifidbg|wifitrace|nanddbg|nandirq|nandpcs (VARIANT=nandboot only): the test images of
+# HANGTEST=up|wrap|errata|errata-dbg|wifidbg|wifitrace|nanddbg|nandirq|nandpcs|nandab (VARIANT=nandboot only): the test images of
 # docs/kernel/nandboot_hang_analysis.md, variants/nandboot-$HANGTEST.config
 # on top of nandboot, e.g. $OUT/m1-nandboot-up.uimg; own build tree
 if [ -n "${HANGTEST:-}" ]; then
