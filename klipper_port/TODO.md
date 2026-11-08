@@ -384,6 +384,14 @@ still require the owner's explicit OK.
       in 5 of 5 runs (98 s to 14 min); one CPU ran 2 h clean. Waiting for
       the kernel session's next test image. Logs in the shared notes
       (hang13_*).
+      **Hang 14 (11-08 03:31): nandvs 1dd5f02c (both CPUs on the vendor
+      kernel's PJ4B setup: ACTLR 41, aux func0 132, dbg0 60001100, dbg1
+      927, dbg2 20008208), RAM-booted first, then from mtd0, froze at
+      60 s,** the fastest yet. The CPU setup isn't it. The ring ends at the
+      NAND read's ISR entry again (cpu0, which had gone idle waiting for
+      the read). cpu1 was in folio_add_file_rmap_ptes (an atomic in
+      fault-around). Tally from mtd0: two CPUs froze in 6 of 6; one CPU ran
+      2 h clean. Logs in the shared notes (hang14_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
