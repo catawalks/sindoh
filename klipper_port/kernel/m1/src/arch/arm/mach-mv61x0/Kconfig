@@ -28,6 +28,9 @@ if MV61X0_LAYOUT_PAD
 config MV61X0_PAD_FS_TEXT
 	hex "fs/ .text bytes"
 	default 0x0
+config MV61X0_PAD_FS_TEXT_UNLIKELY
+	hex "fs/ .text.unlikely bytes"
+	default 0x0
 config MV61X0_PAD_FS_RODATA
 	hex "fs/ .rodata bytes"
 	default 0x0

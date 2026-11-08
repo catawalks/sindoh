@@ -2183,3 +2183,41 @@ on), soak.
   only with two CPUs. Then bisect the shift region by region.
 - **2 h clean:** pstore's own init (`pstore_init`, the compression
   setup) is what matters.
+
+## nandpad: nandps0's layout without pstore, 2 h clean (2026-11-08)
+
+nandpad (0863cdc0, RAM boot, card root, two CPUs, Wi-Fi and camera on):
+- 12 passes, no reset or error;
+- the probe answered throughout;
+- ping lost only the usual network blips.
+
+**So the bulk layout shift isn't the trigger.**
+
+**What `CONFIG_PSTORE*` does here with no backend** (nandps0):
+- `pstore_init` (late_initcall) only calls `pstore_init_fs()`: the
+  "pstore" filesystem type and the `/sys/fs/pstore` mount point;
+- `ramoops_init` (postcore_initcall) registers the ramoops platform
+  driver, which probes nothing;
+- there are no `CONFIG_PSTORE` `#ifdef`s in ARM or core code outside
+  `fs/pstore/`.
+
+**And one code-layout difference nandpad didn't copy:** ramoops'
+`platform_device_register_data.constprop.0` (0x54 bytes) sits in
+`.text.unlikely` at 0xc000e0d4. It shifts every cold function after it,
+up to `__unlikely_text_end`, by 0x54 (`sizediff.py`).
+
+Two images, built 2026-11-08, not booted:
+
+| Image | md5 / modules | What |
+|---|---|---|
+| **nandpad2** | `ac97d361a78b4698ec55a71ad78fa6c0` / `80d48d99d9829e571b281bde2cc290c7` | nandpad + 0x54 bytes of `.text.unlikely` padding (`MV61X0_PAD_FS_TEXT_UNLIKELY`). **All of `.text` is now at nandps0's addresses.** What's left: the sorted ksymtab, init memory (±0x40), and the 0xc bytes of `.bss` before its page alignment. |
+| **nandps2** | `ea629fc5797997efae50ae8bae4bac4d` / `8eb8d1da8ce66b9631a7e60d2157713a` | nandres + `CONFIG_PSTORE` alone (no RAM, CONSOLE, PMSG, COMPRESS): only `pstore_init` runs. |
+
+**Order:** nandpad2 first (RAM boot, the same setup).
+- **It freezes:** the layout of the *cold* text (an alignment-sensitive
+  path in it, e.g. an exception or error path that two CPUs run) is the
+  trigger. Then bisect the cold text.
+- **It's clean:** run nandps2.
+  - **nandps2 freezes:** pstore's filesystem registration itself.
+  - **nandps2 is clean:** the ramoops platform driver registration (with
+    PSTORE_RAM).
