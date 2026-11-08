@@ -375,6 +375,15 @@ still require the owner's explicit OK.
       needs both CPUs. Next: nandmb 5f696673 (two CPUs, the DDR
       controller drain write off), under the owner's standing OK for these
       tests.
+      **Hang 13 (11-08 03:14): nandmb 5f696673 (two CPUs, mc_drain=0),
+      RAM-booted first, then from mtd0 with modules 1a6ec314, froze at about
+      172 s.** The drain write isn't it. Silent again. Both CPUs' last
+      samples are in page-fault / slab code. NAND had been idle for 22 s
+      (the last ring step was a page program at 149.8 s; the SD log shows
+      NAND irqs and reads flat after it). Tally from mtd0: two CPUs froze
+      in 5 of 5 runs (98 s to 14 min); one CPU ran 2 h clean. Waiting for
+      the kernel session's next test image. Logs in the shared notes
+      (hang13_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
