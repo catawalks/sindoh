@@ -432,6 +432,14 @@ still require the owner's explicit OK.
       init.mainline waits 45 s, so a start line sent before that is lost.
       Next: add the debug pieces back to nandwdt one at a time (ramoops
       first). Logs in the shared notes (hang17_*).
+      **Hang 18 (11-08 06:36): nandram e2fb8c98 = nandwdt plus ramoops/pstore
+      and the two no-map 1 MB areas at 0x1e000000, froze at about 175 s**
+      on the card root with two CPUs, Wi-Fi and the camera on, the same
+      setup where nandwdt ran 2 h clean. **So ramoops / the reserved areas
+      bring the freeze back.** Every fast-freezing build since nanddbg has
+      them. pstore shows nothing near the freeze. Next: split ramoops from
+      the reserved areas (the kernel session's call). Logs in the shared
+      notes (hang18_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
