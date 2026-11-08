@@ -1329,3 +1329,11 @@ The boot log should show `mv61x0-timer: tick check every 100 ms on timer 3
 nanddbg) as well as the console. nandab (557a3939) was built before this
 change and has no tick check. The default image is unaffected until it
 is rebuilt (the check is off without the parameter).
+
+**Time units in the ring and the samples:** both store
+`ktime_get_mono_fast_ns() >> 10`, i.e. units of 1.024 µs, not µs. Multiply
+by 1.024 to get uptime. That's the "~3 s offset" against the SD hang log
+in hang 9. The last samples (142970944) are at **146.40 s** uptime, and the
+log's last line (146.13 s) came just before them. So nothing kept running
+after the samples stopped. The last NAND step (118983074) is at 121.84 s,
+the end of TAR 0 (121.86 s).
