@@ -451,6 +451,16 @@ still require the owner's explicit OK.
       setup and mapping of 0x1e000000 alone bring the freeze back, without
       its run-time writes. Sent to the kernel session. Logs in the shared
       notes (hang19_*).
+      **Hangs 20-22 (11-08 09:26-10:01): the ramoops mapping type isn't the
+      trigger.** nandrso ecc0aa6e (strongly-ordered) froze at about
+      20-50 s idle and again at about 6 min; nandrwb 6b077d2a (cacheable)
+      froze at 210 s (and probably during its RAM boot). Left: ramoops /
+      pstore setup itself (ECC init, old records, region claim, the pstore
+      hooks). The reset boots of the ramoops builds also freeze while
+      idle. Write mtd0 only from a stable kernel: a write from nandrso
+      froze partway through kupdate, before the erase. The card gap now
+      holds nandwdt. Logs in the shared notes (hang20_*, hang21_*,
+      hang22_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
