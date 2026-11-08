@@ -412,6 +412,15 @@ still require the owner's explicit OK.
       were on 5b17e2ec / dc3b5f20, without the debug additions. The printer
       is left on the card root (marker .dp200-root) until the kernel
       session picks the next test. Logs in the shared notes (hang16_*).
+      **nandwdt cf897cd8 (the plain image plus only the hang watchdog: no
+      trace, sampler, tick check or ramoops), two CPUs, from mtd0 on the
+      card root: the full 2-hour soak passed (11-08 04:05-06:13).** 12
+      passes, no reset or errors, the console answered throughout, Wi-Fi
+      up. So the debug additions raise the freeze rate a lot (nandfa froze
+      at 106 s on the same setup). Owner's proposal: a no-Wi-Fi run
+      (mwifiex blacklisted) on a fast-freezing build. The earlier clean
+      runs used the older mwifiex_usb, which often failed to start Wi-Fi.
+      Sent to the kernel session along with its add-back plan.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
