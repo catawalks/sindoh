@@ -19,6 +19,7 @@
 #include <linux/moduleparam.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/smp.h>
 #include <asm/barrier.h>
 #include <asm/cputype.h>
 #include <asm/mach/arch.h>
@@ -73,6 +74,33 @@ static void __init mv61x0_init(void)
 			IS_ENABLED(CONFIG_PJ4B_MV61X0_PTE_CLEAN) ? "" : "not ");
 	}
 }
+
+/*
+ * For the hang analysis (hang 13): the PJ4B setup registers on each CPU.
+ * The vendor kernel and mainline's __v7_pj4b_setup program them
+ * differently (CONFIG_PJ4B_MV61X0_VENDOR_SETUP picks the vendor's).
+ */
+static void mv61x0_pj4b_regs(void *unused)
+{
+	u32 actlr, func0, dbg0, dbg1, dbg2;
+
+	asm volatile("mrc p15, 0, %0, c1, c0, 1" : "=r" (actlr));
+	asm volatile("mrc p15, 1, %0, c15, c2, 0" : "=r" (func0));
+	asm volatile("mrc p15, 1, %0, c15, c1, 0" : "=r" (dbg0));
+	asm volatile("mrc p15, 1, %0, c15, c1, 1" : "=r" (dbg1));
+	asm volatile("mrc p15, 1, %0, c15, c1, 2" : "=r" (dbg2));
+	pr_info("mv61x0: cpu%d ACTLR %08x aux func0 %08x dbg0 %08x dbg1 %08x dbg2 %08x (%s PJ4B setup)\n",
+		smp_processor_id(), actlr, func0, dbg0, dbg1, dbg2,
+		IS_ENABLED(CONFIG_PJ4B_MV61X0_VENDOR_SETUP) ? "vendor" : "mainline");
+}
+
+static int __init mv61x0_pj4b_regs_init(void)
+{
+	if (of_machine_is_compatible("marvell,88pa6170"))
+		on_each_cpu(mv61x0_pj4b_regs, NULL, 1);
+	return 0;
+}
+late_initcall(mv61x0_pj4b_regs_init);
 
 static const char *const mv61x0_dt_compat[] __initconst = {
 	"marvell,88pa6170",
