@@ -1477,3 +1477,83 @@ stops the freezes, this part's coherent-walk claim doesn't hold (at
 least not under this load), which the vendor kernel's cleaning would
 then be working around. If it doesn't stop them, the ID registers make
 the PTE path an unlikely cause, and nandup comes next.
+
+## Hang 12: nandpte froze in 98 s; the PTE clean is ruled out (2026-11-08)
+
+nandpte (7ee63c26) from mtd0 froze at 97.83 s, during TAR 0. It was
+silent, as in hangs 10–11 (no tick check, ping and probe lost together).
+- **So cleaning page-table writes doesn't help**, as the ID registers
+  (coherent walk) predicted. Patch 0019 stays as an option, off.
+- **The ring ends like hang 11's:**
+  - the read was issued on cpu1 (`stop`, `cmd` page 0x27b3a, `rdd`);
+  - the last step is cpu0's `isr 00001802` (RDDREQ) at 97.833 s.
+- **The last samples**, ~9 ms before:
+  - cpu0: `set_ptes` (fault-around);
+  - cpu1: `first_zones_zonelist`, after `__raw_readsl` in the PIO read and
+    `ubi_eba_read_leb`.
+
+**What the ISR does after the logged step** (`marvell_nfc_isr`): `bt_log`
+writes the entry with two `writel()`s, each followed by the DDR drain
+(below). Then:
+1. an NDCR read;
+2. an NDCR write (masking RDDREQ);
+3. `complete()`, which wakes the reader on cpu1: an SGI, i.e. a GIC
+   distributor write.
+
+Any of these, or the drains, can be the access that never completes.
+
+**Why not trace the ISR step by step first:** hangs 9 and 10 froze with
+the NAND idle for 24 and 73 s, in the same silent way. The stall doesn't
+need the NAND ISR. In hangs 11–12, cpu0 just happened to be in the ISR,
+doing MMIO, when the interconnect stopped. A finer ISR trace would say
+which access, but not what stopped the bus.
+
+### One candidate the tracing itself feeds: the DDR drain
+
+On this SoC every `mb()`/`wmb()`, and so every `writel()`, also writes
+0x01010101 to the DDR controller at 0xfa300000 + 0x530 (`soc_mb`, the
+vendor's "cache sync", `mach-mv61x0/mv61x0.c`). The drain rate and the
+freeze rate seem to go together:
+
+| Build | Drains, beyond the drivers' own `writel()`s | Freezes |
+|---|---|---|
+| dc3b5f20 (no trace) | none | after ~20–30 min |
+| nanddbg (trace, busy-poll) | 2 per NAND step, thousands per second during reads | in 20–70 s, often in the boot storm |
+| nandirq / nandpcs / nandtick / nandpte | trace, and the sampler: 200/s | 143 s – 14 min, once 4 h clean |
+
+The card-root soaks drain heavily too (`sdhci_writel` is a `writel()`)
+and didn't freeze in 82–84 min. So if the drain matters, it matters
+together with the NAND root's traffic: CPU-filled pages and PIO from
+NDDB. That's a guess, but a cheap one to test. The drain-off A/B of
+2026-10-29 (`mcsync_ab_test.md`) showed no functional difference, on
+the card root and for a short time only.
+
+**`mv61x0.mc_drain`** (new, in `mv61x0.c`, every build, 0644, default 1 =
+stock): 0 skips the drain write in `soc_mb`. It can be switched at run
+time in `/sys/module/mv61x0/parameters/mc_drain`. The boot line says
+`..., off (mc_drain=0)` when it starts off.
+
+**`HANGTEST=nandmb`** = nandtick with `mv61x0.mc_drain=0` on the command
+line. DEBUG IMAGE: the owner's OK, a RAM boot first, then mtd0.
+**Built 2026-11-08, not booted:**
+- `m1-nandboot-nandmb.uimg` md5 `5f696673782f10446ee2eefa4464da19`
+  (2,823,092 bytes);
+- modules tar `1a6ec314f2c121e3c061ea7a4990665d`.
+
+The config is nandtick's (plus the new, unset `PJ4B_MV61X0_PTE_CLEAN`
+symbol). nandup (d7861757) was built before `mc_drain` existed and
+doesn't have it.
+
+### Order
+
+1. **nandup (maxcpus=1), 2 h from mtd0**, as planned. It's the cleanest
+   split.
+   - **A freeze:** it's not SMP. Go to nandmb.
+   - **No freeze:** it's SMP. nandmb then tells whether the drain is the
+     SMP part (two CPUs draining the same controller).
+2. **nandmb, 2 h from mtd0.**
+   - **No freeze:** the drain write is part of the trigger. Next: does the
+     vendor drain at all on the NAND path, and does it serialise the
+     drain between the CPUs?
+   - **A freeze:** the drain is cleared too. Next the ISR-step trace and
+     the DMA masters (EHCI with Wi-Fi only, GMAC).
