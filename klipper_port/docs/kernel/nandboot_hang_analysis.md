@@ -1337,3 +1337,38 @@ in hang 9. The last samples (142970944) are at **146.40 s** uptime, and the
 log's last line (146.13 s) came just before them. So nothing kept running
 after the samples stopped. The last NAND step (118983074) is at 121.84 s,
 the end of TAR 0 (121.86 s).
+
+## Hang 10: nandtick froze silently, a real stall (2026-11-07, ~23:25)
+
+nandtick (9586a6d3) was RAM-boot checked, then booted by U-Boot from mtd0
+with the NAND root. It froze at ~825 s uptime, and the watchdog reset it.
+- **Tick check:** printed nothing and didn't panic. pstore's console ends
+  at 752 s.
+- **Ping (1 Hz) and the serial probe** both stopped at the same second.
+- **The PC samples** stop together at 825.4 s.
+- **NAND** was idle for 73 s before it.
+
+So this was **not a lost tick**. CPU1's timer-3 interrupt, the network
+and the UART all stopped together: **a stall of the whole interconnect
+(or of both CPUs with interrupts off), as first assumed.** Hang 9's
+samples fit that too.
+
+The last samples:
+- cpu0: mm work (`__mmap_region`, `filemap_map_pages`) and the UVC isoc
+  decode (`uvc_video_decode_isoc`/`_end`);
+- cpu1: page-fault and VMA code (`lock_vma_under_rcu`, `vma_prepare`,
+  `do_PrefetchAbort`).
+
+**ustreamer** was streaming the USB camera (MJPEG, isoc) all the time. So
+the EHCI controller's DMA and interrupts were busy, and a CPU was copying
+out of its isoc buffers.
+
+Next, no build needed: **the same soak with ustreamer stopped**, from
+mtd0, for ≥ 2 h.
+- With freezes every 20 s–30 min so far, 2 h clean is strong evidence
+  (e^−4 to e^−8 if nothing changed).
+- If it stays clean, start ustreamer again in the same boot, and see
+  whether the freezes come back within ~1 h.
+- Check first whether ustreamer ran during the card-root soaks (84/82 min
+  clean). If it did, the camera alone isn't enough, and it's the camera's
+  DMA together with the NAND root.
