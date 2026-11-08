@@ -1,0 +1,140 @@
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -91,6 +91,7 @@
+ #include <linux/dma/pxa-dma.h>
+ #include <linux/platform_data/mtd-nand-pxa3xx.h>
+ #include <linux/hrtimer.h>
++#include <linux/cpu.h>
+ #include <asm/irq_regs.h>
+ 
+ /* Data FIFO granularity, FIFO reads/writes must be a multiple of this length */
+@@ -699,14 +700,20 @@
+ static struct bs_page __iomem *bs;
+ static u32 bs_seq[BS_CPUS];
+ static DEFINE_PER_CPU(struct hrtimer, bs_timer);
++static unsigned int bs_ms = 10;		/* pcs_ms, below */
++static unsigned int bs_mb = 2;		/* pcs_mb, below */
++static bool bs_ready;
+ 
+ static enum hrtimer_restart bs_sample(struct hrtimer *t)
+ {
+ 	struct pt_regs *regs = get_irq_regs();
+ 	unsigned int cpu = raw_smp_processor_id();
++	unsigned int ms = READ_ONCE(bs_ms);
+ 	struct bs_ent __iomem *e;
+ 	u32 seq;
+ 
++	if (!ms)
++		return HRTIMER_NORESTART;
+ 	if (bs && cpu < BS_CPUS) {
+ 		seq = ++bs_seq[cpu];
+ 		e = &bs->e[cpu][seq % BS_N];
+@@ -717,21 +724,91 @@
+ 		writel_relaxed(regs ? regs->ARM_lr : 0, &e->lr);
+ 		writel_relaxed(regs ? regs->ARM_sp : 0, &e->sp);
+ 		writel_relaxed(regs ? regs->ARM_cpsr : 0, &e->cpsr);
+-		writel(seq, &e->seq);
++		switch (READ_ONCE(bs_mb)) {
++		case 0:
++			break;
++		case 1:
++			dsb(st);
++			break;
++		default:
++			wmb();	/* dsb(st) + soc_mb: the DDR write-buffer drain */
++		}
++		writel_relaxed(seq, &e->seq);
+ 	}
+-	hrtimer_forward_now(t, ms_to_ktime(10));
++	hrtimer_forward_now(t, ms_to_ktime(ms));
+ 	return HRTIMER_RESTART;
+ }
+ 
+-static void bs_start(void *unused)
++/* on each CPU (IPI, so never inside bs_sample): restart a stopped sampler */
++static void bs_kick(void *unused)
+ {
+ 	struct hrtimer *t = this_cpu_ptr(&bs_timer);
++	unsigned int ms = READ_ONCE(bs_ms);
++
++	if (ms && !hrtimer_active(t))
++		hrtimer_start(t, ms_to_ktime(ms), HRTIMER_MODE_REL_PINNED_HARD);
++}
+ 
+-	hrtimer_setup(t, bs_sample, CLOCK_MONOTONIC,
++static void bs_start(void *unused)
++{
++	hrtimer_setup(this_cpu_ptr(&bs_timer), bs_sample, CLOCK_MONOTONIC,
+ 		      HRTIMER_MODE_REL_PINNED_HARD);
+-	hrtimer_start(t, ms_to_ktime(10), HRTIMER_MODE_REL_PINNED_HARD);
++	bs_kick(NULL);
++}
++
++/*
++ * Debug switches for the hang hunt, both 0644 so one image covers an A/B
++ * run without a reboot (the command line is forced):
++ * - pcs_ms: the sampler period in ms (10 by default; without
++ *   HIGH_RES_TIMERS it fires from the HZ=100 tick, so it rounds up to
++ *   10 ms steps). 0 stops it on both CPUs; a value > 0 restarts it.
++ * - pcs_mb: the barrier before each sample's seq write. 2 (default, as
++ *   patch 0017's writel()): wmb(), i.e. dsb(st) plus soc_mb, the DDR
++ *   controller write-buffer drain; 1: dsb(st) only; 0: none. Without the
++ *   sampler an idle CPU hardly ever drains (the tick path is all
++ *   _relaxed), with it both CPUs drain every 10 ms.
++ * - idle_poll: 1 makes idle CPUs spin in cpu_idle_poll() instead of
++ *   entering WFI (what "nohlt" does at boot); 0 brings WFI back.
++ */
++static int bs_ms_set(const char *val, const struct kernel_param *kp)
++{
++	int ret = param_set_uint(val, kp);
++
++	if (!ret && READ_ONCE(bs_ready))
++		on_each_cpu(bs_kick, NULL, 1);
++	return ret;
+ }
+ 
++static const struct kernel_param_ops bs_ms_ops = {
++	.set = bs_ms_set,
++	.get = param_get_uint,
++};
++module_param_cb(pcs_ms, &bs_ms_ops, &bs_ms, 0644);
++MODULE_PARM_DESC(pcs_ms, "debug: PC sample period in ms with trace_phys (0: stop)");
++
++module_param_named(pcs_mb, bs_mb, uint, 0644);
++MODULE_PARM_DESC(pcs_mb, "debug: barrier per PC sample: 2 wmb (DDR drain), 1 dsb, 0 none");
++
++static bool bs_idle_poll;
++
++static int bs_idle_poll_set(const char *val, const struct kernel_param *kp)
++{
++	bool old = bs_idle_poll;
++	int ret = param_set_bool(val, kp);
++
++	/* sets are serialised by the param lock */
++	if (!ret && bs_idle_poll != old)
++		cpu_idle_poll_ctrl(bs_idle_poll);
++	return ret;
++}
++
++static const struct kernel_param_ops bs_idle_poll_ops = {
++	.set = bs_idle_poll_set,
++	.get = param_get_bool,
++};
++module_param_cb(idle_poll, &bs_idle_poll_ops, &bs_idle_poll, 0644);
++MODULE_PARM_DESC(idle_poll, "debug: 1 = idle CPUs poll instead of WFI (like nohlt)");
++
+ static void bs_init(struct device *dev)
+ {
+ 	u32 cpu, i, last, seq, n;
+@@ -764,8 +841,9 @@
+ 	memset_io(bs->e, 0, sizeof(bs->e));
+ 	writel(BS_MAGIC, &bs->magic);
+ 	on_each_cpu(bs_start, NULL, 1);
+-	dev_info(dev, "pcs: PC samples every 10 ms to %#lx\n",
+-		 bch_v1_tr_phys + sizeof(*bt));
++	WRITE_ONCE(bs_ready, true);
++	dev_info(dev, "pcs: PC samples every %u ms to %#lx (pcs_ms)\n",
++		 READ_ONCE(bs_ms), bch_v1_tr_phys + sizeof(*bt));
+ }
+ 
+ static void bt_log(u32 step, u32 a, u32 b, u32 c)

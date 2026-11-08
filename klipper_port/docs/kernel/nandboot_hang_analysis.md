@@ -1069,7 +1069,8 @@ of 0016, only active with `marvell_nand.trace_phys`:
 **Run plan:**
 1. RAM-boot it first. Check that `pcs: PC samples every 10 ms` and the
    trace line appear, and that the board stays up for a few minutes (the
-   sampler adds 200 interrupts/s).
+   sampler runs inside the existing 10 ms tick; it adds no interrupts,
+   see the nandpcs soak below).
 2. Then either:
    - with the owner's OK, put it in mtd0, so the reset lands in it and it
      prints both the ring and the samples;
@@ -1102,3 +1103,125 @@ was in or after it, before the next command.
     Wi-Fi start at once.
 - The PC samples (patch 0017, nandpcs) and test 1 above (card root, UBIFS
   rw on mtd6, the read soak) are the next steps.
+
+## nandpcs: 4 h of NAND-root read soak without a freeze (2026-11-07)
+
+nandpcs (3ec9c45b: nandirq + the 10 ms PC sampler) was RAM-booted with the
+NAND root and ran the read soak for 14163 s (3 h 56 min):
+- 70 full `tar` passes of `/` after `drop_caches`;
+- NAND stats `7968475,5,1532,0,0,0,0,0,0,1532`: 5 corrected, no fail,
+  timeout or uncorrectable;
+- UBI max_ec 129;
+- dmesg: no oops, lockup, NAND or UBI errors; only the boot-time mwifiex
+  `CMD_RESP 0x242/0x23f result=2` lines.
+
+The owner counts the soak as passed. No freeze, so no PC samples.
+
+| Build | Reads | Sampler | Result |
+|---|---|---|---|
+| nanddbg e6cdb8a6 | busy-poll | – | froze in 20–70 s (≈ 6 times) |
+| nandirq 1f33eb43 | interrupt | – | froze at ~490 s (once, hang 8) |
+| nandpcs 3ec9c45b | interrupt | 10 ms | 14163 s, no freeze |
+
+### How much does one nandirq freeze say?
+
+nandirq has one freeze in one run, so its freeze rate is barely known. If
+its mean time to a freeze were *T*, the chance of 4 h without one is
+e^(−236 min / *T*):
+
+| *T* | 8 min | 30 min | 1 h | 2 h |
+|---|---|---|---|---|
+| P(no freeze in 4 h) | ~10⁻¹³ | 0.04 % | 2 % | 14 % |
+
+So the sampler very likely matters if nandirq freezes about as often as
+hang 8 suggests, but a run of nandirq without the sampler is still needed
+before calling it a heisenbug.
+
+### What the sampler changes (and what it doesn't)
+
+- **It adds no interrupts.** The config is `HZ_PERIODIC`, `HZ=100`, with
+  no `HIGH_RES_TIMERS`. Without high-resolution mode, hrtimers run from
+  the tick (`hrtimer_run_queues()`), so the "10 ms" sampler fires inside
+  the existing 10 ms tick. It can't keep a CPU out of WFI any longer than
+  the tick already does. (The nandpcs run plan said it adds 200
+  interrupts/s; that was wrong.) So "nohlt" tests WFI itself, not the
+  sampler.
+- **What it does add, per tick and CPU:** `get_irq_regs()` and eight
+  uncached stores into the reserved page at 0x1e101000. The last store is
+  a `writel()`. On this SoC (`ARM_HEAVY_MB`, `mach-mv61x0/mv61x0.c`)
+  `writel()` runs `wmb()`, which is `dsb(st)` **plus `soc_mb`: a write of
+  0x01010101 to the DDR controller's +0x530**, the vendor's "cache sync",
+  most likely a write-buffer drain for the controller's ports.
+- **The tick path itself is all `_relaxed`** (timer-mv61x0.c), and the
+  NAND trace only writes while the NAND works. So with the sampler off, an
+  idle CPU hardly ever runs a DSB or drains the DDR write buffers. With it
+  on, both CPUs do every 10 ms. Hang 8 came after ~66 s with no NAND step,
+  in the idle sleep.
+- **Against a simple "drains protect" story:** the trace's own `writel()`s
+  (two per NAND step, so thousands per second during reads) didn't help
+  the polling kernels. nanddbg froze in 20–70 s, often in the boot read
+  storm, which dc3b5f20 (same polling, no trace) survived every boot,
+  freezing only after ~20–30 min. So the switches below measure instead
+  of guessing.
+
+### Patch 0018: run-time switches (m1-nandboot-nandab)
+
+`kernel/m1/patches/0018-mtd-rawnand-marvell-mv61x0-pcs-idle-switches.patch`,
+on top of 0017. Three `marvell_nand` parameters, all 0644, so one image
+covers every A/B without a reboot (the command line is forced):
+
+| Parameter | Default | Values |
+|---|---|---|
+| `pcs_ms` | 10 | sampler period in ms (10 ms steps, from the tick); **0 stops it** on both CPUs, a value > 0 restarts it |
+| `pcs_mb` | 2 | barrier before each sample's last store: **2** `wmb()` = DSB + DDR drain (as 0017), **1** `dsb(st)` only, **0** none |
+| `idle_poll` | 0 | **1**: idle CPUs spin in `cpu_idle_poll()` instead of WFI (what `nohlt` does); 0: WFI again |
+
+With the defaults it behaves as nandpcs. For example:
+
+```
+echo 0 > /sys/module/marvell_nand/parameters/pcs_ms
+cat /sys/module/marvell_nand/parameters/pcs_ms /sys/module/marvell_nand/parameters/pcs_mb /sys/module/marvell_nand/parameters/idle_poll
+```
+
+`HANGTEST=nandab`, the config is nandpcs's (watchdog, ramoops, trace, the
+same reserved areas). DEBUG IMAGE: it arms the hardware watchdog, so each
+run needs the owner's OK. RAM-boot it first, as always. **Built
+2026-11-07, not booted:**
+- `m1-nandboot-nandab.uimg` md5 `557a3939d6db8998a38c86198dd92aa6`
+  (2,822,724 bytes);
+- modules tar `e44e008f58247be4492dcc559f6c10d9`;
+- the boot line now reads `pcs: PC samples every 10 ms to 0x1e101000
+  (pcs_ms)`.
+
+The switches also compile into the default image the next time it is
+built, but do nothing there: the sampler needs `trace_phys`, and
+`idle_poll` defaults to 0. mtd0's dc3b5f20 is unchanged.
+
+### Runs, in order
+
+Set the switches as soon as there is a shell (the boot read storm runs
+with the defaults; hang 8 came in the idle phase), then the same read soak,
+up to 2 h each:
+
+1. **R1: `pcs_ms=0`** (= nandirq). The replication.
+   - **No freeze in 2 h:** hang 8 was a rare event, and 0016 alone has
+     ~6 h with one freeze. Then run long soaks with the sampler on
+     (defaults), so that the next freeze comes with samples.
+   - **A freeze:** the sampler protects (one freeze each in 490 s and R1,
+     none in 4 h with it). Go on with R2–R4.
+2. **R2: `pcs_ms=10 pcs_mb=0`**: the sampler without the barrier. A
+   freeze means the barrier (DSB or drain) is the protecting part; no
+   freeze means it's the tick-time work or timing.
+3. **R3: `pcs_mb=1`** (only if R2 froze): DSB alone vs DSB + DDR drain.
+4. **R4: `pcs_ms=0 idle_poll=1`**: no WFI, no sampler. No freeze points at
+   WFI/idle (the PJ4B WFI errata area).
+
+After a freeze the reset lands in mtd0 (nanddbg e6cdb8a6), which prints
+the NAND ring; with the sampler on, `pcs_dump.py` reads the samples there.
+Resolve them with `m1-nandboot-nandab-System.map`.
+
+**Optional, on the board as it is now (nandpcs, idle):** `python3 -I
+pcs_dump.py` twice, a few seconds apart, shows whether cpu1's samples
+advance at ~100/s. If they don't, CPU1 gets no tick of its own (there is
+only one clockevent, timer 1, and no TWD), and the sampler only ever ran
+on cpu0.

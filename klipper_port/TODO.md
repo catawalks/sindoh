@@ -320,6 +320,20 @@ still require the owner's explicit OK.
       and no sampler, or the sampler at 100 ms. mtd0 still holds nanddbg
       e6cdb8a6. No normal build goes back in mtd0 until this is understood
       and the build is RAM-booted first.
+      **Hang 9 (11-07 ~22:30): the same nandpcs image, written to mtd0
+      (owner OK, KUPDATE OK) and booted by U-Boot from NAND, froze at about
+      143 s** during the 1-hour read soak's 2-minute idle gap. The
+      watchdog reset it, and the next boot printed the trace and the PC
+      samples: both CPUs' samples stop within 15 us of each other. cpu0 was
+      in do_idle; cpu1's last sample was in xas_next_entry (a page-cache
+      fault-around, SVC, IRQs on). The last NAND step was 24 s earlier, a
+      complete read, and the SD stat log shows NAND idle until its last
+      line. So the sampler doesn't hide the hang; the 3 h 56 min run came
+      from the card-gap mmc boot. Open question: does the U-Boot
+      nand-read path leave different state than the mmc path, or was it
+      luck? Console in the shared notes (hang9_mtd0_nandpcs_serial.txt).
+      mtd0 now holds nandpcs (3ec9c45b), so every freeze resets and prints
+      its own samples.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
