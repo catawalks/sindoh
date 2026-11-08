@@ -478,6 +478,12 @@ still require the owner's explicit OK.
       the layout isn't it: pstore's own init is the trigger (compression,
       the fs registration, console/pmsg hooks, or the kmsg dumper). Next
       split is the kernel session's call.
+      **nandpad2 ac97d361 (all of .text at nandps0's addresses, no pstore):
+      2 h clean.** **nandps2 ea629fc5 (CONFIG_PSTORE alone, the pstore fs
+      registered): about 89 min clean.** So registering the pstore fs
+      isn't it, and the layout isn't it. What's left is the ramoops platform
+      driver registration (nandps0 had it). From now on soaks for this
+      quick-freeze phase are 45 min (owner, 11-08; deploy/usb/t/soak45.sh).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
