@@ -357,6 +357,16 @@ still require the owner's explicit OK.
       hangs 9, 10 and 11, one CPU is in page-fault fault-around / PTE code
       at the freeze (a lead for PJ4B page-table-walk coherency, not proof).
       Sent to the kernel session; logs in the shared notes (hang11_*).
+      **Hang 12 (11-08 00:39): nandpte 7ee63c26 (page-table writes cleaned
+      as the vendor kernel does; patch 0019), RAM-booted first, then in mtd0
+      with modules 8f06a39f, froze at about 98 s from mtd0** during the first
+      full read. The clean doesn't fix it. Silent again. The NAND ring ends
+      exactly like hang 11: the read's ISR entry (status 1802), here on cpu0
+      while cpu1 issued the read, with nothing after it. cpu0's last sample
+      was set_ptes (fault-around). The ID line: MMFR3 00102211 (the CPU
+      claims a coherent table walk and broadcast maintenance). Next per the
+      kernel session: nandup d7861757 (one CPU), needs the owner's OK. Logs
+      in the shared notes (hang12_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
