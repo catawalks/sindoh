@@ -77,8 +77,8 @@ static void __init mv61x0_init(void)
 
 /*
  * For the hang analysis (hang 13): the PJ4B setup registers on each CPU.
- * The vendor kernel and mainline's __v7_pj4b_setup program them
- * differently (CONFIG_PJ4B_MV61X0_VENDOR_SETUP picks the vendor's).
+ * They come from __v7_pj4bmp_setup (patch 0001), the vendor 3.2 kernel's
+ * sequence; mainline's __v7_pj4b_setup never runs on this CPU.
  */
 static void mv61x0_pj4b_regs(void *unused)
 {
@@ -89,9 +89,8 @@ static void mv61x0_pj4b_regs(void *unused)
 	asm volatile("mrc p15, 1, %0, c15, c1, 0" : "=r" (dbg0));
 	asm volatile("mrc p15, 1, %0, c15, c1, 1" : "=r" (dbg1));
 	asm volatile("mrc p15, 1, %0, c15, c1, 2" : "=r" (dbg2));
-	pr_info("mv61x0: cpu%d ACTLR %08x aux func0 %08x dbg0 %08x dbg1 %08x dbg2 %08x (%s PJ4B setup)\n",
-		smp_processor_id(), actlr, func0, dbg0, dbg1, dbg2,
-		IS_ENABLED(CONFIG_PJ4B_MV61X0_VENDOR_SETUP) ? "vendor" : "mainline");
+	pr_info("mv61x0: cpu%d ACTLR %08x aux func0 %08x dbg0 %08x dbg1 %08x dbg2 %08x\n",
+		smp_processor_id(), actlr, func0, dbg0, dbg1, dbg2);
 }
 
 static int __init mv61x0_pj4b_regs_init(void)

@@ -1747,3 +1747,24 @@ setup: that's the comparison wanted after hang 13.
   card root also freezes with two CPUs, it isn't the NAND root at all.
   If it doesn't, the CPU-filled (PIO) pages are the key, and the cache
   maintenance of dirty lines across the cores is where to look.
+
+### Correction: the vendor PJ4B setup was in every build (patch 0001)
+
+nandfa (mainline-labelled) printed the same registers as nandvs:
+`ACTLR 00000041 aux func0 00000132 dbg0 60001100 dbg1 00000927 dbg2 20008208`
+on both CPUs.
+- **The reason:** patch 0001 (from the first bring-up) already adds
+  `__v7_pj4bmp_proc_info`, which matches this CPU (`560f5840`/`ff0ffff0`)
+  before mainline's `__v7_pj4b_proc_info`. Its `__v7_pj4bmp_setup` is the
+  vendor's sequence, ACTLR SMP/FW included.
+- **So mainline's Armada XP `__v7_pj4b_setup` has never run on this
+  board.** Patch 0020 only changed that dead path, and nandvs was in
+  effect a rerun of nandtick. I missed 0001 when I compared; the hang 13
+  table above compares the vendor code with mainline's dead path, not
+  with what ran.
+- **What hang 14 does show:** with the vendor's CPU register state (as
+  in every run so far), two CPUs freeze. The CPU setup doesn't differ
+  from the vendor's, so it isn't a candidate.
+- **Removed:** patch 0020, `CONFIG_PJ4B_MV61X0_VENDOR_SETUP` and the
+  nandvs variant. The register print stays, without the
+  "vendor/mainline" label.
