@@ -1844,3 +1844,41 @@ loss and the reset.
 - **No freeze:** one of the additions raises the rate. Add them back one
   at a time: ramoops with its reserved areas first (common to every fast
   freezer since nanddbg), then the sampler, then the tick check.
+
+## nandwdt: two CPUs, card root, 2 h clean (2026-11-08)
+
+nandwdt (cf897cd8: the plain image plus the hang watchdog), from mtd0,
+card root, camera on, **Wi-Fi up and associated**:
+- 12 full passes in 7682 s;
+- no reset, oops, lockup or mmc error;
+- the probe answered throughout;
+- ping lost 32 of ~7640, at most 3 in a row, in clusters every ~20 min
+  (most likely Wi-Fi rekeys; the probe never missed).
+
+The same setup froze in 106 s with nandfa (hang 16). **So the debug
+additions raise the freeze rate a lot; two CPUs with Wi-Fi up aren't
+enough on their own in 2 h.**
+
+**Next, the owner's test (no build): nandfa on the card root with
+mwifiex blacklisted**, everything else as in hang 16, camera included.
+- The 11-06/07 clean card-root runs had the old mwifiex_usb (before
+  0013), which often didn't bring the adapter up, so Wi-Fi may not have
+  run in them.
+- Hang 16's cpu1 was in `ehci_urb_enqueue`.
+- **A freeze:** Wi-Fi isn't needed. Go on adding back the debug pieces to
+  nandwdt.
+- **2 h clean:** Wi-Fi/USB traffic is part of the trigger, and the debug
+  pieces make it fire sooner. Then find which piece, with Wi-Fi on.
+
+**Add-back step 1, built for either outcome: `HANGTEST=nandram`** =
+nandwdt + ramoops/pstore and nanddbg's two no-map 1 MB areas at
+0x1e000000. No `trace_phys`, so no trace, sampler or tick check. The
+config differs from nandwdt's only by PSTORE (and REED_SOLOMON for its
+ECC). **Built 2026-11-08, not booted:**
+- `m1-nandboot-nandram.uimg` md5 `e2fb8c988db1687c88228f471bfefa62`
+  (2,823,812 bytes);
+- modules tar `39cf9a1aab0031a38dbc1f13bd24a6d8`.
+
+After it, if it's clean: nandram + `trace_phys` (the trace ring, inert
+on the card root, and with it the sampler and the tick check), then each
+of those switched off at run time (`pcs_ms=0`).
