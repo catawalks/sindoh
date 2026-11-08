@@ -308,6 +308,18 @@ still require the owner's explicit OK.
       window none). Next tests proposed to the kernel session: NAND root
       with the window none; card root with UBIFS on mtd6 mounted rw idle;
       a trace of all controller accesses incl. program/erase.
+      **nandpcs 3ec9c45b (nandirq + a PC sample every 10 ms per CPU to
+      0x1e101000), RAM-booted on the NAND root, read soak: no freeze in
+      14163 s (3 h 56 min, 11-07).** 70 full reads of / after drop_caches,
+      NAND stats 7968475,5,1532,0,... (5 corrected, no fail/tmo/unc), UBI
+      max_ec 129, dmesg clean apart from boot-time mwifiex CMD_RESP lines.
+      The owner called the soak satisfied. The only difference from
+      nandirq (froze at 490 s) is the 10 ms per-CPU sampling interrupt, so
+      it may hide the hang (WFI/idle time or IPI timing). Sent to the
+      kernel session with two splitting builds: nandirq with idle/WFI off
+      and no sampler, or the sampler at 100 ms. mtd0 still holds nanddbg
+      e6cdb8a6. No normal build goes back in mtd0 until this is understood
+      and the build is RAM-booted first.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
