@@ -13,3 +13,46 @@ config ARCH_MV61X0
 	help
 	  Support for the Marvell 88PA6170 SoC of the Sindoh DP200 3D
 	  printer: two PJ4B-MP cores with an A9-style SCU and GIC.
+
+config MV61X0_LAYOUT_PAD
+	bool "DP200 hang analysis: zero padding in fs/ and lib/"
+	depends on ARCH_MV61X0
+	help
+	  Zero-filled .text, .rodata, .data, .bss and .init.text, linked
+	  where fs/pstore/ and lib/reed_solomon/ would be, so that a kernel
+	  without pstore gets the addresses of one with it. Nothing reads or
+	  runs the padding. Test option (docs/kernel/nandboot_hang_analysis.md,
+	  hang 24).
+
+if MV61X0_LAYOUT_PAD
+config MV61X0_PAD_FS_TEXT
+	hex "fs/ .text bytes"
+	default 0x0
+config MV61X0_PAD_FS_RODATA
+	hex "fs/ .rodata bytes"
+	default 0x0
+config MV61X0_PAD_FS_RODATA_STR
+	hex "fs/ merged-string bytes (at least 1)"
+	default 0x1
+config MV61X0_PAD_FS_DATA
+	hex "fs/ .data bytes"
+	default 0x0
+config MV61X0_PAD_FS_BSS
+	hex "fs/ .bss bytes"
+	default 0x0
+config MV61X0_PAD_FS_INIT_TEXT
+	hex "fs/ .init.text bytes"
+	default 0x0
+config MV61X0_PAD_LIB_TEXT
+	hex "lib/ .text bytes"
+	default 0x0
+config MV61X0_PAD_LIB_RODATA
+	hex "lib/ .rodata bytes"
+	default 0x0
+config MV61X0_PAD_LIB_DATA
+	hex "lib/ .data bytes"
+	default 0x0
+config MV61X0_PAD_LIB_BSS
+	hex "lib/ .bss bytes"
+	default 0x0
+endif
