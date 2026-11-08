@@ -1907,3 +1907,46 @@ camera streaming, froze at ~329.1 s, 74 s into TAR 0, silent as before.
 **Next: nandram** (e2fb8c98, add-back step 1: ramoops/pstore and the
 reserved areas), on the card root with Wi-Fi on as in the nandwdt run,
 2 h.
+
+## Hang 18: ramoops and its reserved areas bring the freeze back (2026-11-08)
+
+nandram (e2fb8c98: nandwdt + ramoops/pstore and the two no-map 1 MB
+areas at 0x1e000000) froze at ~175 s on the card root, two CPUs, Wi-Fi
+and camera on. That's the setup in which nandwdt ran 2 h clean. pstore's
+console from the frozen boot ends at 115.96 s (a mwifiex `CMD_RESP`
+line), 60 s before the freeze.
+
+| Build | Same setup, two CPUs, card root | Result |
+|---|---|---|
+| nandwdt | plain + hang watchdog | 2 h clean |
+| nandram | + ramoops/pstore + the two no-map areas | froze at 175 s |
+
+Every fast freezer since nanddbg has had both.
+
+Two splits, both built:
+- **(a) `HANGTEST=nandres`:** nandwdt with the two no-map areas reserved
+  in the DT, but no PSTORE. Nothing maps or writes them, only the memory
+  map has the 2 MB hole.
+  - `m1-nandboot-nandres.uimg` md5 `70bcc0cf9da578387d740a2627af0e95`
+    (2,814,388 bytes);
+  - modules `78de482955bc62e9019b86e0b050fb00`.
+- **(b) `HANGTEST=nandrnc`:** nandram with ramoops' `console-size` and
+  `pmsg-size` 0. ramoops still maps its area (`ioremap_wc`: Normal
+  non-cacheable), and its ECC and dmesg zones get set up at boot, but
+  nothing writes there while the system runs (only on a panic or oops).
+  - `m1-nandboot-nandrnc.uimg` md5 `4cdb167620e6116de9c038bcb115f3fe`
+    (2,823,596 bytes);
+  - modules `46bed1f17c9c59b0076b5ffb7718bfd2`.
+
+Both DTBs were checked (`dtc -I dtb`): the same `reg`/`no-map`, and the
+console and pmsg sizes as described.
+
+**Order:** (a) first, the same setup, 2 h.
+- **It freezes:** the hole in the memory map (or the layout shift it
+  causes) is enough. Next, (c): the areas moved elsewhere in DDR, and a
+  hole of the same size with nothing reserved at 0x1e000000.
+- **No freeze:** it's ramoops. (b) then tells whether its run-time
+  console writes matter, or just its mapping and setup.
+
+The pstore console ending 60 s before the freeze already argues against
+the writes alone.
