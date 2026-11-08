@@ -484,6 +484,14 @@ still require the owner's explicit OK.
       isn't it, and the layout isn't it. What's left is the ramoops platform
       driver registration (nandps0 had it). From now on soaks for this
       quick-freeze phase are 45 min (owner, 11-08; deploy/usb/t/soak45.sh).
+      **Hang 25 (11-08 16:59): nandps3 237dde13 (PSTORE + PSTORE_RAM + Reed-
+      Solomon; ramoops registered but nothing probes) froze at about 225 s.**
+      The only difference from the clean nandps2 is CONFIG_PSTORE_RAM and
+      CONFIG_REED_SOLOMON*. So the trigger is the ramoops platform-driver
+      registration or the RS library. The watchdog's reset into nandrwb
+      (mtd0) froze again within about 45 s, a reset loop, so **mtd0 now holds
+      nandwdt cf897cd8** (stable; written from a RAM-booted nandwdt), as
+      does the card gap. Logs in the shared notes (hang25_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
