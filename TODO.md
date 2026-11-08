@@ -348,6 +348,15 @@ still require the owner's explicit OK.
       kernel session. Logs are in the shared notes (hang10_*). mtd0 holds
       nandtick; the old modules are in /var/backups/mods-bfd2c0a7.tar on the
       NAND root.
+      **Hang 11 (11-07 23:57): camera-off soak (ustreamer killed, "CAMOFF
+      ok"), nandtick from mtd0, froze at about 683 s.** The camera is ruled
+      out. Silent again: no tick-check output, console and ping stopped
+      together. This time NAND was mid-read: the ring ends on the read's
+      ISR entry (status 1802) at 683.148 s, with no rdd-end after it.
+      cpu1's last sample was set_pte_range under filemap_map_pages. In
+      hangs 9, 10 and 11, one CPU is in page-fault fault-around / PTE code
+      at the freeze (a lead for PJ4B page-table-walk coherency, not proof).
+      Sent to the kernel session; logs in the shared notes (hang11_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
