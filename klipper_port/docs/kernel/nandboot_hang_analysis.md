@@ -1557,3 +1557,37 @@ doesn't have it.
      drain between the CPUs?
    - **A freeze:** the drain is cleared too. Next the ISR-step trace and
      the DMA masters (EHCI with Wi-Fi only, GMAC).
+
+## nandup: one CPU, 2 h from mtd0 without a freeze (2026-11-08)
+
+nandup (d7861757, `maxcpus=1`, modules dd208ffb) from mtd0, on the NAND
+root, with the camera on:
+- 27 full passes (`IRQSOAK DONE 27 passes` at 7281 s), still up at 7730 s;
+- NAND: 3055430 reads, 27 corrected, no fail, timeout or unc;
+- no oops, lockup, tick-check or panic line, and no reset;
+- the probe answered throughout, and ping lost only 9 single packets of
+  ~7660 (the PC's usual drops).
+
+The two-CPU builds from mtd0 froze in 98 s – 14 min (hangs 9–12). If one
+CPU froze as often, 2 h clean would have odds of e^−8 or less. **So the
+freeze needs both CPUs.**
+
+What remains on the SMP side:
+1. **nandmb** (next): both CPUs writing the DDR controller's drain
+   register.
+2. **What the vendor sets up differently for the second core:**
+   - the SCU control register (speculative linefills, standby);
+   - ACTLR (SMP/FW bits);
+   - the PJ4B auxiliary function modes (CP15 c15), against mainline's
+     `__v7_pj4b_setup`;
+   - how `platsmp.c` brings up CPU1 compared with the vendor's
+     secondary start.
+
+   That's offline reading of the vendor image, no board time.
+3. **The 6011 erratum and cache-wrapper area** is already in every build.
+   The vendor's PoUIS clean and `BZ_833`/`BZ_664` are still unported.
+
+**Workaround if the hunt drags on:** `maxcpus=1` in the default nandboot
+config is a stable NAND-root kernel today, at the cost of the second
+core. Klipper's host process doesn't need two cores, but the owner
+should decide on that.
