@@ -367,6 +367,14 @@ still require the owner's explicit OK.
       claims a coherent table walk and broadcast maintenance). Next per the
       kernel session: nandup d7861757 (one CPU), needs the owner's OK. Logs
       in the shared notes (hang12_*).
+      **nandup d7861757 (maxcpus=1), RAM-booted first, then from mtd0 with
+      modules dd208ffb: the full 2-hour soak passed (11-08 00:55-02:56).**
+      IRQSOAK DONE, 27 passes; NAND 3055430 reads, 27 corrected, no fail,
+      tmo or unc; no oops, tick-check or reset; the console answered
+      throughout; 9 single lost pings out of about 7,660. So the freeze
+      needs both CPUs. Next: nandmb 5f696673 (two CPUs, the DDR
+      controller drain write off), under the owner's standing OK for these
+      tests.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
