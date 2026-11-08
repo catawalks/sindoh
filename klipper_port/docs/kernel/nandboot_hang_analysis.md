@@ -1882,3 +1882,28 @@ ECC). **Built 2026-11-08, not booted:**
 After it, if it's clean: nandram + `trace_phys` (the trace ring, inert
 on the card root, and with it the sampler and the tick check), then each
 of those switched off at run time (`pcs_ms=0`).
+
+## Hang 17: no Wi-Fi, card root, still freezes (2026-11-08)
+
+nandfa from mtd0 on the card root with no mwifiex loaded (no `mlan0`),
+camera streaming, froze at ~329.1 s, 74 s into TAR 0, silent as before.
+**So Wi-Fi isn't needed.**
+- **The last samples**, both at 329.13 s:
+  - cpu0: `sdhci_request_done+0x178`, the SD host's request completion;
+  - cpu1: `xas_load`, a page-cache lookup (after `arm_copy_to_user`).
+- **The shape matches the NAND root:** one CPU in the storage I/O
+  completion (the SDHCI done path here, the NFC ISR in hangs 11, 12, 14,
+  15), the other in page-cache/mm code.
+- The ring and sample counters started again at "boot 1". The nandwdt
+  boots in between have no reserved areas, so Linux used that RAM and
+  the magic was gone. Nothing to fix.
+
+**Tally:**
+- **Debug builds, two CPUs:** 9 of 9 froze, NAND or card root, with or
+  without Wi-Fi or the camera.
+- **nandwdt** (plain + watchdog, two CPUs, card root) and **nandup** (one
+  CPU, NAND root): 2 h clean each.
+
+**Next: nandram** (e2fb8c98, add-back step 1: ramoops/pstore and the
+reserved areas), on the card root with Wi-Fi on as in the nandwdt run,
+2 h.
