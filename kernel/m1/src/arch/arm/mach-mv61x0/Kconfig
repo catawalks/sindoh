@@ -62,3 +62,21 @@ config MV61X0_PAD_LIB_BSS
 	hex "lib/ .bss bytes"
 	default 0x0
 endif
+
+config MV61X0_FORCE_REED_SOLOMON
+	bool "DP200 hang analysis: build Reed-Solomon in without a user"
+	depends on ARCH_MV61X0
+	select REED_SOLOMON
+	select REED_SOLOMON_ENC8
+	select REED_SOLOMON_DEC8
+	help
+	  The library PSTORE_RAM selects, on its own (no pstore). Test option
+	  (docs/kernel/nandboot_hang_analysis.md, hang 25).
+
+config MV61X0_RAMOOPS_NO_INIT
+	bool "DP200 hang analysis: ramoops_init returns at once"
+	depends on ARCH_MV61X0 && PSTORE_RAM=y
+	help
+	  PSTORE_RAM built in, but ramoops_init neither registers the dummy
+	  device nor the platform driver. Test option
+	  (docs/kernel/nandboot_hang_analysis.md, hang 25).

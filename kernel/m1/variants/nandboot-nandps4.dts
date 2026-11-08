@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
+/* m1-nandboot-nandps4: nanddbg's reserved areas, no ramoops backend */
+#include "nandboot-nanddbg.dts"
+
+&{/reserved-memory/ramoops@1e000000} {
+	/delete-property/ compatible;
+};
