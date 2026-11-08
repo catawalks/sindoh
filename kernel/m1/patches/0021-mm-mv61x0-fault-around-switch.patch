@@ -1,0 +1,43 @@
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Subject: [PATCH] mm: 88PA61x0: fault-around switch without debugfs
+
+Test option for the DP200 NAND-root hangs, off by default
+(docs/kernel/nandboot_hang_analysis.md, hang 14).
+---
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -5605,6 +5605,34 @@
+ static unsigned long fault_around_pages __read_mostly =
+ 	65536 >> PAGE_SHIFT;
+ 
++#ifdef CONFIG_ARCH_MV61X0
++#include <linux/moduleparam.h>
++
++/*
++ * DP200 hang analysis (docs/kernel/nandboot_hang_analysis.md, hang 14):
++ * memory.fault_around_pages=1 on the command line, or written to
++ * /sys/module/memory/parameters/fault_around_pages, turns fault-around
++ * off without debugfs. 1 (off) or a power of two; 16 is the default.
++ */
++static int fault_around_pages_set(const char *val,
++				  const struct kernel_param *kp)
++{
++	unsigned long n;
++
++	if (kstrtoul(val, 0, &n) || !n || n > PTRS_PER_PTE || (n & (n - 1)))
++		return -EINVAL;
++	WRITE_ONCE(fault_around_pages, n);
++	return 0;
++}
++
++static const struct kernel_param_ops fault_around_pages_ops = {
++	.set = fault_around_pages_set,
++	.get = param_get_ulong,
++};
++module_param_cb(fault_around_pages, &fault_around_pages_ops,
++		&fault_around_pages, 0644);
++#endif
++
+ #ifdef CONFIG_DEBUG_FS
+ static int fault_around_bytes_get(void *data, u64 *val)
+ {

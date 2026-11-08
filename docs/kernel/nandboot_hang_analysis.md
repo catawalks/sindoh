@@ -1683,3 +1683,67 @@ replaces 9586a6d3 in the out directory. A RAM boot to the two
 `mv61x0: cpuN` lines is enough, no soak. The most interesting value is
 ACTLR: if mainline leaves SMP/FW at 0, the cores may not be coherent the
 way the A9-style SCU expects.
+
+## Hang 14: nandvs froze in 60 s; the vendor CPU setup is ruled out (2026-11-08)
+
+nandvs (1dd5f02c, the vendor PJ4B setup; both CPUs read ACTLR 0x41,
+func0 0x132, dbg0 0x60001100, dbg1 0x927, dbg2 0x20008208 from mtd0 as
+well) froze at 60.04 s, five seconds into TAR 0, silent as before.
+- **The ring:** cpu0 issued a read (`cmd` page 0x310f1, `rdd`), went idle
+  (last sample `do_idle`, 4 ms before), and its ISR entry
+  (`isr 00001802`) is the last step. That's the same ending as hangs 11
+  and 12.
+- **cpu1's last sample:** `folio_add_file_rmap_ptes+0x38`, inside an
+  atomic (`arch_atomic_add_return_relaxed`), in fault-around. The one
+  before was `folio_trylock` from `next_uptodate_folio`.
+
+**Two CPUs from mtd0: 6 of 6 froze (60 s – 14 min).**
+- Ruled out: the camera, the PTE clean, the DDR drain, a lost tick, the
+  vendor PJ4B setup.
+- In 3 runs the ring ends at a read's ISR entry (11, 12, 14). In 3 the
+  NAND was idle (9, 10, 13).
+- **In all 6, one CPU's last sample is in the page-fault fault-around
+  path:** `filemap_map_pages`, `next_uptodate_folio`, `set_pte_range`,
+  `set_ptes`, `folio_add_file_rmap_ptes`, `xas_next_entry`,
+  `lock_vma_under_rcu`.
+
+### Fault-around: the one thing the vendor kernel never ran
+
+Fault-around (`do_fault_around`) came in Linux 3.15; the vendor kernel is
+3.2. Per file fault it maps up to 16 page-cache pages at once. That's a
+burst of folio lock/refcount/mapcount atomics (`ldrex`/`strex`), up to 16
+PTE writes, and `__sync_icache_dcache` (hang 12's lr), i.e. a D-cache
+clean and an I-cache invalidate that the hardware broadcasts to the other
+core (MMFR3 MaintBcst 2, ACTLR FW).
+- On the NAND root, every one of those pages was just written by the CPU
+  (PIO from NDDB, then memcpy). Its lines are dirty in one core's L1 when
+  the other core maps and runs it.
+- On the card root, SDHCI DMA filled the pages, and the lines aren't in
+  any cache.
+
+**Patch 0021** (`mm/memory.c`, only with `CONFIG_ARCH_MV61X0`):
+`memory.fault_around_pages`, a module parameter (0644; 1 = off, or a
+power of two; 16 is the default) to replace the debugfs file we don't
+build. It can be switched at run time in
+`/sys/module/memory/parameters/fault_around_pages`.
+
+**`HANGTEST=nandfa`** = nandtick (mainline PJ4B setup, drain on) with
+`memory.fault_around_pages=1`. **Built 2026-11-08, not booted:**
+- `m1-nandboot-nandfa.uimg` md5 `fd2eb360153311e9fda7164c125b7b8e`
+  (2,824,388 bytes);
+- modules tar `7126f652f370c6ba038f3f677cc8d4f7`.
+
+The boot also prints both CPUs' PJ4B registers under the *mainline*
+setup: that's the comparison wanted after hang 13.
+
+**Run:** RAM boot, check `cat /sys/module/memory/parameters/fault_around_pages`
+→ 1, then mtd0, 2 h.
+- **No freeze:** fault-around's pattern is the trigger. Then turn it back
+  to 16 in the same boot and see whether the freeze returns. A fix could
+  keep fault-around off on this SoC, or find which part of it matters
+  (the I/D-cache sync of CPU-written pages first).
+- **A freeze:** the trigger is the page-cache/fault path in general.
+  Next: the **card-root SMP soak with this same image** (no build). If the
+  card root also freezes with two CPUs, it isn't the NAND root at all.
+  If it doesn't, the CPU-filled (PIO) pages are the key, and the cache
+  maintenance of dirty lines across the cores is where to look.
