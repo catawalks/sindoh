@@ -492,6 +492,10 @@ still require the owner's explicit OK.
       (mtd0) froze again within about 45 s, a reset loop, so **mtd0 now holds
       nandwdt cf897cd8** (stable; written from a RAM-booted nandwdt), as
       does the card gap. Logs in the shared notes (hang25_*).
+      **nandsz acac7064 (nandres, no pstore, padded with incompressible data
+      to 2,826,244 bytes, bigger than every freezer): 45 min clean.** So
+      image size isn't it; PSTORE_RAM itself is. Next: PSTORE_RAM without
+      the driver registration vs Reed-Solomon alone (the kernel session).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
