@@ -1664,3 +1664,22 @@ and 2 h.
   setup the nandboot default.
 - **A freeze:** next the SCU setup (the vendor's `scu_enable` against
   mainline's) and the unported PoUIS clean and `BZ_833`/`BZ_664`.
+
+**nandvs's register lines** (RAM boot, both CPUs the same):
+`ACTLR 00000041 aux func0 00000132 dbg0 60001100 dbg1 00000927 dbg2 20008208 (vendor PJ4B setup)`.
+
+| Register | Bits set | Of mainline's bits |
+|---|---|---|
+| ACTLR 0x41 | SMP (6), FW (0) | mainline doesn't write ACTLR |
+| aux func0 0x132 | 1, 4, 5, 8 | `SMP_CFB` (1) and `BROADCAST_CACHE` (8) are already on without mainline's code; `L1_PAR_CHK` (2) is off; bit 7 cleared by the vendor |
+| aux dbg0 0x60001100 | 8, 12, 29, 30 | `WFI_WFE` (22) is off |
+| aux dbg1 0x927 | 0, 1, 2, 5, 8, 11 | `STATIC_BP` (2) stays on (mainline clears it), `INTER_PARITY` (8) is on, `CLEAN_LINE` (16) is off |
+| aux dbg2 0x20008208 | 3, 9, 15, 29 | `OUTSDNG_NC` (29) is on; `SNOOP_DATA` (25), `CWF` (27), `L1_REP_RR` (30) are off |
+
+For the mainline values, nandtick was rebuilt with the print: md5
+`37dc2feda4ae445273b1ebf760f046fe`, modules
+`e231a24c5a8c3b2e0e619645c7da6219`. Its config is unchanged; it
+replaces 9586a6d3 in the out directory. A RAM boot to the two
+`mv61x0: cpuN` lines is enough, no soak. The most interesting value is
+ACTLR: if mainline leaves SMP/FW at 0, the cores may not be coherent the
+way the A9-style SCU expects.
