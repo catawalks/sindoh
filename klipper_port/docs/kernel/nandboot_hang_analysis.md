@@ -1797,3 +1797,50 @@ attached, so after the boot reads nothing touches the NAND controller).
   from NAND. Then a build that traces the ISR step by step (`isr` after
   each of its NDCR read, NDCR write and `complete()`), since 4 of 7 runs
   stop right there.
+
+## Hang 16: the card root freezes too (2026-11-08)
+
+nandfa (fd2eb360) from mtd0 on the **card root** (`/dev/mmcblk0p1`, UBI
+detached, NAND untouched after its boot reads at 9.4 s) froze at 105.7 s,
+51 s into TAR 0, silent as before.
+- **The last samples:**
+  - cpu0: user mode, after `folio_wake_bit`;
+  - cpu1: `pcpu_alloc_noprof`, after `ehci_urb_enqueue` (USB host
+    submission).
+- **Two CPUs: 8 of 8 froze, NAND or card root. One CPU: 2 h clean.**
+  - The NAND root isn't needed, and neither is NAND traffic.
+  - Rings ending at the NAND ISR (4 of 7) only showed that NAND reads are
+    the busiest I/O on the NAND root.
+- **But the card-root soaks of 11-06/07** (5b17e2ec, dc3b5f20: no trace,
+  sampler, tick check or ramoops) ran 82–84 min clean. The debug images
+  now freeze in 60 s – 14 min. If that rate had held, 84 min clean would
+  have odds of e^−6 or less. **So something added since raises the rate
+  sharply.** On the NAND root it was the same: dc3b5f20 hung after 20–30
+  min, nanddbg in 20–70 s.
+
+What the debug images add, beside code that's inert without its
+parameter:
+- the NAND trace (inert on the card root);
+- ramoops/pstore, with the 2 MB no-map pair at 0x1e000000;
+- the hang watchdog;
+- since nandpcs, the 10 ms sampler on both CPUs;
+- since nandtick, the timer-3 tick check.
+
+**`HANGTEST=nandwdt`** = the plain nandboot image (all patches, at their
+defaults) plus only `timer_mv61x0.hang_wdt=30`: no trace, sampler, tick
+check, ramoops or reserved areas. Against dc3b5f20 it adds `rdd_irq` (on
+by default since 0016) and code that's inert without its parameter.
+**Built 2026-11-08, not booted:**
+- `m1-nandboot-nandwdt.uimg` md5 `cf897cd804ba26e9857d242ec6ea8808`
+  (2,813,868 bytes);
+- modules tar `d7bd2ee2ea1208c30bf2b86a03bd1d76`.
+
+**Run on the card root** (the same setup as hang 16, a direct A/B), 2 h.
+It has no ring, samples or pstore, so a freeze shows only as ping/probe
+loss and the reset.
+- **It freezes:** the debug additions aren't the cause. Compare the
+  configs of 5b17e2ec/dc3b5f20 with today's, and rerun dc3b5f20 itself
+  longer: the 84 min may have been luck.
+- **No freeze:** one of the additions raises the rate. Add them back one
+  at a time: ramoops with its reserved areas first (common to every fast
+  freezer since nanddbg), then the sampler, then the tick check.
