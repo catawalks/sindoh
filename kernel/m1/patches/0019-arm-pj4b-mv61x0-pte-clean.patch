@@ -1,0 +1,74 @@
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Subject: [PATCH] ARM: PJ4B 88PA61x0: clean page-table writes on SMP, as the vendor kernel
+
+Test option for the DP200 NAND-root hangs, off by default
+(docs/kernel/nandboot_hang_analysis.md, hang 11).
+---
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -382,6 +382,17 @@
+ 	  after a dsb and a 50-iteration delay loop. The erratum behind it
+ 	  is not documented. Test option (docs/kernel/nandboot_hang_analysis.md).
+ 
++config PJ4B_MV61X0_PTE_CLEAN
++	bool "88PA61x0 PJ4B-MP: clean page-table writes to memory on SMP"
++	depends on CPU_PJ4B && ARCH_MV61X0 && SMP
++	help
++	  Mainline trusts an SMP ARMv7 table walker to read through the L1
++	  D-cache ("MP extensions imply L1 PTW") and skips the cache clean
++	  after a PTE or PMD write on SMP. The Marvell 3.2 vendor kernel of
++	  the 88PA6170 cleans every one (set_pte_ext, dcache_clean_area,
++	  flush_pmd_entry), as mainline does on UP. Test option for the
++	  NAND-root hangs (docs/kernel/nandboot_hang_analysis.md).
++
+ config PJ4B_ERRATA_6011
+ 	bool "88PA61x0 PJ4B-MP erratum 6011: five LDREX, IRQs off"
+ 	depends on CPU_PJ4B && ARCH_MV61X0
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -82,9 +82,11 @@
+ SYM_FUNC_END(cpu_v7_do_idle)
+ 
+ SYM_TYPED_FUNC_START(cpu_v7_dcache_clean_area)
++#ifndef CONFIG_PJ4B_MV61X0_PTE_CLEAN
+ 	ALT_SMP(W(nop))			@ MP extensions imply L1 PTW
+ 	ALT_UP_B(1f)
+ 	ret	lr
++#endif
+ 1:	dcache_line_size r2, r3
+ 2:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+ 	add	r0, r0, r2
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -102,9 +102,13 @@
+  ARM(	str	r3, [r0, #2048]! )
+  THUMB(	add	r0, r0, #2048 )
+  THUMB(	str	r3, [r0] )
++#ifdef CONFIG_PJ4B_MV61X0_PTE_CLEAN
++	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte, on SMP too
++#else
+ 	ALT_SMP(W(nop))
+ 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+ #endif
++#endif
+ 	bx	lr
+ SYM_FUNC_END(cpu_v7_set_pte_ext)
+ 
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -167,7 +167,14 @@
+ # define v6wbi_always_flags	(-1UL)
+ #endif
+ 
+-#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_BARRIER | \
++/* 88PA61x0: flush_pmd_entry/clean_pmd_entry clean on SMP too */
++#ifdef CONFIG_PJ4B_MV61X0_PTE_CLEAN
++#define V7_SMP_DCLEAN		TLB_DCLEAN
++#else
++#define V7_SMP_DCLEAN		0
++#endif
++
++#define v7wbi_tlb_flags_smp	(TLB_WB | V7_SMP_DCLEAN | TLB_BARRIER | \
+ 				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
+ 				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
+ #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \

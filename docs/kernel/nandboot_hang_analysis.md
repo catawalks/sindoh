@@ -1372,3 +1372,90 @@ mtd0, for ≥ 2 h.
 - Check first whether ustreamer ran during the card-root soaks (84/82 min
   clean). If it did, the camera alone isn't enough, and it's the camera's
   DMA together with the NAND root.
+
+## Hang 11: the camera is ruled out; a page-table lead (2026-11-07, ~23:57)
+
+nandtick from mtd0, with ustreamer killed at 55 s, froze at ~683.15 s,
+during TAR 3. It was silent again (no tick check, no panic, ping and probe
+lost), as in hang 10. **So the camera isn't needed for the hang.**
+- **NAND was active this time:** the ring ends with `cmd` (page 0x3c674),
+  `rdd`, and the ISR's entry (`isr 00001802`, RDDREQ) at 683.148 s, and
+  no `rdd-end` after it.
+- **cpu1 was 2 ms earlier in `set_pte_range+0x2c`** (from
+  `filemap_map_pages`, `set_ptes`).
+
+**Across hangs 9–11, one CPU's last sample is in the page-fault
+fault-around / PTE path:**
+- hang 9: `xas_next_entry` under `filemap_map_pages`;
+- hang 10: `lock_vma_under_rcu`, with the other CPU in `__mmap_region`;
+- hang 11: `set_pte_range`.
+
+The hang logger forks every second, so faults are common, but this is the
+gap listed under "What the errata work doesn't cover yet": mainline on
+SMP doesn't clean PTE writes out of the L1 D-cache ("MP extensions imply
+L1 PTW"), while the vendor's 3.2 kernel does.
+- If this PJ4B-MP's walker reads memory rather than L1, a newly written
+  PTE can be missed, and the walk uses a stale entry. The PTE pages are
+  recycled page-cache/anon pages, so a stale entry can name any physical
+  address, and an access nothing decodes can stall the interconnect.
+- Fault-around writes up to 16 PTEs per fault. On the NAND root every
+  page-cache refill (`drop_caches` + `tar` + forks) goes through it.
+- A stale *valid* entry mostly gives a wrong page, not a stall. So this
+  is a lead to test, not a proof.
+
+### Patch 0019 and m1-nandboot-nandpte
+
+`kernel/m1/patches/0019-arm-pj4b-mv61x0-pte-clean.patch`: the option
+`CONFIG_PJ4B_MV61X0_PTE_CLEAN` (off by default), as the vendor kernel and
+mainline UP do:
+- `cpu_v7_set_pte_ext`: `mcr p15, 0, r0, c7, c10, 1` (clean the hardware
+  PTE's line to PoC) on SMP too;
+- `cpu_v7_dcache_clean_area`: the clean loop on SMP too;
+- `v7wbi_tlb_flags_smp` gets `TLB_DCLEAN`, so `flush_pmd_entry` and
+  `clean_pmd_entry` clean on SMP too.
+
+`mach-mv61x0/mv61x0.c` now also prints ID_MMFR0/1/3, TTBR0 and TTBCR at
+boot (in every build):
+- MMFR3[23:20] is "coherent walk";
+- MMFR3[15:12] is maintenance broadcast;
+- TTBR0's low bits are the walk's cache attributes.
+
+That answers the walker question directly, and the TLB-IPI question from
+the logger notes.
+
+`HANGTEST=nandpte` = nandtick + the option. DEBUG IMAGE (hang watchdog,
+tick-check panic): the owner's OK, then RAM-boot first, then mtd0.
+**Built 2026-11-08, not booted:**
+- `m1-nandboot-nandpte.uimg` md5 `7ee63c264489235143df6a3a49b84133`
+  (2,823,620 bytes);
+- modules tar `8f06a39f825458ee733892c7a2eaaf9a`;
+- the config differs from nandtick only by `CONFIG_PJ4B_MV61X0_PTE_CLEAN=y`.
+- The boot log should show `mv61x0: ID_MMFR0 ... page-table writes
+  cleaned`.
+
+### m1-nandboot-nandup: the same without CPU1
+
+`HANGTEST=nandup` = nandtick with `maxcpus=1`: no second core, so no
+cross-core coherency, no TLB/cache broadcast, no IPIs. The old `up` image
+(0eff2431, test 1 of the first plan) was never run and has none of the
+debug tooling. With only CPU0, the tick check runs on CPU0 too, so it can
+only tell a lost tick from a CPU0 that stopped taking interrupts. **Built
+2026-11-08, not booted:** `m1-nandboot-nandup.uimg` md5
+`d7861757df1dd8ddd8f7f88fc62fd3a5` (2,823,212 bytes), modules tar
+`dd208ffb00fe03e7fbec94c64c4a11e9`. It has the MMFR print, not the PTE
+clean. The same DEBUG-IMAGE rules apply.
+
+### Order
+
+Freezes now come every ~2–14 min from mtd0 (hangs 9–11: 143, 825, 683
+s), so 2 h without one is strong evidence (e^−8 or better).
+1. **nandpte, 2 h of the same soak from mtd0.** First read the MMFR3/TTBR0
+   line.
+   - **No freeze:** the PTE clean is both the diagnosis and the fix; it
+     goes into the default config.
+   - **A freeze:** go to 2.
+2. **nandup, 2 h.**
+   - **No freeze:** an SMP problem other than PTE cleaning (TLB/cache
+     broadcast, the 6011 area, the vendor's PoUIS clean).
+   - **A freeze:** not SMP. Go back to the controller (hang 11 was in the
+     NAND ISR), and to the DMA masters without the camera.

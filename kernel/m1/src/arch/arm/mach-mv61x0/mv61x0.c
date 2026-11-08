@@ -19,6 +19,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <asm/barrier.h>
+#include <asm/cputype.h>
 #include <asm/mach/arch.h>
 
 #define MV61X0_MC_DRAIN		0x530
@@ -44,6 +45,23 @@ static void __init mv61x0_init(void)
 		}
 	}
 	of_node_put(np);
+
+	/*
+	 * For the hang analysis: MMFR3 says whether the walker is coherent
+	 * (bits 23:20) and whether cache and TLB maintenance is broadcast
+	 * (15:12), TTBR0 the attributes of the table walk.
+	 */
+	{
+		u32 ttbr0, ttbcr;
+
+		asm volatile("mrc p15, 0, %0, c2, c0, 0" : "=r" (ttbr0));
+		asm volatile("mrc p15, 0, %0, c2, c0, 2" : "=r" (ttbcr));
+		pr_info("mv61x0: ID_MMFR0 %08x MMFR1 %08x MMFR3 %08x, TTBR0 %08x TTBCR %08x, page-table writes %scleaned\n",
+			read_cpuid_ext(CPUID_EXT_MMFR0),
+			read_cpuid_ext(CPUID_EXT_MMFR1),
+			read_cpuid_ext(CPUID_EXT_MMFR3), ttbr0, ttbcr,
+			IS_ENABLED(CONFIG_PJ4B_MV61X0_PTE_CLEAN) ? "" : "not ");
+	}
 }
 
 static const char *const mv61x0_dt_compat[] __initconst = {
