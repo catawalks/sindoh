@@ -421,6 +421,17 @@ still require the owner's explicit OK.
       (mwifiex blacklisted) on a fast-freezing build. The earlier clean
       runs used the older mwifiex_usb, which often failed to start Wi-Fi.
       Sent to the kernel session along with its add-back plan.
+      **Hang 17 (11-08 06:23): the no-Wi-Fi test froze at about 329 s.**
+      nandfa from mtd0, card root, two CPUs, camera on; the mwifiex .ko
+      files were renamed, so nothing loaded (no mlan0). So Wi-Fi isn't
+      needed. cpu0's last sample was in sdhci_request_done (the card's I/O
+      completion; on the NAND root it was the NAND read ISR), cpu1's in a
+      page-cache lookup. Tally: the debug builds froze in 9 of 9 runs on
+      two CPUs; nandwdt (only the watchdog) and nandup (one CPU) ran 2 h
+      clean. The Wi-Fi modules are renamed back. Without mlan0,
+      init.mainline waits 45 s, so a start line sent before that is lost.
+      Next: add the debug pieces back to nandwdt one at a time (ramoops
+      first). Logs in the shared notes (hang17_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
