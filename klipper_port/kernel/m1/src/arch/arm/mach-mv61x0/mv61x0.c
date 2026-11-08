@@ -16,6 +16,7 @@
  * memory-controller node is enabled (it is, as in stock).
  */
 #include <linux/io.h>
+#include <linux/moduleparam.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <asm/barrier.h>
@@ -27,9 +28,17 @@
 
 static void __iomem *mv61x0_mc;
 
+/*
+ * mv61x0.mc_drain (0644): 0 skips the drain write, for the hang analysis
+ * (docs/kernel/nandboot_hang_analysis.md, hang 12). On by default.
+ */
+static bool mv61x0_mc_drain = true;
+module_param_named(mc_drain, mv61x0_mc_drain, bool, 0644);
+
 static void mv61x0_mb(void)
 {
-	writel_relaxed(MV61X0_MC_DRAIN_ALL, mv61x0_mc + MV61X0_MC_DRAIN);
+	if (READ_ONCE(mv61x0_mc_drain))
+		writel_relaxed(MV61X0_MC_DRAIN_ALL, mv61x0_mc + MV61X0_MC_DRAIN);
 }
 
 static void __init mv61x0_init(void)
@@ -41,7 +50,8 @@ static void __init mv61x0_init(void)
 		mv61x0_mc = of_iomap(np, 0);
 		if (mv61x0_mc) {
 			soc_mb = mv61x0_mb;
-			pr_info("mv61x0: DDR write-buffer drain on mb() (vendor cache sync)\n");
+			pr_info("mv61x0: DDR write-buffer drain on mb() (vendor cache sync)%s\n",
+				mv61x0_mc_drain ? "" : ", off (mc_drain=0)");
 		}
 	}
 	of_node_put(np);
