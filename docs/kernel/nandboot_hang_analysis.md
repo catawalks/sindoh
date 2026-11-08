@@ -2122,3 +2122,64 @@ mtd0 writes aren't needed.
 | freezes | (freezes) | pstore's core alone, without a backend |
 | clean | freezes | ramoops' minimal registration/mapping |
 | clean | clean | ECC (Reed-Solomon), compression, or the console/pmsg zones |
+
+## Hang 24: pstore's core alone, with no backend, freezes (2026-11-08)
+
+nandps0 (ee5721ca: PSTORE, PSTORE_RAM, CONSOLE, PMSG, COMPRESS built in;
+the ramoops node without `compatible`, so no backend probed: no pstore or
+ramoops lines at boot) froze in its RAM-boot run, ~20 s after the soak
+started (~90–100 s uptime). Against nandres (2 h clean) the config adds
+only the PSTORE options and REED_SOLOMON. **With no backend, hardly any
+pstore code runs** (`pstore_init` registers the filesystem type).
+
+**The main side's idea: the kernel layout.** nandps0's `.text` is 0x4920
+bytes bigger:
+- pstore in `fs/` (+0x36fc);
+- Reed-Solomon in `lib/` (+0x1224);
+- `.rodata` +0x1100, `.data` starts 0x4000 later.
+
+Every symbol after `fs/` moves. The other fast freezers (trace, sampler,
+tick check) add code too, and nandwdt/nandres are the small ones. A
+layout-sensitive two-CPU bug would fit everything: nandup, one CPU, ran
+2 h even with all the additions.
+
+### `CONFIG_MV61X0_LAYOUT_PAD` and m1-nandboot-nandpad
+
+The option (`mach-mv61x0/Kconfig`):
+- `src/fs/mv61x0_pad.c` and `src/lib/mv61x0_pad.c`, linked right after
+  `fs/pstore/` and `lib/reed_solomon/` (patch 0022 adds the two Makefile
+  lines);
+- zero-filled `.text`, `.rodata.*`, `.data`, `.bss`, `.init.text`, plus
+  one merged-string blob, all sized by Kconfig hex values;
+- an initcall that only references them, because the build has
+  `LD_DEAD_CODE_DATA_ELIMINATION` and `--gc-sections` dropped the first
+  unreferenced attempt;
+- nothing reads or runs the padding.
+
+**`HANGTEST=nandpad`** = nandres (no PSTORE) + the padding, tuned against
+nandps0's System.map (`symdiff.py`) until:
+- **`.text` after the hot section is identical** (every function at
+  nandps0's address);
+- `.data` is identical up to the last few hundred bytes (±0x40);
+- `.bss` starts 0xc apart;
+- init memory is within 0x40;
+- the only differences left are a 0x54-byte shift inside the hot text
+  (absorbed at `__hot_text_end`) and the sorted ksymtab (pstore's
+  exported names).
+
+Sizes: fs text 0x36fc, rodata 0x594, strings 0xb94, data 0x2f0, bss
+0x48, init text 0x1fc; lib text 0x1228, data 0x1c.
+
+**Built 2026-11-08, not booted:**
+- `m1-nandboot-nandpad.uimg` md5 `0863cdc0d1c759acf3e6a534638d1bbe`
+  (2,817,004 bytes);
+- modules `3f8e11a7756306d13f2be69fd954dd20`;
+- no PSTORE in its config.
+
+**Run:** RAM boot, the same setup (card root, two CPUs, Wi-Fi and camera
+on), soak.
+- **It freezes:** the layout is the trigger, not anything pstore does. A
+  hot lock, variable or loop at a particular address or alignment, and
+  only with two CPUs. Then bisect the shift region by region.
+- **2 h clean:** pstore's own init (`pstore_init`, the compression
+  setup) is what matters.

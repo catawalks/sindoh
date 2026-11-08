@@ -1,0 +1,26 @@
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Subject: [PATCH] fs, lib: 88PA61x0: link the layout padding (CONFIG_MV61X0_LAYOUT_PAD)
+
+Test option for the DP200 NAND-root hangs, off by default
+(docs/kernel/nandboot_hang_analysis.md, hang 24).
+---
+--- a/fs/Makefile
++++ b/fs/Makefile
+@@ -123,6 +123,7 @@
+ obj-$(CONFIG_F2FS_FS)		+= f2fs/
+ obj-$(CONFIG_CEPH_FS)		+= ceph/
+ obj-$(CONFIG_PSTORE)		+= pstore/
++obj-$(CONFIG_MV61X0_LAYOUT_PAD)	+= mv61x0_pad.o
+ obj-$(CONFIG_EFIVAR_FS)		+= efivarfs/
+ obj-$(CONFIG_EROFS_FS)		+= erofs/
+ obj-$(CONFIG_VBOXSF_FS)		+= vboxsf/
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -155,6 +155,7 @@
+ obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate/
+ obj-$(CONFIG_ZLIB_DFLTCC) += zlib_dfltcc/
+ obj-$(CONFIG_REED_SOLOMON) += reed_solomon/
++obj-$(CONFIG_MV61X0_LAYOUT_PAD) += mv61x0_pad.o
+ obj-$(CONFIG_BCH) += bch.o
+ obj-$(CONFIG_LZO_COMPRESS) += lzo/
+ obj-$(CONFIG_LZO_DECOMPRESS) += lzo/
