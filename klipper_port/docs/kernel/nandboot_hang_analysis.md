@@ -2252,3 +2252,9 @@ probed. md5 `237dde132fe6eb03a6f65db62b3bd46d`, modules
   - **nandps3 is clean:** CONSOLE, PMSG or COMPRESS. Each is compiled in
     but unused without a backend, so their code or data, or an initcall
     of theirs, is what matters.
+
+**nandps2: clean for ~89 min** (ea629fc5, `CONFIG_PSTORE` alone, RAM boot,
+card root, two CPUs, Wi-Fi and camera on; `nodev pstore` in
+`/proc/filesystems`; 8 passes; the probe never missed). **Registering
+pstore's filesystem doesn't freeze it.** Next: nandps3 (237dde13, PSTORE +
+PSTORE_RAM, no backend), 45 min.
