@@ -461,6 +461,10 @@ still require the owner's explicit OK.
       froze partway through kupdate, before the erase. The card gap now
       holds nandwdt. Logs in the shared notes (hang20_*, hang21_*,
       hang22_*).
+      **Hang 23: nandrmv d9122842 (nandram with both areas moved to
+      0x10000000) froze in its RAM boot,** idle, at about 26-50 s. So it
+      isn't the 0x1e000000 range: what pstore/ramoops sets up is the
+      trigger. (Not written to mtd0.) Logs in the shared notes (hang23_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
