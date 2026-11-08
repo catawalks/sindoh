@@ -2258,3 +2258,51 @@ card root, two CPUs, Wi-Fi and camera on; `nodev pstore` in
 `/proc/filesystems`; 8 passes; the probe never missed). **Registering
 pstore's filesystem doesn't freeze it.** Next: nandps3 (237dde13, PSTORE +
 PSTORE_RAM, no backend), 45 min.
+
+## Hang 25: PSTORE + PSTORE_RAM, no backend, freezes (2026-11-08)
+
+nandps3 (237dde13: PSTORE, PSTORE_RAM, Reed-Solomon; no CONSOLE, PMSG or
+COMPRESS; no ramoops device) froze at ~225 s, RAM boot, card root, two
+CPUs.
+- **Against nandps2 (clean ~89 min)** the config adds only PSTORE_RAM and
+  REED_SOLOMON(_ENC8/_DEC8).
+- **The reset boot** then landed on nandrwb in mtd0, which froze again at
+  ~45 s idle. mtd0 now holds nandwdt (cf897cd8), so resets land on a
+  stable kernel.
+
+**With no device, PSTORE_RAM runs next to nothing.** `ramoops_init`
+registers a platform driver that never binds, and Reed-Solomon has no
+initcall. That can't plausibly stall a bus. **But the compressed image
+size separates clean from frozen perfectly:**
+
+| Two CPUs | Builds | uimg bytes |
+|---|---|---|
+| clean | nandwdt, nandres, nandpad2, nandpad, nandps2 | 2,813,868 / 2,814,388 / 2,814,868 / 2,817,004 / 2,818,460 |
+| froze | nandps3, nandrnc, nandmb, nandpte, nandram, nandtick, nandps0, nandrmv, nandrso, nandrwb, nandfa | 2,822,352 – 2,824,388 |
+
+- nandpad and nandpad2 had nandps0's *uncompressed* layout, but their zero
+  padding compresses away, so they stayed small, and clean.
+- The plain dc3b5f20 (2,813,596) froze only after 20–30 min, on the NAND
+  root.
+- nandup (2,823,212) is big but one CPU.
+
+**Why size could matter:** U-Boot loads the uImage (at 0x400000 from
+mtd0, at 0x2000000 for RAM boots), and bootm copies the zImage to 0x8000.
+The decompressor then relocates itself and the appended DTB above the
+end of the decompressed kernel, so where the DTB (and the decompressor's
+leftovers) end up in RAM depends on the compressed size. The kernel
+reserves the DTB where it finds it.
+
+**`HANGTEST=nandsz`:** nandres (no pstore) plus 10 KB of *incompressible*
+`.rodata` (an xorshift32 sequence, `MV61X0_PAD_FS_RANDOM`, in
+`src/fs/mv61x0_pad.c`). It's as big as the freezers.
+- `m1-nandboot-nandsz.uimg` md5 `acac7064850bd3895525a27441a0701e`
+  (2,826,244 bytes);
+- modules `92fa717102c7094ab3ab7cec8d9a9bb9`.
+
+**Run:** RAM boot, card root, two CPUs, Wi-Fi and camera on, 45 min.
+- **It freezes:** image size (boot-time placement) matters, not pstore.
+  Next, read where the decompressor puts the DTB and what the kernel
+  reserves, for a small and a big image, and look for an overlap.
+- **It's clean:** PSTORE_RAM itself. Next, PSTORE_RAM with
+  `ramoops_init` not registering its driver, against Reed-Solomon alone.

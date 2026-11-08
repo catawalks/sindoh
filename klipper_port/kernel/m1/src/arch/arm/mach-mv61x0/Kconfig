@@ -37,6 +37,9 @@ config MV61X0_PAD_FS_RODATA
 config MV61X0_PAD_FS_RODATA_STR
 	hex "fs/ merged-string bytes (at least 1)"
 	default 0x1
+config MV61X0_PAD_FS_RANDOM
+	hex "fs/ incompressible .rodata bytes (a multiple of 4)"
+	default 0x0
 config MV61X0_PAD_FS_DATA
 	hex "fs/ .data bytes"
 	default 0x0
