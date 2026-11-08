@@ -328,10 +328,11 @@ still require the owner's explicit OK.
       in do_idle; cpu1's last sample was in xas_next_entry (a page-cache
       fault-around, SVC, IRQs on). The last NAND step was 24 s earlier, a
       complete read, and the SD stat log shows NAND idle until its last
-      line. So the sampler doesn't hide the hang; the 3 h 56 min run came
-      from the card-gap mmc boot. Open question: does the U-Boot
-      nand-read path leave different state than the mmc path, or was it
-      luck? Console in the shared notes (hang9_mtd0_nandpcs_serial.txt).
+      line. So the sampler doesn't hide the hang. The 3 h 56 min run
+      (loaded from the card gap) was most likely luck: nandirq also loaded
+      from the card gap and froze at 490 s. Test runs now boot from mtd0,
+      the end-goal configuration (the RAM boot is only the pre-write
+      check). Console in the shared notes (hang9_mtd0_nandpcs_serial.txt).
       mtd0 now holds nandpcs (3ec9c45b), so every freeze resets and prints
       its own samples.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
