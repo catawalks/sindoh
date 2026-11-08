@@ -2334,3 +2334,18 @@ Two images, built 2026-11-08, not booted:
 | freezes | — | Reed-Solomon's presence |
 | clean | freezes | the ramoops code's presence (it's never called) |
 | clean | clean | registering the ramoops platform driver |
+
+**Correction: nandsz froze at ~2956 s (49 min)**, just after the 45 min
+check. The SD hang log's last line is at 2955.81 s, its dmesg ends at
+"IRQSOAK TAR 4 start" (2621.6 s), and the next boot was nandwdt from
+mtd0.
+- So the plain-kernel freeze is still there on the card root. It's
+  slower: nandwdt, nandres, nandpad and nandpad2 ran 2 h clean each, and
+  nandps2 89 min, but one freeze in ~10 h of such runs is a base rate,
+  not zero.
+- **PSTORE_RAM is an accelerator** (20 s – 7 min) of that same freeze.
+  Whether nandsz's size played a part can't be told from one freeze.
+- **A 45 min clean run means "no fast freeze"**, not "no freeze".
+- The PSTORE_RAM split (nandrs, nandps4) still answers what makes it
+  fast. The root cause is the base freeze. With the accelerator
+  understood, a build that has it can test candidate fixes in minutes.
