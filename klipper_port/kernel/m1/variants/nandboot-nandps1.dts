@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0
+/* m1-nandboot-nandps1: nanddbg's reserved areas, ramoops with dmesg records only, no ECC */
+#include "nandboot-nanddbg.dts"
+
+&{/reserved-memory/ramoops@1e000000} {
+	console-size = <0>;
+	pmsg-size = <0>;
+	ecc-size = <0>;
+};

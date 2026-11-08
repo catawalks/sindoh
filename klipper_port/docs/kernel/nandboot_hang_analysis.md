@@ -2087,3 +2087,38 @@ the same setup.
   record.
 - **It doesn't:** 0x1e000000–0x1e1fffff is used by something else in the
   system, and ramoops' boot writes there (headers, ECC, zap) set it off.
+
+## Hang 23: moving ramoops doesn't help (2026-11-08)
+
+nandrmv (d9122842: ramoops and the pad at 0x10000000) froze in its
+RAM-boot check, idle, between ~26 and 50 s (the last kernel line was
+`dp200-bootbar: stopped` at 26.08 s). **So the range 0x1e000000 isn't
+special; it's what pstore/ramoops sets up.**
+
+Two splits, built:
+- **`HANGTEST=nandps0`:** nandram's config (PSTORE, PSTORE_RAM, CONSOLE,
+  PMSG, COMPRESS all built in), but the ramoops DT node's `compatible`
+  is deleted. The areas stay reserved, and pstore's core initialises
+  (its filesystem type; no backend, so nothing is registered or mapped).
+  - `m1-nandboot-nandps0.uimg` md5 `ee5721caab1c0cc82ee22a5d645efa8b`;
+  - modules `63b55d5138828969dcd99e62459d6148`;
+  - DTB checked: no `compatible`.
+- **`HANGTEST=nandps1`:** nandwdt + PSTORE and PSTORE_RAM only (no
+  CONSOLE, PMSG or COMPRESS), and ramoops with dmesg records only:
+  `console-size`, `pmsg-size` and `ecc-size` 0. What's left is the
+  mapping, the zap of its records, pstore's registration and its kmsg
+  dumper.
+  - `m1-nandboot-nandps1.uimg` md5 `770ac0909f90e50ad124d6f8ec12ed07`;
+  - modules `ffc30b00a317411fdfb8a74055efe2ce`;
+  - DTB and config checked.
+
+**Order:** nandps0, then nandps1. Since these images freeze within
+minutes, the RAM boot from the card gap is a valid run (the load path
+is ruled out), and a clean result can be soaked there for 2 h too.
+mtd0 writes aren't needed.
+
+| nandps0 | nandps1 | Meaning |
+|---|---|---|
+| freezes | (freezes) | pstore's core alone, without a backend |
+| clean | freezes | ramoops' minimal registration/mapping |
+| clean | clean | ECC (Reed-Solomon), compression, or the console/pmsg zones |
