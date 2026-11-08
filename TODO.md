@@ -392,6 +392,18 @@ still require the owner's explicit OK.
       the read). cpu1 was in folio_add_file_rmap_ptes (an atomic in
       fault-around). Tally from mtd0: two CPUs froze in 6 of 6; one CPU ran
       2 h clean. Logs in the shared notes (hang14_*).
+      Correction from the kernel session: patch 0001 already ports the
+      vendor PJ4B setup, so nandvs was in effect a rerun of nandtick. Every
+      build ran the vendor's CPU register state.
+      **Hang 15 (11-08 03:47): nandfa fd2eb360 (fault-around off, checked
+      as 1 in both boots), from mtd0, froze at about 70 s.** Fault-around
+      isn't it. The ring ends at the NAND read's ISR entry again (4 of 7
+      two-CPU runs); cpu1 was in VMA / COW code. **Now running:** the
+      same nandfa from mtd0 on the 4GB-SD card root, two CPUs, 2-hour soak
+      (11-08 03:50). Marker renamed back to /.dp200-root; the card got the
+      nandfa modules, its old set is in /var/backups/mods-card-06f000a0.tar
+      on the card. Rename the marker to .dp200-root.off afterwards to go
+      back to the NAND root.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
