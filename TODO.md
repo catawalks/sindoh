@@ -440,6 +440,11 @@ still require the owner's explicit OK.
       them. pstore shows nothing near the freeze. Next: split ramoops from
       the reserved areas (the kernel session's call). Logs in the shared
       notes (hang18_*).
+      nandram also froze while idle in its reset boot, at about 7 min.
+      **nandres 70bcc0cf (only the two no-map areas reserved, no pstore):
+      2 h clean** in the same setup (11-08 06:54-09:01; 12 passes, the
+      console answered throughout). So it's ramoops, not the hole. Next:
+      nandrnc 4cdb1676 (ramoops without its run-time console writes).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
