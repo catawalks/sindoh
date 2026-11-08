@@ -1459,3 +1459,21 @@ s), so 2 h without one is strong evidence (e^−8 or better).
      broadcast, the 6011 area, the vendor's PoUIS clean).
    - **A freeze:** not SMP. Go back to the controller (hang 11 was in the
      NAND ISR), and to the DMA masters without the camera.
+
+**nandpte's ID registers** (RAM boot, 2026-11-08):
+`ID_MMFR0 01100103 MMFR1 40000000 MMFR3 00102211, TTBR0 0000406a TTBCR 00000000`.
+
+| Register | Value | Meaning |
+|---|---|---|
+| MMFR3[23:20] | 1 | coherent walk: PTE updates need no clean for the walker |
+| MMFR3[15:12] | 2 | cache, branch-predictor and TLB maintenance broadcast in hardware, so `tlb_ops_need_broadcast()` is false and the ~150/s function-call IPIs on CPU1 are remote wakeups, not TLB IPIs |
+| MMFR3[11:8], [7:4], [3:0] | 2, 1, 1 | BP invalidate all and by MVA; cache maintenance by set/way and by MVA |
+| MMFR1[31:28] | 4 | the branch predictor needs no flushing |
+| MMFR0 | VMSAv7, 1 shareability level, ACTLR | |
+| TTBR0 0x406a | | tables at phys 0x4000, walks inner WBWA (IRGN 01) and outer WBWA (RGN 01), shareable, inner shareable (S, NOS): mainline's `TTB_FLAGS_SMP` |
+
+So by its ID registers, mainline is allowed to skip the clean. If nandpte
+stops the freezes, this part's coherent-walk claim doesn't hold (at
+least not under this load), which the vendor kernel's cleaning would
+then be working around. If it doesn't stop them, the ID registers make
+the PTE path an unlikely cause, and nandup comes next.
