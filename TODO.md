@@ -445,6 +445,12 @@ still require the owner's explicit OK.
       2 h clean** in the same setup (11-08 06:54-09:01; 12 passes, the
       console answered throughout). So it's ramoops, not the hole. Next:
       nandrnc 4cdb1676 (ramoops without its run-time console writes).
+      **Hang 19 (11-08 09:13): nandrnc 4cdb1676 (ramoops with console and
+      pmsg sizes 0) froze at about 123 s** in the same setup, and probably
+      once before after its RAM boot (that one wasn't captured). So ramoops'
+      setup and mapping of 0x1e000000 alone bring the freeze back, without
+      its run-time writes. Sent to the kernel session. Logs in the shared
+      notes (hang19_*).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
