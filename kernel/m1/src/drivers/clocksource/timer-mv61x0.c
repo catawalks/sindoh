@@ -32,11 +32,13 @@
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/moduleparam.h>
+#include <linux/nmi.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/reboot.h>
 #include <linux/sched_clock.h>
+#include <linux/smp.h>
 #include <linux/workqueue.h>
 
 #define MV61X0_WDT_CTRL		0x00
@@ -61,6 +63,7 @@
 static void __iomem *mv61x0_base;
 static void __iomem *mv61x0_cs_count;
 static u32 mv61x0_ticks_per_jiffy;
+static u32 mv61x0_rate;
 
 /*
  * The first boot of milestone 1 saw the clock jump by 2^32 us now and
@@ -165,16 +168,20 @@ static bool mv61x0_ack(unsigned int n)
 	return true;
 }
 
+/* Timer 1 interrupts taken, for the tick check below */
+static unsigned int mv61x0_ce_irqs;
+
 static irqreturn_t mv61x0_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *ce = dev_id;
-	static unsigned int count;
+	unsigned int count;
 
 	if (!mv61x0_ack(MV61X0_CE_TIMER))
 		return IRQ_NONE;
 
 	/* Bring-up trace: tick rate against the raw clocksource */
-	count++;
+	count = mv61x0_ce_irqs + 1;
+	WRITE_ONCE(mv61x0_ce_irqs, count);
 	if (count <= 3 || count == 100 || count == 1000 || count == 10000)
 		pr_info("mv61x0-timer: timer 1 irq #%u at timer 2 count %08x\n",
 			count, readl_relaxed(mv61x0_cs_count));
@@ -186,10 +193,124 @@ static irqreturn_t mv61x0_timer_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+/*
+ * Tick check, for debug images only (docs/kernel/nandboot_hang_analysis.md,
+ * hang 9): timer_mv61x0.tick_check=MS runs timer 3 every MS ms, with its
+ * interrupt on CPU1, and watches timer 1's interrupt count. Timer 1 is the
+ * only tick: CPU1's comes from CPU0 by broadcast IPI, so if timer 1's
+ * interrupt stops, every timer, the hang watchdog's kicks and the lockup
+ * detectors stop on both CPUs, while the CPUs may still be running. After
+ * 200 ms without one this prints the timer and GIC state of timer 1's
+ * interrupt (then every second) and pings CPU0 by IPI, at 2 s it asks all
+ * CPUs for a backtrace, and at 3 s it panics, so the log lands in pstore.
+ * A stalled bus stops CPU1 in its first register read, and nothing is
+ * printed: that tells the two apart. Off (0) by default.
+ */
+static unsigned int mv61x0_tick_check;
+module_param_named(tick_check, mv61x0_tick_check, uint, 0444);
+static void __iomem *mv61x0_gicd, *mv61x0_gicc;
+static int mv61x0_t3_irq;
+static unsigned int mv61x0_pongs;
+static call_single_data_t mv61x0_ping_csd;
+static bool mv61x0_tick_armed;
+
+static void mv61x0_pong(void *unused)
+{
+	WRITE_ONCE(mv61x0_pongs, mv61x0_pongs + 1);
+}
+
+static void mv61x0_tick_report(unsigned int ms, unsigned int pings)
+{
+	void __iomem *d = mv61x0_gicd;
+	unsigned int hw = irqd_to_hwirq(irq_get_irq_data(mv61x0_ce.irq));
+	u32 bit = BIT(hw % 32), w = 4 * (hw / 32);
+
+	pr_emerg("mv61x0-timer: tick check: no timer 1 irq for %u ms (cpu%d, jiffies %08lx, irq #%u, cpu0 pongs %u/%u): t1 ctrl %08x load %08x count %08x status %08x t2 %08x\n",
+		 ms, smp_processor_id(), jiffies, READ_ONCE(mv61x0_ce_irqs),
+		 READ_ONCE(mv61x0_pongs), pings,
+		 readl_relaxed(mv61x0_base + MV61X0_CTRL(MV61X0_CE_TIMER)),
+		 readl_relaxed(mv61x0_base + MV61X0_LOAD(MV61X0_CE_TIMER)),
+		 readl_relaxed(mv61x0_base + MV61X0_COUNT(MV61X0_CE_TIMER)),
+		 readl_relaxed(mv61x0_base + MV61X0_IRQ_STATUS),
+		 readl_relaxed(mv61x0_cs_count));
+	if (d && mv61x0_gicc)
+		pr_emerg("mv61x0-timer: tick check: gic hwirq %u en %d pend %d act %d tgt %02x prio %02x dctlr %x; cpu%d gicc ctlr %x pmr %02x rpr %02x hppir %03x\n",
+			 hw, !!(readl_relaxed(d + 0x100 + w) & bit),
+			 !!(readl_relaxed(d + 0x200 + w) & bit),
+			 !!(readl_relaxed(d + 0x300 + w) & bit),
+			 readb_relaxed(d + 0x800 + hw),
+			 readb_relaxed(d + 0x400 + hw), readl_relaxed(d),
+			 smp_processor_id(), readl_relaxed(mv61x0_gicc),
+			 readl_relaxed(mv61x0_gicc + 0x04),
+			 readl_relaxed(mv61x0_gicc + 0x14),
+			 readl_relaxed(mv61x0_gicc + 0x18));
+}
+
+static void mv61x0_tick_check_irq(void)
+{
+	static unsigned int last, stuck, pings;
+	unsigned int now = READ_ONCE(mv61x0_ce_irqs);
+	unsigned int p = mv61x0_tick_check, ms;
+
+	if (now != last) {
+		last = now;
+		stuck = 0;
+		return;
+	}
+	ms = ++stuck * p;
+	if (ms < 200)
+		return;
+	if (ms - p < 200 || ms / 1000 != (ms - p) / 1000) {
+		mv61x0_tick_report(ms, pings);
+		if (!smp_call_function_single_async(0, &mv61x0_ping_csd))
+			pings++;
+	}
+	if (ms >= 2000 && ms - p < 2000)
+		trigger_all_cpu_backtrace();
+	if (ms >= 3000)
+		panic("mv61x0-timer: tick check: timer 1 interrupts stopped");
+}
+
+static int __init mv61x0_tick_check_init(void)
+{
+	struct device_node *np;
+	unsigned int ms = mv61x0_tick_check;
+
+	if (!mv61x0_base || !ms || mv61x0_t3_irq <= 0)
+		return 0;
+	ms = clamp(ms, 10U, 100U);
+	mv61x0_tick_check = ms;
+	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+	if (np) {
+		mv61x0_gicd = of_iomap(np, 0);
+		mv61x0_gicc = of_iomap(np, 1);
+		of_node_put(np);
+	}
+	INIT_CSD(&mv61x0_ping_csd, mv61x0_pong, NULL);
+	if (cpu_online(1))
+		irq_set_affinity(mv61x0_t3_irq, cpumask_of(1));
+
+	WRITE_ONCE(mv61x0_tick_armed, true);
+	writel_relaxed(0, mv61x0_base + MV61X0_CTRL(3));
+	writel_relaxed(ms * (mv61x0_rate / 1000), mv61x0_base + MV61X0_LOAD(3));
+	writel(MV61X0_CTRL_ENABLE | MV61X0_CTRL_RELOAD,
+	       mv61x0_base + MV61X0_CTRL(3));
+	pr_warn("mv61x0-timer: tick check every %u ms on timer 3 (irq %d, cpu%d): panics 3 s after the last timer 1 irq\n",
+		ms, mv61x0_t3_irq, cpu_online(1) ? 1 : 0);
+	return 0;
+}
+late_initcall(mv61x0_tick_check_init);
+
 /* Timers 0, 2 and 3: acknowledge only, as the vendor's default_callback */
 static irqreturn_t mv61x0_ack_interrupt(int irq, void *dev_id)
 {
-	return mv61x0_ack((unsigned long)dev_id) ? IRQ_HANDLED : IRQ_NONE;
+	unsigned long n = (unsigned long)dev_id;
+
+	if (!mv61x0_ack(n))
+		return IRQ_NONE;
+	if (n == 3 && READ_ONCE(mv61x0_tick_armed))
+		mv61x0_tick_check_irq();
+	return IRQ_HANDLED;
 }
 
 /* U-Boot's reset_cpu: let the watchdog on timer 0 run out after 1 ms */
@@ -227,7 +348,6 @@ static unsigned int mv61x0_hang_wdt;
 module_param_named(hang_wdt, mv61x0_hang_wdt, uint, 0444);
 static bool mv61x0_hang_wdt_nokick;
 module_param_named(hang_wdt_nokick, mv61x0_hang_wdt_nokick, bool, 0644);
-static u32 mv61x0_rate;
 static struct delayed_work mv61x0_wdt_work;
 
 #define MV61X0_HANG_WDT_KICK	(5 * HZ)
@@ -386,6 +506,8 @@ static int __init mv61x0_timer_init(struct device_node *np)
 		if (!irq || request_irq(irq, mv61x0_ack_interrupt, 0,
 					names[n], (void *)n))
 			pr_warn("mv61x0-timer: no interrupt for timer %lu\n", n);
+		else if (n == 3)
+			mv61x0_t3_irq = irq;
 	}
 
 	/* Clock event device */
