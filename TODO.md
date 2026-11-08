@@ -335,6 +335,19 @@ still require the owner's explicit OK.
       check). Console in the shared notes (hang9_mtd0_nandpcs_serial.txt).
       mtd0 now holds nandpcs (3ec9c45b), so every freeze resets and prints
       its own samples.
+      **Hang 10 (11-07 23:25): nandtick 9586a6d3 (tick check on timer 3 /
+      cpu1), RAM-booted first, then in mtd0 with modules 37b536ff, froze at
+      about 825 s from mtd0.** It froze silent: the tick check printed nothing
+      (no panic, the watchdog reset), pings and the console probe stopped
+      together, and both CPUs' PC samples stop within about 50 us of each
+      other. That fits a bus stall with both CPUs stuck. NAND had been idle
+      for 73 s (the last ring step was the end of TAR 3). Last samples: cpu0
+      in __mmap_region, just after uvc_video_decode_isoc (ustreamer streams
+      the USB camera all the time); cpu1 in lock_vma_under_rcu / page-fault
+      code. A camera-off soak (ustreamer stopped) was proposed to the
+      kernel session. Logs are in the shared notes (hang10_*). mtd0 holds
+      nandtick; the old modules are in /var/backups/mods-bfd2c0a7.tar on the
+      NAND root.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
