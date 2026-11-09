@@ -2427,3 +2427,18 @@ ls /sys/bus/platform/devices/ | grep -i -E "ramoops|1e0"
 - **Clean, with no probe:** it's ramoops' own probe/remove or struct
   after all. Next, nandps3 rebooted with the same three commands, to see
   whether ramoops binds anything there.
+
+**nanddrv2's boot:** the dummy "ramoops" driver's probe *is* called, for
+`1e000000.ramoops` (of_node `/reserved-memory/ramoops@1e000000`,
+modalias `of:NramoopsT(null)Cramoops`), and returns -ENODEV.
+- That's because the nandres-based DTs (nandres, nanddrv, nanddrv2) keep
+  nanddbg's `compatible = "ramoops"`. `of_platform_default_populate`
+  creates that device in all of them, with no driver in nandres or
+  nanddrv.
+- nandps0/3/4 delete the compatible, so there should be no such device
+  there at all. **nandps3's fast freeze, with its ramoops driver and (by
+  the DT) nothing to bind, is the odd one.** So nandps3 will be
+  re-booted to check whether `1e000000.ramoops` exists there, and
+  whether the real ramoops probe ran.
+- nanddrv2's 45 min soak (a "ramoops" driver probing the device and
+  failing) is running.
