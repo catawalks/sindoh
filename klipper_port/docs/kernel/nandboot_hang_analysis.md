@@ -2392,3 +2392,38 @@ What it means:
   the next step is to vary what it allocates.
 - **It's clean:** something specific to ramoops_driver: its name, its
   module kobject with parameters, or the OF table's "ramoops" string.
+
+**nanddrv: clean for 55 min** (44e325c3; `mv61x0-dummy` listed in
+`/sys/bus/platform/drivers`; 5 passes, the probe never missed). **A
+generic postcore platform-driver registration doesn't accelerate it.**
+
+What nandps3 has and both nandps4 and nanddrv lack: a driver *named*
+"ramoops" with an OF match "ramoops". The ramoops code and its module
+parameters are in nandps4 too. So the suspect is that something
+**matches** it and its probe runs, quietly, even though no pstore
+backend ever comes up.
+
+**`HANGTEST=nanddrv2`** = nanddrv with
+`CONFIG_MV61X0_DUMMY_PDRV_AS_RAMOOPS`. The dummy driver takes the name
+"ramoops" and the OF match "ramoops", prints
+`mv61x0-dummy: registering platform driver "ramoops"` at boot, and logs
+`mv61x0-dummy: probe called (...)` at **KERN_EMERG** if anything ever
+probes it (then returns -ENODEV). No pstore.
+- `m1-nandboot-nanddrv2.uimg` md5 `823da894390cd0b55d7e8fa9ff0a8fbc`;
+- modules `1ed058be441e9a1b32a2c17a0e9cd3ea`.
+
+**Run** the same way, 45 min, and also, right after boot:
+
+```
+dmesg | grep -i -E "dummy|ramoops"
+ls -l /sys/bus/platform/drivers/ramoops/
+ls /sys/bus/platform/devices/ | grep -i -E "ramoops|1e0"
+```
+
+- **"probe called":** a device matches "ramoops". It names which one;
+  then find out who creates it.
+- **It freezes fast, with no probe:** the name or match string alone,
+  in the driver core.
+- **Clean, with no probe:** it's ramoops' own probe/remove or struct
+  after all. Next, nandps3 rebooted with the same three commands, to see
+  whether ramoops binds anything there.

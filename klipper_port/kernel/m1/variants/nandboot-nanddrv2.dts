@@ -1,0 +1,3 @@
+// SPDX-License-Identifier: GPL-2.0
+/* m1-nandboot-nanddrv2: the reserved areas of nanddbg, with no driver for them (as nandres) */
+#include "nandboot-nanddbg.dts"
