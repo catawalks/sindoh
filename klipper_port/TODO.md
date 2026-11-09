@@ -557,6 +557,13 @@ still require the owner's explicit OK.
       Next while usage allows: nandpcs from the card gap on the NAND root
       again (its first such run went 3 h 56 min clean; from mtd0 it froze at
       143 s), then a nandsz rerun on the card root.
+      **Paused 11-09 12:27:** the serial console's shell exited (my mistake: a
+      second Ctrl-D sent while freeing a stuck command). The printer runs
+      fine on the one-CPU default from mtd0 (Klipper ready, NAND root), but
+      every test needs serial, and Moonraker refuses to reboot it. Needs a
+      power cycle by the owner. Weekly usage 88%. The nandpcs and nandsz
+      reruns wait (the card gap may hold a partial nandpcs write; a RAM boot
+      checks the CRC first).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
