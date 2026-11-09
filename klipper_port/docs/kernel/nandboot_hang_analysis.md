@@ -2442,3 +2442,39 @@ modalias `of:NramoopsT(null)Cramoops`), and returns -ENODEV.
   whether the real ramoops probe ran.
 - nanddrv2's 45 min soak (a "ramoops" driver probing the device and
   failing) is running.
+
+## nandps3 rerun: frozen again; next the single-CPU workaround (2026-11-08)
+
+- **nanddrv2:** 55 min clean (a "ramoops" driver probing
+  `1e000000.ramoops` and failing).
+- **nandps3, rebooted:**
+  - its DT node has no `compatible`;
+  - there's no `1e000000.ramoops` device;
+  - nothing is bound to the ramoops driver;
+  - it **froze again at ~430 s** (first time ~225 s).
+
+So registering ramoops' platform driver with nothing to bind speeds up
+the freeze, 2 of 2. nanddrv, nanddrv2, nandps4 and nandrs ran 55 min
+clean each.
+
+**Reading:** the code doesn't show why. A generic registration doesn't
+do it, nor does a ramoops-named driver whose probe fails. The pattern
+(many unrelated small changes speeding it up or not, the base freeze
+showing anyway, e.g. nandsz at 49 min, dc3b5f20 at 20–30 min) fits a
+timing- or memory-sensitive **two-CPU hardware fault**, not a software
+bug in ramoops. Bisecting the accelerator further costs many runs, and
+the weekly usage is at 82 %.
+
+**So the next run is the workaround on the production setup.**
+`HANGTEST=nandupw` = nandwdt (the plain kernel + hang watchdog) with
+`maxcpus=1`. nandup (with all the debug code) already ran 2 h clean.
+- `m1-nandboot-nandupw.uimg` md5 `161c05e2cd8cde1c1161ed6a65dd140f`
+  (2,815,044 bytes);
+- modules `1ba47581c5bcdfc48623a3ce9a8515c1`.
+
+**Run:** from mtd0 (written from a stable kernel), **NAND root**, the
+usual soak, as long as the owner allows (overnight if possible; it
+costs no tokens while running, only the check at the end).
+- **Clean:** `maxcpus=1` goes into the default nandboot config as the
+  stable configuration, and the SMP root cause stays an open item.
+- **A freeze:** it isn't only SMP after all.
