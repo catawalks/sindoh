@@ -564,6 +564,8 @@ still require the owner's explicit OK.
       power cycle by the owner. Weekly usage 88%. The nandpcs and nandsz
       reruns wait (the card gap may hold a partial nandpcs write; a RAM boot
       checks the CRC first).
+      **Full status write-up: docs/kernel/smp_freeze_summary.md** (11-09).
+      Weekly usage went over 90%: testing is on hold until the 11-13 reset.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
