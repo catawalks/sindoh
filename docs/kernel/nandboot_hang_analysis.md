@@ -2354,3 +2354,41 @@ mtd0.
 RAM boot, card root, two CPUs, Wi-Fi and camera on; 5 passes; the probe
 never missed). **Reed-Solomon isn't the accelerator.** nandps4
 (`ramoops_init` a no-op) is running.
+
+## nandps4: PSTORE_RAM without ramoops_init, 55 min clean (2026-11-08)
+
+nandps4 (1c85512a: PSTORE + PSTORE_RAM with `ramoops_init` a bare return;
+`nodev pstore` listed, no `ramoops` in `/sys/bus/platform/drivers`), RAM
+boot, card root, two CPUs, Wi-Fi and camera on: 5 passes, no reset; the
+probe never missed.
+
+| Build | ramoops driver registered | Result |
+|---|---|---|
+| nandps3 | yes, no device ever bound | froze at ~225 s |
+| nandps4 | no (same code) | 55 min clean |
+| nandrs | (Reed-Solomon only) | 55 min clean |
+
+**So the accelerator is `platform_driver_register(&ramoops_driver)` at
+postcore, with nothing bound.**
+- Its probe never runs: the DT node has no `compatible`, and
+  `of_platform_default_populate` creates reserved-memory devices only for
+  compatible ones.
+- What the registration leaves in the running system:
+  - the driver on the platform bus's klist, so every later
+    platform-device add runs `platform_match()` against its OF table;
+  - its kobject, the kernfs/sysfs nodes (`bind`, `unbind`, `uevent`,
+    `module`), and their small slab allocations.
+
+**Next: `HANGTEST=nanddrv`.** nandres (no pstore) plus
+`CONFIG_MV61X0_DUMMY_PDRV` (`mach-mv61x0/dummy-pdrv.c`): our own platform
+driver whose OF table nothing matches, registered at postcore like
+ramoops.
+- `m1-nandboot-nanddrv.uimg` md5 `44e325c35c22e1269c22850ffa10139a`;
+- modules `e6905fa6b78073d4704985cd6bf2808f`.
+
+What it means:
+- **It freezes fast:** any such registration is enough. The accelerator
+  is generic driver-core state. It's then a convenient reproducer, and
+  the next step is to vary what it allocates.
+- **It's clean:** something specific to ramoops_driver: its name, its
+  module kobject with parameters, or the OF table's "ramoops" string.
