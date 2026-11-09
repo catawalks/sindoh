@@ -2478,3 +2478,28 @@ costs no tokens while running, only the check at the end).
 - **Clean:** `maxcpus=1` goes into the default nandboot config as the
   stable configuration, and the SMP root cause stays an open item.
 - **A freeze:** it isn't only SMP after all.
+
+## nandupw: one CPU, 10 h on the NAND root, clean; maxcpus=1 is the default (2026-11-09)
+
+nandupw (161c05e2: the plain kernel + hang watchdog, `maxcpus=1`) from
+mtd0 on the NAND root:
+- the 10 h soak: 151 passes, uptime 36286 s at the end;
+- NAND 16919800 reads, 151 corrected, no fail, timeout or unc; UBI
+  max_ec 129;
+- no reset, oops, lockup or UBI/ECC error;
+- the probe answered all night (577 marks, no miss);
+- eth0 and mlan0 up.
+
+**The default nandboot config now has `maxcpus=1`**
+(`variants/nandboot.config`, with a comment pointing here). The two-CPU
+freeze stays open; the hang-test variants keep their own command lines.
+
+**m1-nandboot.uimg, built 2026-11-09, not booted:**
+- md5 `0bcb101e258ef3b11b61eca271229894` (2,814,364 bytes);
+- modules `6f1002ef96770b09206d4e39de7323a1`;
+- its config equals nandupw's except the `hang_wdt=30` (no watchdog in
+  the normal image).
+
+The previous default (dc3b5f20, two CPUs) is kept in
+`D:\DP200\kernel\out\keep-dc3b5f20\`. Putting this into mtd0 needs the
+owner's OK, and a RAM boot first, as always.
