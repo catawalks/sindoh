@@ -25,6 +25,30 @@ the work; it is how open items survive between sessions.
    - **Needs the printer's serial shell** (the fork and kbuild_fm.sh live on the
      printer): after the owner's power cycle. Test on the test printer, then
      the next stick payload.
+0a. **(11-09) NO MOTION on the current setup** (the default nandboot 0bcb101e,
+   maxcpus=1, from mtd0, NAND root). Found while mapping the front edge for
+   the prime line (owner at the printer, bed empty):
+   - **What happened:** G28 gave "No trigger on stepper_x after full
+     movement". The carriage didn't move and made no noise.
+   - **Firmware side is fine:** UPC_STEP_STATS shows X pulses=28440, so the
+     firmware stepped.
+   - **REF PWM is fine:** global enable 0x748000FB (all motor blocks on),
+     ctrl 0xB, X 84/200 and Y 120/200, matching Klipper's 0.425/0.60.
+   - **Engine setup registers are fine:** on X and Y, +0x00=1, +0x10=8,
+     +0x14=4, +0x2c=0xAAAAAAAA (the 10-27 fix is in place); +0x44=0x33224;
+     fm.bin c313d379.
+   - **Yet no holding torque:** with SET_STEPPER_ENABLE X/Y=1 both moved
+     freely by hand (the owner checked). They're off again (M84).
+   - **Same symptom as 10-27** (hardware_notes.md), but those registers are
+     set now.
+   - **Never tested before:** motion has never been tried on a nandboot
+     kernel or the NAND-root setup. It last worked on mainline on 10-30
+     (m1-full, upc-pinmux, upctool by hand).
+   - **Check next:** the CFG register (driver enable, bit0, and stock's
+     bit4) for each engine; 24 V presence (do fans spin?); the pads and
+     pinmux of the smot pins under nandboot vs m1-full; a regsnap.sh of a
+     working boot (stock app, or the 10-30 m1-full path) vs this one.
+   - **Until it's found:** don't print on the dev printer.
 0b. **(11-09, owner) PRIME_LINE lies inside big prints.** The work printer's
    test print covered X 40-160 / Y 35 (klipper/config/dp200_printer.cfg
    PRIME_LINE). Move it out of the print area. Options: (a) place it from the
