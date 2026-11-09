@@ -528,6 +528,13 @@ still require the owner's explicit OK.
       timing- or layout-sensitive two-CPU fault. This tests the single-CPU
       workaround on the production setup. Clean: maxcpus=1 becomes the
       nandboot default and the two-CPU cause stays open.
+      **Result: 10 h clean** (11-08 22:59 to 11-09 09:02). IRQSOAK DONE 151
+      passes; NAND 16.9 M reads, 151 corrected, no fail, tmo or unc; no
+      reset or errors; the console answered all night; Wi-Fi up. The
+      single-CPU workaround holds on the production setup. Next: the kernel
+      session rebuilds the default nandboot with maxcpus=1; putting that
+      normal build into mtd0 needs the owner's OK. The two-CPU freeze stays
+      an open item (PROJECTS).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
