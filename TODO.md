@@ -9,6 +9,29 @@ the work; it is how open items survive between sessions.
 
 ## Next (user at a printer)
 
+0. **(11-09, owner) UPC load into Mainsail's MCU panel.**
+   - **Why it reads ~0 now:** on the UPC, the step timers run inside irq_wait()
+     (src/upc/main.c irq_poll), and sched.c's run_tasks() subtracts the irq_wait
+     span from its stats, so mcu_awake / task_avg leave all timer work out.
+   - **Plan:**
+     1. In src/upc/main.c, accumulate the ticks spent in
+        timer_dispatch_many_polling() inside irq_poll into a global.
+     2. Add a small core patch (0015) to the fork's sched.c run_tasks(), under
+        CONFIG_MACH_UPC: give those ticks back to `start` after the sleep
+        (`start += timer_read_time() - upc_take_sleep_busy()`), so the standard
+        "stats" sum includes timer work and Mainsail's Load/Awake show real
+        figures for the FM and IO cores.
+     3. Optionally have UPC_STEP_STATS also print busy/idle.
+   - **Needs the printer's serial shell** (the fork and kbuild_fm.sh live on the
+     printer): after the owner's power cycle. Test on the test printer, then
+     the next stick payload.
+0b. **(11-09, owner) PRIME_LINE lies inside big prints.** The work printer's
+   test print covered X 40-160 / Y 35 (klipper/config/dp200_printer.cfg
+   PRIME_LINE). Move it out of the print area. Options: (a) place it from the
+   slicer's first-layer bounds (PrusaSlicer first_layer_print_min/max); (b) a
+   fixed strip at the bed edge (the front Y < ~10 is over the grip handle);
+   (c) drop it and rely on PRINT_START's bin purge + wipe. Owner to choose.
+
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
    Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH
    bug - `MCU 'mcu' shutdown: Stepper too far in past` ~19 min in, on the
