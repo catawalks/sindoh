@@ -535,6 +535,19 @@ still require the owner's explicit OK.
       session rebuilds the default nandboot with maxcpus=1; putting that
       normal build into mtd0 needs the owner's OK. The two-CPU freeze stays
       an open item (PROJECTS).
+      **11-09: mtd0 now holds the default nandboot with maxcpus=1** (0bcb101e,
+      modules 6f1002ef; RAM-booted first, written from the one-CPU boot with
+      the owner's OK; it boots from mtd0 onto the NAND root with Wi-Fi up).
+      The old two-CPU default dc3b5f20 is in out/keep-dc3b5f20/. **The
+      two-CPU freeze is HIGH PRIORITY once weekly usage resets (11-13):**
+      one core carries a high load, and the vendor 3.2 kernel runs both
+      cores fine. Where it stands:
+      - Fast reproducer: registering ramoops' platform driver (nandps3,
+        2 of 2 runs, nothing bound).
+      - Base rate: about 1 freeze per 10 h on the card root, 20-30 min on
+        the NAND root.
+      - The NAND root only raises the rate; card-root runs froze too
+        (hangs 16-17, nandsz).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
