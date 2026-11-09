@@ -2349,3 +2349,8 @@ mtd0.
 - The PSTORE_RAM split (nandrs, nandps4) still answers what makes it
   fast. The root cause is the base freeze. With the accelerator
   understood, a build that has it can test candidate fixes in minutes.
+
+**nandrs: clean for ~55 min** (4764112c, Reed-Solomon alone, no pstore,
+RAM boot, card root, two CPUs, Wi-Fi and camera on; 5 passes; the probe
+never missed). **Reed-Solomon isn't the accelerator.** nandps4
+(`ramoops_init` a no-op) is running.
