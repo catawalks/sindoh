@@ -503,7 +503,11 @@ still require the owner's explicit OK.
       **nandrs 4764112c (Reed-Solomon alone, no pstore): about 57 min
       clean** (still up at 3408 s). So RS isn't the trigger. Running
       nandps4 1c85512a (PSTORE_RAM code present, ramoops_init a bare return,
-      so no driver is registered).
+      so no driver is registered): **55 min clean** (IRQSOAK DONE 5 passes).
+      **So the trigger is registering the ramoops platform driver**
+      (nandps3, the same code with the registration, froze at about 225 s).
+      Sent to the kernel session: what the driver registration changes in
+      the running system.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
