@@ -90,3 +90,10 @@ config MV61X0_DUMMY_PDRV
 	  any such registration speeds up the two-CPU freeze, or only
 	  ramoops'. Test option (docs/kernel/nandboot_hang_analysis.md,
 	  hang 25 / nandps4).
+
+config MV61X0_DUMMY_PDRV_AS_RAMOOPS
+	bool "DP200 hang analysis: the dummy driver as \"ramoops\""
+	depends on MV61X0_DUMMY_PDRV && !PSTORE_RAM
+	help
+	  The dummy platform driver takes ramoops' driver name and OF match
+	  string, and logs at KERN_EMERG if its probe is ever called.
