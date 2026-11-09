@@ -508,6 +508,10 @@ still require the owner's explicit OK.
       (nandps3, the same code with the registration, froze at about 225 s).
       Sent to the kernel session: what the driver registration changes in
       the running system.
+      **nanddrv 44e325c3 (nandres plus our own do-nothing platform driver,
+      mv61x0-dummy, registered at postcore like ramoops): 55 min clean.**
+      So a generic driver registration isn't it: it's something specific
+      to ramoops' driver (name, module parameters, the of_match string).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
