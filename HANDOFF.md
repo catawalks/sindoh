@@ -19,6 +19,11 @@ their decisions were changed later. The live documents:
   **docs/hardware_notes.md** (measured facts).
 
 Decisions in force:
+- **Two-CPU hard freeze, the current status:** read
+  **docs/kernel/smp_freeze_summary.md** first (results table, reproducers,
+  test method, next steps). The default nandboot runs `maxcpus=1` as a
+  stopgap (0bcb101e in mtd0 since 11-09). The two-CPU fix is high priority
+  after the 11-13 usage reset.
 - **Boot any kernel before writing it to NAND** (owner, 2026-11-07): RAM
   boot from the 4GB-SD gap (tools/sd_raw_install.sh + sd_raw_boot.sh) to
   userspace first, then tools/mtd0_kernel_update.sh. (The nanddbg image
