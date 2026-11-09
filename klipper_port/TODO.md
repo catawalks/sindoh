@@ -512,6 +512,14 @@ still require the owner's explicit OK.
       mv61x0-dummy, registered at postcore like ramoops): 55 min clean.**
       So a generic driver registration isn't it: it's something specific
       to ramoops' driver (name, module parameters, the of_match string).
+      nanddrv2 823da894 (a dummy "ramoops" driver; it probes the existing
+      1e000000.ramoops device, which exists in the nandres-based DTs that
+      keep compatible = "ramoops", and fails): 55 min clean. nandps3's DT has
+      no compatible, so there's no device and nothing bound (checked on the
+      running system). Yet the **nandps3 rerun froze again at about 7 min**
+      (2 of 2). So registering ramoops' own driver, with nothing to bind, is
+      the accelerator: it's in its driver struct or registration path.
+      Weekly usage 82% (owner: pause at 90%).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
