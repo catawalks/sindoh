@@ -500,6 +500,10 @@ still require the owner's explicit OK.
       rate a little, or this is the plain base rate. A 45-min clean means
       "no fast freeze", not "no freeze". Next: PSTORE_RAM without the driver
       registration (nandps4) vs Reed-Solomon alone (nandrs).
+      **nandrs 4764112c (Reed-Solomon alone, no pstore): about 57 min
+      clean** (still up at 3408 s). So RS isn't the trigger. Running
+      nandps4 1c85512a (PSTORE_RAM code present, ramoops_init a bare return,
+      so no driver is registered).
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
