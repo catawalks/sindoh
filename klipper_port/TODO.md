@@ -520,6 +520,14 @@ still require the owner's explicit OK.
       (2 of 2). So registering ramoops' own driver, with nothing to bind, is
       the accelerator: it's in its driver struct or registration path.
       Weekly usage 82% (owner: pause at 90%).
+      **Overnight (11-08 22:59, owner's OK): nandupw 161c05e2 (the plain
+      kernel, hang watchdog, maxcpus=1) from mtd0 on the NAND root**
+      (marker renamed back to /.dp200-root.off), 10-hour read soak
+      (deploy/usb/t/soak10h.sh). The kernel session stopped the driver
+      bisect: nothing in ramoops' code explains it, so it looks like a
+      timing- or layout-sensitive two-CPU fault. This tests the single-CPU
+      workaround on the production setup. Clean: maxcpus=1 becomes the
+      nandboot default and the two-CPU cause stays open.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
