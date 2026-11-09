@@ -548,6 +548,15 @@ still require the owner's explicit OK.
         the NAND root.
       - The NAND root only raises the rate; card-root runs froze too
         (hangs 16-17, nandsz).
+      **11-09 12:13: nandwdt cf897cd8 (the plain kernel plus the hang
+      watchdog, two CPUs), RAM-booted from the card gap onto the NAND root,
+      froze at about 20 min** (TAR 5 done at 1162.7 s; the console and ping
+      stopped about 12:13:22; the watchdog reset it into the one-CPU default).
+      The same image ran 2 h clean on the card root. So for the plain
+      kernel the NAND root is the trigger (it matches dc3b5f20's 22-30 min).
+      Next while usage allows: nandpcs from the card gap on the NAND root
+      again (its first such run went 3 h 56 min clean; from mtd0 it froze at
+      143 s), then a nandsz rerun on the card root.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
