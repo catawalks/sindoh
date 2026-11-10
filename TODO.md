@@ -9,7 +9,19 @@ the work; it is how open items survive between sessions.
 
 ## Next (user at a printer)
 
-0. **(11-09, owner) UPC load into Mainsail's MCU panel.**
+0. **(11-09, owner) UPC load into Mainsail's MCU panel: DONE on the test
+   printer, not yet in the fork.**
+   - **Done:** fm.bin 6cdaee5b and io.bin f0407060, built from fork 8d4fb4d
+     plus tools/upc_load_edit.py with tools/kbuild_load.sh. Installed in
+     /opt/dp200 on the card root; old ones kept as fm_preload_c313d379.bin and
+     io_preload_dbc8e40d.bin. Klipper ready; idle FM awake 0.002 (was ~0.001).
+   - **Left:** check the load under motion once motors work. Commit the
+     sched.c half to catawalks/klipper sindoh-dp200 (the port's main.c is
+     already in this repo). Put it in the next stick payload.
+   - **Printer state:** nandwdt (two CPUs, watchdog) RAM-booted from the card
+     gap onto the card root (marker /.dp200-root); mtd0 still holds the
+     one-CPU default.
+   Original plan:
    - **Why it reads ~0 now:** on the UPC, the step timers run inside irq_wait()
      (src/upc/main.c irq_poll), and sched.c's run_tasks() subtracts the irq_wait
      span from its stats, so mcu_awake / task_avg leave all timer work out.
