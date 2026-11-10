@@ -215,13 +215,21 @@ timer_dispatch_task_poll(void)
     console_poll();
 }
 
+// Ticks spent dispatching timers since sched.c last reset it. Timers run
+// from irq_poll(), also while run_tasks() "sleeps" in irq_wait(), which its
+// stats leave out; sched.c adds this back so mcu_awake shows the real load
+// (the sched.c half: tools/upc_load_edit.py, to go into the fork).
+uint32_t upc_sleep_busy;
+
 void
 irq_poll(void)
 {
     if (timer_pending()) {
         timer_clear_pending();
+        uint32_t t0 = timer_read_time();
         uint32_t next = timer_dispatch_many_polling();
         timer_set(next);
+        upc_sleep_busy += timer_read_time() - t0;
     }
     console_poll();
     UPC_IPC->heartbeat++;
