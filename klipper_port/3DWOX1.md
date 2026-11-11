@@ -116,8 +116,13 @@ hardware_notes.md is not tested here).
   triggered with about 13 mm left to the nozzle (DP200: about 2.3 mm), but
   the bed plate had been removed for the test. Repeat with the plate on,
   then do the paper test.
-- **Z travel:** roughly 200 mm bottom to switch, based on a by-eye 40 mm
-  after the stall. Not measured.
+- **Z travel: about 198 mm from the switch to the mechanical bottom**
+  (DP200: ~195 mm). Measured by step count at 3 mm/s, starting with the
+  bed on the switch (xena44 = 1): 190 mm in five stages, then 1 mm steps
+  with pauses. The bed followed every step to 198 mm, stopped on the next
+  one and buzzed after that, so the end is between 198 and 199 mm. One
+  run, bed plate removed. `position_max: 194` is about 4 mm short of this
+  printer's travel.
 - **Z speed:** 5 mm/s from a standing start stalls; 3 mm/s works. Not
   tried: 5 mm/s with acceleration (as klippy does it), or a higher Z REF.
 - **Not tested:** extruder motor and clutch, heatsink and exhaust fans,
