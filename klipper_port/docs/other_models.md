@@ -94,7 +94,7 @@ Nothing here was run on those printers. It was read from the updates only
   - So the only way in is a **real 30X's `/app/crypto_key.dat`** (decrypt it
     with the empty password → key). No 30X key file exists in any local dump.
   - The vendor store `http://firmware.sindoh.com/<path>/` (HTTP basic auth,
-    the original dev's login embedded in `net_update.sh`) is now behind
+    the original dev's login embedded in `net_update.sh` "karaspinetree_user:karaspinetree_sindoh" ) is now behind
     CloudFront and returns **502** (origin gone) as of 2026-11-11.
 
 ## Boot logo per model
