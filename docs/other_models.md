@@ -80,8 +80,22 @@ Nothing here was run on those printers. It was read from the updates only
 - **eMMC boards** have partitions p1 (U-Boot), p2 (root with `/boot`), p3
   (systemdata), p5 (recovery) and p6 (userdata). A Klipper chroot could go
   on userdata or an SD card instead of the DP200's SD-card root.
-- **30X:** nothing until its key is found. The likely source is
-  `/app/crypto_key.dat` from a 30X.
+- **30X:** needs the key, and the key is **not guessable** — settled
+  2026-11-11. The `karaspinetree` Prime (2X) firmware (unencrypted, from
+  `firmware.sindoh.com`) let us confirm the whole scheme end to end:
+  - each model's `/app/crypto_key.dat` is an openssl blob with an **empty
+    password** (`des3` or `aes-256-cbc -d -k "" -md md5`) that unpacks (bzip2
+    tar) to `crypto_key.txt` = the KEY; `update.she` is then `des3 -k KEY`
+    or `aes-256-cbc -K hex(KEY) -iv hex(KEY)`;
+  - the Prime's KEY is `sindoh024601779`, yet its `RODIN_SUB` is `P`, so the
+    suffix is **not** derived from the model tag — the base+suffix pattern was
+    a coincidence, and brute-forcing suffixes is a dead end (confirmed by the
+    STF sweep).
+  - So the only way in is a **real 30X's `/app/crypto_key.dat`** (decrypt it
+    with the empty password → key). No 30X key file exists in any local dump.
+  - The vendor store `http://firmware.sindoh.com/<path>/` (HTTP basic auth,
+    the original dev's login embedded in `net_update.sh`) is now behind
+    CloudFront and returns **502** (origin gone) as of 2026-11-11.
 
 ## Boot logo per model
 
