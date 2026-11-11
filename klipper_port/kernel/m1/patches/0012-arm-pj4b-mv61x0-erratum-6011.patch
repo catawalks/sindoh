@@ -1,5 +1,5 @@
 From: catawalks <59056948+catawalks@users.noreply.github.com>
-Subject: [PATCH] ARM: PJ4B 88PA61x0: erratum 6011 (five LDREX, IRQs off)
+Subject: [PATCH] ARM: PJ4B 88PA61x0: erratum 6011 (five LDREX, IRQs off for the loads)
 
 Test options for the DP200 nandboot hangs, off by default
 (docs/kernel/nandboot_hang_analysis.md).
@@ -20,8 +20,8 @@ Test options for the DP200 nandboot hangs, off by default
  	prefetchw(&v->counter);						\
 -	__asm__ __volatile__("@ atomic_" #op "\n"			\
 -"1:	ldrex	%0, [%3]\n"						\
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_" #op "\n"			\
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"						\
++	__asm__ __volatile__("@ atomic_" #op "\n"			\
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"						\
  "	" #asm_op "	%0, %0, %4\n"					\
  "	strex	%1, %0, [%3]\n"						\
  "	teq	%1, #0\n"						\
@@ -29,7 +29,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
  	: "r" (&v->counter), "Ir" (i)					\
 -	: "cc");							\
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
++	: "cc" __PJ4B_CLOBBER);							\
  }									\
  
  #define ATOMIC_OP_RETURN(op, c_op, asm_op)				\
@@ -39,8 +39,8 @@ Test options for the DP200 nandboot hangs, off by default
  									\
 -	__asm__ __volatile__("@ atomic_" #op "_return\n"		\
 -"1:	ldrex	%0, [%3]\n"						\
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_" #op "_return\n"		\
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"						\
++	__asm__ __volatile__("@ atomic_" #op "_return\n"		\
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"						\
  "	" #asm_op "	%0, %0, %4\n"					\
  "	strex	%1, %0, [%3]\n"						\
  "	teq	%1, #0\n"						\
@@ -48,7 +48,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
  	: "r" (&v->counter), "Ir" (i)					\
 -	: "cc");							\
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
++	: "cc" __PJ4B_CLOBBER);							\
  									\
  	return result;							\
  }
@@ -58,8 +58,8 @@ Test options for the DP200 nandboot hangs, off by default
  									\
 -	__asm__ __volatile__("@ atomic_fetch_" #op "\n"			\
 -"1:	ldrex	%0, [%4]\n"						\
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_fetch_" #op "\n"			\
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%4]") "ldrex	%0, [%4]\n"						\
++	__asm__ __volatile__("@ atomic_fetch_" #op "\n"			\
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%4]") "ldrex	%0, [%4]\n"						\
  "	" #asm_op "	%1, %0, %5\n"					\
  "	strex	%2, %1, [%4]\n"						\
  "	teq	%2, #0\n"						\
@@ -67,7 +67,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (result), "=&r" (val), "=&r" (tmp), "+Qo" (v->counter)	\
  	: "r" (&v->counter), "Ir" (i)					\
 -	: "cc");							\
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
++	: "cc" __PJ4B_CLOBBER);							\
  									\
  	return result;							\
  }
@@ -77,15 +77,15 @@ Test options for the DP200 nandboot hangs, off by default
  	do {
 -		__asm__ __volatile__("@ atomic_cmpxchg\n"
 -		"ldrex	%1, [%3]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic_cmpxchg\n"
-+		"" __PJ4B_LDREX("ldrex	%1, [%3]") "ldrex	%1, [%3]\n"
++		__asm__ __volatile__("@ atomic_cmpxchg\n"
++		"" __PJ4B_LDREX_IRQ("ldrex	%1, [%3]") "ldrex	%1, [%3]\n"
  		"mov	%0, #0\n"
  		"teq	%1, %4\n"
  		"strexeq %0, %5, [%3]\n"
  		    : "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
  		    : "r" (&ptr->counter), "Ir" (old), "r" (new)
 -		    : "cc");
-+		    : "cc"); pj4b_6011_restore(__pj4b_f); }
++		    : "cc" __PJ4B_CLOBBER);
  	} while (res);
  
  	return oldval;
@@ -95,8 +95,8 @@ Test options for the DP200 nandboot hangs, off by default
  
 -	__asm__ __volatile__ ("@ atomic_add_unless\n"
 -"1:	ldrex	%0, [%4]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__ ("@ atomic_add_unless\n"
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%4]") "ldrex	%0, [%4]\n"
++	__asm__ __volatile__ ("@ atomic_add_unless\n"
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%4]") "ldrex	%0, [%4]\n"
  "	teq	%0, %5\n"
  "	beq	2f\n"
  "	add	%1, %0, %6\n"
@@ -105,7 +105,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (oldval), "=&r" (newval), "=&r" (tmp), "+Qo" (v->counter)
  	: "r" (&v->counter), "r" (u), "r" (a)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	if (oldval != u)
  		smp_mb();
@@ -115,12 +115,12 @@ Test options for the DP200 nandboot hangs, off by default
  
 -	__asm__ __volatile__("@ atomic64_read\n"
 -"	ldrexd	%0, %H0, [%1]"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_read\n"
-+"	" __PJ4B_LDREX("ldrexd	%0, %H0, [%1]") "ldrexd	%0, %H0, [%1]"
++	__asm__ __volatile__("@ atomic64_read\n"
++"	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%1]") "ldrexd	%0, %H0, [%1]"
  	: "=&r" (result)
  	: "r" (&v->counter), "Qo" (v->counter)
 -	);
-+	); pj4b_6011_restore(__pj4b_f); }
++	__PJ4B_CLOBBER_ONLY);
  
  	return result;
  }
@@ -130,15 +130,15 @@ Test options for the DP200 nandboot hangs, off by default
  	prefetchw(&v->counter);
 -	__asm__ __volatile__("@ atomic64_set\n"
 -"1:	ldrexd	%0, %H0, [%2]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_set\n"
-+"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%2]") "ldrexd	%0, %H0, [%2]\n"
++	__asm__ __volatile__("@ atomic64_set\n"
++"1:	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%2]") "ldrexd	%0, %H0, [%2]\n"
  "	strexd	%0, %3, %H3, [%2]\n"
  "	teq	%0, #0\n"
  "	bne	1b"
  	: "=&r" (tmp), "=Qo" (v->counter)
  	: "r" (&v->counter), "r" (i)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  }
  #endif
  
@@ -148,8 +148,8 @@ Test options for the DP200 nandboot hangs, off by default
  	prefetchw(&v->counter);						\
 -	__asm__ __volatile__("@ atomic64_" #op "\n"			\
 -"1:	ldrexd	%0, %H0, [%3]\n"					\
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_" #op "\n"			\
-+"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"					\
++	__asm__ __volatile__("@ atomic64_" #op "\n"			\
++"1:	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"					\
  "	" #op1 " %Q0, %Q0, %Q4\n"					\
  "	" #op2 " %R0, %R0, %R4\n"					\
  "	strexd	%1, %0, %H0, [%3]\n"					\
@@ -158,7 +158,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
  	: "r" (&v->counter), "r" (i)					\
 -	: "cc");							\
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
++	: "cc" __PJ4B_CLOBBER);							\
  }									\
  
  #define ATOMIC64_OP_RETURN(op, op1, op2)				\
@@ -168,8 +168,8 @@ Test options for the DP200 nandboot hangs, off by default
  									\
 -	__asm__ __volatile__("@ atomic64_" #op "_return\n"		\
 -"1:	ldrexd	%0, %H0, [%3]\n"					\
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_" #op "_return\n"		\
-+"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"					\
++	__asm__ __volatile__("@ atomic64_" #op "_return\n"		\
++"1:	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"					\
  "	" #op1 " %Q0, %Q0, %Q4\n"					\
  "	" #op2 " %R0, %R0, %R4\n"					\
  "	strexd	%1, %0, %H0, [%3]\n"					\
@@ -178,7 +178,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)		\
  	: "r" (&v->counter), "r" (i)					\
 -	: "cc");							\
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
++	: "cc" __PJ4B_CLOBBER);							\
  									\
  	return result;							\
  }
@@ -188,8 +188,8 @@ Test options for the DP200 nandboot hangs, off by default
  									\
 -	__asm__ __volatile__("@ atomic64_fetch_" #op "\n"		\
 -"1:	ldrexd	%0, %H0, [%4]\n"					\
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_fetch_" #op "\n"		\
-+"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%4]") "ldrexd	%0, %H0, [%4]\n"					\
++	__asm__ __volatile__("@ atomic64_fetch_" #op "\n"		\
++"1:	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%4]") "ldrexd	%0, %H0, [%4]\n"					\
  "	" #op1 " %Q1, %Q0, %Q5\n"					\
  "	" #op2 " %R1, %R0, %R5\n"					\
  "	strexd	%2, %1, %H1, [%4]\n"					\
@@ -198,7 +198,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (result), "=&r" (val), "=&r" (tmp), "+Qo" (v->counter)	\
  	: "r" (&v->counter), "r" (i)					\
 -	: "cc");							\
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }							\
++	: "cc" __PJ4B_CLOBBER);							\
  									\
  	return result;							\
  }
@@ -208,8 +208,8 @@ Test options for the DP200 nandboot hangs, off by default
  	do {
 -		__asm__ __volatile__("@ atomic64_cmpxchg\n"
 -		"ldrexd		%1, %H1, [%3]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_cmpxchg\n"
-+		"" __PJ4B_LDREX("ldrexd		%1, %H1, [%3]") "ldrexd		%1, %H1, [%3]\n"
++		__asm__ __volatile__("@ atomic64_cmpxchg\n"
++		"" __PJ4B_LDREX_IRQ("ldrexd		%1, %H1, [%3]") "ldrexd		%1, %H1, [%3]\n"
  		"mov		%0, #0\n"
  		"teq		%1, %4\n"
  		"teqeq		%H1, %H4\n"
@@ -217,7 +217,7 @@ Test options for the DP200 nandboot hangs, off by default
  		: "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
  		: "r" (&ptr->counter), "r" (old), "r" (new)
 -		: "cc");
-+		: "cc"); pj4b_6011_restore(__pj4b_f); }
++		: "cc" __PJ4B_CLOBBER);
  	} while (res);
  
  	return oldval;
@@ -227,15 +227,15 @@ Test options for the DP200 nandboot hangs, off by default
  
 -	__asm__ __volatile__("@ atomic64_xchg\n"
 -"1:	ldrexd	%0, %H0, [%3]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_xchg\n"
-+"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"
++	__asm__ __volatile__("@ atomic64_xchg\n"
++"1:	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"
  "	strexd	%1, %4, %H4, [%3]\n"
  "	teq	%1, #0\n"
  "	bne	1b"
  	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
  	: "r" (&ptr->counter), "r" (new)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	return result;
  }
@@ -245,8 +245,8 @@ Test options for the DP200 nandboot hangs, off by default
  
 -	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
 -"1:	ldrexd	%0, %H0, [%3]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_dec_if_positive\n"
-+"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"
++	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
++"1:	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%3]") "ldrexd	%0, %H0, [%3]\n"
  "	subs	%Q0, %Q0, #1\n"
  "	sbc	%R0, %R0, #0\n"
  "	teq	%R0, #0\n"
@@ -255,7 +255,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
  	: "r" (&v->counter)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	smp_mb();
  
@@ -265,8 +265,8 @@ Test options for the DP200 nandboot hangs, off by default
  
 -	__asm__ __volatile__("@ atomic64_add_unless\n"
 -"1:	ldrexd	%0, %H0, [%4]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__("@ atomic64_add_unless\n"
-+"1:	" __PJ4B_LDREX("ldrexd	%0, %H0, [%4]") "ldrexd	%0, %H0, [%4]\n"
++	__asm__ __volatile__("@ atomic64_add_unless\n"
++"1:	" __PJ4B_LDREX_IRQ("ldrexd	%0, %H0, [%4]") "ldrexd	%0, %H0, [%4]\n"
  "	teq	%0, %5\n"
  "	teqeq	%H0, %H5\n"
  "	beq	2f\n"
@@ -275,7 +275,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (oldval), "=&r" (newval), "=&r" (tmp), "+Qo" (v->counter)
  	: "r" (&v->counter), "r" (u), "r" (a)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	if (oldval != u)
  		smp_mb();
@@ -295,42 +295,42 @@ Test options for the DP200 nandboot hangs, off by default
  	case 1:
 -		asm volatile("@	__xchg1\n"
 -		"1:	ldrexb	%0, [%3]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@	__xchg1\n"
-+		"1:	" __PJ4B_LDREX("ldrexb	%0, [%3]") "ldrexb	%0, [%3]\n"
++		asm volatile("@	__xchg1\n"
++		"1:	" __PJ4B_LDREX_IRQ("ldrexb	%0, [%3]") "ldrexb	%0, [%3]\n"
  		"	strexb	%1, %2, [%3]\n"
  		"	teq	%1, #0\n"
  		"	bne	1b"
  			: "=&r" (ret), "=&r" (tmp)
  			: "r" (x), "r" (ptr)
 -			: "memory", "cc");
-+			: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
++			: "memory", "cc" __PJ4B_CLOBBER);
  		break;
  	case 2:
 -		asm volatile("@	__xchg2\n"
 -		"1:	ldrexh	%0, [%3]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@	__xchg2\n"
-+		"1:	" __PJ4B_LDREX("ldrexh	%0, [%3]") "ldrexh	%0, [%3]\n"
++		asm volatile("@	__xchg2\n"
++		"1:	" __PJ4B_LDREX_IRQ("ldrexh	%0, [%3]") "ldrexh	%0, [%3]\n"
  		"	strexh	%1, %2, [%3]\n"
  		"	teq	%1, #0\n"
  		"	bne	1b"
  			: "=&r" (ret), "=&r" (tmp)
  			: "r" (x), "r" (ptr)
 -			: "memory", "cc");
-+			: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
++			: "memory", "cc" __PJ4B_CLOBBER);
  		break;
  #endif
  	case 4:
 -		asm volatile("@	__xchg4\n"
 -		"1:	ldrex	%0, [%3]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@	__xchg4\n"
-+		"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
++		asm volatile("@	__xchg4\n"
++		"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
  		"	strex	%1, %2, [%3]\n"
  		"	teq	%1, #0\n"
  		"	bne	1b"
  			: "=&r" (ret), "=&r" (tmp)
  			: "r" (x), "r" (ptr)
 -			: "memory", "cc");
-+			: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
++			: "memory", "cc" __PJ4B_CLOBBER);
  		break;
  #elif defined(swp_is_buggy)
  #ifdef CONFIG_SMP
@@ -340,30 +340,30 @@ Test options for the DP200 nandboot hangs, off by default
  		do {
 -			asm volatile("@ __cmpxchg1\n"
 -			"	ldrexb	%1, [%2]\n"
-+			{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@ __cmpxchg1\n"
-+			"	" __PJ4B_LDREX("ldrexb	%1, [%2]") "ldrexb	%1, [%2]\n"
++			asm volatile("@ __cmpxchg1\n"
++			"	" __PJ4B_LDREX_IRQ("ldrexb	%1, [%2]") "ldrexb	%1, [%2]\n"
  			"	mov	%0, #0\n"
  			"	teq	%1, %3\n"
  			"	strexbeq %0, %4, [%2]\n"
  				: "=&r" (res), "=&r" (oldval)
  				: "r" (ptr), "Ir" (old), "r" (new)
 -				: "memory", "cc");
-+				: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
++				: "memory", "cc" __PJ4B_CLOBBER);
  		} while (res);
  		break;
  	case 2:
  		do {
 -			asm volatile("@ __cmpxchg1\n"
 -			"	ldrexh	%1, [%2]\n"
-+			{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@ __cmpxchg1\n"
-+			"	" __PJ4B_LDREX("ldrexh	%1, [%2]") "ldrexh	%1, [%2]\n"
++			asm volatile("@ __cmpxchg1\n"
++			"	" __PJ4B_LDREX_IRQ("ldrexh	%1, [%2]") "ldrexh	%1, [%2]\n"
  			"	mov	%0, #0\n"
  			"	teq	%1, %3\n"
  			"	strexheq %0, %4, [%2]\n"
  				: "=&r" (res), "=&r" (oldval)
  				: "r" (ptr), "Ir" (old), "r" (new)
 -				: "memory", "cc");
-+				: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
++				: "memory", "cc" __PJ4B_CLOBBER);
  		} while (res);
  		break;
  #endif
@@ -371,15 +371,15 @@ Test options for the DP200 nandboot hangs, off by default
  		do {
 -			asm volatile("@ __cmpxchg4\n"
 -			"	ldrex	%1, [%2]\n"
-+			{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); asm volatile("@ __cmpxchg4\n"
-+			"	" __PJ4B_LDREX("ldrex	%1, [%2]") "ldrex	%1, [%2]\n"
++			asm volatile("@ __cmpxchg4\n"
++			"	" __PJ4B_LDREX_IRQ("ldrex	%1, [%2]") "ldrex	%1, [%2]\n"
  			"	mov	%0, #0\n"
  			"	teq	%1, %3\n"
  			"	strexeq %0, %4, [%2]\n"
  				: "=&r" (res), "=&r" (oldval)
  				: "r" (ptr), "Ir" (old), "r" (new)
 -				: "memory", "cc");
-+				: "memory", "cc"); pj4b_6011_restore(__pj4b_f); }
++				: "memory", "cc" __PJ4B_CLOBBER);
  		} while (res);
  		break;
  	default:
@@ -389,8 +389,8 @@ Test options for the DP200 nandboot hangs, off by default
  
 -	__asm__ __volatile__(
 -"1:	ldrexd		%1, %H1, [%3]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
-+"1:	" __PJ4B_LDREX("ldrexd		%1, %H1, [%3]") "ldrexd		%1, %H1, [%3]\n"
++	__asm__ __volatile__(
++"1:	" __PJ4B_LDREX_IRQ("ldrexd		%1, %H1, [%3]") "ldrexd		%1, %H1, [%3]\n"
  "	teq		%1, %4\n"
  "	teqeq		%H1, %H4\n"
  "	bne		2f\n"
@@ -399,7 +399,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (res), "=&r" (oldval), "+Qo" (*ptr)
  	: "r" (ptr), "r" (old), "r" (new)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	return oldval;
  }
@@ -419,8 +419,8 @@ Test options for the DP200 nandboot hangs, off by default
  	prefetchw(&lock->slock);
 -	__asm__ __volatile__(
 -"1:	ldrex	%0, [%3]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
++	__asm__ __volatile__(
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
  "	add	%1, %0, %4\n"
  "	strex	%2, %1, [%3]\n"
  "	teq	%2, #0\n"
@@ -428,7 +428,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (lockval), "=&r" (newval), "=&r" (tmp)
  	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	while (lockval.tickets.next != lockval.tickets.owner) {
  		wfe();
@@ -438,8 +438,8 @@ Test options for the DP200 nandboot hangs, off by default
  	do {
 -		__asm__ __volatile__(
 -		"	ldrex	%0, [%3]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
-+		"	" __PJ4B_LDREX("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
++		__asm__ __volatile__(
++		"	" __PJ4B_LDREX_IRQ("ldrex	%0, [%3]") "ldrex	%0, [%3]\n"
  		"	mov	%2, #0\n"
  		"	subs	%1, %0, %0, ror #16\n"
  		"	addeq	%0, %0, %4\n"
@@ -447,7 +447,7 @@ Test options for the DP200 nandboot hangs, off by default
  		: "=&r" (slock), "=&r" (contended), "=&r" (res)
  		: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
 -		: "cc");
-+		: "cc"); pj4b_6011_restore(__pj4b_f); }
++		: "cc" __PJ4B_CLOBBER);
  	} while (res);
  
  	if (!contended) {
@@ -457,8 +457,8 @@ Test options for the DP200 nandboot hangs, off by default
  	prefetchw(&rw->lock);
 -	__asm__ __volatile__(
 -"1:	ldrex	%0, [%1]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%1]") "ldrex	%0, [%1]\n"
++	__asm__ __volatile__(
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%1]") "ldrex	%0, [%1]\n"
  "	teq	%0, #0\n"
  	WFE("ne")
  "	strexeq	%0, %2, [%1]\n"
@@ -467,7 +467,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (tmp)
  	: "r" (&rw->lock), "r" (0x80000000)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	smp_mb();
  }
@@ -477,15 +477,15 @@ Test options for the DP200 nandboot hangs, off by default
  	do {
 -		__asm__ __volatile__(
 -		"	ldrex	%0, [%2]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
-+		"	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
++		__asm__ __volatile__(
++		"	" __PJ4B_LDREX_IRQ("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
  		"	mov	%1, #0\n"
  		"	teq	%0, #0\n"
  		"	strexeq	%1, %3, [%2]"
  		: "=&r" (contended), "=&r" (res)
  		: "r" (&rw->lock), "r" (0x80000000)
 -		: "cc");
-+		: "cc"); pj4b_6011_restore(__pj4b_f); }
++		: "cc" __PJ4B_CLOBBER);
  	} while (res);
  
  	if (!contended) {
@@ -494,10 +494,10 @@ Test options for the DP200 nandboot hangs, off by default
  
  	prefetchw(&rw->lock);
 -	__asm__ __volatile__(
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
++	__asm__ __volatile__(
  "	.syntax unified\n"
 -"1:	ldrex	%0, [%2]\n"
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
  "	adds	%0, %0, #1\n"
  "	strexpl	%1, %0, [%2]\n"
  	WFE("mi")
@@ -506,7 +506,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (tmp), "=&r" (tmp2)
  	: "r" (&rw->lock)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	smp_mb();
  }
@@ -516,8 +516,8 @@ Test options for the DP200 nandboot hangs, off by default
  	prefetchw(&rw->lock);
 -	__asm__ __volatile__(
 -"1:	ldrex	%0, [%2]\n"
-+	{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
-+"1:	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
++	__asm__ __volatile__(
++"1:	" __PJ4B_LDREX_IRQ("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
  "	sub	%0, %0, #1\n"
  "	strex	%1, %0, [%2]\n"
  "	teq	%1, #0\n"
@@ -525,7 +525,7 @@ Test options for the DP200 nandboot hangs, off by default
  	: "=&r" (tmp), "=&r" (tmp2)
  	: "r" (&rw->lock)
 -	: "cc");
-+	: "cc"); pj4b_6011_restore(__pj4b_f); }
++	: "cc" __PJ4B_CLOBBER);
  
  	if (tmp == 0)
  		dsb_sev();
@@ -535,15 +535,15 @@ Test options for the DP200 nandboot hangs, off by default
  	do {
 -		__asm__ __volatile__(
 -		"	ldrex	%0, [%2]\n"
-+		{ unsigned long __pj4b_f; pj4b_6011_save(__pj4b_f); __asm__ __volatile__(
-+		"	" __PJ4B_LDREX("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
++		__asm__ __volatile__(
++		"	" __PJ4B_LDREX_IRQ("ldrex	%0, [%2]") "ldrex	%0, [%2]\n"
  		"	mov	%1, #0\n"
  		"	adds	%0, %0, #1\n"
  		"	strexpl	%1, %0, [%2]"
  		: "=&r" (contended), "=&r" (res)
  		: "r" (&rw->lock)
 -		: "cc");
-+		: "cc"); pj4b_6011_restore(__pj4b_f); }
++		: "cc" __PJ4B_CLOBBER);
  	} while (res);
  
  	/* If the lock is negative, then it is already held for write. */
