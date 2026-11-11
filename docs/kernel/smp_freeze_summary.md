@@ -67,6 +67,11 @@ This summary is for resuming after the weekly usage reset (2026-11-13 19:00 UTC)
 - **Real-world (about 20 min, NAND root):** nandwdt `cf897cd804ba26e9857d242ec6ea8808` (modules d7bd2ee2), RAM-booted from the card gap.
 - **Workaround:** `maxcpus=1` (default now).
 
+## Candidate 3 result (11-11)
+
+All barriers as `dsb sy` (plus the 6011 window and clrex): nanddsb passed
+the 2 h NAND-root soak on two CPUs, the first ever. A 10 h soak follows.
+
 ## Next, after the reset
 
 1. **Rerun nandpcs from the card gap on the NAND root, 2 h.** Does its long clean run repeat? If it does, compare its mtd0 boot path.
