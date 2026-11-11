@@ -636,6 +636,12 @@ still require the owner's explicit OK.
         is in /var/backups/mods-default1cpu-6f1002ef.tar.
       - Side data: nandwdt ran 25.6 h idle on two CPUs from the card root
         without freezing.
+      **Candidate 2 (b64dcec, local only):** candidate 1 plus clrex on
+      exception return (the vendor uses clrex; mainline uses a dummy strex).
+      nandclrex froze on the NAND root at about 30 min (11-11). Not the fix.
+      Zero "refused NDCB" lines in 62 captures, so the write guard never
+      blocked anything. Next per smp-fable: drop pldw before exclusives
+      (418 in our kernel, none in the vendor's).
       Weekly usage went over 90%: testing is on hold until the 11-13 reset.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
