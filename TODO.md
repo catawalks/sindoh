@@ -624,6 +624,18 @@ still require the owner's explicit OK.
       reruns wait (the card gap may hold a partial nandpcs write; a RAM boot
       checks the CRC first).
       **Full status write-up: docs/kernel/smp_freeze_summary.md** (11-09).
+      **11-10/11, Fable session on LenovoLinux (smp-fable), candidate 1
+      (adbdbac, local only):** port the vendor's erratum-6011 workaround
+      more faithfully, so IRQs are masked only across the five LDREXes and
+      not the whole retry loop.
+      - nand6011ps (fast reproducer, card root): 55 min clean.
+      - nand6011 (plain, NAND root): froze at about 2 min (old modules) and
+        about 3.5 min (patched modules).
+      - So it doesn't fix the NAND-root freeze. The fast-reproducer pass may
+        be luck. The patched modules are now on the NAND root; the old set
+        is in /var/backups/mods-default1cpu-6f1002ef.tar.
+      - Side data: nandwdt ran 25.6 h idle on two CPUs from the card root
+        without freezing.
       Weekly usage went over 90%: testing is on hold until the 11-13 reset.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
