@@ -643,6 +643,16 @@ still require the owner's explicit OK.
       blocked anything. Next per smp-fable: drop pldw before exclusives
       (418 in our kernel, none in the vendor's).
       Weekly usage went over 90%: testing is on hold until the 11-13 reset.
+      **Candidate 3 (2e8ee1c, local only): first NAND-root pass.** Candidates
+      1+2 plus every dmb/dsb turned into `dsb sy` like the vendor's 3.2
+      (patch 0025, CONFIG_PJ4B_MV61X0_DSB_BARRIERS). nanddsb (a4e0cb33,
+      modules 82cfeff0) ran the 2 h soak on two CPUs, NAND root, 11-11:
+      120/120 probes alive, IRQSOAK DONE 36 passes, longest ping gap 6 s.
+      Every earlier NAND-root run froze within ~30 min. A 10 h soak on the
+      same boot started at 09:40. If it holds: build C3 as the normal
+      kernel and replace maxcpus=1 in mtd0 (needs the owner's OK).
+      Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
+      did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
       (iw not installed): power save was ON, with drops every ~100 s
       (reason 6). iw 6.9-1 (Debian trixie armel, sha256 12112fa6) installed
