@@ -1,0 +1,69 @@
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Subject: [PATCH] ARM: PJ4B 88PA61x0: dsb sy for every data barrier
+
+The Marvell 3.2 vendor kernel of the 88PA6170 contains no dmb and no
+barrier with an option: 4155 "dsb sy" and nothing else, where stock 3.2
+has dmb in smp_mb(), the atomics, the locks and the kuser helpers. Mainline
+6.18 uses dmb ish/ishst and dsb ish/ishst/st throughout. Marvell changed
+this on purpose, so the PJ4B-MP of this SoC most likely needs it.
+
+CONFIG_PJ4B_MV61X0_DSB_BARRIERS turns every dmb and dsb, in C and in
+assembly, into "dsb sy" (docs/kernel/smp_freeze_summary.md).
+---
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -403,6 +403,16 @@
+ 	  get the five loads only. Test option
+ 	  (docs/kernel/nandboot_hang_analysis.md).
+ 
++config PJ4B_MV61X0_DSB_BARRIERS
++	bool "88PA61x0 PJ4B-MP: dsb sy for every data barrier"
++	depends on CPU_PJ4B && ARCH_MV61X0 && !THUMB2_KERNEL
++	help
++	  The Marvell 3.2 vendor kernel of the 88PA6170 has no dmb at all
++	  and no barrier with an option: smp_mb() and every other data
++	  barrier is "dsb sy". Mainline uses dmb ish/ishst and dsb
++	  ish/ishst/st. With this option every dmb and dsb in C and in
++	  assembly becomes "dsb sy" (docs/kernel/smp_freeze_summary.md).
++
+ # ARMv6
+ config CPU_V6
+ 	bool
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -17,8 +17,14 @@
+ 
+ #if __LINUX_ARM_ARCH__ >= 7
+ #define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
++#ifdef CONFIG_PJ4B_MV61X0_DSB_BARRIERS
++/* 88PA61x0 PJ4B-MP: only "dsb sy", as in the vendor 3.2 kernel */
++#define dsb(option) __asm__ __volatile__ ("dsb sy" : : : "memory")
++#define dmb(option) __asm__ __volatile__ ("dsb sy" : : : "memory")
++#else
+ #define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
+ #define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
++#endif
+ #ifdef CONFIG_THUMB2_KERNEL
+ #define CSDB	".inst.w 0xf3af8014"
+ #else
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -122,6 +122,18 @@
+ 	.endm
+ #endif
+ 
++#if defined(CONFIG_PJ4B_MV61X0_DSB_BARRIERS) && !defined(CONFIG_THUMB2_KERNEL)
++	@ 88PA61x0 PJ4B-MP: every data barrier is "dsb sy", as in the
++	@ vendor 3.2 kernel (no dmb, no barrier options)
++	.macro	dsb, args:vararg
++	.inst	0xf57ff04f			@ dsb sy
++	.endm
++
++	.macro	dmb, args:vararg
++	.inst	0xf57ff04f			@ dsb sy
++	.endm
++#endif
++
+ 	.macro asm_trace_hardirqs_off, save=1
+ #if defined(CONFIG_TRACE_IRQFLAGS)
+ 	.if \save
