@@ -752,6 +752,16 @@ still require the owner's explicit OK.
       pings to the router every minute, a 2.8 MB download over mlan0 every
       5 min, a full root read every 10 min. Watchers: serial probe, pings to
       eth0 (.147) and mlan0 (.21), dmesg + heartbeat over TCP.
+      **Result: PASS.** `SOAK DONE after 513 cycles` at 21794 s uptime, no
+      reboot, no NO PROMPT, hang_wdt never fired, no oops/timeout/UBI/ECC
+      lines. Downloads 103/103 (HTTP 200, full 2813892 bytes, 4.5-7.6 s);
+      root reads 52/52. mlan0 stayed associated (no disconnect after the
+      boot-time roam at 112 s). Router pings: 9927/10260 (3.2 % loss), loss
+      falling from 5.0 % in hour 1 to 1.5 % in hour 6; 3 single checks lost
+      all 20 (7171, 14078, 17740 s), each fine on the next check. PC pings:
+      eth0 21500 ok / 46 lost, mlan0 21482 ok / 64 lost, both peaking in the
+      04:00 hour together, so mostly the LAN, not the 8782.
+      Logs: notes folder wifi0028_soak6h/.
       **Morning list (owner):** part D (3 power cycles); upstream/0002
       sign-off (Signed-off-by, Fixes:) when the wifi session's write-up is
       ready.
