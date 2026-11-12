@@ -4,6 +4,7 @@ status (no Moonraker, nothing sent: post() and get() are stubbed):
   2  a LOAD that stops: the error page with UNLOAD / TRY AGAIN
   3  EMPTY BIN -> the empty-the-bin page -> DONE (BIN_EMPTIED)
   5  custom macro buttons (home -> MACROS, a JSON file)
+  6  a print that is starting (bed question, PRINT_START): not "paused"
 Runs anywhere with Pillow:  python3 test_dp200_print_notes.py
     python3 test_dp200_print_notes.py --demo DIR   also saves the pages as PNGs"""
 import io, json, os, sys, tempfile, time, urllib.error
@@ -254,9 +255,56 @@ open(S.MACROS_FILE, 'w').write('not json')
 tap('BACK') if 'BACK' in labels else None
 ui.screen = 'home'; tap('MACROS'); check('not JSON: error shown', ui.mac['error'] is not None)
 
+# ---- 6: a print that is starting (Klipper: paused) ---------------------------
+def starting(pending='', start=0, **kw):
+    st = status('paused', **kw)
+    st['gcode_macro PRINT_START'] = {'pending': pending, 'starting': start}
+    return st
+
+ui.screen, ui.confirm, ui.last_pstate = 'home', None, 'standby'
+ui.st = starting(pending='BED=60 EXTRUDER=210 MESH=4', homed='')
+ui.st['gcode_macro BED_CLEAR'] = {'ok': 0, 'asking': 1}
+ui.bed_answered = 0.0
+render('6_bed_question')
+check('bed question: the print page, not home', ui.screen == 'print')
+check('  the bed dialog is up', ui.confirm is not None and 'EMPTY' in ui.confirm[0])
+check('  no PRINT PAUSED banner, no RESUME', 'RESUME' not in labels and 'JOB' not in labels)
+tap('YES')
+check('YES sends BED_CLEAR', sent[-1] == ('/printer/gcode/script', 'BED_CLEAR'))
+check('  without holding the busy slot (the start takes ~7 min)', ui.busy is None)
+ui.st = starting(start=1, homed='')
+ui.st['extruder'] = {'temperature': 60.0, 'target': 150.0}
+ui.st['heater_bed'] = {'temperature': 30.0, 'target': 60.0}
+render('6_starting_home')
+check('starting: "Starting print", step Homing', S.start_phase(ui.st) == 'home')
+check('  only CANCEL and LAMP', [k for k in labels if k] == ['CANCEL', 'LAMP'])
+check('  no HOME button', '' not in labels)
+ui.st['toolhead'] = dict(ui.st['toolhead'], homed_axes='xyz')
+check('homed, bed cold: Heating the bed', S.start_phase(ui.st) == 'bed')
+ui.st['heater_bed'] = {'temperature': 59.6, 'target': 60.0}
+render('6_starting_mesh')
+check('bed hot, nozzle at 150: Probing', S.start_phase(ui.st) == 'mesh')
+ui.st['extruder'] = {'temperature': 170.0, 'target': 215.0}
+check('nozzle heating to print temp: Heating the nozzle', S.start_phase(ui.st) == 'nozzle')
+ui.st['extruder'] = {'temperature': 214.0, 'target': 215.0}
+check('nozzle hot: Purging', S.start_phase(ui.st) == 'purge')
+ui.screen = 'home'; render()
+check('starting: home goes to the print page', ui.screen == 'print')
+n = len(sent); tap('CANCEL'); check('CANCEL asks first', ui.confirm is not None and len(sent) == n)
+tap('YES'); check('  YES sends CANCEL_PRINT', sent[-1] == ('/printer/gcode/script', 'CANCEL_PRINT'))
+n = len(sent); ui.run(('confirm', 'x', ('gcode', 'BED_CLEAR\nG28', 'Home all')))
+check('starting: homing refused', ui.confirm is None and len(sent) == n)
+ui.screen = 'bedlevel'; render(); check('starting: no pause pages (back to print)', ui.screen == 'print')
+ui.st = status('printing'); render()
+check('start done -> printing: normal print page', 'PAUSE' in labels)
+ui.st = status('paused'); render()
+check('a real pause: RESUME and HOME again', 'RESUME' in labels and '' in labels)
+
 # ---- STOP is on every new page ----------------------------------------------
-for page in ('fil_error', 'bin', 'macros', 'macros_edit'):
+for page in ('fil_error', 'bin', 'macros', 'macros_edit', 'print'):
     ui.screen, ui.confirm = page, None
+    if page == 'print':
+        ui.st = starting(start=1)
     ui.render()
     check('STOP on %s' % page, any(a == ('estop',) for _, a in ui.buttons))
 print('FAILURES: %d' % fails)

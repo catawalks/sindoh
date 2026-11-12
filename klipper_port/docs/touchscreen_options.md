@@ -193,6 +193,17 @@ macro side is `dp200_macros.cfg`). Offline test:
 `install/display/test_dp200_print_notes.py` (runs anywhere with Pillow,
 made-up status; `--demo DIR` saves the pages as PNGs).
 
+**Starting print.** PRINT_START pauses the job while its bed question is
+open (`pending`) and while the start runs after YES (`starting`; heat,
+home, mesh, purge, ~7 min). The screen does not call that paused: the
+print page shows "Starting print" with the steps (the current one is
+guessed from the homing, targets and temperatures, in the order
+`_PRINT_START_BODY` runs them: M104 S150 marks the probing part) and the
+temperatures, with only CANCEL (asks; Klipper runs it once the start
+finishes - hold STOP to stop at once) and LAMP. No HOME, RESUME or paused
+actions. The bed-question YES is sent without holding the screen's busy
+slot, because Klipper only answers once the whole start is done.
+
 **Paused print.** While printing, the print page is shown (as before), and
 a print that starts or resumes leaves any page that could move or heat.
 While paused, the print page has the HOME button and its RESUME asks first

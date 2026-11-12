@@ -21,6 +21,10 @@ the work; it is how open items survive between sessions.
    page (UNLOAD / TRY AGAIN), EMPTY BIN -> empty-the-bin page -> DONE, purge
    count, MACROS on home (dp200_screen_macros.json; also while paused, owner
    11-12), both RESUME buttons ask. (4) needed no UI change.
+   Later 11-12: a starting print (PRINT_START pending/starting, Klipper says
+   paused) shows "Starting print" with its step (homing / heating / probing
+   / purging, guessed from homing and temperatures) and only CANCEL + LAMP;
+   the bed-question YES no longer holds the screen busy for the ~7 min start.
    **Not on a printer yet; deploy only together with the macro change below.**
    On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and

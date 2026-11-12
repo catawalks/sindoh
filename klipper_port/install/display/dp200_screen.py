@@ -123,7 +123,7 @@ OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extru
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
            'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
            'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR', 'manual_probe',
-           'exclude_object', 'save_variables')
+           'exclude_object', 'save_variables', 'gcode_macro PRINT_START')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -638,6 +638,16 @@ class UI:
                 self.bed_answered = time.time()
             label = action[2] if len(action) > 2 else action[1]
             after = action[3] if len(action) > 3 else None
+            if after == 'detach':
+                # the bed answer runs a whole print start (~7 min) before it
+                # returns: don't hold the busy slot (CANCEL must stay usable)
+                def work():
+                    try:
+                        post('/printer/gcode/script', {'script': action[1]})
+                    except Exception as e:
+                        self.flash('%s failed: %s' % (label, fail_text(e)))
+                threading.Thread(target=work, daemon=True).start()
+                return
             self._bg(label, lambda: self.gcode_then(action[1], label, after))
         elif kind == 'post':
             self._bg(action[2], lambda: post(action[1]))
@@ -757,7 +767,7 @@ class UI:
             self.confirm = None
             self.screen = 'fil_error'
             return
-        paused = ((self.st or {}).get('print_stats') or {}).get('state') == 'paused'
+        paused = job_state(self.st) == 'paused'
         if after == 'fil':
             if self.screen == 'fil_error':             # TRY AGAIN / UNLOAD worked
                 self.screen = 'filament'
@@ -1543,14 +1553,15 @@ class UI:
         if state != 'ready':
             self.page_error(d, st)
         else:
-            pstate = st['print_stats']['state']
-            # Printing: the print page (home shows it). A print that starts or
+            js = job_state(st)
+            pstate = 'printing' if js == 'starting' else js
+            # Printing (and starting: the bed question or PRINT_START): the print page (home shows it). A print that starts or
             # resumes also leaves any page that could move or heat. Paused:
             # free to go (load filament, empty the bin), with the job on the
             # home page and nothing that homes (paused_refusal, page_move).
             started = pstate == 'printing' and self.last_pstate != 'printing'
             if pstate == 'printing' and (self.screen == 'home' or (
-                    started and self.screen not in self.IN_PRINT_OK)):
+                    (started or js == 'starting') and self.screen not in self.IN_PRINT_OK)):
                 if self.screen != 'home':
                     self.confirm = None                # e.g. a LOAD question from the pause
                 self.screen = 'print'
@@ -1567,7 +1578,7 @@ class UI:
             if asking and not self.confirm and settled:
                 self.confirm = ('Is the bed EMPTY? Homing raises it to the top and crushes '
                                 'anything on it.',
-                                ('gcode', 'BED_CLEAR', 'Bed empty'),
+                                ('gcode', 'BED_CLEAR', 'Bed empty', 'detach'),
                                 ('gcode', 'BED_CLEAR CANCEL=1', 'Homing cancelled'))
             elif (not asking and settled and self.confirm
                     and self.confirm[1][:2] == ('gcode', 'BED_CLEAR')):
@@ -1599,8 +1610,7 @@ class UI:
         d.text((200, 102), '%.0f/%.0f°' % (b['temperature'], b['target']), font=font(32), fill=C_BED)
         # HOME: straight back to the home page from anywhere in the menus
         # (from the print page only while paused: a print shows that page)
-        if self.screen != 'home' and (self.screen != 'print'
-                                      or st['print_stats']['state'] == 'paused'):
+        if self.screen != 'home' and (self.screen != 'print' or job_state(st) == 'paused'):
             box = (394, 72, PW - 12, 146)
             self.button(d, box, '', ('go_home',), C_BTN, 20)
             dy = 2 if self.pressed(box) else 0
@@ -1682,7 +1692,7 @@ class UI:
     # ---- pages -----------------------------------------------------------
     def page_home(self, d, st):
         ps = st['print_stats']
-        paused = ps['state'] == 'paused'
+        paused = job_state(st) == 'paused'
         top = 236
         if paused:
             # a paused print (runout, PAUSE): the job stays one tap away
@@ -1728,6 +1738,8 @@ class UI:
             d.text((20, 196), 'Purge bin full (%d): MOVE -> EMPTY BIN' % n, font=font(20), fill=C_WARN)
 
     def page_print(self, d, st):
+        if job_state(st) == 'starting':
+            return self.page_starting(d, st)
         ps, vs = st['print_stats'], st.get('virtual_sdcard', {})
         prog = st.get('display_status', {}).get('progress') or vs.get('progress', 0.0)
         name = ps.get('filename') or '?'
@@ -1755,6 +1767,33 @@ class UI:
             ('OBJECTS', ('screen', 'objects'), C_BTN, 30, 'skip one')
             if len(print_objects(st)) > 1 else None,
         ], top=320, rows_h=96)
+
+    def page_starting(self, d, st):
+        """The bed question and PRINT_START's start (heat, home, mesh, purge;
+        ~7 min). Klipper calls the job paused meanwhile, but there is
+        nothing to resume: only CANCEL (and LAMP)."""
+        ps = st['print_stats']
+        d.text((20, 160), (ps.get('filename') or '?')[:34], font=font(20), fill=C_DIM)
+        d.text((20, 188), 'Starting print', font=font(30), fill=C_TXT)
+        cur = start_phase(st)
+        e, b = st['extruder'], st['heater_bed']
+        for i, (key, text) in enumerate(START_STEPS):
+            y = 234 + i * 32
+            done = START_KEYS.index(cur) > i
+            now = key == cur
+            mark = 'OK' if done else '>' if now else ''
+            d.text((24, y), mark, font=font(20), fill=C_ON if done else C_WARN)
+            d.text((66, y), text, font=font(22 if now else 20),
+                   fill=C_WARN if now else C_DIM if done else C_TXT)
+        d.text((20, 438), 'Nozzle %.0f / %.0f°    Bed %.0f / %.0f°' % (
+            e['temperature'], e['target'], b['temperature'], b['target']), font=font(20), fill=C_TXT)
+        lamp = self.lamp_on(st)
+        self.grid(d, [
+            ('CANCEL', ('confirm', 'Cancel the print? Klipper finishes the current start first '
+                                   '(hold STOP to stop at once).',
+                        ('gcode', 'CANCEL_PRINT', 'Cancel')), C_RED),
+            ('LAMP', ('gcode', 'LAMP_TOGGLE', 'Lamp'), C_ON if lamp else C_BTN, 30, 'on' if lamp else 'off'),
+        ], top=490, rows_h=96)
 
     OBJ_PER_PAGE = 8
 
@@ -1867,7 +1906,7 @@ class UI:
             step = l[:1].isdigit()
             d.text((20, y), l, font=font(24 if step else 20), fill=C_TXT if step else C_DIM)
             y += 36
-        if st['print_stats']['state'] == 'paused':
+        if job_state(st) == 'paused':
             d.text((20, y + 4), 'RESUME moves the head and bed back.', font=font(20), fill=C_WARN)
         self.button(d, (30, 480, PW - 30, 580), 'DONE', ('gcode', 'BIN_EMPTIED', 'Bin emptied', 'bin_done'),
                     C_ON, 34, 'bin is empty and back in')
@@ -1885,7 +1924,7 @@ class UI:
             d.text((20, 330), 'Fix it in Mainsail (Machine tab).', font=font(18), fill=C_DIM)
             return
         btns = m['buttons']
-        paused = st['print_stats']['state'] == 'paused'
+        paused = job_state(st) == 'paused'
         if btns:
             d.text((20, 196), 'Paused: the part is still on the bed!' if paused else
                    'Each one asks first.', font=font(18), fill=C_WARN if paused else C_DIM)
@@ -1946,7 +1985,7 @@ class UI:
     def page_move(self, d, st):
         th = st['toolhead']
         homed = th.get('homed_axes', '')
-        paused = st['print_stats']['state'] == 'paused'
+        paused = job_state(st) == 'paused'
         d.text((20, 160), 'Move / maintenance', font=font(28), fill=C_TXT)
         if paused:
             # the part is still on the bed and RESUME needs the axes as they are
@@ -2557,6 +2596,39 @@ def bin_count(st):
 # While a print is paused the part is on the bed and RESUME needs the axes
 # as they are: nothing may home (Z homing raises the bed into the part),
 # probe, or turn the motors off.
+def job_state(st):
+    """print_stats.state, except 'starting' while PRINT_START is not done:
+    its bed question is open (pending) or its start runs (starting). The
+    job is paused in Klipper meanwhile, but RESUME refuses."""
+    ps = ((st or {}).get('print_stats') or {}).get('state')
+    if ps == 'paused':
+        pst = (st or {}).get('gcode_macro PRINT_START') or {}
+        if pst.get('pending') or pst.get('starting'):
+            return 'starting'
+    return ps
+
+# PRINT_START's steps (_PRINT_START_BODY, dp200_printer.cfg) as the
+# starting page lists them
+START_STEPS = (('ask', 'Bed empty? (question)'), ('home', 'Homing'),
+               ('bed', 'Heating the bed'), ('mesh', 'Probing the bed (mesh)'),
+               ('nozzle', 'Heating the nozzle'), ('purge', 'Purging and wiping'))
+START_KEYS = tuple(k for k, _ in START_STEPS)
+START_WARM = 150              # PRINT_START's nozzle target while probing (M104 S150)
+
+def start_phase(st):
+    """Which START_STEPS step runs, from what Klipper reports: there is no
+    step variable, so read the homing, the targets and the temperatures in
+    the order _PRINT_START_BODY works through them."""
+    if ((st.get('gcode_macro PRINT_START') or {}).get('pending')):
+        return 'ask'
+    e, b = st['extruder'], st['heater_bed']
+    if st['toolhead'].get('homed_axes', '') != 'xyz':
+        return 'home'
+    if e['target'] <= START_WARM:
+        # after G28: M190 waits for the bed, then the mesh (nozzle at 150)
+        return 'bed' if b['target'] and b['temperature'] < b['target'] - 1 else 'mesh'
+    return 'nozzle' if e['temperature'] < e['target'] - 3 else 'purge'
+
 PAUSE_REFUSED = ('G28', 'M84', 'M18', 'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCURACY',
                  'LV_PROBE_CALIBRATE', 'Z_ENDSTOP_CALIBRATE', 'FILAMENT_DRY', 'SHAPER_CALIBRATE',
                  'PID_CALIBRATE', 'BED_CLEAR')
@@ -2564,7 +2636,7 @@ PAUSE_REFUSED = ('G28', 'M84', 'M18', 'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCU
 def paused_refusal(act, st):
     """Why `act` (a confirm's YES) must not run while the print is paused,
     or None. Custom macros: unknown, so never while paused."""
-    if ((st or {}).get('print_stats') or {}).get('state') != 'paused':
+    if job_state(st) not in ('paused', 'starting'):
         return None
     if act[0] in ('cal_start', 'bl_probe', 'pid_run'):
         return 'Not while a print is paused'
@@ -2652,7 +2724,8 @@ def view_key(ui):
             bin_count(st), int((st['toolhead'].get('position') or [0, 0, 0])[2]) >= LOWER_BED_Z,
             tuple(b['gcode'] for b in ui.mac['buttons']), ui.mac['error'], ui.mac['page'],
             ui.mac['edit_page'], None if ui.mac['all'] is None else len(ui.mac['all']),
-            ui.fil_fail and ui.fil_fail['msg'])
+            ui.fil_fail and ui.fil_fail['msg'], job_state(st),
+            start_phase(st) if job_state(st) == 'starting' else None)
 
 # ---------------------------------------------------------------------------
 def main():
