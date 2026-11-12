@@ -198,8 +198,8 @@ open (`pending`) and while the start runs after YES (`starting`; heat,
 home, mesh, purge, ~7 min). The screen does not call that paused: the
 print page shows "Starting print" with the steps (the current one is
 guessed from the homing, targets and temperatures, in the order
-`_PRINT_START_BODY` runs them: M104 S150 marks the probing part) and the
-temperatures, with only CANCEL (asks; Klipper runs it once the start
+`_PRINT_START_BODY` runs them: M104 S150 marks the probing part; the
+temperatures are in the header), with only CANCEL (asks; Klipper runs it once the start
 finishes - hold STOP to stop at once) and LAMP. No HOME, RESUME or paused
 actions. The bed-question YES is sent without holding the screen's busy
 slot, because Klipper only answers once the whole start is done.

@@ -1771,12 +1771,12 @@ class UI:
     def page_starting(self, d, st):
         """The bed question and PRINT_START's start (heat, home, mesh, purge;
         ~7 min). Klipper calls the job paused meanwhile, but there is
-        nothing to resume: only CANCEL (and LAMP)."""
+        nothing to resume: only CANCEL (and LAMP). The temperatures are in
+        the header."""
         ps = st['print_stats']
         d.text((20, 160), (ps.get('filename') or '?')[:34], font=font(20), fill=C_DIM)
         d.text((20, 188), 'Starting print', font=font(30), fill=C_TXT)
         cur = start_phase(st)
-        e, b = st['extruder'], st['heater_bed']
         for i, (key, text) in enumerate(START_STEPS):
             y = 234 + i * 32
             done = START_KEYS.index(cur) > i
@@ -1785,8 +1785,6 @@ class UI:
             d.text((24, y), mark, font=font(20), fill=C_ON if done else C_WARN)
             d.text((66, y), text, font=font(22 if now else 20),
                    fill=C_WARN if now else C_DIM if done else C_TXT)
-        d.text((20, 438), 'Nozzle %.0f / %.0f°    Bed %.0f / %.0f°' % (
-            e['temperature'], e['target'], b['temperature'], b['target']), font=font(20), fill=C_TXT)
         lamp = self.lamp_on(st)
         self.grid(d, [
             ('CANCEL', ('confirm', 'Cancel the print? Klipper finishes the current start first '
