@@ -9,6 +9,33 @@ the work; it is how open items survive between sessions.
 
 ## Next (user at a printer)
 
+00. **(11-12, owner's work-printer notes) Screen app and load/bin macros.**
+   The work printer runs the latest USB stick install; a test print is on.
+   UI side -> the screen-app session (install/display/): (1) reach HOME while
+   a print is paused or failed (dp200_screen.py forces the print page while
+   printing/paused); (3) EMPTY BIN button + BIN EMPTIED feedback;
+   (5) user-configurable page of custom macro buttons.
+   Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and
+   cfglint OK, **not yet run on a printer**):
+   - **Crash fix:** during a paused print LOAD/UNLOAD/CLEAN_NOZZLE moved to
+     Z10/Z23.1, i.e. raised the bed into any part taller than ~10 mm (PAUSE
+     leaves the bed 10 mm below the nozzle). Now `_SINDOH_SAFE_Z`: while
+     paused, Z never goes below the current Z. Needed before (1) ships.
+   - (2) LOAD jam check: after 130 mm of feed, M400 + filament_encoder
+     must still report motion after every chunk (Klipper tracks it while
+     the sensor is disabled); else clutch off, encoder on, nozzle back to
+     its old target, error.
+   - (4) LOAD/UNLOAD put the nozzle back to its target from before
+     (preheat stays on with the bed; nothing heating -> off).
+   - (3) `EMPTY_BIN`: home if needed (Z asks BED_CLEAR), bed down 70 mm
+     (clamped), carriage to X0 (X < -5.6 toggles the LV lever); refused
+     while printing, allowed when paused.
+   **Test with the owner (motion + heat):** EMPTY_BIN idle and paused; LOAD
+   normal; LOAD with the filament held back (must stop); LOAD during a
+   paused print taller than 10 mm (bed must not rise), then RESUME (check
+   the first lines: LOAD ends with a 15 mm retract and RESUME restores
+   only 1 mm, so expect a dry start - may need a prime on resume).
+   Also open: **move the prime lines** (owner at the printer).
 0. **(11-09, owner) UPC load into Mainsail's MCU panel: DONE on the test
    printer, not yet in the fork.**
    - **Done:** fm.bin 6cdaee5b and io.bin f0407060, built from fork 8d4fb4d
