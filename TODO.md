@@ -95,6 +95,17 @@ the work; it is how open items survive between sessions.
      pinmux of the smot pins under nandboot vs m1-full; a regsnap.sh of a
      working boot (stock app, or the 10-30 m1-full path) vs this one.
    - **Until it's found:** don't print on the dev printer.
+   - **CAUSE FOUND 2026-11-12 (owner at the printer):** GPIO bank 3
+     (0xf8043000) is left as U-Boot sets it on nandboot (dir 0x00010040,
+     selects 0x000C1000); stock is dir 0, selects 0x00001002 on pins 0-4,
+     6-22, 24-28 (eth-pinmux.sh steps 1-2 did this by accident on 10-30).
+     Found offline by the motor session. Test on C3 from mtd0: rc.dp200
+     stop, write the stock values by devmem (RAM only), rc.dp200 start,
+     SET_STEPPER_ENABLE X/Y: **both hold** (owner checked by hand), CFG
+     0xf815000c / 0xf815100c = 0x10. Then G28 X -> 216.0, G28 Y -> 5.5:
+     **both home.** Lost at reboot until the permanent fix: the mv61x0-upc
+     driver sets bank 3 at probe (after forcing the drivers off), then a
+     kernel rebuild, RAM boot, and mtd0 with the owner's OK.
 0b. **(11-09, owner) PRIME_LINE lies inside big prints.** The work printer's
    test print covered X 40-160 / Y 35 (klipper/config/dp200_printer.cfg
    PRIME_LINE). Move it out of the print area. Options: (a) place it from the
