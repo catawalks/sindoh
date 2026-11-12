@@ -719,6 +719,21 @@ still require the owner's explicit OK.
       0028 runs from RAM only; the NAND root still has the tar's 0013
       module. Left: install 0028 on the root (owner's OK), then warm-boot
       parts A/C/D; upstream/0002 to be updated by the wifi session.
+      **0028 installed on the NAND root (11-11, owner's OK)** over
+      /lib/modules/6.18.59/kernel/drivers/net/wireless/marvell/mwifiex/
+      mwifiex_usb.ko; the tar's module is kept beside it as
+      mwifiex_usb.ko.0013-tar (e05479d4; init's `find -name mwifiex_usb.ko`
+      doesn't match it). Roll back = copy it back.
+      **TESTPLAN part A (10 warm boots, busybox reboot, defaults): 10/10
+      PASS.** Every boot: 0028 loaded (usb8782_rmmod=2), boot-ROM first reply
+      (zeros), full 253996-byte download, INIT_DONE after 56 ms, host_mlme,
+      no timeout, no "already runs". Boots 4 and 8 were mid-roam at the
+      122 s check (AP drop reason 34 at ~112 s, back on the first BSSID at
+      127 s), not a driver fault. Logs: notes folder wifi0028_partA/.
+      upstream/0002 updated locally by the wifi session (detection dropped,
+      reset after FUNC_SHUTDOWN); not committed or sent.
+      Left: part C (insmod parameters in init.mainline, 15 boots, for the
+      upstream write-up) and part D (3 power cycles, owner at the printer).
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
