@@ -70,7 +70,23 @@ This summary is for resuming after the weekly usage reset (2026-11-13 19:00 UTC)
 ## Candidate 3 result (11-11)
 
 All barriers as `dsb sy` (plus the 6011 window and clrex): nanddsb passed
-the 2 h NAND-root soak on two CPUs, the first ever. A 10 h soak follows.
+the 2 h NAND-root soak on two CPUs, the first ever.
+
+**10 h soak: PASS (11-11).** The normal two-CPU build (`uname`: Linux
+6.18.59 #1 SMP, `nproc`=2, no `maxcpus=1`) ran a full 10 h IRQ soak on the
+NAND root:
+
+- `IRQSOAK DONE 172 passes`, kernel uptime monotonic 7714 s -> 43734 s
+  (~10.0 h), no reboot, no panic/U-Boot/stall marker on serial.
+- Serial liveness: 559 `alive`, **0 NO PROMPT** -- the console answered every
+  minute for the whole run.
+- Ping: 688 LOST / 35 156 (~2 %). The one long run (427 pings, 17:52-17:59)
+  overlaps serial that stayed `alive` throughout, so by the grading rule it
+  is a network blip, not a freeze. (.147 is the Ethernet IP.)
+
+This is the first clean 10 h two-CPU NAND-root soak. The SMP hard freeze is
+fixed by candidate 3 (`dsb sy` barriers + the 6011 window + clrex). The ~2 %
+link loss is a separate network-layer item, folded into the Wi-Fi work.
 
 ## Next, after the reset
 

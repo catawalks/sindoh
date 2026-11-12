@@ -648,9 +648,19 @@ still require the owner's explicit OK.
       (patch 0025, CONFIG_PJ4B_MV61X0_DSB_BARRIERS). nanddsb (a4e0cb33,
       modules 82cfeff0) ran the 2 h soak on two CPUs, NAND root, 11-11:
       120/120 probes alive, IRQSOAK DONE 36 passes, longest ping gap 6 s.
-      Every earlier NAND-root run froze within ~30 min. A 10 h soak on the
-      same boot started at 09:40. If it holds: build C3 as the normal
-      kernel and replace maxcpus=1 in mtd0 (needs the owner's OK).
+      Every earlier NAND-root run froze within ~30 min.
+      **10 h soak: PASS (11-11).** Same boot (6.18.59 SMP, nproc=2, no
+      maxcpus=1), NAND root: IRQSOAK DONE 172 passes, uptime monotonic
+      7714->43734 s (~10 h, no reboot), 559 probes alive / 0 NO PROMPT,
+      no panic/U-Boot marker. Ping 688 LOST / 35 156 (~2 %); the one long
+      run (7 min, 17:52-17:59) overlaps serial that stayed alive, so it is
+      a network/Ethernet blip, not a freeze. **The SMP hard freeze is fixed.**
+      Next, per the owner's standing OK (memory c3-mtd0-approval): run the
+      Wi-Fi driver tests on this live C3, then write C3 to mtd0 (replace the
+      maxcpus=1 default). Wi-Fi test harness + whether this build has the
+      reload patch 0026 are with the smp-fable build session; C3 is RAM/
+      card-gap booted (mtd0 still the one-CPU default), so warm-boot Wi-Fi
+      tests wait for the mtd0 write -- reload-without-reboot tests run now.
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
