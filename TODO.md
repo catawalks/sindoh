@@ -147,7 +147,19 @@ the work; it is how open items survive between sessions.
    "Starting print" checklist showed during the start; the owner found
    everything blocked that should be. Owner: quality "good enough", some
    straggler lines at the resume layer - check on real prints later.
-   Not run yet: the LOAD jam check (no grab / held filament).
+   **Jam check, no grab: PASS** (18:22, inlet empty): stopped after 160 mm
+   with the encoder error, nozzle back off. Normal LOAD from an unhomed
+   printer (homes X/Y only, no Z): **Load complete** (owner). Not run:
+   a filament held back mid-load.
+   Found + fixed 11-12: (a) a Klipper restart during the owner's work
+   (mine - check idle before any restart); (b) G28 Y failed from the Y 0
+   park position, the switch still pressed after the 5 mm retract ->
+   _SINDOH_HOME_Y moves off it first, as X (54a8e5b, deployed, not yet
+   exercised from Y 0); (c) LOAD/UNLOAD/CLEAN no longer home Z (4e85d0a).
+   Open (screen session): after a load error the screen kept the error
+   page through TRY AGAIN and stayed busy afterwards (MOTORS OFF did
+   nothing until the screen app was restarted); a homing failure must not
+   get the filament page with TRY AGAIN.
 
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
    Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH
