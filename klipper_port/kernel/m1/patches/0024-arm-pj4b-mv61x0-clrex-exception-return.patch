@@ -1,0 +1,39 @@
+From: catawalks <59056948+catawalks@users.noreply.github.com>
+Subject: [PATCH] ARM: PJ4B 88PA61x0: clrex on exception return, no dummy STREX
+
+Mainline clears the exclusive monitor on every exception return with a
+dummy STREX (Cortex-A15 erratum 830321 forbids clrex there). On the
+88PA6170's PJ4B-MP that is an exclusive store without the five loads of
+erratum 6011, run with the monitor still armed whenever an interrupt hit
+between a LDREX and its STREX. The Marvell 3.2 vendor kernel uses clrex in
+every one of these places (__irq_svc, __dabt_svc, __pabt_svc, __und_svc,
+ret_fast_syscall, no_work_pending). With CONFIG_PJ4B_ERRATA_6011, do the
+same (docs/kernel/smp_freeze_summary.md).
+---
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -222,7 +222,11 @@
+ #ifndef CONFIG_THUMB2_KERNEL
+ 	@ ARM mode SVC restore
+ 	msr	spsr_cxsf, \rpsr
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
++#if defined(CONFIG_PJ4B_ERRATA_6011)
++	@ 88PA61x0 PJ4B-MP: no STREX without its five LDREX; the vendor
++	@ 3.2 kernel clears the monitor with clrex here
++	clrex
++#elif defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
+ 	@ We must avoid clrex due to Cortex-A15 erratum #830321
+ 	sub	r0, sp, #4			@ uninhabited address
+ 	strex	r1, r2, [r0]			@ clear the exclusive monitor
+@@ -314,7 +318,10 @@
+ 	tst	r1, #PSR_I_BIT | 0x0f
+ 	bne	1f
+ 	msr	spsr_cxsf, r1			@ save in spsr_svc
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
++#if defined(CONFIG_PJ4B_ERRATA_6011)
++	@ 88PA61x0 PJ4B-MP: clrex, as the vendor 3.2 kernel (see above)
++	clrex
++#elif defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
+ 	@ We must avoid clrex due to Cortex-A15 erratum #830321
+ 	strex	r1, r2, [r2]			@ clear the exclusive monitor
+ #endif
