@@ -136,8 +136,14 @@ the work; it is how open items survive between sessions.
    square. Owner: "prime line and square came out great". Found: the
    screen says PRINT PAUSED during the start (the job is paused while the
    start runs) -> PRINT_START.starting (ad60eaa) + screen change pending.
-   Not run yet:
-   the screen app's new pages, EMPTY_BIN, the LOAD jam check.
+   **Pause test PASS 2026-11-12 18:04-18:11** (20 mm box, paused at Z ~4 from
+   the screen): UNLOAD (Z up to 23.1, nozzle back to 210), LOAD (**Z stayed
+   23.06** - the old macro went to Z 10), EMPTY_BIN (Z 93, X 0), BIN_EMPTIED,
+   RESUME (re-prime over the bin, back to Z 4.04, printed to the end). The
+   "Starting print" checklist showed during the start; the owner found
+   everything blocked that should be. Owner: quality "good enough", some
+   straggler lines at the resume layer - check on real prints later.
+   Not run yet: the LOAD jam check (no grab / held filament).
 
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
    Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH
