@@ -663,6 +663,24 @@ still require the owner's explicit OK.
       reload patch 0026 are with the smp-fable build session; C3 is RAM/
       card-gap booted (mtd0 still the one-CPU default), so warm-boot Wi-Fi
       tests wait for the mtd0 write -- reload-without-reboot tests run now.
+      **Wi-Fi reload test (patch 0026), 11-11: FAIL.** The 07:20 build has
+      no 0026; a separate mwifiex_usb-0026.ko (62d6966c, wifi_fw session)
+      was insmodded with smp-fable's wifi_reload.sh (TESTPLAN part B).
+      10 usb loops: 0/10 -- after the first rmmod the 8782's first read
+      times out (rx -110), the fallback download fails (tx -110). Step d
+      (usb8782_winner=1): 0/3 -- tx -110, "no boot ROM answer", then
+      Timeout cmd 0xa9. The chip stops answering on USB after rmmod; only a
+      reboot brings it back. Logs in the side-session notes folder
+      (wifi0026_reload_*). Handed to the wifi session as its own bug.
+      **C3 is in mtd0 (11-11, owner's OK, hang_wdt kept armed).**
+      tools/mtd0_kernel_update.sh: KUPDATE OK, mtd0 kernel area =
+      a4e0cb33 (m1-nandboot-nanddsb, the exact soaked binary), U-Boot block
+      unchanged, readback ok, ecc_failures 0. The maxcpus=1 default is gone
+      from mtd0. First boot (busybox reboot; the Debian root has no
+      /sbin/reboot): U-Boot NAND read 0x40000, 2 CPUs up, NAND root, Wi-Fi
+      reassociated with the tar's 0013 module (so the warm boot recovered the
+      chip). Modules on the NAND root: tar 82cfeff0. Left for smp-fable:
+      variants/nandboot.config still says maxcpus=1; Kconfig/doc updates.
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
