@@ -198,8 +198,8 @@ open (`pending`) and while the start runs after YES (`starting`; heat,
 home, mesh, purge, ~7 min). The screen does not call that paused: the
 print page shows "Starting print" with the steps (the current one is
 guessed from the homing, targets and temperatures, in the order
-`_PRINT_START_BODY` runs them: M104 S150 marks the probing part) and the
-temperatures, with only CANCEL (asks; Klipper runs it once the start
+`_PRINT_START_BODY` runs them: M104 S150 marks the probing part; the
+temperatures are in the header), with only CANCEL (asks; Klipper runs it once the start
 finishes - hold STOP to stop at once) and LAMP. No HOME, RESUME or paused
 actions. The bed-question YES is sent without holding the screen's busy
 slot, because Klipper only answers once the whole start is done.
@@ -225,6 +225,29 @@ part): deploy both together.
 a red page with the whole message and UNLOAD (asks) / TRY AGAIN (asks) /
 OK. A load that works says "Load PLA complete" (plus "RESUME when ready"
 while paused).
+
+**Homing before LOAD / UNLOAD / CLEAN.** These macros call
+`_SINDOH_ENSURE_HOMED_XY` (owner, 11-12): they home only a missing X or Y,
+never Z, and skip their Z move without Z homed. So the screen asks a plain
+question for them, without the bed-empty part (`HOMES_XY`). Commands
+that home everything (`_SINDOH_ENSURE_HOMED`, so LOWER BED; EMPTY_BIN,
+probing, the mesh, FILAMENT_DRY: `HOMES_FIRST`) still add the bed question
+and BED_CLEAR. During a paused print that lost its homing, both kinds are
+refused.
+
+**Long requests never leave the screen busy.** A G-code button waits for
+Moonraker's reply (LOAD: 1-3 min) and refuses other buttons meanwhile
+("Busy"). On 11-12 a LOAD stopped by the jam check but the screen never
+got the reply: no error page, and MOTORS OFF did nothing until the app
+was restarted. Now the busy state ends with the request whatever happens
+(reply, Klipper's error, timeout), and also when Klipper has been idle for
+5 s (`idle_timeout` not "Printing", which it is while a script holds the
+G-code lock, heat waits included) after the request has run 10 s. The
+outcome is then read from Moonraker's G-code log
+(`/server/gcode_store`): a `!! ...` error opens the LOAD error page (or a
+flash for other buttons), "Load complete" says complete, nothing says
+"ended (no reply)". A late reply is ignored. Each request's end is logged
+(`request 'Load PLA': ...`). STOP never waits for any of this.
 
 **Purge bin.** MOVE -> EMPTY BIN shows the purge count (`save_variables`
 `bin_count` / 15; amber when full, and the home page then says "Purge bin

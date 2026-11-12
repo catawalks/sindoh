@@ -25,6 +25,10 @@ the work; it is how open items survive between sessions.
    paused) shows "Starting print" with its step (homing / heating / probing
    / purging, guessed from homing and temperatures) and only CANCEL + LAMP;
    the bed-question YES no longer holds the screen busy for the ~7 min start.
+   Dev printer 11-12: a jam-stopped LOAD left the screen busy (no error page,
+   MOTORS OFF ignored). Fixed: busy always ends (reply / error / timeout, or
+   Klipper idle 5 s), outcome read from the G-code log. Root cause (why the
+   reply never came) not seen from the PC: check moonraker.log for that POST.
    **Not on a printer yet; deploy only together with the macro change below.**
    On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and
@@ -136,8 +140,26 @@ the work; it is how open items survive between sessions.
    square. Owner: "prime line and square came out great". Found: the
    screen says PRINT PAUSED during the start (the job is paused while the
    start runs) -> PRINT_START.starting (ad60eaa) + screen change pending.
-   Not run yet:
-   the screen app's new pages, EMPTY_BIN, the LOAD jam check.
+   **Pause test PASS 2026-11-12 18:04-18:11** (20 mm box, paused at Z ~4 from
+   the screen): UNLOAD (Z up to 23.1, nozzle back to 210), LOAD (**Z stayed
+   23.06** - the old macro went to Z 10), EMPTY_BIN (Z 93, X 0), BIN_EMPTIED,
+   RESUME (re-prime over the bin, back to Z 4.04, printed to the end). The
+   "Starting print" checklist showed during the start; the owner found
+   everything blocked that should be. Owner: quality "good enough", some
+   straggler lines at the resume layer - check on real prints later.
+   **Jam check, no grab: PASS** (18:22, inlet empty): stopped after 160 mm
+   with the encoder error, nozzle back off. Normal LOAD from an unhomed
+   printer (homes X/Y only, no Z): **Load complete** (owner). Not run:
+   a filament held back mid-load.
+   Found + fixed 11-12: (a) a Klipper restart during the owner's work
+   (mine - check idle before any restart); (b) G28 Y failed from the Y 0
+   park position, the switch still pressed after the 5 mm retract ->
+   _SINDOH_HOME_Y moves off it first, as X (54a8e5b, deployed, not yet
+   exercised from Y 0); (c) LOAD/UNLOAD/CLEAN no longer home Z (4e85d0a).
+   Open (screen session): after a load error the screen kept the error
+   page through TRY AGAIN and stayed busy afterwards (MOTORS OFF did
+   nothing until the screen app was restarted); a homing failure must not
+   get the filament page with TRY AGAIN.
 
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
    Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH

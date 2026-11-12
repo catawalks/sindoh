@@ -5,9 +5,11 @@ status (no Moonraker, nothing sent: post() and get() are stubbed):
   3  EMPTY BIN -> the empty-the-bin page -> DONE (BIN_EMPTIED)
   5  custom macro buttons (home -> MACROS, a JSON file)
   6  a print that is starting (bed question, PRINT_START): not "paused"
+  7  a long request that errors, times out or never answers: the screen
+     is never left busy (dev printer 11-12: LOAD stopped, screen stuck)
 Runs anywhere with Pillow:  python3 test_dp200_print_notes.py
     python3 test_dp200_print_notes.py --demo DIR   also saves the pages as PNGs"""
-import io, json, os, sys, tempfile, time, urllib.error
+import io, json, os, socket, sys, tempfile, threading, time, urllib.error
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -22,17 +24,30 @@ if not os.path.exists(S.FONT):            # a PC: any bold TrueType font for the
             break
 
 sent, refuse = [], {}
+slow = {'delay': 0.0, 'hang': None, 'timeout': False}   # how the next requests behave
 def post(path, body=None):
     script = (body or {}).get('script')
     sent.append((path, script))
+    gcode = path == '/printer/gcode/script'
+    if slow['delay'] and gcode:
+        time.sleep(slow['delay'])
+    if slow['hang'] is not None and gcode:   # no reply until the test lets it go
+        slow['hang'].wait()
+    if slow['timeout'] and gcode:
+        raise urllib.error.URLError(socket.timeout('timed out'))
     for word, msg in refuse.items():      # a G-code Klipper refuses: HTTP 400 + its message
         if script and word in script:
             raise urllib.error.HTTPError(S.API, 400, 'Bad Request', {},
                                          io.BytesIO(json.dumps({'error': {'message': msg}}).encode()))
     return {'result': 'ok'}
 S.post = post
-S.get = lambda path: {'objects': ['gcode_macro PRINT_START', 'gcode_macro _DP200', 'gcode_macro MY_PURGE',
-                                  'gcode_macro PARK_REAR', 'extruder', 'gcode_macro LAMP_TOGGLE']}
+gstore = []                               # Moonraker's G-code log: {'message', 'time'}
+def get(path):
+    if path.startswith('/server/gcode_store'):
+        return {'gcode_store': list(gstore)}
+    return {'objects': ['gcode_macro PRINT_START', 'gcode_macro _DP200', 'gcode_macro MY_PURGE',
+                        'gcode_macro PARK_REAR', 'extruder', 'gcode_macro LAMP_TOGGLE']}
+S.get = get
 T = tempfile.mkdtemp()
 S.MACROS_FILE = os.path.join(T, 'dp200_screen_macros.json')
 S.SETTINGS = os.path.join(T, 'screen_settings.json')
@@ -179,10 +194,18 @@ check('  ok this time: "complete", back to FILAMENT', ui.msg and 'Load complete'
 ui.screen = 'fil_error'; tap('OK'); check('OK -> filament page', ui.screen == 'filament')
 ui.st = status(homed='')
 ui.screen = 'fil_mat'; tap('PETG'); tap('YES')
-check('unhomed LOAD still sends BED_CLEAR first', sent[-1][1] == 'BED_CLEAR\nLOAD_FILAMENT TEMP=240')
+check('unhomed LOAD: no BED_CLEAR (homes X/Y only)', sent[-1][1] == 'LOAD_FILAMENT TEMP=240')
+ui.screen = 'move'; tap('CLEAN')
+check('unhomed CLEAN: plain confirm, no bed question', ui.confirm is not None and 'EMPTY' not in ui.confirm[0]
+      and ui.confirm[1][1] == 'CLEAN_NOZZLE')
+tap('NO')
+tap('LOWER BED')
+check('unhomed LOWER BED still asks about the bed', 'EMPTY?' in ui.confirm[0]
+      and ui.confirm[1][1].startswith('BED_CLEAR\n_SINDOH_ENSURE_HOMED'))
+tap('NO')
 refuse['UNLOAD_FILAMENT'] = 'Homing cancelled: the bed is not confirmed empty'
 ui.st = status()
-ui.fil['mode'] = 'unload'; tap('ABS'); tap('YES')
+ui.screen = 'fil_mat'; ui.fil['mode'] = 'unload'; tap('ABS'); tap('YES')
 render('2_unload_stopped')
 check('stopped UNLOAD -> error page, TRY AGAIN, no UNLOAD',
       ui.screen == 'fil_error' and 'TRY AGAIN' in labels and 'UNLOAD' not in labels)
@@ -299,6 +322,128 @@ ui.st = status('printing'); render()
 check('start done -> printing: normal print page', 'PAUSE' in labels)
 ui.st = status('paused'); render()
 check('a real pause: RESUME and HOME again', 'RESUME' in labels and '' in labels)
+
+# ---- 7: long requests: error, timeout, no reply -----------------------------
+JAM = ('LOAD_FILAMENT stopped: the filament encoder saw no movement (jam, or the feeder did not grab '
+       'the filament). Check the inlet, then UNLOAD and try again')
+S.BUSY_MIN, S.IDLE_RELEASE = 0.3, 0.3
+
+def load_pla():
+    ui.screen, ui.confirm, ui.fil_fail = 'fil_mat', None, None
+    ui.run(S.fil_confirm('load', 'PLA', 230))
+    ui.run(ui.confirm[1]); ui.confirm = None
+
+def until(cond, secs=3.0, tick=True):
+    t0 = time.time()
+    while time.time() - t0 < secs and not cond():
+        if tick:
+            ui.busy_tick()
+        time.sleep(0.02)
+    return cond()
+
+def motors_off_works():
+    n = len(sent)
+    ui.run(('gcode', 'M84', 'Motors off'))
+    return until(lambda: not ui.busy) and sent[n:] == [('/printer/gcode/script', 'M84')]
+
+ui.st = status()
+ui.st['idle_timeout'] = {'state': 'Printing'}
+# a: the request runs 1 s, then Klipper refuses it (HTTP 400)
+slow['delay'], refuse['LOAD_FILAMENT'] = 1.0, JAM
+load_pla()
+check('long LOAD: busy while it runs', ui.busy == 'Load PLA')
+n = len(sent); ui.run(('gcode', 'M84', 'Motors off'))
+check('  other buttons wait meanwhile ("Busy")', len(sent) == n and 'Busy' in ui.msg[0])
+check('  then the error page with the message', until(lambda: ui.screen == 'fil_error')
+      and ui.fil_fail['msg'] == JAM)
+check('  and busy is over', not ui.busy and ui.req is None)
+slow['delay'] = 0.0; del refuse['LOAD_FILAMENT']
+check('  MOTORS OFF works after it', motors_off_works())
+
+# b: no reply at all while Klipper is still working ("Printing"): stays busy
+slow['hang'] = threading.Event()
+load_pla()
+time.sleep(1.0)
+for _ in range(20):
+    ui.busy_tick(); time.sleep(0.02)
+check('no reply, Klipper still Printing: still busy', ui.busy == 'Load PLA')
+# ... Klipper idle again (the macro stopped, the reply was lost): released
+gstore[:] = [{'message': 'LOAD_FILAMENT MATERIAL=PLA', 'time': time.time() - 2},
+             {'message': '!! ' + JAM, 'time': time.time()}]
+ui.st['idle_timeout'] = {'state': 'Ready'}
+check('  Klipper idle a moment: busy released', until(lambda: not ui.busy, 2.0))
+check('  the error from the G-code log is shown', until(lambda: ui.screen == 'fil_error', tick=False)
+      and ui.fil_fail and ui.fil_fail['msg'] == JAM)
+check('  MOTORS OFF works', motors_off_works())
+fail_was = dict(ui.fil_fail)
+ui.msg = None
+slow['hang'].set(); slow['hang'] = None   # the old reply turns up after all
+time.sleep(0.3)
+check('  a late reply changes nothing', ui.fil_fail == fail_was and not (ui.msg and 'complete' in ui.msg[0]))
+
+# c: a lost reply, but LOAD finished fine ("Load complete" in the log)
+slow['hang'] = threading.Event()
+ui.st['idle_timeout'] = {'state': 'Printing'}
+load_pla()
+time.sleep(0.5)
+gstore[:] = [{'message': 'Load complete', 'time': time.time()}]
+ui.st['idle_timeout'] = {'state': 'Ready'}
+check('lost reply, load done: released', until(lambda: not ui.busy, 2.0))
+check('  says complete', until(lambda: bool(ui.msg and 'Load PLA complete' in ui.msg[0]), tick=False)
+      and ui.screen != 'fil_error')
+slow['hang'].set(); slow['hang'] = None
+
+# d: lost reply, nothing in the log either
+slow['hang'] = threading.Event()
+ui.st['idle_timeout'] = {'state': 'Printing'}
+load_pla()
+time.sleep(0.5)
+gstore[:] = []
+ui.st['idle_timeout'] = {'state': 'Ready'}
+check('lost reply, empty log: released', until(lambda: not ui.busy, 2.0))
+check('  says it ended without a reply', until(lambda: bool(ui.msg and 'no reply' in ui.msg[0]), tick=False))
+slow['hang'].set(); slow['hang'] = None
+
+# e: the request times out (socket timeout): Klipper's message from the log
+slow['delay'], slow['timeout'] = 0.5, True
+gstore[:] = []
+ui.st['idle_timeout'] = {'state': 'Printing'}
+def later():
+    time.sleep(0.2)
+    gstore.append({'message': '!! ' + JAM, 'time': time.time()})
+threading.Thread(target=later).start()
+load_pla()
+check('timeout: error page, Klipper\'s message', until(lambda: ui.screen == 'fil_error', tick=False)
+      and ui.fil_fail['msg'] == JAM and not ui.busy)
+gstore[:] = []
+load_pla()
+check('timeout, nothing logged: error page says timed out', until(lambda: ui.screen == 'fil_error', tick=False)
+      and 'timed out' in ui.fil_fail['msg'] and not ui.busy)
+slow['delay'], slow['timeout'] = 0.0, False
+check('  MOTORS OFF works', motors_off_works())
+
+# f: another request (not LOAD) whose reply is lost ends too, with its error
+slow['hang'] = threading.Event()
+ui.st['idle_timeout'] = {'state': 'Printing'}
+ui.screen = 'move'
+ui.run(('gcode', 'EMPTY_BIN', 'Empty bin', 'bin'))
+time.sleep(0.5)
+gstore[:] = [{'message': '!! EMPTY_BIN: pause the print first', 'time': time.time()}]
+ui.st['idle_timeout'] = {'state': 'Ready'}
+check('lost EMPTY_BIN reply: released, error flashed', until(lambda: not ui.busy, 2.0)
+      and until(lambda: bool(ui.msg and 'pause the print first' in ui.msg[0]), tick=False)
+      and ui.screen == 'move')
+slow['hang'].set(); slow['hang'] = None
+gstore[:] = []
+ui.st = status()
+
+# STOP is never refused while busy
+slow['hang'] = threading.Event()
+load_pla()
+ui.emergency_stop()
+check('STOP while a request hangs: emergency_stop sent', sent[-1] == ('/printer/emergency_stop', None))
+slow['hang'].set(); slow['hang'] = None
+until(lambda: not ui.busy, tick=False)
 
 # ---- STOP is on every new page ----------------------------------------------
 for page in ('fil_error', 'bin', 'macros', 'macros_edit', 'print'):
