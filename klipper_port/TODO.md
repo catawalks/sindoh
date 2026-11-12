@@ -125,7 +125,14 @@ the work; it is how open items survive between sessions.
    **Deployed to the dev printer 2026-11-12 17:30:** dp200_macros.cfg
    4d29164a, dp200_printer.cfg 7f87f6cf (both replace the Nov 2-3 copies;
    .bak-1112 kept), dp200_screen.py 5cea5684 (.bak-1112 kept). Klipper
-   ready, the new macros listed, the screen app running. Not run yet:
+   ready, the new macros listed, the screen app running.
+   **Full test print PASS 2026-11-12 17:32-17:44** (gen_test_prints.py
+   first layer, now with PRIME_LINE): PRINT_START (bed question on the
+   screen, heat, home, 4x4 mesh, purge) -> PRIME_LINE at Y 0 -> 50 mm
+   square. Owner: "prime line and square came out great". Found: the
+   screen says PRINT PAUSED during the start (the job is paused while the
+   start runs) -> PRINT_START.starting (ad60eaa) + screen change pending.
+   Not run yet:
    the screen app's new pages, EMPTY_BIN, the LOAD jam check.
 
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**

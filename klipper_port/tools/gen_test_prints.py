@@ -6,7 +6,7 @@
   dp200_box_20mm.gcode     20x20x10 mm open box: 2 perimeters, 3 solid
                            bottom layers, no top
 
-Both start with PRINT_START (heat, home, bed mesh, purge/wipe) and end with
+Both start with PRINT_START (heat, home, bed mesh, purge/wipe) and PRIME_LINE, and end with
 PRINT_END, use relative E (M83) and label the object for [exclude_object].
 Usage: gen_test_prints.py OUTDIR [--bed 60] [--extruder 210]
 """
@@ -95,15 +95,13 @@ class G:
         self.emit('G90')
         self.emit('M83')
         self.emit('M106 S0')
-        # PRINT_START ends over the bed centre at Z 10: travel at Z 5, then down,
-        # then a prime line in front of the object (inside the mesh area)
-        py = y0 - 8
+        # the slicer start G-code's prime line: PRIME_LINE at the front edge
+        # (Y 0), ends at Z 2; then travel to the object at Z 5
+        self.emit('PRIME_LINE')
+        self.emit('G90')
+        self.emit('M83')
         self.emit('G0 Z5 F600')
-        self.travel(CX - 35, py)
-        self.emit('G0 Z0.300 F600')
-        self.extrude(CX + 35, py, e_per_mm(0.6, 0.3), 15)
-        self.extrude(CX + 35, py + 0.6, e_per_mm(0.6, 0.3), 15)
-        self.extrude(CX - 5, py + 0.6, e_per_mm(0.6, 0.3), 15)
+        self.travel(x0, y0)            # over the object before going down
         self.emit('EXCLUDE_OBJECT_START NAME=%s' % self.name)
 
     def layer(self, z, n):
