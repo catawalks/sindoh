@@ -762,9 +762,12 @@ still require the owner's explicit OK.
       eth0 21500 ok / 46 lost, mlan0 21482 ok / 64 lost, both peaking in the
       04:00 hour together, so mostly the LAN, not the 8782.
       Logs: notes folder wifi0028_soak6h/.
-      **Morning list (owner):** part D (3 power cycles); upstream/0002
-      sign-off (Signed-off-by, Fixes:) when the wifi session's write-up is
-      ready.
+      **Morning list (owner):** part D (3 power cycles).
+      **Upstream submission tabled (owner, 11-12):** the 8782 fix stays a
+      local patch. The patch and cover letter (soak result included) are
+      ready in the wifi session's upstream/ folder, not committed or sent.
+      Sending needs the owner's Signed-off-by and email, so it is the
+      owner's call to revive.
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
