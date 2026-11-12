@@ -226,6 +226,15 @@ a red page with the whole message and UNLOAD (asks) / TRY AGAIN (asks) /
 OK. A load that works says "Load PLA complete" (plus "RESUME when ready"
 while paused).
 
+**Homing before LOAD / UNLOAD / CLEAN.** These macros call
+`_SINDOH_ENSURE_HOMED_XY` (owner, 11-12): they home only a missing X or Y,
+never Z, and skip their Z move without Z homed. So the screen asks a plain
+question for them, without the bed-empty part (`HOMES_XY`). Commands
+that home everything (`_SINDOH_ENSURE_HOMED`, so LOWER BED; EMPTY_BIN,
+probing, the mesh, FILAMENT_DRY: `HOMES_FIRST`) still add the bed question
+and BED_CLEAR. During a paused print that lost its homing, both kinds are
+refused.
+
 **Purge bin.** MOVE -> EMPTY BIN shows the purge count (`save_variables`
 `bin_count` / 15; amber when full, and the home page then says "Purge bin
 full"). It asks first (and about the bed when not homed), runs

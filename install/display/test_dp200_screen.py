@@ -244,14 +244,15 @@ tap('LOAD'); tap('YES');              check('custom LOAD sends TEMP=260',
                                             sent[-1] == ('/printer/gcode/script', 'LOAD_FILAMENT TEMP=%d' % S.FIL_MAX))
 check('custom temperature saved', S.load_settings().get('fil_custom') == S.FIL_MAX)
 tap('BACK'); tap('BACK');             check('BACK x2 -> filament', ui.screen == 'filament')
-# not homed: a command that homes first asks about the bed and sends BED_CLEAR
+# not homed: LOAD homes only X/Y (never Z), so no bed question and no BED_CLEAR
 ui.st['toolhead'] = dict(ui.st['toolhead'], homed_axes='')
 tap('LOAD'); tap('PETG')
-check('unhomed LOAD asks if the bed is empty', 'EMPTY' in ui.confirm[0])
-tap('YES');                           check('YES sends BED_CLEAR + LOAD_FILAMENT',
-                                            sent[-1] == ('/printer/gcode/script', 'BED_CLEAR\nLOAD_FILAMENT TEMP=240'))
+check('unhomed LOAD: no bed question', ui.confirm is not None and 'EMPTY' not in ui.confirm[0])
+tap('YES');                           check('YES sends LOAD_FILAMENT alone',
+                                            sent[-1] == ('/printer/gcode/script', 'LOAD_FILAMENT TEMP=240'))
 tap('CUSTOM'); tap('LOAD')
-check('unhomed custom LOAD asks too', 'EMPTY' in ui.confirm[0] and ui.confirm[1][1].startswith('BED_CLEAR\n'))
+check('unhomed custom LOAD: no bed question', 'EMPTY' not in ui.confirm[0]
+      and ui.confirm[1][1] == 'LOAD_FILAMENT TEMP=%d' % S.FIL_MAX)
 tap('NO'); tap('BACK'); tap('BACK')
 ui.st['toolhead'] = dict(ui.st['toolhead'], homed_axes='xyz')
 tap('UNLOAD'); tap('ABS'); tap('YES')

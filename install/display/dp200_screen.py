@@ -2525,9 +2525,12 @@ def save_settings(s):
 
 # Macros that home all axes first when the printer is not homed
 # (_SINDOH_ENSURE_HOMED, dp200_macros.cfg). Homing Z needs BED_CLEAR.
-HOMES_FIRST = ('_SINDOH_ENSURE_HOMED', 'CLEAN_NOZZLE', 'LOAD_FILAMENT', 'UNLOAD_FILAMENT',
+HOMES_FIRST = ('_SINDOH_ENSURE_HOMED',
                'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCURACY', 'LV_PROBE_CALIBRATE',
                'FILAMENT_DRY', 'EMPTY_BIN')
+# Macros that home only a missing X or Y and never Z (_SINDOH_ENSURE_HOMED_XY;
+# without Z homed they skip their Z move): no bed question, a plain confirm.
+HOMES_XY = ('CLEAN_NOZZLE', 'LOAD_FILAMENT', 'UNLOAD_FILAMENT')
 
 REVERT_SURE = 'Are you sure? This removes Klipper and returns the printer completely to stock.'
 
@@ -2646,7 +2649,7 @@ def paused_refusal(act, st):
     if any(c in PAUSE_REFUSED for c in cmds):
         return 'Not while paused (part on the bed)'
     homed = ((st or {}).get('toolhead') or {}).get('homed_axes', '')
-    if homed != 'xyz' and any(c in HOMES_FIRST for c in cmds):
+    if homed != 'xyz' and any(c in HOMES_FIRST + HOMES_XY for c in cmds):
         return 'Not homed: cancel the paused print'
     return None
 

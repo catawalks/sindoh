@@ -179,10 +179,18 @@ check('  ok this time: "complete", back to FILAMENT', ui.msg and 'Load complete'
 ui.screen = 'fil_error'; tap('OK'); check('OK -> filament page', ui.screen == 'filament')
 ui.st = status(homed='')
 ui.screen = 'fil_mat'; tap('PETG'); tap('YES')
-check('unhomed LOAD still sends BED_CLEAR first', sent[-1][1] == 'BED_CLEAR\nLOAD_FILAMENT TEMP=240')
+check('unhomed LOAD: no BED_CLEAR (homes X/Y only)', sent[-1][1] == 'LOAD_FILAMENT TEMP=240')
+ui.screen = 'move'; tap('CLEAN')
+check('unhomed CLEAN: plain confirm, no bed question', ui.confirm is not None and 'EMPTY' not in ui.confirm[0]
+      and ui.confirm[1][1] == 'CLEAN_NOZZLE')
+tap('NO')
+tap('LOWER BED')
+check('unhomed LOWER BED still asks about the bed', 'EMPTY?' in ui.confirm[0]
+      and ui.confirm[1][1].startswith('BED_CLEAR\n_SINDOH_ENSURE_HOMED'))
+tap('NO')
 refuse['UNLOAD_FILAMENT'] = 'Homing cancelled: the bed is not confirmed empty'
 ui.st = status()
-ui.fil['mode'] = 'unload'; tap('ABS'); tap('YES')
+ui.screen = 'fil_mat'; ui.fil['mode'] = 'unload'; tap('ABS'); tap('YES')
 render('2_unload_stopped')
 check('stopped UNLOAD -> error page, TRY AGAIN, no UNLOAD',
       ui.screen == 'fil_error' and 'TRY AGAIN' in labels and 'UNLOAD' not in labels)
