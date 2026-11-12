@@ -734,6 +734,27 @@ still require the owner's explicit OK.
       reset after FUNC_SHUTDOWN); not committed or sent.
       Left: part C (insmod parameters in init.mainline, 15 boots, for the
       upstream write-up) and part D (3 power cycles, owner at the printer).
+      **TESTPLAN part C (11-11 night, 0028 installed, warm boots):** params
+      came from a one-line hook in init.mainline (insmod line appends
+      /etc/dp200/wifi_test_params for mwifiex_usb); init.mainline is back
+      to the original (c827fcd9) and the params file removed; a copy of the
+      original stays at /etc/dp200/init.mainline.orig-c827fcd9.
+      - C1 usb8782_ready_ms=0 (no INIT_DONE read): **3/5** -- boots 3 and 4:
+        FUNC_INIT (0xa9) taken, never answered (cmd_sent=0), unregister.
+      - C2 usb8782_winner=1: **5/5** -- winner reply `01 00 ...`, INIT_DONE
+        56 ms. At boot the chip is in its boot ROM, so this only shows the
+        probe doesn't disturb the download.
+      - C3 (both) skipped: C1 not 5/5.
+      Reading: the unread INIT_DONE is the cause; the probe is optional.
+      Logs: notes folder wifi0028_partC/.
+      **Overnight 11-11/12: 6 h Wi-Fi + NAND soak** (tools/nand_wifi_soak.sh)
+      on the installed setup -- C3 from mtd0, 0028, NAND root: 20 mlan0
+      pings to the router every minute, a 2.8 MB download over mlan0 every
+      5 min, a full root read every 10 min. Watchers: serial probe, pings to
+      eth0 (.147) and mlan0 (.21), dmesg + heartbeat over TCP.
+      **Morning list (owner):** part D (3 power cycles); upstream/0002
+      sign-off (Signed-off-by, Fixes:) when the wifi session's write-up is
+      ready.
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
