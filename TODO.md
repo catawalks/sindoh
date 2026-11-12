@@ -15,6 +15,13 @@ the work; it is how open items survive between sessions.
    a print is paused or failed (dp200_screen.py forces the print page while
    printing/paused); (3) EMPTY BIN button + BIN EMPTIED feedback;
    (5) user-configurable page of custom macro buttons.
+   **UI side written 11-12** (screen-app session; offline test
+   test_dp200_print_notes.py 58/58, docs/touchscreen_options.md "Paused
+   prints ..."): paused-job banner + HOME, no homing while paused, LOAD error
+   page (UNLOAD / TRY AGAIN), EMPTY BIN -> empty-the-bin page -> DONE, purge
+   count, MOVE -> MACROS (dp200_screen_macros.json). (4) needed no UI change.
+   **Not on a printer yet; deploy only together with the macro change below.**
+   On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and
    cfglint OK, **not yet run on a printer**):
    - **Crash fix:** during a paused print LOAD/UNLOAD/CLEAN_NOZZLE moved to

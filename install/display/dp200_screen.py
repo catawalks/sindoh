@@ -78,6 +78,16 @@ STICK_UPDATE = '_update_rodin/update.she'
 # Preheat presets (nozzle, bed); bed max_temp is 100, nozzle 260
 PRESETS = (('PLA', 200, 60), ('ABS', 240, 90))
 LOWER_BED_Z = 120                     # Z grows downwards on this machine (bed moves down)
+# Purge bin: _SINDOH_BIN_COUNT counts purges in save_variables bin_count and
+# asks for emptying from bin_threshold (_DP200, dp200_macros.cfg) on
+BIN_THRESHOLD = 15
+BIN_DROP = 70                         # EMPTY_BIN lowers the bed this far (bin_drop)
+# Custom macro buttons (MOVE -> MACROS): a JSON file in Klipper's config
+# folder, so it can also be edited in Mainsail. {"buttons": [{"label":
+# "PURGE", "gcode": "MY_PURGE"}, ...]}; every button asks before it runs.
+MACROS_FILE = '/home/klipper/printer_data/config/dp200_screen_macros.json'
+MAC_PER_PAGE = 8                      # buttons per MACROS page
+MAC_EDIT_PER_PAGE = 10                # macros per EDIT page
 
 # Input shaping with a USB accelerometer (docs/input_shaping.md): the sensor
 # config is included only while it has the .cfg name (see dp200_printer.cfg)
@@ -112,7 +122,7 @@ OBJECTS = ('webhooks', 'print_stats', 'virtual_sdcard', 'display_status', 'extru
            'heater_bed', 'output_pin lamp', 'gcode_move', 'toolhead', 'idle_timeout',
            'filament_switch_sensor cartridge_lever', 'filament_motion_sensor filament_encoder',
            'dp200_cartridge', 'gcode_macro _DRY', 'gcode_macro BED_CLEAR', 'manual_probe',
-           'exclude_object')
+           'exclude_object', 'save_variables')
 
 C_BG = (20, 20, 26)
 C_BAR = (36, 36, 44)
@@ -122,6 +132,7 @@ C_BTN = (50, 50, 62)
 C_ON = (55, 140, 90)
 C_RED = (160, 40, 40)
 C_WARN = (210, 140, 40)
+C_FULL = (130, 82, 18)                # a button that wants attention (full bin)
 C_NOZ = (255, 170, 80)
 C_BED = (110, 180, 255)
 
@@ -333,14 +344,14 @@ def err_text(e):
         return 'Moonraker: Klipper not connected yet (HTTP %d)' % e.code
     return str(r)
 
-def fail_text(e):
+def fail_text(e, n=160):
     """Why a Moonraker request failed: for a refused G-code that is
     Klipper's own message in the JSON body (the HTTP reason phrase is just
     'Bad Request' or 'unknown')."""
     if isinstance(e, urllib.error.HTTPError):
         try:
             msg = json.load(e)['error']['message']
-            return str(msg).strip().splitlines()[0][:160]
+            return str(msg).strip().splitlines()[0][:n]
         except Exception:
             return 'HTTP %d' % e.code
     return str(getattr(e, 'reason', e))
@@ -505,6 +516,10 @@ class UI:
         self.con = {'rev': 0, 'checked': 0.0, 'busy': False, 'lines': []}
         # USB sticks seen (sdX names), and which of them hold a Sindoh update
         self.stk = {'checked': 0.0, 'busy': False, 'seen': set(), 'sindoh': set(), 'asked': set()}
+        self.last_pstate = None        # print state at the last render (jump to the print page)
+        self.fil_fail = None           # a LOAD/UNLOAD that stopped: {'mode', 'msg', 'script'}
+        # custom macro buttons: the file's buttons (or its error), the printer's macros (EDIT)
+        self.mac = {'buttons': [], 'error': None, 'all': None, 'page': 0, 'edit_page': 0}
 
     # ---- actions -------------------------------------------------------
     def run(self, action):
@@ -517,6 +532,21 @@ class UI:
                 self.net['checked'] = 0
             if self.screen == 'console':
                 self.con['checked'] = 0
+            if self.screen == 'macros':
+                self.mac_load()                        # re-read: it may be edited in Mainsail
+        elif kind == 'mac_edit':                       # MACROS -> EDIT: the printer's macros
+            self.mac_load()
+            if self.mac['error']:
+                self.flash('Macro file not valid: fix it in Mainsail', 10)
+                return
+            self.screen = 'macros_edit'
+            self._bg('Reading macros', self.mac_list)
+        elif kind == 'mac_toggle':
+            self.mac_toggle(action[1])
+        elif kind == 'mac_more':
+            self.mac['page'] += 1
+        elif kind == 'mac_edit_more':
+            self.mac['edit_page'] += 1
         elif kind.startswith('wifi') or kind.startswith('kb'):
             self.wifi_action(action)
         elif kind.startswith('net') or kind.startswith('np'):
@@ -588,21 +618,26 @@ class UI:
             if self.settings.get('fil_custom') != t:
                 self.settings['fil_custom'] = t
                 save_settings(self.settings)
-            self.confirm = with_bed_check(*fil_confirm(self.fil['mode'], 'CUSTOM', t)[1:], self.st)
+            self.run(fil_confirm(self.fil['mode'], 'CUSTOM', t))
         elif kind == 'set_timeout':
             self.settings['timeout'] = action[1]
             ok = save_settings(self.settings)
             self.flash('Screen timeout: %s%s' % (fmt_timeout(action[1]), '' if ok else ' (not saved!)'))
             self.screen = 'display'
         elif kind == 'confirm':                        # (question, yes[, no])
+            why = paused_refusal(action[2], self.st)
+            if why:
+                self.flash(why, 10)
+                return
             self.confirm = with_bed_check(action[1], action[2], self.st) + tuple(action[3:4])
         elif kind == 'cancel':
             self.confirm = None
-        elif kind == 'gcode':
+        elif kind == 'gcode':                          # (script[, label[, after]])
             if action[1].startswith('BED_CLEAR'):
                 self.bed_answered = time.time()
-            self._bg(action[2] if len(action) > 2 else action[1],
-                     lambda: post('/printer/gcode/script', {'script': action[1]}))
+            label = action[2] if len(action) > 2 else action[1]
+            after = action[3] if len(action) > 3 else None
+            self._bg(label, lambda: self.gcode_then(action[1], label, after))
         elif kind == 'post':
             self._bg(action[2], lambda: post(action[1]))
         elif kind == 'dry_mat':
@@ -703,6 +738,68 @@ class UI:
             finally:
                 self.busy = None
         threading.Thread(target=work, daemon=True).start()
+
+    def gcode_then(self, script, label, after):
+        """Run a G-code script (in the _bg thread), then what `after` says:
+        'fil'      LOAD/UNLOAD: say it finished, or show why it stopped
+                   (page fil_error: UNLOAD / TRY AGAIN) instead of a short flash
+        'bin'      EMPTY_BIN: the bin is reachable -> the empty-the-bin page
+        'bin_done' BIN_EMPTIED: confirm the reset, back to MOVE"""
+        try:
+            post('/printer/gcode/script', {'script': script})
+        except Exception as e:
+            if after != 'fil':
+                raise
+            last = script.splitlines()[-1]
+            self.fil_fail = {'mode': 'unload' if last.startswith('UNLOAD') else 'load',
+                             'msg': fail_text(e, 400), 'script': last}
+            self.confirm = None
+            self.screen = 'fil_error'
+            return
+        paused = ((self.st or {}).get('print_stats') or {}).get('state') == 'paused'
+        if after == 'fil':
+            if self.screen == 'fil_error':             # TRY AGAIN / UNLOAD worked
+                self.screen = 'filament'
+            self.flash('%s complete%s' % (label, ': RESUME when ready' if paused else ''), 10)
+        elif after == 'bin':
+            self.screen = 'bin'
+        elif after == 'bin_done':
+            self.screen = 'move'
+            self.flash('Bin emptied: purge count 0 / %d' % BIN_THRESHOLD, 10)
+
+    # ---- custom macro buttons (MOVE -> MACROS) ------------------------------
+    def mac_load(self):
+        """Read MACROS_FILE. A missing file is no buttons; a broken one is
+        shown (and EDIT refuses, so the user's file is not overwritten)."""
+        try:
+            with open(MACROS_FILE) as f:
+                self.mac['buttons'], self.mac['error'] = parse_macros(json.load(f)), None
+        except FileNotFoundError:
+            self.mac['buttons'], self.mac['error'] = [], None
+        except (OSError, ValueError) as e:
+            self.mac['buttons'], self.mac['error'] = [], str(e)
+
+    def mac_list(self):
+        """The printer's own G-code macros for EDIT (names with _ are internal)."""
+        objs = get('/printer/objects/list')['objects']
+        self.mac['all'] = sorted(o.split(None, 1)[1] for o in objs
+                                 if o.startswith('gcode_macro ') and not o.split(None, 1)[1].startswith('_'))
+
+    def mac_toggle(self, name):
+        """EDIT: add a button for macro `name`, or remove the one there is."""
+        self.mac_load()
+        if self.mac['error']:
+            self.flash('Macro file not valid: fix it in Mainsail', 10)
+            return
+        btns = [b for b in self.mac['buttons'] if b['gcode'] != name]
+        if len(btns) == len(self.mac['buttons']):
+            btns.append({'label': name, 'gcode': name})
+        try:
+            save_macros(btns)
+        except OSError as e:
+            self.flash('Not saved: %s' % e, 10)
+            return
+        self.mac['buttons'] = btns
 
     # ---- input shaping (USB accelerometer) --------------------------------
     def adxl_switch(self, on):
@@ -1446,10 +1543,21 @@ class UI:
             self.page_error(d, st)
         else:
             pstate = st['print_stats']['state']
-            if pstate in ('printing', 'paused') and self.screen == 'home':
+            # Printing: the print page (home shows it). A print that starts or
+            # resumes also leaves any page that could move or heat. Paused:
+            # free to go (load filament, empty the bin), with the job on the
+            # home page and nothing that homes (paused_refusal, page_move).
+            started = pstate == 'printing' and self.last_pstate != 'printing'
+            if pstate == 'printing' and (self.screen == 'home' or (
+                    started and self.screen not in self.IN_PRINT_OK)):
+                if self.screen != 'home':
+                    self.confirm = None                # e.g. a LOAD question from the pause
                 self.screen = 'print'
+            if pstate == 'paused' and self.screen in self.PAUSE_BLOCKED:
+                self.screen = 'move'
             if pstate not in ('printing', 'paused') and self.screen in ('print', 'objects'):
                 self.screen = 'home'
+            self.last_pstate = pstate
             getattr(self, 'page_' + self.screen)(d, st)
             # Z homing was refused until the bed is confirmed empty (BED_CLEAR);
             # a print waits in PRINT_START for the same answer
@@ -1489,7 +1597,9 @@ class UI:
         d.text((200, 78), 'Bed', font=font(18), fill=C_DIM)
         d.text((200, 102), '%.0f/%.0f°' % (b['temperature'], b['target']), font=font(32), fill=C_BED)
         # HOME: straight back to the home page from anywhere in the menus
-        if self.screen not in ('home', 'print'):
+        # (from the print page only while paused: a print shows that page)
+        if self.screen != 'home' and (self.screen != 'print'
+                                      or st['print_stats']['state'] == 'paused'):
             box = (394, 72, PW - 12, 146)
             self.button(d, box, '', ('go_home',), C_BTN, 20)
             dy = 2 if self.pressed(box) else 0
@@ -1507,9 +1617,14 @@ class UI:
               'pid': 'calibrate', 'objects': 'print',
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'wifi_saved': 'wifi',
-              'display': 'system', 'timeout': 'display', 'power': 'home'}
+              'display': 'system', 'timeout': 'display', 'power': 'home',
+              'fil_error': 'filament', 'bin': 'move', 'macros': 'move', 'macros_edit': 'macros'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
     NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_saved', 'wifi_kb', 'power')
+    # pages a print that starts or resumes leaves alone (no motion or heat on them)
+    IN_PRINT_OK = ('print', 'objects', 'console', 'info', 'display', 'timeout') + NO_KLIPPER
+    # pages that home or probe: not while a print is paused (the part is on the bed)
+    PAUSE_BLOCKED = ('homing', 'calibrate', 'papertest', 'pid', 'shaper', 'bedlevel')
 
     def back_action(self):
         if self.confirm:
@@ -1566,9 +1681,27 @@ class UI:
     # ---- pages -----------------------------------------------------------
     def page_home(self, d, st):
         ps = st['print_stats']
-        d.text((20, 160), 'Job: %s' % ps['state'], font=font(26), fill=C_TXT)
-        if ps.get('filename'):
-            d.text((20, 196), ps['filename'][:34], font=font(18), fill=C_DIM)
+        paused = ps['state'] == 'paused'
+        top = 236
+        if paused:
+            # a paused print (runout, PAUSE): the job stays one tap away
+            top = 316
+            d.rounded_rectangle((12, 154, PW - 12, 304), radius=14, fill=(70, 52, 20))
+            d.text((26, 162), 'PRINT PAUSED', font=font(24), fill=C_WARN)
+            d.text((26, 194), (ps.get('filename') or '?')[:38], font=font(18), fill=C_TXT)
+            w = (PW - 24 - 28 - 2 * 10) // 3
+            for i, it in enumerate((
+                    ('RESUME', ('confirm', 'Resume the print? The head goes back to the part.',
+                                ('gcode', 'RESUME', 'Resume')), C_ON, 26),
+                    ('CANCEL', ('confirm', 'Cancel the print?', ('gcode', 'CANCEL_PRINT', 'Cancel')),
+                     C_RED, 26),
+                    ('JOB', ('screen', 'print'), C_BTN, 26, 'details'))):
+                x = 26 + i * (w + 10)
+                self.button(d, (x, 224, x + w, 294), *it)
+        else:
+            d.text((20, 160), 'Job: %s' % ps['state'], font=font(26), fill=C_TXT)
+            if ps.get('filename'):
+                d.text((20, 196), ps['filename'][:34], font=font(18), fill=C_DIM)
         lamp = self.lamp_on(st)
         self.grid(d, [
             ('LAMP', ('gcode', 'LAMP_TOGGLE', 'Lamp'), C_ON if lamp else C_BTN, 30, 'on' if lamp else 'off'),
@@ -1576,13 +1709,22 @@ class UI:
             ('PREHEAT', ('screen', 'preheat')),
             ('MOVE', ('screen', 'move')),
             ('SYSTEM', ('screen', 'system')),
-            ('COOL DOWN', ('gcode', 'FILAMENT_DRY_STOP\nTURN_OFF_HEATERS', 'Cool down')),
-        ], top=236)
+            ('COOL DOWN', ('confirm', 'The print is paused: cool down anyway? It cannot resume '
+                                      'until the nozzle is hot again.',
+                           ('gcode', 'FILAMENT_DRY_STOP\nTURN_OFF_HEATERS', 'Cool down'))
+             if paused else ('gcode', 'FILAMENT_DRY_STOP\nTURN_OFF_HEATERS', 'Cool down')),
+        ], top=top, rows_h=96 if paused else 110)
+        if paused:
+            return
         dry = st.get('gcode_macro _DRY') or {}
+        n = bin_count(st)
         if dry.get('active'):
             d.rectangle((0, 190, PW, 228), fill=C_BG)
             d.text((20, 196), 'Drying: %s left, bed %d C' % (fmt_mins(dry['remaining']), dry['temp']),
                    font=font(20), fill=C_WARN)
+        elif n >= BIN_THRESHOLD:
+            d.rectangle((0, 190, PW, 228), fill=C_BG)
+            d.text((20, 196), 'Purge bin full (%d): MOVE -> EMPTY BIN' % n, font=font(20), fill=C_WARN)
 
     def page_print(self, d, st):
         ps, vs = st['print_stats'], st.get('virtual_sdcard', {})
@@ -1690,6 +1832,106 @@ class UI:
         self.button(d, (20, 470, PW - 20, 570), mode.upper(), ('fil_custom_go',), C_ON, 34,
                     'heat to %d °C' % t)
 
+    def page_fil_error(self, d, st):
+        """A LOAD/UNLOAD that stopped (jam, no grab, homing refused): why,
+        and what next. Klipper's message is shown in full."""
+        f = self.fil_fail or {'mode': 'load', 'msg': '?', 'script': 'LOAD_FILAMENT MATERIAL=PLA'}
+        mode = f['mode']
+        d.rounded_rectangle((12, 154, PW - 12, 470), radius=14, fill=(90, 24, 24))
+        d.text((28, 166), '%s stopped' % mode.upper(), font=font(30), fill=C_TXT)
+        for i, l in enumerate(wrap(d, f['msg'], font(20), PW - 60)[:9]):
+            d.text((28, 212 + i * 28), l, font=font(20), fill=(240, 210, 210))
+        arg = f['script'].split(None, 1)[1] if ' ' in f['script'] else ''
+        unload = ('UNLOAD_FILAMENT ' + arg).strip()
+        items = []
+        if mode == 'load':
+            d.text((20, 482), 'Check the inlet. UNLOAD pulls the filament back.', font=font(18), fill=C_DIM)
+            items.append(('UNLOAD', ('confirm', 'Heat the nozzle and UNLOAD the filament?',
+                                     ('gcode', unload, 'Unload', 'fil')), C_BTN, 30))
+        else:
+            d.text((20, 482), 'Check the inlet and the filament path.', font=font(18), fill=C_DIM)
+        items.append(('TRY AGAIN', ('confirm', 'Heat the nozzle and %s again?' % mode.upper(),
+                                    ('gcode', f['script'], mode.capitalize(), 'fil')), C_BTN, 28))
+        items.append(('OK', ('screen', 'filament'), C_BTN, 30))
+        self.grid(d, items, top=516, rows_h=80, cols=len(items))
+
+    def page_bin(self, d, st):
+        """After EMPTY_BIN: the bin can come out; DONE resets the count."""
+        n = bin_count(st)
+        d.text((20, 160), 'Empty the purge bin', font=font(28), fill=C_TXT)
+        y = 210
+        for l in ('1. Take out the purge bin.', '2. Empty it.', '3. Put it back.', '',
+                  'Then tap DONE: the purge count', 'goes back to 0 (now %d / %d).' % (n, BIN_THRESHOLD)):
+            step = l[:1].isdigit()
+            d.text((20, y), l, font=font(24 if step else 20), fill=C_TXT if step else C_DIM)
+            y += 36
+        if st['print_stats']['state'] == 'paused':
+            d.text((20, y + 4), 'RESUME moves the head and bed back.', font=font(20), fill=C_WARN)
+        self.button(d, (30, 480, PW - 30, 580), 'DONE', ('gcode', 'BIN_EMPTIED', 'Bin emptied', 'bin_done'),
+                    C_ON, 34, 'bin is empty and back in')
+        self.button(d, (30, 598, PW - 30, 668), 'NOT EMPTIED', ('screen', 'move'), C_BTN, 24)
+
+    def page_macros(self, d, st):
+        """Custom macro buttons from MACROS_FILE; each asks first."""
+        m = self.mac
+        name = os.path.basename(MACROS_FILE)
+        d.text((20, 156), 'Macros', font=font(28), fill=C_TXT)
+        if m['error']:
+            d.text((20, 196), '%s is not valid:' % name, font=font(18), fill=C_WARN)
+            for i, l in enumerate(wrap(d, m['error'], font(18), PW - 40)[:4]):
+                d.text((20, 222 + i * 24), l, font=font(18), fill=C_DIM)
+            d.text((20, 330), 'Fix it in Mainsail (Machine tab).', font=font(18), fill=C_DIM)
+            return
+        btns = m['buttons']
+        paused = st['print_stats']['state'] == 'paused'
+        if btns:
+            d.text((20, 196), 'Not while a print is paused.' if paused else 'Each one asks first.',
+                   font=font(18), fill=C_WARN if paused else C_DIM)
+        else:
+            for i, l in enumerate(('No buttons yet. EDIT picks from', "the printer's macros, or edit",
+                                   name, 'in Mainsail (Machine tab).')):
+                d.text((20, 200 + i * 28), l, font=font(20), fill=C_DIM)
+        n = MAC_PER_PAGE
+        pages = max(1, (len(btns) + n - 1) // n)
+        m['page'] %= pages
+        items = []
+        for b in btns[m['page'] * n:(m['page'] + 1) * n]:
+            q = b.get('confirm') or ('Run %s? The screen cannot tell whether it moves or heats.'
+                                     % b['gcode'].split()[0])
+            items.append((b['label'], None if paused else
+                          ('confirm', q, ('gcode', b['gcode'], b['label'], 'macro')),
+                          C_BAR if paused else C_BTN, 24, None, C_DIM if paused else C_TXT))
+        if btns:
+            items += [None] * (n - len(items))
+        items.append(('EDIT', ('mac_edit',), C_BTN, 24, 'add / remove'))
+        if pages > 1:
+            items.append(('MORE', ('mac_more',), C_BTN, 24, '%d / %d' % (m['page'] + 1, pages)))
+        self.grid(d, items, top=226 if btns else 340, rows_h=70)
+
+    def page_macros_edit(self, d, st):
+        """EDIT: the printer's macros; tap one to add or remove its button."""
+        m = self.mac
+        d.text((20, 156), 'Macro buttons', font=font(28), fill=C_TXT)
+        d.text((20, 196), 'Tap to add (green) or remove.', font=font(18), fill=C_DIM)
+        names = m['all']
+        if names is None:
+            d.text((20, 240), 'Reading the macros...' if self.busy else 'Could not read the macros.',
+                   font=font(22), fill=C_DIM)
+            return
+        if not names:
+            d.text((20, 240), 'The printer has no macros of its own.', font=font(22), fill=C_DIM)
+            return
+        on = set(b['gcode'] for b in m['buttons'])
+        n = MAC_EDIT_PER_PAGE
+        pages = max(1, (len(names) + n - 1) // n)
+        m['edit_page'] %= pages
+        items = [(nm, ('mac_toggle', nm), C_ON if nm in on else C_BTN, 20)
+                 for nm in names[m['edit_page'] * n:(m['edit_page'] + 1) * n]]
+        if pages > 1:
+            items += [None] * (n - len(items))
+            items.append(('MORE', ('mac_edit_more',), C_BTN, 22, '%d / %d' % (m['edit_page'] + 1, pages)))
+        self.grid(d, items, top=226, rows_h=56)
+
     def page_preheat(self, d, st):
         d.text((20, 160), 'Preheat', font=font(28), fill=C_TXT)
         items = []
@@ -1701,20 +1943,50 @@ class UI:
         self.grid(d, items, top=210)
 
     def page_move(self, d, st):
-        homed = st['toolhead'].get('homed_axes', '')
+        th = st['toolhead']
+        homed = th.get('homed_axes', '')
+        paused = st['print_stats']['state'] == 'paused'
         d.text((20, 160), 'Move / maintenance', font=font(28), fill=C_TXT)
-        d.text((20, 200), 'Homed: %s' % (homed.upper() or 'no'), font=font(20), fill=C_DIM)
-        self.grid(d, [
+        if paused:
+            # the part is still on the bed and RESUME needs the axes as they are
+            d.text((20, 200), 'Print paused: no homing' if homed == 'xyz' else
+                   'Paused but NOT homed: cancel the print', font=font(20), fill=C_WARN)
+        else:
+            d.text((20, 200), 'Homed: %s' % (homed.upper() or 'no'), font=font(20), fill=C_DIM)
+        n = bin_count(st)
+        z = (th.get('position') or [0, 0, 0])[2]
+        if paused:
+            # only lowering (Z grows downwards), and without the homing macro
+            lower = (('confirm', 'Lower the bed to Z%d? It moves away from the nozzle.' % LOWER_BED_Z,
+                      ('gcode', 'G90\nG1 Z%d F600' % LOWER_BED_Z, 'Lower bed'))
+                     if homed == 'xyz' and z < LOWER_BED_Z else None)
+        else:
+            lower = ('confirm', 'Lower the bed to Z%d?' % LOWER_BED_Z,
+                     ('gcode', '_SINDOH_ENSURE_HOMED\nG90\nG1 Z%d F600' % LOWER_BED_Z, 'Lower bed'))
+        no = 'not while paused'
+        items = [
             ('HOME', ('screen', 'homing'), C_BTN, 30, 'all / X / Y / Z'),
-            ('LOWER BED', ('confirm', 'Lower the bed to Z%d?' % LOWER_BED_Z,
-                           ('gcode', '_SINDOH_ENSURE_HOMED\nG90\nG1 Z%d F600' % LOWER_BED_Z, 'Lower bed'))),
+            ('LOWER BED', lower, C_BTN, 30, None if lower or not paused else
+             ('already low' if homed == 'xyz' else no)),
             ('CLEAN', ('confirm', 'Heat, purge and wipe the nozzle?',
                        ('gcode', 'CLEAN_NOZZLE', 'Clean nozzle')), C_BTN, 30, 'nozzle'),
             ('MOTORS OFF', ('gcode', 'M84', 'Motors off')),
-            ('BIN EMPTIED', ('gcode', 'BIN_EMPTIED', 'Bin emptied'), C_BTN, 24),
+            ('EMPTY BIN', ('confirm', 'Lower the bed %d mm and move the head to the left, to take '
+                                      'out the purge bin?' % BIN_DROP, ('gcode', 'EMPTY_BIN', 'Empty bin', 'bin')),
+             C_FULL if n >= BIN_THRESHOLD else C_BTN, 28, '%d / %d purges' % (n, BIN_THRESHOLD)),
             ('CALIBRATE', ('screen', 'calibrate'), C_BTN, 28, 'input shaping'),
             ('BED LEVEL', ('screen', 'bedlevel'), C_BTN, 28, 'probe + screws'),
-        ], top=240, rows_h=90)
+            ('MACROS', ('screen', 'macros'), C_BTN, 28, 'your own'),
+        ]
+        if paused:
+            for k in (0, 3, 5, 6):                     # HOME, MOTORS OFF, CALIBRATE, BED LEVEL
+                items[k] = (items[k][0], None, C_BAR, 28, no, C_DIM)
+            if not lower:
+                items[1] = items[1][:1] + (None, C_BAR) + items[1][3:] + (C_DIM,)
+            if homed != 'xyz':                          # anything else would home first
+                items = [it if it[0] == 'MACROS' else (it[0], None, C_BAR, 28, no, C_DIM)
+                         for it in items]
+        self.grid(d, items, top=240, rows_h=90)
 
     def bl_view(self, d, top, w, live):
         """Top-down plate (back at the top, door at the bottom) with the 16
@@ -2219,7 +2491,7 @@ def save_settings(s):
 # (_SINDOH_ENSURE_HOMED, dp200_macros.cfg). Homing Z needs BED_CLEAR.
 HOMES_FIRST = ('_SINDOH_ENSURE_HOMED', 'CLEAN_NOZZLE', 'LOAD_FILAMENT', 'UNLOAD_FILAMENT',
                'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCURACY', 'LV_PROBE_CALIBRATE',
-               'FILAMENT_DRY')
+               'FILAMENT_DRY', 'EMPTY_BIN')
 
 REVERT_SURE = 'Are you sure? This removes Klipper and returns the printer completely to stock.'
 
@@ -2275,13 +2547,76 @@ def with_bed_check(question, act, st):
     return (question + ' It homes first: is the bed EMPTY?',
             (act[0], 'BED_CLEAR\n' + act[1]) + tuple(act[2:]))
 
+def bin_count(st):
+    """Purges since the bin was last emptied (save_variables bin_count)."""
+    v = ((st or {}).get('save_variables') or {}).get('variables') or {}
+    try:
+        return int(v.get('bin_count', 0))
+    except (TypeError, ValueError):
+        return 0
+
+# While a print is paused the part is on the bed and RESUME needs the axes
+# as they are: nothing may home (Z homing raises the bed into the part),
+# probe, or turn the motors off.
+PAUSE_REFUSED = ('G28', 'M84', 'M18', 'BED_MESH_CALIBRATE', 'PROBE', 'PROBE_ACCURACY',
+                 'LV_PROBE_CALIBRATE', 'Z_ENDSTOP_CALIBRATE', 'FILAMENT_DRY', 'SHAPER_CALIBRATE',
+                 'PID_CALIBRATE', 'BED_CLEAR')
+
+def paused_refusal(act, st):
+    """Why `act` (a confirm's YES) must not run while the print is paused,
+    or None. Custom macros: unknown, so never while paused."""
+    if ((st or {}).get('print_stats') or {}).get('state') != 'paused':
+        return None
+    if act[0] in ('cal_start', 'bl_probe', 'pid_run'):
+        return 'Not while a print is paused'
+    if act[0] != 'gcode':
+        return None
+    if len(act) > 3 and act[3] == 'macro':
+        return 'Macros: not while paused'
+    cmds = [l.split()[0].upper() for l in act[1].splitlines() if l.split()]
+    if any(c in PAUSE_REFUSED for c in cmds):
+        return 'Not while paused (part on the bed)'
+    homed = ((st or {}).get('toolhead') or {}).get('homed_axes', '')
+    if homed != 'xyz' and any(c in HOMES_FIRST for c in cmds):
+        return 'Not homed: cancel the paused print'
+    return None
+
+def parse_macros(data):
+    """MACROS_FILE contents -> [{'label', 'gcode'[, 'confirm']}]; ValueError if malformed."""
+    if not isinstance(data, dict) or not isinstance(data.get('buttons', []), list):
+        raise ValueError('expected {"buttons": [{"label": ..., "gcode": ...}, ...]}')
+    out = []
+    for i, b in enumerate(data.get('buttons', [])):
+        if not isinstance(b, dict) or not isinstance(b.get('gcode'), str) or not b['gcode'].strip():
+            raise ValueError('button %d: needs "gcode" (the macro name or G-code to run)' % (i + 1))
+        e = {'label': str(b.get('label') or b['gcode'].split()[0])[:24], 'gcode': b['gcode']}
+        if b.get('confirm'):
+            e['confirm'] = str(b['confirm'])
+        out.append(e)
+    return out
+
+def save_macros(buttons):
+    """Write MACROS_FILE (atomically), owned like the config folder so
+    Mainsail can still edit it."""
+    tmp = MACROS_FILE + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump({'buttons': buttons}, f, indent=2)
+        f.write('\n')
+    if hasattr(os, 'chown'):
+        try:
+            ds = os.stat(os.path.dirname(MACROS_FILE))
+            os.chown(tmp, ds.st_uid, ds.st_gid)
+        except OSError:
+            pass
+    os.replace(tmp, MACROS_FILE)
+
 def fil_confirm(mode, name, t):
     """The confirm action for LOAD/UNLOAD of filament `name` at t C."""
     macro = 'LOAD_FILAMENT' if mode == 'load' else 'UNLOAD_FILAMENT'
     arg = 'MATERIAL=%s' % name if name in FIL_STOCK else 'TEMP=%d' % t
     what = name if name != 'CUSTOM' else 'filament'
     return ('confirm', 'Heat the nozzle to %d°C and %s %s?' % (t, mode.upper(), what),
-            ('gcode', '%s %s' % (macro, arg), '%s %s' % (mode.capitalize(), what)))
+            ('gcode', '%s %s' % (macro, arg), '%s %s' % (mode.capitalize(), what), 'fil'))
 
 def fmt_timeout(s):
     return 'never' if not s else '%d min' % (s // 60) if s >= 60 else '%d s' % s
@@ -2314,7 +2649,11 @@ def view_key(ui):
             tuple(sorted((st.get('dp200_cartridge') or {}).items(), key=lambda kv: kv[0]))
             if st.get('dp200_cartridge') else None,
             tuple(sorted((st.get('gcode_macro _DRY') or {}).items())), ui.dry['mat'], ui.dry['hours'],
-            (st.get('gcode_macro BED_CLEAR') or {}).get('asking'))
+            (st.get('gcode_macro BED_CLEAR') or {}).get('asking'),
+            bin_count(st), int((st['toolhead'].get('position') or [0, 0, 0])[2]) >= LOWER_BED_Z,
+            tuple(b['gcode'] for b in ui.mac['buttons']), ui.mac['error'], ui.mac['page'],
+            ui.mac['edit_page'], None if ui.mac['all'] is None else len(ui.mac['all']),
+            ui.fil_fail and ui.fil_fail['msg'])
 
 # ---------------------------------------------------------------------------
 def main():
