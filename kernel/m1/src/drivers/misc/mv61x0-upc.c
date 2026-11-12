@@ -37,11 +37,19 @@
  * UPC pads: the XENA inputs (endstops, cartridge lever, XIRD/XIRD1) and the
  * UPC outputs (stepper and PWM pads) work only when their SoC pads have the
  * function the vendor's board code (gr_def_mpp_list) gives them; U-Boot
- * leaves them GPIO. With the optional "pads" range (GPIO banks 4-6 at
- * 0xf8044000) and "marvell,pads" (<bank pin value> triples), probe sets
+ * leaves them GPIO. With the optional "pads" range (GPIO banks 3-6 at
+ * 0xf8043000) and "marvell,pads" (<bank pin value> triples), probe sets
  * them, but only after it has held the cores and found every output off,
  * and checks the outputs again afterwards (user-approved stock values: UPC
- * tests 2c and 3, 35 pads).
+ * tests 2c and 3, 35 pads in banks 4-6).
+ *
+ * Bank 3 (GPIO 96-127) carries the stepper engines' driver pads: with it
+ * left as U-Boot's GPIO the engines count pulses but the A4982s stay
+ * disabled (no holding torque; found on the nandboot kernel, confirmed on
+ * the printer 2026-11-12). Stock has function 2 on 27 of its pins and the
+ * whole bank as inputs; U-Boot leaves pins 6 and 16 as GPIO outputs.
+ * "marvell,pads-dir-clear" lists the banks whose direction register probe
+ * clears, before the selects, under the same condition.
  *
  * Differences from stock that upctool does not notice: one mailbox
  * write-and-wait at a time but without blocking UPC_IOC_HOLD; the
@@ -129,7 +137,7 @@ struct mv61x0_upc {
 	void __iomem *pwm;
 	void __iomem *smot;
 	void __iomem *apb;			/* optional: APB config, UPC clock */
-	void __iomem *pads;			/* optional: GPIO banks 4-6 */
+	void __iomem *pads;			/* optional: GPIO banks 3-6 */
 	struct mutex lock;
 	struct mutex mbox_lock;			/* one mailbox write-and-wait */
 	struct completion gp[UPC_NR_CORES];	/* GPStatus bit n, core n IRQ */
@@ -200,14 +208,18 @@ static bool upc_outputs_safe(struct mv61x0_upc *upc)
  * and every output off, so that an output pad can only show its
  * peripheral's idle level: PWM low, stepper drivers disabled.
  */
-#define UPC_PAD_SELECT(bank, pin)	(0x1000 * ((bank) - 4) + 0x80 + 4 * (pin))
+#define UPC_PAD_BANK_FIRST	3
+#define UPC_PAD_BANK_LAST	6
+#define UPC_PAD_BANK(bank)	(0x1000 * ((bank) - UPC_PAD_BANK_FIRST))
+#define UPC_PAD_DIR(bank)	(UPC_PAD_BANK(bank) + 0x08)
+#define UPC_PAD_SELECT(bank, pin)	(UPC_PAD_BANK(bank) + 0x80 + 4 * (pin))
 
 static void upc_setup_pads(struct mv61x0_upc *upc)
 {
 	struct device_node *np = upc->dev->of_node;
 	unsigned int i, n, changed = 0;
-	u32 t[3];
-	int len;
+	u32 t[3], bank;
+	int len, ndir;
 
 	if (!upc->pads)
 		return;
@@ -220,14 +232,38 @@ static void upc_setup_pads(struct mv61x0_upc *upc)
 	for (i = 0; i < n; i++) {
 		if (of_property_read_u32_index(np, "marvell,pads", 3 * i, &t[0]) ||
 		    of_property_read_u32_index(np, "marvell,pads", 3 * i + 1, &t[1]) ||
-		    t[0] < 4 || t[0] > 6 || t[1] > 31) {
+		    t[0] < UPC_PAD_BANK_FIRST || t[0] > UPC_PAD_BANK_LAST ||
+		    t[1] > 31) {
 			dev_err(upc->dev, "marvell,pads entry %u invalid: pads left alone\n", i);
+			return;
+		}
+	}
+	ndir = of_property_count_u32_elems(np, "marvell,pads-dir-clear");
+	for (i = 0; ndir > 0 && i < ndir; i++) {
+		if (of_property_read_u32_index(np, "marvell,pads-dir-clear", i,
+					       &bank) ||
+		    bank < UPC_PAD_BANK_FIRST || bank > UPC_PAD_BANK_LAST) {
+			dev_err(upc->dev, "marvell,pads-dir-clear entry %u invalid: pads left alone\n", i);
 			return;
 		}
 	}
 	if (!upc_outputs_safe(upc)) {
 		dev_err(upc->dev, "outputs not safe: UPC pads left alone\n");
 		return;
+	}
+	/* Direction first, as stock has it: no GPIO output on these banks */
+	for (i = 0; ndir > 0 && i < ndir; i++) {
+		u32 old;
+
+		of_property_read_u32_index(np, "marvell,pads-dir-clear", i,
+					   &bank);
+		old = readl(upc->pads + UPC_PAD_DIR(bank));
+		if (old) {
+			writel(0, upc->pads + UPC_PAD_DIR(bank));
+			dev_info(upc->dev, "UPC pads: bank %u direction %08x -> %08x\n",
+				 bank, old,
+				 readl(upc->pads + UPC_PAD_DIR(bank)));
+		}
 	}
 	for (i = 0; i < n; i++) {
 		void __iomem *reg;

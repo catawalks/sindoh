@@ -411,19 +411,33 @@
 			compatible = "marvell,88pa6170-upc";
 			reg = <0xf9200000 0x10000>, <0xf9210000 0xb0000>,
 			      <0xf9304000 0x2100>, <0xf8150000 0x5000>,
-			      <0xf8000180 0x4>, <0xf8044000 0x3000>;
+			      <0xf8000180 0x4>, <0xf8043000 0x4000>;
 			reg-names = "upc0", "upc1", "pwm", "smot", "apb",
 				    "pads";
 			/*
-			 * pads: GPIO banks 4-6. marvell,pads = <bank pin
+			 * pads: GPIO banks 3-6. marvell,pads = <bank pin
 			 * select> as the vendor's gr_def_mpp_list sets them at
 			 * every stock boot: the XENA inputs (bank 5 pins 20-24:
 			 * X/Y/Z endstops, cartridge lever) and the UPC output
 			 * pads (steppers, PWM). User-approved, UPC tests 2c and
 			 * 3 (XIRD 0x3c040000 = stock). The driver writes them
 			 * only with the cores held and every output off.
+			 *
+			 * Bank 3 (GPIO 96-127): the stepper engines' driver
+			 * pads, function 2 on pins 0-4, 6-22 and 24-28 and
+			 * the bank's direction register 0, as stock. Without
+			 * them the A4982s stay disabled (no holding torque);
+			 * values confirmed on the printer 2026-11-12.
 			 */
+			marvell,pads-dir-clear = <3>;
 			marvell,pads = <
+				3 0 0x1002 3 1 0x1002 3 2 0x1002 3 3 0x1002
+				3 4 0x1002 3 6 0x1002 3 7 0x1002 3 8 0x1002
+				3 9 0x1002 3 10 0x1002 3 11 0x1002 3 12 0x1002
+				3 13 0x1002 3 14 0x1002 3 15 0x1002 3 16 0x1002
+				3 17 0x1002 3 18 0x1002 3 19 0x1002 3 20 0x1002
+				3 21 0x1002 3 22 0x1002 3 24 0x1002 3 25 0x1002
+				3 26 0x1002 3 27 0x1002 3 28 0x1002
 				4 24 0x1003 4 26 0x1003 5 0 0x1003 5 1 0x1003
 				5 2 0x1003 5 3 0x1003 5 6 0x1001 5 7 0x1001
 				5 8 0x1001 5 9 0x1001 5 10 0x1001 5 11 0x1001
