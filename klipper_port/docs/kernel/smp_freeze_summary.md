@@ -80,13 +80,20 @@ NAND root:
   (~10.0 h), no reboot, no panic/U-Boot/stall marker on serial.
 - Serial liveness: 559 `alive`, **0 NO PROMPT** -- the console answered every
   minute for the whole run.
-- Ping: 688 LOST / 35 156 (~2 %). The one long run (427 pings, 17:52-17:59)
-  overlaps serial that stayed `alive` throughout, so by the grading rule it
-  is a network blip, not a freeze. (.147 is the Ethernet IP.)
+- Ping: 688 LOST / 35 156 (~2 %). The one long run (427 pings, 17:52-17:59,
+  ~62 % of all loss) was **PC-side, not the printer**: the Claude desktop app
+  and its helper processes crashed on the monitoring PC in that window, which
+  is why both the ping and the serial probe stopped emitting after ~17:59;
+  the owner force-restarted the app and monitoring resumed at 18:15. The
+  printer stayed up throughout -- serial `alive` and kernel uptime monotonic
+  across the whole window, no reboot. The remaining ~261 losses are scattered
+  1-15 ping runs (PC or LAN hiccups), none overlapping a missed serial probe,
+  so none is a freeze.
 
 This is the first clean 10 h two-CPU NAND-root soak. The SMP hard freeze is
-fixed by candidate 3 (`dsb sy` barriers + the 6011 window + clrex). The ~2 %
-link loss is a separate network-layer item, folded into the Wi-Fi work.
+fixed by candidate 3 (`dsb sy` barriers + the 6011 window + clrex). The ping
+loss was a monitoring-PC artifact, not a printer or kernel event. (Wi-Fi
+power-saving drops are a separate, real item tracked in the Wi-Fi work.)
 
 ## Next, after the reset
 
