@@ -683,6 +683,28 @@ still require the owner's explicit OK.
       (11-11): variants/nandboot.config now matches mtd0 (two CPUs, no
       maxcpus=1, hang_wdt=30, PJ4B_MV61X0_DSB_BARRIERS); 6011 and barrier
       Kconfig help and the docs updated (smp_freeze_summary.md, "The fix").
+      **Wi-Fi reload fix found: 0027 with usb8782_rmmod=2 (11-11, TESTPLAN
+      part E, C3 in mtd0).** Cause of the 0026 failure: mainline's unbind
+      sends FUNC_SHUTDOWN and no USB reset, so the firmware stops serving
+      its endpoints. mwifiex_usb-0027.ko (78879a6d, wifi_fw session) adds
+      usb8782_rmmod: 0 = keep firmware, 1 = shutdown (old), 2 = shutdown +
+      usb_reset_device (Marvell SDK way).
+      - E1 (rmmod stock, USBDEVFS_RESET, insmod 0027): PASS -- boot-ROM first
+        reply, full 253996-byte download, INIT_DONE, host_mlme.
+      - E1 loops, rmmod=2: **10/10 PASS** (download path, reset rc 0 on every
+        unbind, scans 14-17 BSS, no timeouts).
+      - E2 (rmmod=0, firmware left running): 0/3, also 0/3 with winner=1 --
+        no reply on reload, download fails. 0026's running-firmware detection
+        is not worth keeping.
+      - Found by accident: after a failed download the card is unregistered,
+        so the module's unbind reset never runs, and a userspace reset of
+        that chip lost it ("unable to enumerate", even after the hub's port
+        power cycle). The owner power-cycled; cold boot recovered Wi-Fi.
+        The fix should also cover the failed-download path.
+      Logs in the side-session notes folder (e1_*, e2_*,
+      wifi0027_e2_gone_dmesg.txt). Next: wifi session makes rmmod=2 the
+      8782 default and handles the failed-download case; then warm-boot
+      parts A/C/D on the new module.
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
