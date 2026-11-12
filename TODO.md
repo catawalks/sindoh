@@ -653,8 +653,10 @@ still require the owner's explicit OK.
       maxcpus=1), NAND root: IRQSOAK DONE 172 passes, uptime monotonic
       7714->43734 s (~10 h, no reboot), 559 probes alive / 0 NO PROMPT,
       no panic/U-Boot marker. Ping 688 LOST / 35 156 (~2 %); the one long
-      run (7 min, 17:52-17:59) overlaps serial that stayed alive, so it is
-      a network/Ethernet blip, not a freeze. **The SMP hard freeze is fixed.**
+      run (7 min, 17:52-17:59) was the Claude desktop app crashing on the
+      monitoring PC (both monitors stopped emitting; owner force-restarted,
+      monitoring resumed 18:15) -- the printer stayed up (serial alive,
+      uptime monotonic), so not a freeze. **The SMP hard freeze is fixed.**
       Next, per the owner's standing OK (memory c3-mtd0-approval): run the
       Wi-Fi driver tests on this live C3, then write C3 to mtd0 (replace the
       maxcpus=1 default). Wi-Fi test harness + whether this build has the
