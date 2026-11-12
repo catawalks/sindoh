@@ -112,6 +112,13 @@ the work; it is how open items survive between sessions.
    slicer's first-layer bounds (PrusaSlicer first_layer_print_min/max); (b) a
    fixed strip at the bed edge (the front Y < ~10 is over the grip handle);
    (c) drop it and rely on PRINT_START's bin purge + wipe. Owner to choose.
+   **Decided + done 2026-11-12 (owner at the dev printer):** the front edge.
+   Probe map (map_front.py, 36 points): flat to Y -2 (each column within
+   ~0.04 mm), edge between Y -2 and -5 - no handle dead zone. Test line at
+   Y 2 (210/60, no mesh) printed 5 mm from the edge (owner measured), so
+   the edge is at Y ~-3. PRIME_LINE moved to **Y 0** (return pass Y 0.6).
+   Not yet: a test line at Y 0; the work printer gets it with the next
+   stick payload. Also seen: the bed took 9 min to reach 60 C.
 
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
    Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH

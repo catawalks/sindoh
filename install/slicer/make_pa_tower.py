@@ -24,7 +24,7 @@ p.add_argument('--bed', type=int, default=60)
 p.add_argument('--temp', type=int, default=205)
 a = p.parse_args()
 
-CX, CY = 105.0, 100.0          # bed centre, clear of the prime line (Y 35)
+CX, CY = 105.0, 100.0          # bed centre, clear of the prime line (Y 0)
 W = 0.45                       # extrusion width
 LH, FLH = 0.2, 0.25            # layer heights
 FIL = math.pi * 1.75 ** 2 / 4
