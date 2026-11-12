@@ -3,7 +3,7 @@ status (no Moonraker, nothing sent: post() and get() are stubbed):
   1  a paused print: HOME and the job banner, nothing that homes
   2  a LOAD that stops: the error page with UNLOAD / TRY AGAIN
   3  EMPTY BIN -> the empty-the-bin page -> DONE (BIN_EMPTIED)
-  5  custom macro buttons (MOVE -> MACROS, a JSON file)
+  5  custom macro buttons (home -> MACROS, a JSON file)
 Runs anywhere with Pillow:  python3 test_dp200_print_notes.py
     python3 test_dp200_print_notes.py --demo DIR   also saves the pages as PNGs"""
 import io, json, os, sys, tempfile, time, urllib.error
@@ -110,6 +110,12 @@ check('home shows the job: RESUME, CANCEL, JOB', all(k in labels for k in ('RESU
 tap('RESUME'); check('RESUME asks first', ui.confirm is not None and 'Resume' in ui.confirm[0])
 n = len(sent); tap('YES'); check('YES sends RESUME', sent[n:] == [('/printer/gcode/script', 'RESUME')])
 tap('JOB'); check('JOB -> print page', ui.screen == 'print')
+n = len(sent); tap('RESUME')
+check('print page RESUME asks first too', ui.confirm is not None and len(sent) == n)
+tap('YES'); check('  YES sends RESUME', sent[n:] == [('/printer/gcode/script', 'RESUME')])
+ui.st = status('printing'); render()
+n = len(sent); tap('PAUSE'); check('PAUSE: no question (it stops motion)', sent[n:] == [('/printer/gcode/script', 'PAUSE')])
+ui.st = status('paused')
 tap(''); tap('MOVE'); render('1_move_paused')
 check('paused MOVE: HOME, MOTORS OFF, CALIBRATE, BED LEVEL off',
       all(labels.get(k) is None for k in ('HOME', 'MOTORS OFF', 'CALIBRATE', 'BED LEVEL')))
@@ -126,7 +132,7 @@ check('paused: a G28 confirm is refused', ui.confirm is None and len(sent) == n)
 ui.screen = 'bedlevel'; render(); check('paused: the bed level page is left', ui.screen == 'move')
 ui.st = status('paused', homed='')
 render('1_move_paused_unhomed')
-check('paused + not homed: only MACROS left on MOVE',
+check('paused + not homed: nothing left on MOVE',
       [k for k in ('HOME', 'LOWER BED', 'CLEAN', 'MOTORS OFF', 'EMPTY BIN', 'CALIBRATE', 'BED LEVEL')
        if labels.get(k) is not None] == [])
 ui.screen = 'fil_mat'; n = len(sent); tap('PLA')
@@ -207,8 +213,12 @@ render('3_bin_paused')
 ui.st = status()
 
 # ---- 5: custom macro buttons ----------------------------------------------
-ui.screen = 'move'; tap('MACROS'); render('5_macros_empty')
+ui.screen = 'home'; render('5_home')
+check('MACROS on the home page', labels.get('MACROS') == ('screen', 'macros'))
+ui.screen = 'move'; render(); check('no MACROS on MOVE', 'MACROS' not in labels)
+ui.screen = 'home'; tap('MACROS'); render('5_macros_empty')
 check('MACROS: no file -> no buttons, EDIT', ui.screen == 'macros' and 'EDIT' in labels)
+check('MACROS BACK -> home', ui.back_action() == ('screen', 'home'))
 tap('EDIT'); render('5_macros_edit')
 check('EDIT lists the macros without _ names', ui.mac['all'] == ['LAMP_TOGGLE', 'MY_PURGE', 'PARK_REAR', 'PRINT_START'])
 tap('MY_PURGE'); tap('PARK_REAR')
@@ -221,7 +231,7 @@ with open(S.MACROS_FILE, 'w') as f:      # as edited in Mainsail
     json.dump({'buttons': [{'label': 'PURGE', 'gcode': 'MY_PURGE'},
                            {'label': 'PARK', 'gcode': 'PARK_REAR', 'confirm': 'Park the head at the back?'},
                            {'gcode': 'M117 hello'}]}, f)
-ui.screen = 'move'; tap('MACROS'); render('5_macros')
+ui.screen = 'home'; tap('MACROS'); render('5_macros')
 check('file edited elsewhere: re-read', all(k in labels for k in ('PURGE', 'PARK', 'M117')))
 n = len(sent); tap('PURGE')
 check('a macro button asks first', ui.confirm is not None and 'MY_PURGE' in ui.confirm[0] and len(sent) == n)
@@ -229,18 +239,20 @@ tap('YES'); check('YES runs it', sent[-1] == ('/printer/gcode/script', 'MY_PURGE
 tap('PARK'); check('own question from the file', ui.confirm[0] == 'Park the head at the back?')
 tap('NO')
 ui.st = status('paused'); render('5_macros_paused')
-check('paused: macro buttons off', labels.get('PURGE') is None)
-n = len(sent); ui.run(('confirm', 'x', ('gcode', 'MY_PURGE', 'PURGE', 'macro')))
-check('paused: a macro confirm is refused', ui.confirm is None and len(sent) == n)
+n = len(sent); tap('PURGE')
+check('paused: a macro still asks first', ui.confirm is not None and len(sent) == n)
+tap('YES'); check('  and runs on YES (the user answers for it)', sent[-1] == ('/printer/gcode/script', 'MY_PURGE'))
+ui.screen = 'home'; render('5_home_paused')
+check('paused home page: MACROS there', labels.get('MACROS') == ('screen', 'macros'))
 ui.st = status()
 open(S.MACROS_FILE, 'w').write('{"buttons": [ {"label": "x"} ]}')
-ui.screen = 'move'; tap('MACROS'); render('5_macros_broken')
+ui.screen = 'home'; tap('MACROS'); render('5_macros_broken')
 check('broken file: shown, no buttons', ui.mac['error'] and 'gcode' in ui.mac['error'])
 tap('EDIT'); check('broken file: EDIT refuses (file kept)', ui.screen == 'macros'
                    and json.load(open(S.MACROS_FILE)) == {'buttons': [{'label': 'x'}]})
 open(S.MACROS_FILE, 'w').write('not json')
 tap('BACK') if 'BACK' in labels else None
-ui.screen = 'move'; tap('MACROS'); check('not JSON: error shown', ui.mac['error'] is not None)
+ui.screen = 'home'; tap('MACROS'); check('not JSON: error shown', ui.mac['error'] is not None)
 
 # ---- STOP is on every new page ----------------------------------------------
 for page in ('fil_error', 'bin', 'macros', 'macros_edit'):

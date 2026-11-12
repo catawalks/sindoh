@@ -19,7 +19,8 @@ the work; it is how open items survive between sessions.
    test_dp200_print_notes.py 58/58, docs/touchscreen_options.md "Paused
    prints ..."): paused-job banner + HOME, no homing while paused, LOAD error
    page (UNLOAD / TRY AGAIN), EMPTY BIN -> empty-the-bin page -> DONE, purge
-   count, MOVE -> MACROS (dp200_screen_macros.json). (4) needed no UI change.
+   count, MACROS on home (dp200_screen_macros.json; also while paused, owner
+   11-12), both RESUME buttons ask. (4) needed no UI change.
    **Not on a printer yet; deploy only together with the macro change below.**
    On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and

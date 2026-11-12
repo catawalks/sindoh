@@ -195,8 +195,9 @@ made-up status; `--demo DIR` saves the pages as PNGs).
 
 **Paused print.** While printing, the print page is shown (as before), and
 a print that starts or resumes leaves any page that could move or heat.
-While paused, the print page has the HOME button, and the home page shows
-a PRINT PAUSED banner with RESUME (asks first), CANCEL (asks) and JOB (the
+While paused, the print page has the HOME button and its RESUME asks first
+(owner, 11-12), and the home page shows a PRINT PAUSED banner with RESUME
+(asks first), CANCEL (asks) and JOB (the
 print page). Nothing that homes, probes or turns the motors off can run
 while paused (`paused_refusal`): MOVE greys out HOME, MOTORS OFF,
 CALIBRATE and BED LEVEL, and those pages are left if they were open. LOWER
@@ -225,10 +226,11 @@ EMPTIED.
 the screen only shows the targets Klipper reports, so a preheat stays
 visible as a preheat. No screen change was needed.
 
-**Custom macro buttons.** MOVE -> MACROS shows buttons from
+**Custom macro buttons.** MACROS on the home page shows buttons from
 `~/printer_data/config/dp200_screen_macros.json`, which Mainsail can edit
 (Machine tab). Every button asks before it runs (the screen can't know
-whether a macro moves or heats); none run while a print is paused. EDIT
+whether a macro moves or heats). They also run while a print is paused:
+the user answers for their own macros (owner, 11-12). EDIT
 lists the printer's macros (`/printer/objects/list`, names starting with
 `_` hidden): tap one to add or remove its button. A broken file is shown
 with its error and EDIT refuses to overwrite it.

@@ -88,6 +88,7 @@ BIN_DROP = 70                         # EMPTY_BIN lowers the bed this far (bin_d
 MACROS_FILE = '/home/klipper/printer_data/config/dp200_screen_macros.json'
 MAC_PER_PAGE = 8                      # buttons per MACROS page
 MAC_EDIT_PER_PAGE = 10                # macros per EDIT page
+RESUME_Q = 'Resume the print? The head goes back to the part.'
 
 # Input shaping with a USB accelerometer (docs/input_shaping.md): the sensor
 # config is included only while it has the .cfg name (see dp200_printer.cfg)
@@ -1618,7 +1619,7 @@ class UI:
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'wifi_saved': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home',
-              'fil_error': 'filament', 'bin': 'move', 'macros': 'move', 'macros_edit': 'macros'}
+              'fil_error': 'filament', 'bin': 'move', 'macros': 'home', 'macros_edit': 'macros'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
     NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_saved', 'wifi_kb', 'power')
     # pages a print that starts or resumes leaves alone (no motion or heat on them)
@@ -1691,8 +1692,7 @@ class UI:
             d.text((26, 194), (ps.get('filename') or '?')[:38], font=font(18), fill=C_TXT)
             w = (PW - 24 - 28 - 2 * 10) // 3
             for i, it in enumerate((
-                    ('RESUME', ('confirm', 'Resume the print? The head goes back to the part.',
-                                ('gcode', 'RESUME', 'Resume')), C_ON, 26),
+                    ('RESUME', ('confirm', RESUME_Q, ('gcode', 'RESUME', 'Resume')), C_ON, 26),
                     ('CANCEL', ('confirm', 'Cancel the print?', ('gcode', 'CANCEL_PRINT', 'Cancel')),
                      C_RED, 26),
                     ('JOB', ('screen', 'print'), C_BTN, 26, 'details'))):
@@ -1708,12 +1708,13 @@ class UI:
             ('FILAMENT', ('screen', 'filament')),
             ('PREHEAT', ('screen', 'preheat')),
             ('MOVE', ('screen', 'move')),
+            ('MACROS', ('screen', 'macros'), C_BTN, 30, 'your own'),
             ('SYSTEM', ('screen', 'system')),
             ('COOL DOWN', ('confirm', 'The print is paused: cool down anyway? It cannot resume '
                                       'until the nozzle is hot again.',
                            ('gcode', 'FILAMENT_DRY_STOP\nTURN_OFF_HEATERS', 'Cool down'))
              if paused else ('gcode', 'FILAMENT_DRY_STOP\nTURN_OFF_HEATERS', 'Cool down')),
-        ], top=top, rows_h=96 if paused else 110)
+        ], top=top, rows_h=74 if paused else 90)
         if paused:
             return
         dry = st.get('gcode_macro _DRY') or {}
@@ -1743,7 +1744,8 @@ class UI:
         paused = ps['state'] == 'paused'
         lamp = self.lamp_on(st)
         self.grid(d, [
-            ('RESUME' if paused else 'PAUSE', ('gcode', 'RESUME' if paused else 'PAUSE')),
+            ('RESUME', ('confirm', RESUME_Q, ('gcode', 'RESUME', 'Resume')), C_ON) if paused
+            else ('PAUSE', ('gcode', 'PAUSE')),
             ('CANCEL', ('confirm', 'Cancel the print?', ('gcode', 'CANCEL_PRINT', 'Cancel')), C_RED),
             ('Z -0.025', ('gcode', 'SET_GCODE_OFFSET Z_ADJUST=-0.025 MOVE=1', 'Z -0.025'), C_BTN, 26, 'closer'),
             ('Z +0.025', ('gcode', 'SET_GCODE_OFFSET Z_ADJUST=0.025 MOVE=1', 'Z +0.025'), C_BTN, 26, 'further'),
@@ -1885,8 +1887,8 @@ class UI:
         btns = m['buttons']
         paused = st['print_stats']['state'] == 'paused'
         if btns:
-            d.text((20, 196), 'Not while a print is paused.' if paused else 'Each one asks first.',
-                   font=font(18), fill=C_WARN if paused else C_DIM)
+            d.text((20, 196), 'Paused: the part is still on the bed!' if paused else
+                   'Each one asks first.', font=font(18), fill=C_WARN if paused else C_DIM)
         else:
             for i, l in enumerate(('No buttons yet. EDIT picks from', "the printer's macros, or edit",
                                    name, 'in Mainsail (Machine tab).')):
@@ -1898,9 +1900,8 @@ class UI:
         for b in btns[m['page'] * n:(m['page'] + 1) * n]:
             q = b.get('confirm') or ('Run %s? The screen cannot tell whether it moves or heats.'
                                      % b['gcode'].split()[0])
-            items.append((b['label'], None if paused else
-                          ('confirm', q, ('gcode', b['gcode'], b['label'], 'macro')),
-                          C_BAR if paused else C_BTN, 24, None, C_DIM if paused else C_TXT))
+            items.append((b['label'], ('confirm', q, ('gcode', b['gcode'], b['label'], 'macro')),
+                          C_BTN, 24))
         if btns:
             items += [None] * (n - len(items))
         items.append(('EDIT', ('mac_edit',), C_BTN, 24, 'add / remove'))
@@ -1976,7 +1977,6 @@ class UI:
              C_FULL if n >= BIN_THRESHOLD else C_BTN, 28, '%d / %d purges' % (n, BIN_THRESHOLD)),
             ('CALIBRATE', ('screen', 'calibrate'), C_BTN, 28, 'input shaping'),
             ('BED LEVEL', ('screen', 'bedlevel'), C_BTN, 28, 'probe + screws'),
-            ('MACROS', ('screen', 'macros'), C_BTN, 28, 'your own'),
         ]
         if paused:
             for k in (0, 3, 5, 6):                     # HOME, MOTORS OFF, CALIBRATE, BED LEVEL
@@ -1984,8 +1984,7 @@ class UI:
             if not lower:
                 items[1] = items[1][:1] + (None, C_BAR) + items[1][3:] + (C_DIM,)
             if homed != 'xyz':                          # anything else would home first
-                items = [it if it[0] == 'MACROS' else (it[0], None, C_BAR, 28, no, C_DIM)
-                         for it in items]
+                items = [(it[0], None, C_BAR, 28, no, C_DIM) for it in items]
         self.grid(d, items, top=240, rows_h=90)
 
     def bl_view(self, d, top, w, live):
@@ -2572,7 +2571,7 @@ def paused_refusal(act, st):
     if act[0] != 'gcode':
         return None
     if len(act) > 3 and act[3] == 'macro':
-        return 'Macros: not while paused'
+        return None                            # the user's own macro: their call (owner, 11-12)
     cmds = [l.split()[0].upper() for l in act[1].splitlines() if l.split()]
     if any(c in PAUSE_REFUSED for c in cmds):
         return 'Not while paused (part on the bed)'
