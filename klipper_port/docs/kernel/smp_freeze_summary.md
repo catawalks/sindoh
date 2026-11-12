@@ -95,6 +95,11 @@ fixed by candidate 3 (`dsb sy` barriers + the 6011 window + clrex). The ping
 loss was a monitoring-PC artifact, not a printer or kernel event. (Wi-Fi
 power-saving drops are a separate, real item tracked in the Wi-Fi work.)
 
+**In mtd0 (11-11).** The exact soaked binary (m1-nandboot-nanddsb, md5
+a4e0cb33, forced command line with `timer_mv61x0.hang_wdt=30`) replaced the
+maxcpus=1 default in mtd0 with `tools/mtd0_kernel_update.sh` (KUPDATE OK,
+U-Boot block unchanged). It booted from NAND on two CPUs, onto the NAND root.
+
 ## Next, after the reset
 
 1. **Rerun nandpcs from the card gap on the NAND root, 2 h.** Does its long clean run repeat? If it does, compare its mtd0 boot path.
