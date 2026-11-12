@@ -29,6 +29,8 @@ the work; it is how open items survive between sessions.
    MOTORS OFF ignored). Fixed: busy always ends (reply / error / timeout, or
    Klipper idle 5 s), outcome read from the G-code log. Root cause (why the
    reply never came) not seen from the PC: check moonraker.log for that POST.
+   Same day: TRY AGAIN now leaves the error page at once for a "Loading PLA"
+   page with its steps; homing/move errors get a plain page (OK only).
    **Not on a printer yet; deploy only together with the macro change below.**
    On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and

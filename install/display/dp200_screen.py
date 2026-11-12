@@ -541,7 +541,8 @@ class UI:
         # USB sticks seen (sdX names), and which of them hold a Sindoh update
         self.stk = {'checked': 0.0, 'busy': False, 'seen': set(), 'sindoh': set(), 'asked': set()}
         self.last_pstate = None        # print state at the last render (jump to the print page)
-        self.fil_fail = None           # a LOAD/UNLOAD that stopped: {'mode', 'msg', 'script'}
+        self.fil_fail = None           # a LOAD/UNLOAD that stopped: {'mode', 'msg', 'script', 'label', 'kind'}
+        self.fil_job = None            # the LOAD/UNLOAD running now (page fil_run): the req
         self.busy_tok = None           # the _bg job that holds self.busy
         self.req = None                # the G-code request it waits on (see busy_tick)
         # custom macro buttons: the file's buttons (or its error), the printer's macros (EDIT)
@@ -676,6 +677,9 @@ class UI:
             req = {'script': action[1], 'label': label, 'after': after, 't0': time.time(),
                    'done': False, 'idle_since': None}
             self._bg(label, lambda: self.gcode_then(req), req)
+            if after == 'fil' and self.req is req:     # started (not refused as busy)
+                self.fil_job = req
+                self.screen = 'fil_run'
         elif kind == 'post':
             self._bg(action[2], lambda: post(action[1]))
         elif kind == 'dry_mat':
@@ -816,7 +820,8 @@ class UI:
             return
         last = req['script'].splitlines()[-1]
         self.fil_fail = {'mode': 'unload' if last.startswith('UNLOAD') else 'load',
-                         'msg': msg, 'script': last}
+                         'msg': msg, 'script': last, 'label': req['label'], 'kind': fil_error_kind(msg)}
+        self.fil_job = None
         self.confirm = None
         self.screen = 'fil_error'
 
@@ -856,6 +861,9 @@ class UI:
             self.gcode_failed(r, err)
         elif r['after'] == 'fil' and not any('oad complete' in l for l in lines or ()):
             # neither an error nor LOAD/UNLOAD's "... complete": say so
+            self.fil_job = None
+            if self.screen == 'fil_run':
+                self.screen = 'filament'
             self.flash('%s ended (no reply): check it' % r['label'], 15)
         else:
             self.gcode_ok(r)
@@ -864,7 +872,8 @@ class UI:
         label, after = req['label'], req['after']
         paused = job_state(self.st) == 'paused'
         if after == 'fil':
-            if self.screen == 'fil_error':             # TRY AGAIN / UNLOAD worked
+            self.fil_job = None
+            if self.screen in ('fil_run', 'fil_error'):  # done (also a TRY AGAIN / UNLOAD)
                 self.screen = 'filament'
             self.flash('%s complete%s' % (label, ': RESUME when ready' if paused else ''), 10)
         elif after == 'bin':
@@ -1724,7 +1733,7 @@ class UI:
               'network': 'system', 'ipcfg': 'network', 'wifi': 'network', 'wifi_list': 'wifi',
               'wifi_saved': 'wifi',
               'display': 'system', 'timeout': 'display', 'power': 'home',
-              'fil_error': 'filament', 'bin': 'move', 'macros': 'home', 'macros_edit': 'macros'}
+              'fil_error': 'filament', 'fil_run': 'filament', 'bin': 'move', 'macros': 'home', 'macros_edit': 'macros'}
     # pages that also work without Klipper (to fix the network from the waiting/error page)
     NO_KLIPPER = ('network', 'ipcfg', 'numpad', 'wifi', 'wifi_list', 'wifi_saved', 'wifi_kb', 'power')
     # pages a print that starts or resumes leaves alone (no motion or heat on them)
@@ -1966,26 +1975,61 @@ class UI:
         self.button(d, (20, 470, PW - 20, 570), mode.upper(), ('fil_custom_go',), C_ON, 34,
                     'heat to %d °C' % t)
 
+    def page_fil_run(self, d, st):
+        """A LOAD/UNLOAD running (also after TRY AGAIN): its steps, guessed
+        from the homing and the nozzle temperature (the macro has no step
+        variable). BACK leaves it running; the result comes anyway."""
+        r = self.fil_job
+        if r is None:
+            d.text((20, 160), 'Nothing running', font=font(26), fill=C_DIM)
+            return
+        mode = 'unload' if r['script'].splitlines()[-1].startswith('UNLOAD') else 'load'
+        what = r['label'].split(None, 1)[1] if ' ' in r['label'] else 'filament'
+        d.text((20, 160), '%s %s' % ('Loading' if mode == 'load' else 'Unloading', what),
+               font=font(30), fill=C_TXT)
+        el = int(time.time() - r['t0'])
+        d.text((20, 202), 'Running %d:%02d' % (el // 60, el % 60), font=font(20), fill=C_DIM)
+        steps = FIL_STEPS_LOAD if mode == 'load' else FIL_STEPS_UNLOAD
+        cur = fil_phase(st)
+        keys = [k for k, _ in steps]
+        for n, (key, text) in enumerate(steps):
+            y = 250 + n * 40
+            done = keys.index(cur) > n
+            now = key == cur
+            d.text((24, y), 'OK' if done else '>' if now else '', font=font(22), fill=C_ON if done else C_WARN)
+            d.text((70, y), text, font=font(24 if now else 22),
+                   fill=C_WARN if now else C_DIM if done else C_TXT)
+        d.text((20, 430), 'STOP (hold) stops it at once.', font=font(18), fill=C_DIM)
+
     def page_fil_error(self, d, st):
-        """A LOAD/UNLOAD that stopped (jam, no grab, homing refused): why,
-        and what next. Klipper's message is shown in full."""
+        """A LOAD/UNLOAD that stopped. A filament-path stop (jam, no grab)
+        offers UNLOAD / TRY AGAIN; anything else (homing, moves, the bed
+        question) is shown plainly with OK only. Klipper's message in full."""
         f = self.fil_fail or {'mode': 'load', 'msg': '?', 'script': 'LOAD_FILAMENT MATERIAL=PLA'}
         mode = f['mode']
-        d.rounded_rectangle((12, 154, PW - 12, 470), radius=14, fill=(90, 24, 24))
-        d.text((28, 166), '%s stopped' % mode.upper(), font=font(30), fill=C_TXT)
+        path = f.get('kind', 'path') == 'path'
+        d.rounded_rectangle((12, 154, PW - 12, 470), radius=14, fill=(90, 24, 24) if path else (70, 52, 20))
+        d.text((28, 166), '%s %s' % (mode.upper(), 'stopped' if path else 'failed'), font=font(30), fill=C_TXT)
         for i, l in enumerate(wrap(d, f['msg'], font(20), PW - 60)[:9]):
-            d.text((28, 212 + i * 28), l, font=font(20), fill=(240, 210, 210))
+            d.text((28, 212 + i * 28), l, font=font(20), fill=(240, 210, 210) if path else C_TXT)
+        if not path:
+            d.text((20, 482), 'Not a filament problem: fix this, then %s again.' % mode.upper(),
+                   font=font(18), fill=C_DIM)
+            self.button(d, (30, 516, PW - 30, 596), 'OK', ('screen', 'filament'), C_BTN, 30)
+            return
         arg = f['script'].split(None, 1)[1] if ' ' in f['script'] else ''
         unload = ('UNLOAD_FILAMENT ' + arg).strip()
+        label = f.get('label') or mode.capitalize()
         items = []
         if mode == 'load':
             d.text((20, 482), 'Check the inlet. UNLOAD pulls the filament back.', font=font(18), fill=C_DIM)
             items.append(('UNLOAD', ('confirm', 'Heat the nozzle and UNLOAD the filament?',
-                                     ('gcode', unload, 'Unload', 'fil')), C_BTN, 30))
+                                     ('gcode', unload, 'Unload ' + label.split(None, 1)[-1]
+                                      if ' ' in label else 'Unload', 'fil')), C_BTN, 30))
         else:
             d.text((20, 482), 'Check the inlet and the filament path.', font=font(18), fill=C_DIM)
         items.append(('TRY AGAIN', ('confirm', 'Heat the nozzle and %s again?' % mode.upper(),
-                                    ('gcode', f['script'], mode.capitalize(), 'fil')), C_BTN, 28))
+                                    ('gcode', f['script'], label, 'fil')), C_BTN, 28))
         items.append(('OK', ('screen', 'filament'), C_BTN, 30))
         self.grid(d, items, top=516, rows_h=80, cols=len(items))
 
@@ -2777,6 +2821,29 @@ def save_macros(buttons):
             pass
     os.replace(tmp, MACROS_FILE)
 
+# The LOAD/UNLOAD macros' steps (dp200_macros.cfg) as the running page lists them
+FIL_STEPS_LOAD = (('home', 'Homing X and Y'), ('heat', 'Heating the nozzle'),
+                  ('feed', 'Feeding, purging, wiping'))
+FIL_STEPS_UNLOAD = (('home', 'Homing X and Y'), ('heat', 'Heating the nozzle'),
+                    ('feed', 'Pulling the filament back'))
+
+def fil_phase(st):
+    """Which FIL_STEPS step runs: X/Y homing, heating, then the feed."""
+    homed = st['toolhead'].get('homed_axes', '')
+    if 'x' not in homed or 'y' not in homed:
+        return 'home'
+    e = st['extruder']
+    return 'heat' if not e['target'] or e['temperature'] < e['target'] - 3 else 'feed'
+
+# Messages of a LOAD/UNLOAD stop that are about the filament path (the jam /
+# no-grab check, dp200_macros.cfg): UNLOAD / TRY AGAIN help there. Anything
+# else (homing, endstops, moves, the bed question) is shown plainly.
+FIL_PATH_WORDS = ('encoder', 'jam', 'did not grab', 'feeder')
+
+def fil_error_kind(msg):
+    m = msg.lower()
+    return 'path' if any(w in m for w in FIL_PATH_WORDS) else 'other'
+
 def fil_confirm(mode, name, t):
     """The confirm action for LOAD/UNLOAD of filament `name` at t C."""
     macro = 'LOAD_FILAMENT' if mode == 'load' else 'UNLOAD_FILAMENT'
@@ -2821,6 +2888,8 @@ def view_key(ui):
             tuple(b['gcode'] for b in ui.mac['buttons']), ui.mac['error'], ui.mac['page'],
             ui.mac['edit_page'], None if ui.mac['all'] is None else len(ui.mac['all']),
             ui.fil_fail and ui.fil_fail['msg'], job_state(st),
+            (int(time.time() - ui.fil_job['t0']), fil_phase(st)) if ui.screen == 'fil_run' and ui.fil_job
+            else None,
             start_phase(st) if job_state(st) == 'starting' else None)
 
 # ---------------------------------------------------------------------------
