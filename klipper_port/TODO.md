@@ -15,6 +15,14 @@ the work; it is how open items survive between sessions.
    a print is paused or failed (dp200_screen.py forces the print page while
    printing/paused); (3) EMPTY BIN button + BIN EMPTIED feedback;
    (5) user-configurable page of custom macro buttons.
+   **UI side written 11-12** (screen-app session; offline test
+   test_dp200_print_notes.py 58/58, docs/touchscreen_options.md "Paused
+   prints ..."): paused-job banner + HOME, no homing while paused, LOAD error
+   page (UNLOAD / TRY AGAIN), EMPTY BIN -> empty-the-bin page -> DONE, purge
+   count, MACROS on home (dp200_screen_macros.json; also while paused, owner
+   11-12), both RESUME buttons ask. (4) needed no UI change.
+   **Not on a printer yet; deploy only together with the macro change below.**
+   On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and
    cfglint OK, **not yet run on a printer**):
    - **Crash fix:** during a paused print LOAD/UNLOAD/CLEAN_NOZZLE moved to
@@ -88,12 +96,37 @@ the work; it is how open items survive between sessions.
      pinmux of the smot pins under nandboot vs m1-full; a regsnap.sh of a
      working boot (stock app, or the 10-30 m1-full path) vs this one.
    - **Until it's found:** don't print on the dev printer.
+   - **CAUSE FOUND 2026-11-12 (owner at the printer):** GPIO bank 3
+     (0xf8043000) is left as U-Boot sets it on nandboot (dir 0x00010040,
+     selects 0x000C1000); stock is dir 0, selects 0x00001002 on pins 0-4,
+     6-22, 24-28 (eth-pinmux.sh steps 1-2 did this by accident on 10-30).
+     Found offline by the motor session. Test on C3 from mtd0: rc.dp200
+     stop, write the stock values by devmem (RAM only), rc.dp200 start,
+     SET_STEPPER_ENABLE X/Y: **both hold** (owner checked by hand), CFG
+     0xf815000c / 0xf815100c = 0x10. Then G28 X -> 216.0, G28 Y -> 5.5:
+     **both home.** Lost at reboot until the permanent fix: the mv61x0-upc
+     driver sets bank 3 at probe (after forcing the drivers off), then a
+     kernel rebuild, RAM boot, and mtd0 with the owner's OK.
 0b. **(11-09, owner) PRIME_LINE lies inside big prints.** The work printer's
    test print covered X 40-160 / Y 35 (klipper/config/dp200_printer.cfg
    PRIME_LINE). Move it out of the print area. Options: (a) place it from the
    slicer's first-layer bounds (PrusaSlicer first_layer_print_min/max); (b) a
    fixed strip at the bed edge (the front Y < ~10 is over the grip handle);
    (c) drop it and rely on PRINT_START's bin purge + wipe. Owner to choose.
+   **Decided + done 2026-11-12 (owner at the dev printer):** the front edge.
+   Probe map (map_front.py, 36 points): flat to Y -2 (each column within
+   ~0.04 mm), edge between Y -2 and -5 - no handle dead zone. Test line at
+   Y 2 (210/60, no mesh) printed 5 mm from the edge (owner measured), so
+   the edge is at Y ~-3. PRIME_LINE moved to **Y 0** (return pass Y 0.6).
+   Test line at Y 0: 3 mm from the edge (owner measured), stuck most of
+   the way but blotchy (no mesh; nozzle oozed while waiting). Next: a full
+   test print (PRINT_START mesh + PRIME_LINE). The work printer gets it
+   with the next stick payload. Also seen: the bed took 9 min to reach 60 C.
+   **Deployed to the dev printer 2026-11-12 17:30:** dp200_macros.cfg
+   4d29164a, dp200_printer.cfg 7f87f6cf (both replace the Nov 2-3 copies;
+   .bak-1112 kept), dp200_screen.py 5cea5684 (.bak-1112 kept). Klipper
+   ready, the new macros listed, the screen app running. Not run yet:
+   the screen app's new pages, EMPTY_BIN, the LOAD jam check.
 
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
    Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH

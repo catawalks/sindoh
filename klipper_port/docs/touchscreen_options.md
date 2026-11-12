@@ -186,6 +186,69 @@ of 1 s instead of a confirmation dialog so it stays fast.
 **Error overlay:** when `webhooks.state` is `shutdown`/`error`, a full-width
 red banner shows the message plus a FIRMWARE_RESTART button.
 
+## Paused prints, load errors, purge bin, custom macros (built 11-12)
+
+From the owner's work-printer notes of 11-12 (`dp200_screen.py`; the
+macro side is `dp200_macros.cfg`). Offline test:
+`install/display/test_dp200_print_notes.py` (runs anywhere with Pillow,
+made-up status; `--demo DIR` saves the pages as PNGs).
+
+**Paused print.** While printing, the print page is shown (as before), and
+a print that starts or resumes leaves any page that could move or heat.
+While paused, the print page has the HOME button and its RESUME asks first
+(owner, 11-12), and the home page shows a PRINT PAUSED banner with RESUME
+(asks first), CANCEL (asks) and JOB (the
+print page). Nothing that homes, probes or turns the motors off can run
+while paused (`paused_refusal`): MOVE greys out HOME, MOTORS OFF,
+CALIBRATE and BED LEVEL, and those pages are left if they were open. LOWER
+BED only lowers (Z grows downwards) and skips `_SINDOH_ENSURE_HOMED`. If
+the axes lost their homing during the pause, anything that would home
+(LOAD, CLEAN, EMPTY BIN, ...) is refused: "Not homed: cancel the paused
+print". COOL DOWN asks first while paused. After a cancel or a failure,
+homing works again and Z homing still asks the BED_CLEAR question. LOAD
+during a pause relies on `_SINDOH_SAFE_Z` (the bed never rises toward the
+part): deploy both together.
+
+**LOAD / UNLOAD that stops.** Klipper's error (for example the jam check:
+"LOAD_FILAMENT stopped: the filament encoder saw no movement ...") opens
+a red page with the whole message and UNLOAD (asks) / TRY AGAIN (asks) /
+OK. A load that works says "Load PLA complete" (plus "RESUME when ready"
+while paused).
+
+**Purge bin.** MOVE -> EMPTY BIN shows the purge count (`save_variables`
+`bin_count` / 15; amber when full, and the home page then says "Purge bin
+full"). It asks first (and about the bed when not homed), runs
+`EMPTY_BIN`, then shows "take out the bin, empty it, put it back" with
+DONE (runs `BIN_EMPTIED`, then "Bin emptied: purge count 0 / 15") or NOT
+EMPTIED.
+
+**Preheat and LOAD.** LOAD/UNLOAD put the nozzle back to its old target;
+the screen only shows the targets Klipper reports, so a preheat stays
+visible as a preheat. No screen change was needed.
+
+**Custom macro buttons.** MACROS on the home page shows buttons from
+`~/printer_data/config/dp200_screen_macros.json`, which Mainsail can edit
+(Machine tab). Every button asks before it runs (the screen can't know
+whether a macro moves or heats). They also run while a print is paused:
+the user answers for their own macros (owner, 11-12). EDIT
+lists the printer's macros (`/printer/objects/list`, names starting with
+`_` hidden): tap one to add or remove its button. A broken file is shown
+with its error and EDIT refuses to overwrite it.
+
+```json
+{
+  "buttons": [
+    {"label": "PURGE", "gcode": "MY_PURGE"},
+    {"label": "PARK", "gcode": "PARK_REAR", "confirm": "Park the head at the back?"},
+    {"gcode": "M117 hello"}
+  ]
+}
+```
+
+`gcode` is any script (usually one macro name); `label` defaults to its
+first word (max 24 characters); `confirm` replaces the default question.
+Eight buttons per page, MORE for the next.
+
 ## Suggested next steps
 
 1. With someone at the printer: find the backlight control. (Orientation
