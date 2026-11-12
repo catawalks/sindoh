@@ -705,6 +705,20 @@ still require the owner's explicit OK.
       wifi0027_e2_gone_dmesg.txt). Next: wifi session makes rmmod=2 the
       8782 default and handles the failed-download case; then warm-boot
       parts A/C/D on the new module.
+      **0028 (rmmod=2 as the default): PASS 10/10 (11-11).**
+      mwifiex_usb-0028.ko (6645762a) = 0027 with usb8782_rmmod defaulting
+      to 2. Swapped in with wifi_e1.sh (now refuses to reset a chip with no
+      mlan0, i.e. whose last load failed: reboot instead), then 10 reloads
+      with no parameters: all pass, download path, reset rc 0 each unbind,
+      param reads 2, scans 14-16 BSS, no errors. The wifi session's newer
+      reading: a running firmware goes deaf when sent a download block, so
+      0026's running-firmware detection can't work; a reset after
+      FUNC_SHUTDOWN worked 11/11, a reset of a deaf chip lost it twice.
+      After the test, wpa_supplicant, the wpa_cli action daemon and the
+      mlan0 udhcpc had to be restarted by hand (the test scripts don't).
+      0028 runs from RAM only; the NAND root still has the tar's 0013
+      module. Left: install 0028 on the root (owner's OK), then warm-boot
+      parts A/C/D; upstream/0002 to be updated by the wifi session.
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran
