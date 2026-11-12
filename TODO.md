@@ -25,6 +25,10 @@ the work; it is how open items survive between sessions.
    paused) shows "Starting print" with its step (homing / heating / probing
    / purging, guessed from homing and temperatures) and only CANCEL + LAMP;
    the bed-question YES no longer holds the screen busy for the ~7 min start.
+   Dev printer 11-12: a jam-stopped LOAD left the screen busy (no error page,
+   MOTORS OFF ignored). Fixed: busy always ends (reply / error / timeout, or
+   Klipper idle 5 s), outcome read from the G-code log. Root cause (why the
+   reply never came) not seen from the PC: check moonraker.log for that POST.
    **Not on a printer yet; deploy only together with the macro change below.**
    On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and

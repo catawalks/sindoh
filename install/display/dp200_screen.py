@@ -45,6 +45,13 @@ DIM_AFTER = 600                       # default s without touch while idle -> bl
 TIMEOUTS = (60, 300, 600, 1800, 0)    # choices on the TIMEOUT page; 0 = never
 SETTINGS = '/etc/dp200/screen_settings.json'   # saved touch-screen settings
 HOLD_STOP = 1.0                       # s to hold STOP
+# A G-code request the screen waits on (LOAD: 1-3 min) whose reply does not
+# come: once Klipper is idle (idle_timeout not "Printing") this long, the
+# script has ended. The busy state is released then and the outcome is read
+# from Moonraker's G-code log instead (a LOAD stopped on 11-12 and the reply
+# never came; the screen stayed busy and refused every button).
+BUSY_MIN = 10.0                       # s a request runs before Klipper's idle state counts
+IDLE_RELEASE = 5.0                    # s of idle Klipper that end a request
 
 # Front power button: GPIO bank 5 pin 27, 1 = pressed (found 2026-10-22).
 # A short press opens the POWER page. Holding it ~HW_CUT s makes the
@@ -345,6 +352,22 @@ def err_text(e):
         return 'Moonraker: Klipper not connected yet (HTTP %d)' % e.code
     return str(r)
 
+def log(msg):
+    """A line in the screen app's log (stdout)."""
+    print('%s %s' % (time.strftime('%H:%M:%S'), msg), flush=True)
+
+def gcode_lines_since(t0):
+    """Moonraker's G-code log (console lines) since t0 (time.time(), same host)."""
+    log = get('/server/gcode_store?count=100').get('gcode_store') or []
+    return [str(e.get('message', '')) for e in log if e.get('time', 0) >= t0 - 1]
+
+def gcode_error_since(t0, lines=None):
+    """The last Klipper error ("!! ...") since t0, without the "!! ", or None."""
+    for m in reversed(gcode_lines_since(t0) if lines is None else lines):
+        if m.startswith('!! '):
+            return m[3:].strip().splitlines()[0][:400]
+    return None
+
 def fail_text(e, n=160):
     """Why a Moonraker request failed: for a refused G-code that is
     Klipper's own message in the JSON body (the HTTP reason phrase is just
@@ -519,6 +542,8 @@ class UI:
         self.stk = {'checked': 0.0, 'busy': False, 'seen': set(), 'sindoh': set(), 'asked': set()}
         self.last_pstate = None        # print state at the last render (jump to the print page)
         self.fil_fail = None           # a LOAD/UNLOAD that stopped: {'mode', 'msg', 'script'}
+        self.busy_tok = None           # the _bg job that holds self.busy
+        self.req = None                # the G-code request it waits on (see busy_tick)
         # custom macro buttons: the file's buttons (or its error), the printer's macros (EDIT)
         self.mac = {'buttons': [], 'error': None, 'all': None, 'page': 0, 'edit_page': 0}
 
@@ -648,7 +673,9 @@ class UI:
                         self.flash('%s failed: %s' % (label, fail_text(e)))
                 threading.Thread(target=work, daemon=True).start()
                 return
-            self._bg(label, lambda: self.gcode_then(action[1], label, after))
+            req = {'script': action[1], 'label': label, 'after': after, 't0': time.time(),
+                   'done': False, 'idle_since': None}
+            self._bg(label, lambda: self.gcode_then(req), req)
         elif kind == 'post':
             self._bg(action[2], lambda: post(action[1]))
         elif kind == 'dry_mat':
@@ -735,11 +762,16 @@ class UI:
                     'klipper': (vi.get('klipper') or {}).get('version', '-'),
                     'moonraker': (vi.get('moonraker') or {}).get('version', '-')}
 
-    def _bg(self, label, fn):
+    def _bg(self, label, fn, req=None):
+        """Run fn in a worker thread while the footer says "Running: label";
+        other commands are refused meanwhile. The busy state always ends
+        with the job, or earlier for a G-code request `req` once Klipper is
+        idle again (busy_tick). STOP never waits for it."""
         if self.busy:
             self.flash('Busy: ' + self.busy)
             return
-        self.busy = label
+        tok = object()
+        self.busy, self.busy_tok, self.req = label, tok, req
 
         def work():
             try:
@@ -747,26 +779,89 @@ class UI:
             except Exception as e:
                 self.flash('%s failed: %s' % (label, fail_text(e)))
             finally:
-                self.busy = None
+                if self.busy_tok is tok:               # not released and reused meanwhile
+                    self.busy, self.busy_tok, self.req = None, None, None
         threading.Thread(target=work, daemon=True).start()
 
-    def gcode_then(self, script, label, after):
-        """Run a G-code script (in the _bg thread), then what `after` says:
+    def gcode_then(self, req):
+        """Run a G-code script (in the _bg thread), then what req['after'] says:
         'fil'      LOAD/UNLOAD: say it finished, or show why it stopped
                    (page fil_error: UNLOAD / TRY AGAIN) instead of a short flash
         'bin'      EMPTY_BIN: the bin is reachable -> the empty-the-bin page
-        'bin_done' BIN_EMPTIED: confirm the reset, back to MOVE"""
+        'bin_done' BIN_EMPTIED: confirm the reset, back to MOVE
+        If busy_tick has already settled the request, a late reply is ignored."""
         try:
-            post('/printer/gcode/script', {'script': script})
+            post('/printer/gcode/script', {'script': req['script']})
         except Exception as e:
-            if after != 'fil':
-                raise
-            last = script.splitlines()[-1]
-            self.fil_fail = {'mode': 'unload' if last.startswith('UNLOAD') else 'load',
-                             'msg': fail_text(e, 400), 'script': last}
-            self.confirm = None
-            self.screen = 'fil_error'
+            msg = fail_text(e, 400)                    # reads the reply body: once
+            log('request %r: %s after %.0f s%s' % (req['label'], msg, time.time() - req['t0'],
+                                                  ' (already ended)' if req['done'] else ''))
+            if req['done']:
+                return
+            req['done'] = True
+            if not isinstance(e, urllib.error.HTTPError):
+                # timeout / lost connection: Klipper's own words, if it logged any
+                msg = gcode_error_since(req['t0']) or msg
+            self.gcode_failed(req, msg)
             return
+        if req['done']:
+            log('request %r: late reply after %.0f s (already ended)' % (req['label'], time.time() - req['t0']))
+            return
+        req['done'] = True
+        self.gcode_ok(req)
+
+    def gcode_failed(self, req, msg):
+        if req['after'] != 'fil':
+            self.flash('%s failed: %s' % (req['label'], msg), 10)
+            return
+        last = req['script'].splitlines()[-1]
+        self.fil_fail = {'mode': 'unload' if last.startswith('UNLOAD') else 'load',
+                         'msg': msg, 'script': last}
+        self.confirm = None
+        self.screen = 'fil_error'
+
+    def busy_tick(self, now=None):
+        """Main loop: end a G-code request whose reply did not come once
+        Klipper has been idle for IDLE_RELEASE s (idle_timeout stays
+        "Printing" while a script holds the G-code lock, heating waits
+        included). Frees the screen at once, then reads the outcome from
+        Moonraker's G-code log in a thread."""
+        r = self.req
+        if r is None or r['done'] or self.st is None:
+            return
+        now = time.time() if now is None else now
+        state = (self.st.get('idle_timeout') or {}).get('state')
+        if state == 'Printing' or now - r['t0'] < BUSY_MIN:
+            r['idle_since'] = None
+            return
+        if r['idle_since'] is None:
+            r['idle_since'] = now
+            return
+        if now - r['idle_since'] < IDLE_RELEASE:
+            return
+        r['done'] = True
+        log('request %r: no reply, Klipper idle %.0f s after %.0f s: released'
+            % (r['label'], now - r['idle_since'], now - r['t0']))
+        self.busy, self.busy_tok, self.req = None, None, None
+        threading.Thread(target=self.req_ended, args=(r,), daemon=True).start()
+
+    def req_ended(self, r):
+        """A request busy_tick ended: what did Klipper say meanwhile?"""
+        try:
+            lines = gcode_lines_since(r['t0'])
+        except Exception:
+            lines = None
+        err = gcode_error_since(r['t0'], lines) if lines is not None else None
+        if err:
+            self.gcode_failed(r, err)
+        elif r['after'] == 'fil' and not any('oad complete' in l for l in lines or ()):
+            # neither an error nor LOAD/UNLOAD's "... complete": say so
+            self.flash('%s ended (no reply): check it' % r['label'], 15)
+        else:
+            self.gcode_ok(r)
+
+    def gcode_ok(self, req):
+        label, after = req['label'], req['after']
         paused = job_state(self.st) == 'paused'
         if after == 'fil':
             if self.screen == 'fil_error':             # TRY AGAIN / UNLOAD worked
@@ -2798,6 +2893,7 @@ def main():
                 continue
             ui.on_touch(ev)
         ui.check_hold()
+        ui.busy_tick()
         ui.stick_tick()
         ui.wifi_tick()
         ui.net_tick()

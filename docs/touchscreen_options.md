@@ -235,6 +235,20 @@ probing, the mesh, FILAMENT_DRY: `HOMES_FIRST`) still add the bed question
 and BED_CLEAR. During a paused print that lost its homing, both kinds are
 refused.
 
+**Long requests never leave the screen busy.** A G-code button waits for
+Moonraker's reply (LOAD: 1-3 min) and refuses other buttons meanwhile
+("Busy"). On 11-12 a LOAD stopped by the jam check but the screen never
+got the reply: no error page, and MOTORS OFF did nothing until the app
+was restarted. Now the busy state ends with the request whatever happens
+(reply, Klipper's error, timeout), and also when Klipper has been idle for
+5 s (`idle_timeout` not "Printing", which it is while a script holds the
+G-code lock, heat waits included) after the request has run 10 s. The
+outcome is then read from Moonraker's G-code log
+(`/server/gcode_store`): a `!! ...` error opens the LOAD error page (or a
+flash for other buttons), "Load complete" says complete, nothing says
+"ended (no reply)". A late reply is ignored. Each request's end is logged
+(`request 'Load PLA': ...`). STOP never waits for any of this.
+
 **Purge bin.** MOVE -> EMPTY BIN shows the purge count (`save_variables`
 `bin_count` / 15; amber when full, and the home page then says "Purge bin
 full"). It asks first (and about the bed when not homed), runs
