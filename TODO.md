@@ -118,8 +118,15 @@ the work; it is how open items survive between sessions.
    ~0.04 mm), edge between Y -2 and -5 - no handle dead zone. Test line at
    Y 2 (210/60, no mesh) printed 5 mm from the edge (owner measured), so
    the edge is at Y ~-3. PRIME_LINE moved to **Y 0** (return pass Y 0.6).
-   Not yet: a test line at Y 0; the work printer gets it with the next
-   stick payload. Also seen: the bed took 9 min to reach 60 C.
+   Test line at Y 0: 3 mm from the edge (owner measured), stuck most of
+   the way but blotchy (no mesh; nozzle oozed while waiting). Next: a full
+   test print (PRINT_START mesh + PRIME_LINE). The work printer gets it
+   with the next stick payload. Also seen: the bed took 9 min to reach 60 C.
+   **Deployed to the dev printer 2026-11-12 17:30:** dp200_macros.cfg
+   4d29164a, dp200_printer.cfg 7f87f6cf (both replace the Nov 2-3 copies;
+   .bak-1112 kept), dp200_screen.py 5cea5684 (.bak-1112 kept). Klipper
+   ready, the new macros listed, the screen app running. Not run yet:
+   the screen app's new pages, EMPTY_BIN, the LOAD jam check.
 
 1. **Work printer failed test print: diagnosed + fixed (2026-11-06).**
    Logs + G-code on the stick (Work_Printer_Logs/). Cause: UPC_STEP_BATCH
