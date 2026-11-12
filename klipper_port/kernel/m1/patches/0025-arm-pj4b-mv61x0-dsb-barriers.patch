@@ -12,9 +12,9 @@ assembly, into "dsb sy" (docs/kernel/smp_freeze_summary.md).
 ---
 --- a/arch/arm/mm/Kconfig
 +++ b/arch/arm/mm/Kconfig
-@@ -403,6 +403,16 @@
- 	  get the five loads only. Test option
- 	  (docs/kernel/nandboot_hang_analysis.md).
+@@ -403,6 +403,18 @@
+ 	  emulation and the kuser cmpxchg helpers get the five loads only.
+ 	  Part of the two-CPU fix (docs/kernel/smp_freeze_summary.md).
  
 +config PJ4B_MV61X0_DSB_BARRIERS
 +	bool "88PA61x0 PJ4B-MP: dsb sy for every data barrier"
@@ -24,7 +24,9 @@ assembly, into "dsb sy" (docs/kernel/smp_freeze_summary.md).
 +	  and no barrier with an option: smp_mb() and every other data
 +	  barrier is "dsb sy". Mainline uses dmb ish/ishst and dsb
 +	  ish/ishst/st. With this option every dmb and dsb in C and in
-+	  assembly becomes "dsb sy" (docs/kernel/smp_freeze_summary.md).
++	  assembly becomes "dsb sy". With ERRATA_6011 (which also puts clrex
++	  on exception return) this ended the two-CPU hard freeze: 10 h clean
++	  on the NAND root, 2026-11-11 (docs/kernel/smp_freeze_summary.md).
 +
  # ARMv6
  config CPU_V6

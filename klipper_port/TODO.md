@@ -643,7 +643,7 @@ still require the owner's explicit OK.
       blocked anything. Next per smp-fable: drop pldw before exclusives
       (418 in our kernel, none in the vendor's).
       Weekly usage went over 90%: testing is on hold until the 11-13 reset.
-      **Candidate 3 (2e8ee1c, local only): first NAND-root pass.** Candidates
+      **Candidate 3 (d88ee33, local only): first NAND-root pass.** Candidates
       1+2 plus every dmb/dsb turned into `dsb sy` like the vendor's 3.2
       (patch 0025, CONFIG_PJ4B_MV61X0_DSB_BARRIERS). nanddsb (a4e0cb33,
       modules 82cfeff0) ran the 2 h soak on two CPUs, NAND root, 11-11:
@@ -679,8 +679,10 @@ still require the owner's explicit OK.
       from mtd0. First boot (busybox reboot; the Debian root has no
       /sbin/reboot): U-Boot NAND read 0x40000, 2 CPUs up, NAND root, Wi-Fi
       reassociated with the tar's 0013 module (so the warm boot recovered the
-      chip). Modules on the NAND root: tar 82cfeff0. Left for smp-fable:
-      variants/nandboot.config still says maxcpus=1; Kconfig/doc updates.
+      chip). Modules on the NAND root: tar 82cfeff0. Done by smp-fable
+      (11-11): variants/nandboot.config now matches mtd0 (two CPUs, no
+      maxcpus=1, hang_wdt=30, PJ4B_MV61X0_DSB_BARRIERS); 6011 and barrier
+      Kconfig help and the docs updated (smp_freeze_summary.md, "The fix").
       Open: the 1-CPU default rebooted by itself ~07:20 on 11-11 (owner
       did not power-cycle; no watchdog, no pstore). Cause unknown.
     - Wi-Fi power saving: init.mainline's `iw ... power_save off` never ran

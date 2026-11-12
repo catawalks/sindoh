@@ -1,8 +1,10 @@
-# Two-CPU hard freeze: where it stands (2026-11-09)
+# Two-CPU hard freeze: fixed 2026-11-11 (history and method below)
+
+**Status, 2026-11-11:** fixed. mtd0 holds the two-CPU kernel (nanddsb a4e0cb33) and `variants/nandboot.config` now builds the same thing: two CPUs, no `maxcpus=1`, `timer_mv61x0.hang_wdt=30`. See "Candidate 3 result" and "The fix" below. The sections before them describe the state on 11-09 and are kept as history.
 
 This summary is for resuming after the weekly usage reset (2026-11-13 19:00 UTC). The kernel session's detailed log is in [nandboot_hang_analysis.md](nandboot_hang_analysis.md). Its hand-over note is `smp_freeze_resume_plan.md` in the shared side-session notes folder. The day-by-day record is in TODO.md (hangs 9 to 25).
 
-## Current state of the dev printer
+## State of the dev printer on 11-09 (superseded, see "In mtd0")
 
 - **mtd0:** the default `m1-nandboot.uimg` **0bcb101e**, with `maxcpus=1` and no hang watchdog. Its modules are 6f1002ef (the same `.ko` files as every recent build).
   - It was RAM-booted first, then written from a one-CPU boot with the owner's OK.
@@ -65,7 +67,7 @@ This summary is for resuming after the weekly usage reset (2026-11-13 19:00 UTC)
 
 - **Fast (minutes, card root):** nandps3 `237dde132fe6eb03a6f65db62b3bd46d` (modules 7565bc8f).
 - **Real-world (about 20 min, NAND root):** nandwdt `cf897cd804ba26e9857d242ec6ea8808` (modules d7bd2ee2), RAM-booted from the card gap.
-- **Workaround:** `maxcpus=1` (default now).
+- **Workaround until 11-11:** `maxcpus=1` (the default from 11-09 to 11-11).
 
 ## Candidate 3 result (11-11)
 
@@ -100,7 +102,31 @@ a4e0cb33, forced command line with `timer_mv61x0.hang_wdt=30`) replaced the
 maxcpus=1 default in mtd0 with `tools/mtd0_kernel_update.sh` (KUPDATE OK,
 U-Boot block unchanged). It booted from NAND on two CPUs, onto the NAND root.
 
-## Next, after the reset
+## The fix (patches 0012, 0024, 0025)
+
+Found by comparing the vendor 3.2 kernel's disassembly with ours. Three
+things the vendor does and mainline doesn't, all now in the default build:
+
+| Patch | Option | What it does | Alone on the NAND root |
+|---|---|---|---|
+| 0012 (reworked) | `PJ4B_ERRATA_6011` | every LDREX five times; atomics, cmpxchg and locks mask IRQs for the five loads only, not up to the STREX | froze at 2 to 3.5 min (worse than plain, ~20 min) |
+| 0024 | `PJ4B_ERRATA_6011` | `clrex` on exception return instead of mainline's dummy `strex` | with 0012: froze at ~30 min |
+| 0025 | `PJ4B_MV61X0_DSB_BARRIERS` | every `dmb` and every optioned `dsb` becomes `dsb sy` | with both: 2 h and 10 h clean |
+
+- **Evidence for 0025:** the vendor image has 4,155 `dsb sy`, no `dmb` at
+  all and no barrier with an option. Ours had about 4,340 `dmb` and 860
+  optioned `dsb`. After the patch vmlinux and the modules have only `dsb sy`.
+- **Not known:** why. No erratum document says `dmb` or the barrier options
+  are broken on this PJ4B-MP; that is inferred from the vendor's code and
+  the soak result. 0025 was only tested on top of 0012 and 0024, so whether
+  it is enough alone is not known either.
+- **Modules:** 0025 changes the `.ko` files, so the kernel and the modules
+  tar go together (82cfeff0 for a4e0cb33).
+- **Default variant:** `variants/nandboot.config` has the same options and
+  command line as the soaked nanddsb. A rebuilt default has another md5
+  (name, build time) and has not been soaked itself.
+
+## Next, after the reset (written 11-09, superseded by the fix)
 
 1. **Rerun nandpcs from the card gap on the NAND root, 2 h.** Does its long clean run repeat? If it does, compare its mtd0 boot path.
 2. **Rerun nandsz on the card root, 2 h.** Was 49 min a fluke?

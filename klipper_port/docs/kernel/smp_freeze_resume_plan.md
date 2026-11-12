@@ -1,5 +1,7 @@
 # SMP freeze: where it stands and the plan to resume (2026-11-09)
 
+**Superseded 2026-11-11:** the freeze is fixed and the default nandboot runs two CPUs again (smp_freeze_summary.md, "The fix"). The plan below is kept as history.
+
 From the kernel analysis side session. The full record is in
 docs/kernel/nandboot_hang_analysis.md (hangs 4–25 and the splits after them).
 

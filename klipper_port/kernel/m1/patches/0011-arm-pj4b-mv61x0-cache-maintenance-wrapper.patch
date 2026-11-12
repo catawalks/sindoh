@@ -24,10 +24,10 @@ Test options for the DP200 nandboot hangs, off by default
 +	depends on CPU_PJ4B && ARCH_MV61X0
 +	help
 +	  As the Marvell 3.2 vendor kernel of the 88PA6170: every exclusive
-+	  load is issued five times, and in kernel atomics, locks and bitops
-+	  with IRQs disabled around it. The kuser cmpxchg helpers (user mode)
-+	  get the five loads only. Test option
-+	  (docs/kernel/nandboot_hang_analysis.md).
++	  load is issued five times. Kernel atomics, cmpxchg, locks and bitops
++	  mask IRQs for the five loads only, not up to the store. Futex, SWP
++	  emulation and the kuser cmpxchg helpers get the five loads only.
++	  Part of the two-CPU fix (docs/kernel/smp_freeze_summary.md).
 +
  # ARMv6
  config CPU_V6
