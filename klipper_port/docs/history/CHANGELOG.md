@@ -5,6 +5,10 @@ one. The detail for everything up to 2026-11-12 is in
 [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md) and the other
 files in this folder; `git log` has the rest.
 
+## 2026-11-13
+- **PROJECTS.md cut to status + decisions** (287 -> ~200 lines with a
+  status table); the long version is PROJECTS_archive_2026-11-13.md.
+
 ## 2026-11-12
 - **Docs reorganised:** TODO.md is open items only; STATUS.md, this
   changelog, docs/README.md (map + rules), nand_layout.md; history moved

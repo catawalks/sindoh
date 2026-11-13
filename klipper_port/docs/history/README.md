@@ -6,6 +6,8 @@ describes the current state: that is [../STATUS.md](../STATUS.md).
 - [CHANGELOG.md](CHANGELOG.md): what was done, by date. Start here.
 - [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md): the old task
   list with every result up to 2026-11-12.
+- [PROJECTS_archive_2026-11-13.md](PROJECTS_archive_2026-11-13.md): the
+  longer project list, with background and the options that were weighed.
 - `kernel/`: kernel bring-up logs and the two long investigations (the
   two-CPU freeze, the Wi-Fi boot failure), both solved.
 

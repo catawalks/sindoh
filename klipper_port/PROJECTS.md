@@ -1,287 +1,221 @@
-# DP200 - larger projects ("look at later" / nice to have)
+# DP200 - larger projects and decisions
 
-Bigger, mostly self-contained pieces of work, separate from the day-to-day
-list in [TODO.md](TODO.md). Each entry is written so it can be handed to
-another agent or session: goal, where things stand, where to start, what
-"done" means.
+One entry per project: goal, status, the decisions that stand, what is
+next, and where the detail lives. Day-to-day open items are in
+[TODO.md](TODO.md); the state of the printers is in
+[docs/STATUS.md](docs/STATUS.md). Keep entries short: background and
+options that were weighed go to `docs/history/` (the earlier, longer
+version of this file is
+[docs/history/PROJECTS_archive_2026-11-13.md](docs/history/PROJECTS_archive_2026-11-13.md)).
+The numbers are stable; other documents refer to them.
 
-**Rules for anyone picking one up** (same as the main work):
-- No heat and no motion unless the user is at the printer and agreed.
-- Never write the NAND, the cartridge chip, or the user's `printer.cfg`
-  without the user's OK; never delete `/mnt/sd/pa6170_rodin_nand.bin` or the
-  stock `auto_update.sh`.
+**Rules for anyone picking one up:**
+- No heat and no motion unless the owner is at the printer and agreed.
+- Never write the NAND, the cartridge chip or the user's `printer.cfg`
+  without the owner's OK. NAND rules: [docs/nand_layout.md](docs/nand_layout.md).
 - Downloaded files are untrusted: own directory, read with `python -I`.
-- Commits as catawalks (see docs/history/HANDOFF_2026-10-18_to_11-04.md), normal pushes only.
-- Update this file and TODO.md in the same commit as the work (done items,
-  new open items, decisions): they carry the state between sessions.
-- Work in a branch or a separate checkout; the main session keeps editing
-  `klipper_port` and the printer's live files.
+- Where to write things down: [docs/README.md](docs/README.md).
+
+| # | Project | Status |
+|---|---|---|
+| 1 | Kernel | Mainline 6.18 runs on the dev printer from NAND; work printer on stock 3.2 |
+| 2 | SD-card boot by DIP switch | Low priority, after the release |
+| 3 | Internal NAND install | USB stick install done; end-goal stages 1-5 of 9 done |
+| 4 | Object-on-bed camera check | Planned, not started |
+| 5 | Faster stepping | Done 2026-11-03 |
+| 6 | Other Sindoh models | Research; firmware decrypted except the 30X |
+| 7 | Spaghetti / failure detection | Idea: document an external host |
+| 8 | Cartridge chip read/write | Low priority; read-only so far |
+| 9 | JTAG | Parked |
+| 10 | Before a release | Open: features, Wi-Fi priority |
+| 11 | G-code and log storage | Decided; to build with the end-goal install |
+| 12 | Wi-Fi chip firmware study | Low priority; a side session has started |
 
 ---
 
-## 1. Kernel: rebuild 3.2 modules, or a newer kernel
+## 1. Kernel
 
-**Goal:** get past the vendor kernel's limits: no Thumb (forces Debian
-armel), no swap, no devtmpfs, no USB CDC-ACM, time32-only V4L2/input.
+**Goal:** get past the vendor 3.2 kernel's limits (no Thumb, so Debian
+armel; no swap, no devtmpfs, no USB CDC-ACM).
 
-**Status:** research only (2026-10-20), [docs/history/kernel_research.md](docs/history/kernel_research.md).
-Vendor kernel `3.2.0-g67a8e16`, Marvell LSP 2014 "shiloh", built with Marvell
-GCC (Linaro 4.6.4); no public source. `/proc/config.gz` and a hardware
-snapshot are in `docs/kernel/`. A GPL source request is drafted in that doc
-(the user hasn't sent it yet).
+**Status:**
+- **Mainline 6.18.59 with our device tree and drivers runs on the dev
+  printer from NAND**: two CPUs, NAND root, Wi-Fi, motion (2026-11-12).
+  No vendor source was needed: [docs/no_gpl_plan.md](docs/no_gpl_plan.md).
+  The two-CPU freeze and its fix:
+  [docs/kernel/smp_freeze_summary.md](docs/kernel/smp_freeze_summary.md).
+- **Modules for the stock 3.2 kernel** can be built without Marvell's SDK
+  (`install/kernel_modules/`): `cdc-acm.ko` loads and a USB accelerometer
+  appears as /dev/ttyACM0 (2026-10-30). The same recipe works for other
+  missing modules (ch341, cp210x).
+- The GPL source request to Sindoh/Marvell was drafted and not sent; the
+  main path no longer needs it.
 
-**Steps, smallest first:**
-1. **Out-of-tree modules for the running 3.2 kernel without Marvell's SDK.**
-   Vanilla Linux 3.2 + the printer's config + a matching vermagic
-   (`3.2.0-g67a8e16 SMP preempt mod_unload ARMv7`), built with an old
-   ARM GCC. First target: `cdc-acm.ko` (USB accelerometers, see
-   docs/input_shaping.md). Risk: Marvell patches may change struct layouts
-   the module touches; test by loading it only with the user's OK and with
-   a power cycle as the way back. Done = the module loads and a Klipper
-   RP2040 board appears as /dev/ttyACM0.
-   **BUILT 2026-10-28** (install/kernel_modules/, README there): vanilla 3.2 +
-   vendor config, native GCC 14 on the printer, vermagic identical. Checked
-   read-only: 165 structs identical to the vendor modules' debug info,
-   145/148 USB/tty field offsets identical to the running kernel's own code
-   (the 3 differences are code generation), all 65 imports exported, only
-   ABS32/CALL relocations. Risk low. **Loaded 2026-10-30** (with the owner's
-   OK): a FLY-ADXL345 shows up as /dev/ttyACM0; dp200-start.sh loads it.
-   The same recipe can build other missing modules (e.g. ch341, cp210x).
-2. **GPL request** (user sends the draft; what it is and the realistic
-   chances: docs/history/kernel_research.md, "What a GPL source request is") - if the
-   source arrives, rebuild the vendor kernel with Thumb, swap and CDC-ACM.
-3. **Mainline kernel (6.x) with a new device tree**, booted from RAM via
-   U-Boot first (milestone 1: UART + GIC + timer). Weeks of work; see the
-   "routes" section of docs/history/kernel_research.md. Needs SD boot (project 2).
+**Decision:** the work printer and the USB stick stay on stock 3.2 until
+the end-goal install (#3).
+
+**Next:** the kernel items in TODO; then #3.
 
 ## 2. SD-card boot (low priority: after the end-goal release)
 
 **Goal (owner, 2026-11-03):** boot from the SD card by the DIP switch,
-without the NAND. An extra recovery path if the NAND is ever completely
-corrupted, and maybe a way for NAND-only installs to stop depending on mtd5,
-freeing its ~200 MB.
-**Status** ([docs/sd_boot_plan.md](docs/sd_boot_plan.md)): U-Boot from NAND
-can read the card once the two SD pin selects are set (0xf8041080/84 =
-0x1002, RAM only: `uboot_cmd.py --pinmux-sd`), and boots our kernel from raw
-card sectors by hand (`tools/sd_raw_boot.sh`, 2026-10-31). The DIP-switch
-boot (the boot ROM loading U-Boot from the card) hangs silently; open lead:
-the SD pad settings the ROM uses in mode 6.
-**Not the daily boot path:** that is our kernel in mtd0 (#3).
-**Later layout option it would open (2026-11-03): merge mtd5 + mtd6.**
-- Space: mtd6 alone 294 MB raw, ~258 MB usable (measured df), ~150 MB free
-  after our ~106 MB runtime; mtd5 + mtd6 (blocks 141-4091, ~3,950 x 128 KB)
-  494 MB raw, ~435 MB usable (estimate, same ~12 % UBI/UBIFS overhead),
-  **~330 MB free**. mtd0 (kernel), mtd1 (U-Boot env, 128 KB), mtd2 (bad
-  block table, 512 KB), mtd3 (logo), mtd4 (karas.db backup) and the vendor
-  BBT blocks 4092-4095 stay.
-- No U-Boot change: our kernel sets its own partition layout instead of the
-  mtdparts U-Boot passes.
-- **mtd5 must be saved first:** the stock base root (nandrootfs.ubifs) is
-  only in mtd5 - Sindoh's downloadable updates carry the apps and kernel,
-  not the base root - and we can't publish Sindoh/Marvell images. The
-  installer copies the 149 MB recovery set to the user's stick or card
-  before wiping it; without that copy stock can't come back.
-- The revert then boots a recovery SD card (DIP switch) that writes the
-  saved set back to mtd5/mtd6 and hands over to Sindoh's update, instead
-  of the mtd5-based Sindoh-stick revert. Only once the DIP-switch SD boot
-  works; it would also cover a fully corrupted NAND.
+without the NAND: a recovery path for a fully corrupted NAND.
+
+**Status** ([docs/sd_boot_plan.md](docs/sd_boot_plan.md)): U-Boot from
+NAND reads the card once two SD pin selects are set (RAM only) and boots
+our kernel from raw card sectors (`tools/sd_raw_boot.sh`); that is how new
+kernels are RAM-booted. The DIP-switch boot (the boot ROM loading U-Boot
+from the card) hangs silently. Open lead: the SD pad settings the ROM uses
+in mode 6.
+
+**Decision:** not the daily boot path; that is our kernel in mtd0.
+
+**Later option it would open:** merging mtd5 + mtd6 (about 330 MB free
+instead of about 150). It needs the recovery set saved to the user's stick
+first, and a recovery card for the way back. The numbers and conditions
+are in the archive, section 2.
 
 ## 3. Internal NAND install (stock printers have no SD card)
 
-**DONE 2026-11-02** ([docs/usb_installer.md](docs/usb_installer.md)): the
-USB stick installs the runtime into `/klipper` on the stock root (mtd6, not
-mtd5: that would erase the factory recovery set), removing Sindoh's app
-(backed up to the stick per printer and firmware) and Qt WebKit. Install,
-upgrade, cancel and remove (stick backup or the mtd5 fallback) tested on
-the test printer; installs on the work printer from 160505 and 191210
-firmware. Open: our kernel in mtd0 (the mtd0 write path is proven: end-goal
-stage 1, 2026-11-07), NAND space for
-upstream updates (#10).
-End goal (our kernel in mtd0, our root in mtd6, mtd5 untouched): revert by
-plugging in a Sindoh update stick (decided 2026-11-03, TODO 11d).
-The sequence to get there: [docs/end_goal_install_plan.md](docs/end_goal_install_plan.md)
-(all stages approved 2026-11-03; stages 1-2 done 2026-11-07).
+**Goal:** install from a USB stick, with no added hardware, revertible to
+stock.
+
+**Status:**
+- **USB stick install: done 2026-11-02**
+  ([docs/usb_installer.md](docs/usb_installer.md)): our runtime in
+  `/klipper` on the stock root (mtd6) under the stock 3.2 kernel. Install,
+  upgrade, cancel and remove are tested on both printers.
+- **End goal** (our kernel in mtd0, our root in mtd6, mtd5 untouched):
+  [docs/end_goal_install_plan.md](docs/end_goal_install_plan.md). All 9
+  stages were approved 2026-11-03. Stages 1-5 are done on the dev printer.
+
+**Decisions:**
+- No U-Boot or environment change. mtd5 (the factory recovery set) is
+  never written.
+- **Revert = plug in a Sindoh update stick** (2026-11-03): our system
+  restores stock from mtd5, then Sindoh's update runs
+  ([docs/kernel/revert_to_stock_plan.md](docs/kernel/revert_to_stock_plan.md)).
+- No per-printer backup is required: karas.db rebuilds from mtd4.
+- Accepted risk: a power cut during the mtd0 write needs the serial
+  console, as with Sindoh's own updates.
+
+**Next:** stage 6, installer v2 (TODO).
 
 ## 4. Object-on-bed check with the camera
 
 **Goal:** before a print, warn or stop if something is still on the bed.
-**Plan:** fixed bed pose + lamp on -> snapshot from ustreamer -> compare with
-a reference of the empty bed (downscaled difference + blob size) in a small
-Klipper extra; PRINT_START stops with "Object on the bed?", the screen offers
-CONTINUE / CANCEL. Camera looks down at the bed from close above
-(hardware_notes, 2026-10-27).
-**Needs the user for:** the pose that shows the whole plate, the reference,
-tests with real leftovers (thin first layers are the hard case).
-**Pose problem (2026-10-28):** the check must run BEFORE G28 - Z homes
-upward, so a tall leftover (or a spool left from the dryer) would be pushed
-into the head/gantry. So the bed can't be moved to a fixed pose first.
-Plan: PRINT_END, CANCEL_PRINT and the dryer end with the bed at the bottom
-(Z 190, fixed Y) and record that in save_variables; PRINT_START checks the
-picture at that pose before homing. Unknown pose (power cycle, manual move):
-find the plate's edges in the picture and compare in plate coordinates, or
-ask on the screen. A Z sweep (camera/bed_pose_sweep.sh) shows how the view
-changes with height.
+
+**Plan:** lamp on, a snapshot from ustreamer, compare it with a reference
+of the empty bed in a small Klipper extra. PRINT_START stops and the
+screen offers CONTINUE / CANCEL.
+
+**Constraint (2026-10-28):** the check must run before G28, because Z
+homes upward. So prints, cancels and the dryer end with the bed at a known
+pose (bottom, fixed Y), saved in save_variables, and the check runs at
+that pose. For an unknown pose: find the plate's edges in the picture, or
+ask on the screen.
+
+**Needs the owner for:** the pose, the reference picture, and tests with
+real leftovers (thin first layers are the hard case).
+
+Until it exists, BED_CLEAR asks before every Z homing.
 
 ## 5. Faster stepping in the UPC firmware
 
-**Goal:** raise the step-rate ceiling. Each step is one hardware engine move
-now; the engines can do multi-step moves with their own ramp (stock firmware
-does), which would cut per-step overhead.
-**Status: DONE 2026-11-03** ([docs/faster_stepping_plan.md](docs/faster_stepping_plan.md)):
-CONFIG_UPC_STEP_BATCH (constant-rate blocks as engine moves, one timer
-event per step otherwise) is the default in dp200_fm.config. Left: an
-idle-loop counter for an on-printer load figure. Also open: what step-engine registers +0x10 / +0x14 /
-+0x2c mean (copied from the stock app, 2026-10-27).
-**Done =** drift test (scratchpad drift_test.py) still 0.000 mm at higher
-speeds, emulator regression passes.
+**Done 2026-11-03**
+([docs/faster_stepping_plan.md](docs/faster_stepping_plan.md)):
+`CONFIG_UPC_STEP_BATCH` (constant-rate blocks as engine moves) is the
+default. A batching bug found on the work printer was fixed in the fork
+(8d4fb4d8, 2026-11-06). The UPC load shows in Mainsail's MCU panel since
+2026-11-09.
+
+**Open:** what step-engine registers +0x10 / +0x14 / +0x2c mean (the
+values are copied from the stock app).
 
 ## 6. Other Sindoh models
 
-**Goal:** the same Klipper port on the 3DWOX 1X, 2X (dual extruder) and 30X.
-**Status:** [docs/other_models.md](docs/other_models.md); OEM firmware for all
-models decrypted (oem_models, oem_3dwox1); the 30X key is unknown.
-**Next:** 1X testing; 2X second extruder; 30X key.
-Note (owner, 2026-11-06): the 3DWOX 1X shows a shutdown loading screen on a
-long press of the power button. When working on the 1X, look in its
-firmware (oem_models/1x) for how it does that (our DP200 shutdown screens:
-dp200_screen.py draw_shutdown, dp200-powerkey.sh).
+**Goal:** the same port on the 3DWOX 1X, 2X (dual extruder) and 30X.
+
+**Status:** [docs/other_models.md](docs/other_models.md). The OEM firmware
+is decrypted for all models except the 30X (key unknown).
+
+**Next:** 1X testing; the second extruder of the 2X; the 30X key.
+
+Note (owner, 2026-11-06): the 1X shows a shutdown screen on a long press
+of the power button. Look in its firmware for how it does that.
 
 ## 7. Spaghetti / failure detection
 
-Not on the printer (CPU/RAM). Document how a main Klipper host running
-Obico (or similar) can watch this printer through its Moonraker.
+Not on the printer (CPU and RAM). To do: document how a separate host
+running Obico or similar watches this printer through its Moonraker.
 
 ## 8. Cartridge chip read/write (low priority)
 
-The owner wants to continue investigating cartridge-chip reading and
-writing, but this is a low-priority, independent project. It is not a
-prerequisite or blocker for other work; do not wait on it during a session
-unless the owner explicitly makes it the current task. Current work remains
-read-only (docs/cartridge_chip.md). Any write operation (for example,
-resetting the remaining length) requires the owner's explicit OK.
+Independent of everything else: never wait on it unless the owner makes it
+the current task. Read-only so far
+([docs/cartridge_chip.md](docs/cartridge_chip.md)). Any write, such as
+resetting the remaining length, needs the owner's explicit OK. The
+cartridge sensing does not work on the dev printer, so a "no cartridge"
+reading there means nothing.
 
 ## 9. JTAG
 
-CN3 header prepared, no TAP answered (likely fused off), [docs/jtag_prep.md](docs/jtag_prep.md).
-Parked.
+The CN3 header is prepared; no TAP answered (likely fused off).
+[docs/jtag_prep.md](docs/jtag_prep.md). Parked.
 
 ## 10. Before a release
 
-**Release decision (owner, 2026-11-03):** the current installer (stock
-kernel, Klipper in /klipper on mtd6) becomes the first public release, but
-not yet: the screen app and features are still being refined, and the
-faster stepping is still being tested. The work printer has completed a
-long print on it.
+**Decisions:**
+- **The first public release is the USB stick install** (stock kernel,
+  `/klipper` on mtd6), but not yet: the screen app and features are still
+  being refined (owner, 2026-11-03). The end-goal install is a later
+  release.
+- **Updates (2026-11-03):** NAND only: Mainsail and Moonraker from
+  upstream, Klipper (host and UPC firmware) from our releases. With a
+  storage card: everything from upstream, built on the card and copied to
+  NAND (#11). Our Klipper fork is public, so anyone can build the images.
+  The options that were weighed are in the archive, section 10.
+- The root stays **armel** through the end-goal release, so the stick
+  install and our kernel share one root (owner, 2026-11-06).
+- Never publish a payload that contains Wi-Fi networks, or Marvell or
+  Sindoh images.
 
-- **Homing speed:** DONE 2026-11-02: X/Y at stock's 208 mm/s seek, Z
-  stays at 5 mm/s (stock 5.05; 10 stalls lifting the bed).
-  [docs/history/homing_speed_plan.md](docs/history/homing_speed_plan.md).
-- **Stick backups and firmware versions:** DONE 2026-11-02: each backup
-  stores the firmware version; a mismatch offers a new backup and keeps
-  the old one as `<MAC>_<firmware>`.
-- **Updates and NAND space: DECIDED 2026-11-03** (with the storage tiers,
-  #11): on a NAND-only install Mainsail and Moonraker update from upstream
-  (git, shallow), Klipper (host + UPC firmware) from our releases; with an
-  SD card everything updates from upstream and builds on the printer.
-  Our Klipper fork is public, so anyone can build the images if our
-  releases stop. Background below (written for the ~40 MB of the current
-  /klipper install; the end-goal root leaves ~140-150 MB):
-  Goal: Klipper and
-  Moonraker update from their upstream main branches through Moonraker,
-  without the port having to publish images. Facts: Klipper's host side is
-  upstream plus three add-on modules (dp200_cartridge, upc_clockcheck,
-  upc_stats: installable as plugins); Moonraker is unmodified. On the
-  printer, upstream updates need git + a shallow history (~15 MB), pip,
-  and a C compiler (Klipper rebuilds chelper; some Python packages have C
-  parts, no armel wheels): ~50 MB of flash, ~40 MB is free. The UPC
-  firmware (fm.bin/io.bin, ARM cross-compiler) can't be built on the
-  printer: an upstream MCU protocol change would need a rebuild.
-  Options: A) the stable base (Debian, Python, git, compiler) in a
-  read-only squashfs+xz image (needs squashfs.ko for 3.2; loop.ko ships),
-  the apps as writable git checkouts: ~25-35 MB free; B) no image, remove
-  more stock files (unused modules, /test/web, OpenCV; stick-only
-  restore) and add git/pip/compiler: ~15-20 MB free; C) git + pip only:
-  Moonraker/Mainsail from upstream, Klipper pinned. USB/SD storage is out
-  (no extra hardware).
-- **Wi-Fi stability and saved-network priority:** power saving reduced drops
-  on the test printer (the 8782 had missed key handshakes, reason 15). The
-  owner reports a separate priority bug: when connected to a lower-priority
-  SSID, the printer does not rejoin a higher-priority SSID when it becomes
-  available. Open: reproduce and trace preference/watchdog reconnect logic,
-  then verify on the work printer. A displayed ordering is not evidence that
-  priority works. The SYSTEM -> NETWORK -> WIFI summary page also sometimes
-  shows inaccurate data; it displayed the Ethernet IP as the Wi-Fi IP on the
-  test printer. Trace the page's data source/state updates and clean it up to
-  show Wi-Fi information only, without stale or Ethernet values.
+**Open before a release:** the saved-network priority bug (TODO); the next
+payload with the 2026-11-12 fixes, and a real print on it; the release
+checklist itself, which is still to be written.
 
-## 11. G-code and log storage (2026-11-03, decided: see the end)
+## 11. G-code and log storage
 
-**Problem:** the NAND install leaves ~40 MB free on mtd6. A 23-min cube is
-0.4 MB, but long prints run 15-25 MB (the owner's USB stick) and detailed
-multi-hour ones 50-200 MB; Moonraker never deletes G-code by itself.
-**Owner's direction:** an SD card added once inside the case (the microSD
-slot is on the mainboard, not reachable from outside), then forgotten;
-any size. Our own kernel may add whatever filesystem support is needed
-(the stock 3.2 kernel has vfat, ext2/3/4 and an NFS client; no exFAT, no
-SMB).
-**Pieces:**
-- Detect the card at boot, mount it (ext4; FAT32 too), use it for
-  printer_data/gcodes and logs; NAND as before without one. Offer to
-  format a new card from the screen.
-- NAND space safety for printers without a card: refuse uploads that
-  don't fit, offer/auto-delete the oldest finished G-codes, show free
-  space on the screen and in Mainsail.
-- Alternatives considered: a USB stick on the front port (shared with the
-  accelerometer: hub), an NFS share (unlimited, but a network drop ends a
-  print), and, as the owner's last resort, Klipper/Moonraker on a separate
-  host with the printer as bridge + screen (upctool bridge over TCP).
-**Decided 2026-11-03: optional, with tiers.** No card is required to
-install. Boot path stays the agreed one: our kernel in mtd0, our system in
-mtd6, mtd5 recovery untouched, no U-Boot env change. With our system
-replacing the stock root, ~140-150 MB of mtd6 should be free (estimate:
-~106 MB on flash for today's runtime). Tiers:
-- NAND only: managed G-code space (upload check, auto-delete oldest
-  finished jobs, free space shown), logs in RAM, Mainsail/Moonraker
-  updates from upstream, Klipper from our releases if space is tight.
-- SD card inside (or a USB stick on the front port): G-code and logs on
-  it, full upstream updates (git/pip/compiler), timelapse, swap, backups.
-- Our kernel detects a card/stick marked for the printer at boot; the
-  screen offers to format one; the installer reports what it found.
-- **Decided 2026-11-07 (owner): the card is storage, never the root.**
-  mtd6 is always the root. `/.dp200-root` (a card that IS the system,
-  replacing mtd6) stays for development and recovery only. Expanded
-  storage gets its own marker: the card is mounted for G-code, logs,
-  timelapse, swap, backups (and the full-update tier's git/pip/compiler
-  as a mounted /home/klipper or an overlay). A dead or pulled card then
-  can't stop the boot, and there is one system to update. The
-  initramfs/end_goal_install_plan.md stage 3 wording ("root = a marked
-  card") changes with this.
-- **Update path, direction set 2026-11-07 (owner; to discuss again
-  later):** build on the card, run from NAND. With a storage card or
-  stick, Klipper, Moonraker and Mainsail update from the upstream main
-  channel: the git checkouts, the Python environments and the compiler
-  live on the card; after a successful build an install step copies the
-  result into NAND (Mainsail's release files need no build), ideally
-  keeping the previous version until the new one starts (~70 MB of apps,
-  ~143 MB free). NAND always runs the newest installed version, so a
-  pulled or dead card changes nothing that runs. Moonraker's update
-  manager updates checkouts in place, so it needs our glue: update the
-  card's copies, then our deploy step. NAND-only users update with our
-  prebuilt images. Open for the later discussion: A/B space on NAND, how
-  the screen and Mainsail show a pending deploy, rollback.
-**Next:** build it with the mtd0 kernel install (end-goal stage 4).
+**Problem:** long prints are 15-200 MB of G-code, and NAND has about
+140 MB free with our root. The microSD slot is inside the case.
 
-## 12. Wi-Fi chip firmware: decompile / clean-room rewrite (low priority, after the release)
+**Decided 2026-11-03: optional storage, in tiers.** No card is needed to
+install.
+- **NAND only:** managed G-code space (refuse uploads that don't fit,
+  delete the oldest finished jobs, show the free space), logs in RAM.
+- **SD card inside, or a USB stick:** G-code and logs on it, full upstream
+  updates, timelapse, swap, backups. The screen offers to format one.
+- **The card is storage, never the root** (owner, 2026-11-07). mtd6 is
+  always the root, so a dead or pulled card can't stop the boot. The
+  `/.dp200-root` marker (a card that is the system) is for development
+  and recovery only; storage gets its own marker.
+- **Updates with a card (direction set 2026-11-07, to discuss again):**
+  build on the card, copy the result into NAND, keep the previous version
+  until the new one starts. Open: A/B space, how a pending deploy is
+  shown, rollback.
 
-The owner's idea (2026-11-07): take apart the 88W8782's firmware
-(mrvl/usb8782_uapsta.bin, the program that runs on the Wi-Fi chip's own
-CPU) and maybe write a clean-room replacement. Low priority, a "fun path"
-for after the release stage; not a fix for anything current. Notes:
-- It would not fix the boot-time Wi-Fi failure: that is in the host driver
-  (mwifiex_usb) and the chip's state across a warm reboot (TODO,
-  docs/history/kernel/wifi_boot_failure.md).
-- It covers only the 8782; other DP200 batches may have a different
-  Wi-Fi module.
-- A full rewrite (RTOS, 802.11 MAC, radio calibration) is a large
-  research project; a decompile for understanding is the realistic first
-  step. Nothing from the vendor binary gets published (Marvell firmware).
+**Next:** build it with the end-goal install. The alternatives that were
+considered (NFS, a separate host) are in the archive, section 11.
+
+## 12. Wi-Fi chip firmware: decompile / clean-room rewrite (low priority)
+
+The owner's idea (2026-11-07): take apart the 88W8782's firmware and maybe
+write a clean-room replacement. It is a "fun path", not a fix for
+anything: the boot and reload failures were in the host driver and are
+solved ([docs/kernel/wifi_88w8782.md](docs/kernel/wifi_88w8782.md)).
+
+**Status:** a side session on the build box has started on the decompile.
+- It covers only the 8782; other DP200 batches may have another module.
+- A decompile for understanding is the realistic first step. A full
+  rewrite (RTOS, 802.11 MAC, radio calibration) is a research project.
+- Nothing from the vendor binary gets published.
