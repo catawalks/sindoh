@@ -1,5 +1,7 @@
 # SMP freeze: where it stands and the plan to resume (2026-11-09)
 
+**Status: DONE 2026-11-11** (the freeze is fixed). History only: [../../kernel/smp_freeze_summary.md](../../kernel/smp_freeze_summary.md).
+
 From the kernel analysis side session. The full record is in
 docs/kernel/nandboot_hang_analysis.md (hangs 4–25 and the splits after them).
 

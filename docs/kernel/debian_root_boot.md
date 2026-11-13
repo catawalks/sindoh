@@ -249,4 +249,4 @@ spare).
   now stops the stack first; the card stays mounted, though.
 - **Not automatic yet:** U-Boot still needs the commands typed each boot.
   Making it the default boot is the owner's saveenv decision
-  (docs/printer_checks.md).
+  (../history/printer_checks_2026-10-31.md).

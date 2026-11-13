@@ -1,5 +1,7 @@
 # Motion test plan for mainline (for the user's approval, 2026-10-30)
 
+**Status: DONE 2026-10-30** (motion ran on mainline). History only.
+
 Nothing here runs without the user present and their OK for each step. No heat
 in any step.
 

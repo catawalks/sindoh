@@ -97,8 +97,8 @@ back to U-Boot and the stock firmware.
 
 | Image (md5) | Result |
 |---|---|
-| 870017 B, `86595c02…` (2026-10-29) | Boots to the shell. Earlycon, DT, GIC, clocksource and UART work (log: `docs/kernel/m1_boot1.log`). **Timekeeping broken:** uptime jumps by 2^32 µs, `sleep` returns at once, timer 1 interrupts stop after ~0.5 s, and timer 2's status bit stays pending. |
-| 771801 B, `c073d1ea…` | Status bits are cleared after timer 2 starts; IRQs 52/54/55 are taken and acked like the vendor's; clocksource reads are filtered and counted; restart handler; `panic=10`; config trimmed (VT, input, HID, STRICT_KERNEL_RWX off). **Boot 2 (`m1_boot2.log`):** timer probe status 0; the restart handler works (panic → reset → stock). `/init` died with exit 2 at 0.40 s because BusyBox lacked `$(( ))` (`FEATURE_SH_MATH` off). Linux IRQ 24 is now timer 0; timer 1 is IRQ 27. |
+| 870017 B, `86595c02…` (2026-10-29) | Boots to the shell. Earlycon, DT, GIC, clocksource and UART work (log: `docs/history/kernel/m1_boot1.log`). **Timekeeping broken:** uptime jumps by 2^32 µs, `sleep` returns at once, timer 1 interrupts stop after ~0.5 s, and timer 2's status bit stays pending. |
+| 771801 B, `c073d1ea…` | Status bits are cleared after timer 2 starts; IRQs 52/54/55 are taken and acked like the vendor's; clocksource reads are filtered and counted; restart handler; `panic=10`; config trimmed (VT, input, HID, STRICT_KERNEL_RWX off). **Boot 2 (`docs/history/kernel/m1_boot2.log`):** timer probe status 0; the restart handler works (panic → reset → stock). `/init` died with exit 2 at 0.40 s because BusyBox lacked `$(( ))` (`FEATURE_SH_MATH` off). Linux IRQ 24 is now timer 0; timer 1 is IRQ 27. |
 | 773633 B, `d583f22f…` | `FEATURE_SH_MATH` on. `/init` is minimal and runs the checks as a child (`/etc/m1-checks.sh`), so PID 1 can't exit. The driver logs timer 1 interrupts #1-3, #100, #1000 and #10000 with the raw timer 2 count. **Boot 3:** the timer 1 tick runs at 100 Hz (#1000 at 10.017 s), uptime matches real time, no clocksource glitches. But every timed sleep returns at once: tinyconfig leaves `COMPAT_32BIT_TIME` off, musl uses the time32 `nanosleep`/`ppoll` for small values, and gets ENOSYS. |
 | 783265 B, `f34f8ba8…` | `COMPAT_32BIT_TIME` and `POSIX_TIMERS` on. **Boot 4: milestone 1 done.** `sleep 2` = 2014135 µs, `sleep 10` = 10.0 s, timer 1 at 100 Hz, no glitches, UART input works, `reboot -f` returns to stock. |
 | 842710 B, `25e2d0da…` | Next steps: SMP (no `maxcpus=1`), SIC0/SIC1 irqchip, panel console via simple-framebuffer (VT + fbcon; keyboard/mouse/serio off). `/init` also prints the online CPUs and `/proc/fb`. **Boot 5:** 2 CPUs, fbcon on the panel, timing right, SIC probe lines present. |
@@ -147,7 +147,7 @@ Wi-Fi, media or panel. Its `/init` prints the MDIO PHY ID and GPIO 62's
 state, then waits.
 
 1. **Pin mux and PHY reset** (approved by the user; test 2 passed,
-   docs/kernel/m1_eth_test2.md). U-Boot sets neither. `ethload` runs
+   docs/history/kernel/m1_eth_test2.md). U-Boot sets neither. `ethload` runs
    `/etc/eth-pinmux.sh` first: GPIO 48-61 and 63 to function 1 (0x1001, the
    RGMII + MDC/MDIO pins from the vendor's gr_def_mpp_list), bank 3 to the
    stock state, then GPIO 62 low for 125 ms, then it rebinds stmmac.
@@ -201,12 +201,12 @@ There is no PL310 L2. The vendor's only real "outer cache" op writes
 0x01010101 to the DDR controller at 0xfa300530 on every mb()/wmb(), which
 includes every writel(). mach-mv61x0 does the same from `soc_mb`, because
 the DT node `memory-controller@fa300000` is enabled. The A/B test showed no
-measurable cost (docs/kernel/mcsync_ab_test.md). dmesg says "DDR
+measurable cost (../../docs/history/kernel/mcsync_ab_test.md). dmesg says "DDR
 write-buffer drain on mb()".
 
 ### net: join Wi-Fi
 
-Passed in wifi_join_test1 (docs/kernel/wifi_join_test1.md, built as m1-net-smp).
+Passed in wifi_join_test1 (../../docs/history/kernel/wifi_join_test1.md, built as m1-net-smp).
 
 1. Boot it through the fast path:
    `tools/eth_kernel_boot.sh D:/DP200/kernel/out/m1-net-zImage-dtb.bin`
@@ -230,8 +230,8 @@ Passed in wifi_join_test1 (docs/kernel/wifi_join_test1.md, built as m1-net-smp).
 ### upc: the UPC driver (Klipper MCUs)
 
 Test 1 (probe, hold, safe, reboot and panic paths) passed:
-docs/kernel/upc_test1.md. Test 2 (probe firmware, safety paths) and 2c
-(XENA inputs) passed: docs/kernel/upc_test2.md.
+docs/history/kernel/upc_test1.md. Test 2 (probe firmware, safety paths) and 2c
+(XENA inputs) passed: docs/history/kernel/upc_test2.md.
 
 XENA inputs: the endstop and cartridge-lever pads are bank 5 pins 20-24
 (X = 20 -> XIRD1 bit 10, Y = 21 -> bit 11, 22 probably Z, lever = 23 ->

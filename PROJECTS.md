@@ -11,7 +11,7 @@ another agent or session: goal, where things stand, where to start, what
   without the user's OK; never delete `/mnt/sd/pa6170_rodin_nand.bin` or the
   stock `auto_update.sh`.
 - Downloaded files are untrusted: own directory, read with `python -I`.
-- Commits as catawalks (see HANDOFF.md), normal pushes only.
+- Commits as catawalks (see docs/history/HANDOFF_2026-10-18_to_11-04.md), normal pushes only.
 - Update this file and TODO.md in the same commit as the work (done items,
   new open items, decisions): they carry the state between sessions.
 - Work in a branch or a separate checkout; the main session keeps editing
@@ -24,7 +24,7 @@ another agent or session: goal, where things stand, where to start, what
 **Goal:** get past the vendor kernel's limits: no Thumb (forces Debian
 armel), no swap, no devtmpfs, no USB CDC-ACM, time32-only V4L2/input.
 
-**Status:** research only (2026-10-20), [docs/kernel_research.md](docs/kernel_research.md).
+**Status:** research only (2026-10-20), [docs/history/kernel_research.md](docs/history/kernel_research.md).
 Vendor kernel `3.2.0-g67a8e16`, Marvell LSP 2014 "shiloh", built with Marvell
 GCC (Linaro 4.6.4); no public source. `/proc/config.gz` and a hardware
 snapshot are in `docs/kernel/`. A GPL source request is drafted in that doc
@@ -48,11 +48,11 @@ snapshot are in `docs/kernel/`. A GPL source request is drafted in that doc
    OK): a FLY-ADXL345 shows up as /dev/ttyACM0; dp200-start.sh loads it.
    The same recipe can build other missing modules (e.g. ch341, cp210x).
 2. **GPL request** (user sends the draft; what it is and the realistic
-   chances: kernel_research.md, "What a GPL source request is") - if the
+   chances: docs/history/kernel_research.md, "What a GPL source request is") - if the
    source arrives, rebuild the vendor kernel with Thumb, swap and CDC-ACM.
 3. **Mainline kernel (6.x) with a new device tree**, booted from RAM via
    U-Boot first (milestone 1: UART + GIC + timer). Weeks of work; see the
-   "routes" section of kernel_research.md. Needs SD boot (project 2).
+   "routes" section of docs/history/kernel_research.md. Needs SD boot (project 2).
 
 ## 2. SD-card boot (low priority: after the end-goal release)
 
@@ -175,7 +175,7 @@ long print on it.
 
 - **Homing speed:** DONE 2026-11-02: X/Y at stock's 208 mm/s seek, Z
   stays at 5 mm/s (stock 5.05; 10 stalls lifting the bed).
-  [docs/homing_speed_plan.md](docs/homing_speed_plan.md).
+  [docs/history/homing_speed_plan.md](docs/history/homing_speed_plan.md).
 - **Stick backups and firmware versions:** DONE 2026-11-02: each backup
   stores the firmware version; a mismatch offers a new backup and keeps
   the old one as `<MAC>_<firmware>`.
@@ -279,7 +279,7 @@ CPU) and maybe write a clean-room replacement. Low priority, a "fun path"
 for after the release stage; not a fix for anything current. Notes:
 - It would not fix the boot-time Wi-Fi failure: that is in the host driver
   (mwifiex_usb) and the chip's state across a warm reboot (TODO,
-  docs/kernel/wifi_boot_failure.md).
+  docs/history/kernel/wifi_boot_failure.md).
 - It covers only the 8782; other DP200 batches may have a different
   Wi-Fi module.
 - A full rewrite (RTOS, 802.11 MAC, radio calibration) is a large
