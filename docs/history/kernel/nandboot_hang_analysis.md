@@ -2496,6 +2496,9 @@ mtd0 on the NAND root:
 (`variants/nandboot.config`, with a comment pointing here). The two-CPU
 freeze stays open; the hang-test variants keep their own command lines.
 
+**Superseded 2026-11-11:** the freeze is fixed and the default is two CPUs
+again, with `timer_mv61x0.hang_wdt=30` (smp_freeze_summary.md, "The fix").
+
 **m1-nandboot.uimg, built 2026-11-09, not booted:**
 - md5 `0bcb101e258ef3b11b61eca271229894` (2,814,364 bytes);
 - modules `6f1002ef96770b09206d4e39de7323a1`;
