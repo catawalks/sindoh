@@ -134,7 +134,9 @@ the work; it is how open items survive between sessions.
      pads: bank 3 ... -> 00000000", 2 CPUs, ubi0 root, hang_wdt armed,
      Wi-Fi up; Klipper ready, G28 X 216.0, G28 Y 5.5. **Motion fixed on the
      dev printer.** Rollback: C3 a4e0cb33 on 10.10.0.68:8098. Open: merge
-     upc-bank3-pads (7dd0f21) into the kernel tree / stick payload; a soak.
+     upc-bank3-pads (7dd0f21) into the kernel tree; a soak. (Not a stick
+     item: the stick carries no kernel - the work printer runs vendor 3.2
+     until the end-goal install, when it becomes the kernel-swap machine.)
 0b. **(11-09, owner) PRIME_LINE lies inside big prints.** The work printer's
    test print covered X 40-160 / Y 35 (klipper/config/dp200_printer.cfg
    PRIME_LINE). Move it out of the print area. Options: (a) place it from the
