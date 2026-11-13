@@ -1,0 +1,5 @@
+# The Klipper source the DP200 builds from. One line each; get_fork.sh reads it.
+# Change COMMIT in the same commit as the port change that needs it.
+REPO=https://github.com/catawalks/klipper
+BRANCH=sindoh-dp200
+COMMIT=289952f979811ed87e04a8550c7742e41fb6f9ab

@@ -8,7 +8,7 @@ core=${1:-fm}
 PORT=/usr/src/dp200/klipper_port
 KBUILD=$(mktemp -d /var/tmp/kbuild.XXXX)
 cp -a /home/klipper/klipper $KBUILD/klipper
-sh $PORT/klipper/install_port.sh $KBUILD/klipper
+# /home/klipper/klipper is the fork checkout (klipper/FORK): the port is already in it
 cd $KBUILD/klipper
 make clean >/dev/null
 cp config/dp200_$core.config .config

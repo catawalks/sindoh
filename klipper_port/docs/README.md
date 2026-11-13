@@ -20,6 +20,8 @@ Read in this order when you pick the project up:
 | Anything that needs the owner at the printer | `TODO.md`, section "Owner at a printer" | One list. (`docs/history/printer_checks_2026-10-31.md` is folded into it.) |
 
 Rules that keep it tidy:
+- **One home per file, too.** Klipper code lives in the fork, printer
+  configuration here: [../klipper/README.md](../klipper/README.md).
 - **One home per fact.** NAND partitions and the boot path: `nand_layout.md`.
   Network settings: `network.md`. Wi-Fi setup and the 8782 driver:
   `wifi.md` and `kernel/wifi_88w8782.md`. Link, don't copy.
@@ -44,6 +46,7 @@ Rules that keep it tidy:
 | Mainline kernel | [no_gpl_plan.md](no_gpl_plan.md), [kernel/smp_freeze_summary.md](kernel/smp_freeze_summary.md), [kernel/upc_mainline_design.md](kernel/upc_mainline_design.md), [kernel/debian_root_boot.md](kernel/debian_root_boot.md), [mainline_userspace.md](mainline_userspace.md), [kernel/rtc_setup.md](kernel/rtc_setup.md), [kernel/touch_bu21029.md](kernel/touch_bu21029.md) |
 | Wi-Fi and network | [wifi.md](wifi.md), [network.md](network.md), [kernel/wifi_88w8782.md](kernel/wifi_88w8782.md) |
 | Hardware facts | [hardware_notes.md](hardware_notes.md), [stock_routines.md](stock_routines.md), [kernel/6270_vs_6170.md](kernel/6270_vs_6170.md), `kernel/uboot_*.txt`, `kernel/vendor_*` |
+| Klipper code and configuration: what lives where | [../klipper/README.md](../klipper/README.md) |
 | Motion and stepping | [faster_stepping_plan.md](faster_stepping_plan.md), [input_shaping.md](input_shaping.md), [test_print_plan.md](test_print_plan.md) |
 | Touch screen app | [touchscreen_options.md](touchscreen_options.md) |
 | Other topics | [cartridge_chip.md](cartridge_chip.md), [other_models.md](other_models.md), [sd_boot_plan.md](sd_boot_plan.md), [jtag_prep.md](jtag_prep.md), [kernel/marvell_github.md](kernel/marvell_github.md) |

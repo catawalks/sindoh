@@ -155,7 +155,7 @@ own log strings, listed after each hypothesis. Numbers are little-endian 32-bit.
 
 ## Klipper module (drafted 2026-10-21, NOT yet tested on the printer)
 
-`klipper/extras/dp200_cartridge.py`, enabled with an empty `[dp200_cartridge]`
+`klippy/extras/dp200_cartridge.py` in the Klipper fork, enabled with an empty `[dp200_cartridge]`
 section:
 - Reads ROM + pages 0, 2, 3, 6, 7 at start-up and on `CARTRIDGE_READ`
   (refused while printing). The read runs in a background thread, so the

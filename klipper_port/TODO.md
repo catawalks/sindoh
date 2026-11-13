@@ -80,8 +80,14 @@ Wi-Fi:
     The patch and cover letter are ready on the build box, not sent.
 
 Motion and firmware:
-28. **Commit the sched.c half of the UPC load change** to the fork
-    (`catawalks/klipper` sindoh-dp200); the port's main.c is in this repo.
+28. **Root and payload builds now take Klipper from the fork**
+    (`klipper/get_fork.sh`, 2026-11-13). Syntax-checked and the checkout
+    tested on the PC; the first real root or payload build is the test.
+    The two printers' `/home/klipper/klipper` are older checkouts: move
+    them to the pinned fork commit with the next payload.
+28a. **`upc-fast-step` (fork):** two untested stepping commits (fewer
+    timer reads; ARM-mode step path, default off). Test, rebase onto
+    `sindoh-dp200` without the merge commit, then delete the branch.
 29. **Probe settling after homing:** the first ~5 touches after G28 read
     0.015-0.02 mm high. Check BED_MESH_CALIBRATE right after homing.
 30. **Prebuilt (zig) UPC images** are untested with motion (they are the

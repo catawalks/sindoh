@@ -41,8 +41,7 @@ There are two ways it is installed today:
 | `common/` | Hardware register map and IPC layout, shared by every component |
 | `host/upctool.c` | Linux tool: `load`, `stop`, `safe`, `probe`, `bridge`, `info`, `dump` |
 | `upc_fw/probe/` | Hardware probe firmware (passive) |
-| `klipper/src/upc/` | Klipper MCU port for the UPC cores; `install_port.sh` adds it to a Klipper tree |
-| `klipper/configs/` | Build configs for each core (`dp200_fm`, `dp200_io`) |
+| `klipper/README.md`, `klipper/FORK` | Where Klipper's code lives: the fork `catawalks/klipper`, branch `sindoh-dp200` (MCU port, host modules, build configs), and the commit the printers build |
 | `klipper/config/printer.cfg` | The user's file: includes the two below and holds per-printer calibration. Never overwritten by an update |
 | `klipper/config/dp200_printer.cfg` | Hardware definition, PRINT_START/END, PAUSE/RESUME, PRIME_LINE; replaced on updates |
 | `klipper/config/dp200_macros.cfg` | Stock-derived macros (load/unload, clean, bin, probe, bed mesh, homing guards); replaced on updates |

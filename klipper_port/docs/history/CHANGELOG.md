@@ -6,6 +6,14 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-13
+- **Klipper fork tidied, one home per file.** Fork: `fast-stepping`
+  deleted (fully contained in `sindoh-dp200`), `master` synced to upstream
+  29d4ec2d, the printer configs removed from it (da0660ea, 289952f9). Port
+  repo: the copies of `src/upc`, the host modules, the build configs,
+  `install_port.sh`, `make_fork.sh` and `patches/` removed; builds check
+  out the pinned fork (`klipper/FORK`, `get_fork.sh`); `tools/fork_check.sh`
+  guards against drift; rules in `klipper/README.md`. The UPC load change's
+  sched.c half was already in the fork (5194e292).
 - **PROJECTS.md cut to status + decisions** (287 -> ~200 lines with a
   status table); the long version is PROJECTS_archive_2026-11-13.md.
 

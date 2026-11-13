@@ -73,7 +73,9 @@ in_root id $KUSER >/dev/null 2>&1 || \
 chmod 755 "$KHOME"
 
 echo "== 4. Klipper + Moonraker (this compiles python wheels under qemu; slow)"
-[ -d "$KHOME/klipper" ] || as_user "git clone --depth 1 https://github.com/Klipper3d/klipper ~/klipper"
+# Klipper comes from our fork at the commit pinned in klipper/FORK: it holds
+# the UPC MCU port and the host modules (nothing is copied in from here)
+sh "$PORT/klipper/get_fork.sh" "$KHOME/klipper"
 [ -d "$KHOME/moonraker" ] || as_user "git clone --depth 1 https://github.com/Arksine/moonraker ~/moonraker"
 as_user "python3 -m venv ~/klippy-env && ~/klippy-env/bin/pip install -q -r ~/klipper/scripts/klippy-requirements.txt"
 as_user "python3 -m venv ~/moonraker-env && ~/moonraker-env/bin/pip install -q -r ~/moonraker/scripts/moonraker-requirements.txt"
@@ -95,7 +97,6 @@ echo "== 6. UPC firmware (built on this PC with arm-none-eabi-gcc)"
 # firmware and the klippy host are the same version.
 KBUILD=$(mktemp -d)
 cp -a "$KHOME/klipper" "$KBUILD/klipper"
-"$PORT/klipper/install_port.sh" "$KBUILD/klipper"
 mkdir -p "$OUT/opt/dp200"
 for core in fm io; do
     ( cd "$KBUILD/klipper" && make clean >/dev/null &&
@@ -103,7 +104,7 @@ for core in fm io; do
       make olddefconfig >/dev/null && make )
     cp "$KBUILD/klipper/out/klipper.bin" "$OUT/opt/dp200/$core.bin"
 done
-make -C "$PORT/upc_fw/probe"
+make -C "$PORT/upc_fw/probe" KLIPPER="$KBUILD/klipper"
 cp "$PORT/upc_fw/probe/probe_fm.bin" "$PORT/upc_fw/probe/probe_io.bin" "$OUT/opt/dp200/"
 rm -rf "$KBUILD"
 
@@ -125,8 +126,6 @@ cp -n "$HERE/rootfs/home/klipper/printer_data/config/moonraker.conf" "$KHOME/pri
 cp "$PORT/klipper/config/dp200_printer.cfg" "$PORT/klipper/config/dp200_macros.cfg" \
    "$PORT/klipper/config/dp200_adxl.cfg.off" "$KHOME/printer_data/config/"
 cp -n "$PORT/klipper/config/printer.cfg" "$KHOME/printer_data/config/printer.cfg" || true
-cp "$PORT/klipper/extras/upc_stats.py" "$PORT/klipper/extras/upc_clockcheck.py" \
-   "$PORT/klipper/extras/dp200_cartridge.py" "$KHOME/klipper/klippy/extras/"
 in_root chown -R $KUSER:$KUSER /home/$KUSER
 echo "dp200-klipper" > "$OUT/etc/hostname"
 
