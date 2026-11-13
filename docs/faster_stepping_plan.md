@@ -272,7 +272,7 @@ upc_step_stats). The emulator's event counts stay the load evidence.
 
 **Adopted 2026-11-03** (owner: surfaces as before): fork branch merged
 into sindoh-dp200, `CONFIG_UPC_STEP_BATCH=y` in config/dp200_fm.config
-(f035bdbc, mirrored to klipper/configs/). The test printer runs it from
+(f035bdbc). The test printer runs it from
 /opt/dp200/fm.bin (the previous build kept as fm_gcc.bin); the USB payload
 is rebuilt with it.
 

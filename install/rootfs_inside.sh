@@ -28,7 +28,9 @@ id $KUSER >/dev/null 2>&1 || useradd -m -s /bin/bash -G dialout,video,tty $KUSER
 chmod 755 $KHOME
 
 echo "== 5. Klipper + Moonraker (native pip builds; slow on the PJ4)"
-[ -d $KHOME/klipper ] || as_user "git clone --depth 1 https://github.com/Klipper3d/klipper ~/klipper"
+# Klipper comes from our fork at the commit pinned in klipper/FORK: it holds
+# the UPC MCU port and the host modules (nothing is copied in from here)
+sh $PORT/klipper/get_fork.sh $KHOME/klipper
 [ -d $KHOME/moonraker ] || as_user "git clone --depth 1 https://github.com/Arksine/moonraker ~/moonraker"
 [ -x $KHOME/klippy-env/bin/python ] || as_user "python3 -m venv ~/klippy-env"
 as_user "TMPDIR=~/.cache/tmp; mkdir -p \$TMPDIR; export TMPDIR; ~/klippy-env/bin/pip install -q -r ~/klipper/scripts/klippy-requirements.txt"
@@ -51,7 +53,6 @@ ln -sf ../sites-available/mainsail /etc/nginx/sites-enabled/mainsail
 echo "== 7. UPC firmware (arm-none-eabi-gcc, same Klipper version as klippy)"
 KBUILD=$(mktemp -d /var/tmp/kbuild.XXXX)
 cp -a $KHOME/klipper $KBUILD/klipper
-sh $PORT/klipper/install_port.sh $KBUILD/klipper     # tarballs made on Windows carry no exec bits
 mkdir -p /opt/dp200
 for core in fm io; do
     # The Makefile fails the build itself when the image exceeds the 16 KiB ITCM
@@ -94,8 +95,6 @@ cp -n $PORT/install/rootfs/home/klipper/printer_data/config/moonraker.conf $KHOM
 cp $PORT/klipper/config/dp200_printer.cfg $PORT/klipper/config/dp200_macros.cfg \
    $PORT/klipper/config/dp200_adxl.cfg.off $KHOME/printer_data/config/
 cp -n $PORT/klipper/config/printer.cfg $KHOME/printer_data/config/printer.cfg || true
-cp $PORT/klipper/extras/upc_stats.py $PORT/klipper/extras/upc_clockcheck.py \
-   $PORT/klipper/extras/dp200_cartridge.py $KHOME/klipper/klippy/extras/
 chown -R $KUSER:$KUSER $KHOME
 echo "dp200-klipper" > /etc/hostname
 echo "== inside: done ($(du -sh /usr /home /opt 2>/dev/null | tr '\n' ' '))"

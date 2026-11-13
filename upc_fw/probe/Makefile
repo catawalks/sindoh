@@ -8,7 +8,9 @@
 CROSS ?= arm-none-eabi-
 CC = $(CROSS)gcc
 OBJCOPY = $(CROSS)objcopy
-PORT = ../../klipper/src/upc
+# A checkout of the Klipper fork (klipper/get_fork.sh): the port lives there
+KLIPPER ?= $(HOME)/klipper
+PORT = $(KLIPPER)/src/upc
 COMMON = ../../common
 CFLAGS = -march=armv5te -marm -mfloat-abi=soft -Os -Wall -ffreestanding \
          -fno-builtin -ffunction-sections -fdata-sections -I$(COMMON)

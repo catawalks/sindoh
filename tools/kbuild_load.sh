@@ -1,6 +1,6 @@
 #!/bin/sh
-# Build the FM and IO UPC firmware from /home/klipper/kb (the fork plus
-# upc_load_edit.py) and leave them in /run as fm_load.bin / io_load.bin.
+# Build the FM and IO UPC firmware from /home/klipper/kb (a checkout of the
+# fork, klipper/FORK) and leave them in /run as fm_load.bin / io_load.bin.
 # Log: /run/kbuild_load.log; ends with KBUILD-LOAD DONE or KBUILD-LOAD FAIL.
 cd /home/klipper/kb || exit 1
 for c in fm io; do

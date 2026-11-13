@@ -1,7 +1,7 @@
 # UPC driver for mainline (design, offline)
 
 Goal: run what already works on the stock kernel unchanged on mainline.
-That covers the Klipper MCU firmware on both UPC cores (`klipper/src/upc/`),
+That covers the Klipper MCU firmware on both UPC cores (`src/upc/` in the Klipper fork),
 `host/upctool` (load, stop, safe, info, bridge) and klippy. The stock
 driver is the module `upc.ko` (`/app/upc.ko`, also
 `/lib/modules/3.2.0-g67a8e16/kernel/arch/arm/mach-gogin/upc.ko`).

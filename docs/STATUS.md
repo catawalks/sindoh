@@ -55,7 +55,7 @@ and build in their own area and report files and md5s.
 | Kernel and boot (SMP, NAND, build variants) | build box `~/SINDOH-DEV`, served on 10.10.0.68:8098; summary in `docs/kernel/smp_freeze_summary.md` |
 | Motor / UPC driver | build box `~/SINDOH-DEV/motor`, branch `upc-bank3-pads` (7dd0f21, not yet merged into the kernel tree) |
 | Wi-Fi (8782 driver, firmware study) | build box; `TESTPLAN.md` and `upstream/` there; facts in `docs/kernel/wifi_88w8782.md` |
-| UPC stepping firmware | the Klipper fork `catawalks/klipper` branch `sindoh-dp200`; `docs/faster_stepping_plan.md` |
+| Klipper code (UPC MCU port, stepping, host modules) | the fork `catawalks/klipper`, branch `sindoh-dp200`; the pinned commit is `klipper/FORK`; rules in `klipper/README.md`; `docs/faster_stepping_plan.md` |
 | Touch screen app | `install/display/` in this repo; `docs/touchscreen_options.md` |
 
 Publishing: commit in `klipper_port`, then merge into the `sindoh_publish`

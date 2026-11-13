@@ -1,5 +1,6 @@
-﻿"""Mimic Klipper's make for MACH_UPC on Windows using zig as the cross compiler.
-usage: kbuild.py KLIPPER_TREE PORT_DIR CONFIG_FILE OUTDIR [extra cflags...]"""
+"""Mimic Klipper's make for MACH_UPC on Windows using zig as the cross compiler.
+usage: kbuild.py KLIPPER_TREE PORT_DIR CONFIG_FILE OUTDIR [extra cflags...]
+KLIPPER_TREE is a checkout of the fork (klipper/get_fork.sh); PORT_DIR is unused now."""
 import os, re, shutil, subprocess, sys
 
 kl, port, cfg, out = [os.path.abspath(a) for a in sys.argv[1:5]]
@@ -17,18 +18,9 @@ def run(cmd, **kw):
         print(r.stderr.strip())
     return r
 
-# 1. install port (same logic as install_port.sh)
-dst = os.path.join(kl, 'src', 'upc')
-shutil.rmtree(dst, ignore_errors=True)
-shutil.copytree(os.path.join(port, 'klipper', 'src', 'upc'), dst)
-for h in ('upc_hw.h', 'upc_ipc.h'):
-    shutil.copy(os.path.join(port, 'common', h), dst)
-kc = os.path.join(kl, 'src', 'Kconfig')
-s = open(kc).read()
-if 'MACH_UPC' not in s:
-    s = s.replace('    config MACH_AR100\n', '    config MACH_UPC\n        bool "Marvell 88PA6170 UPC (Sindoh DP200)"\n    config MACH_AR100\n', 1)
-    s = s.replace('source "src/ar100/Kconfig"\n', 'source "src/ar100/Kconfig"\nsource "src/upc/Kconfig"\n', 1)
-    open(kc, 'w', newline='\n').write(s)
+# 1. the tree must be a checkout of the fork (klipper/get_fork.sh): the port is in it
+if not os.path.isfile(os.path.join(kl, 'src', 'upc', 'Kconfig')):
+    sys.exit('%s has no src/upc: check out the fork with klipper/get_fork.sh' % kl)
 
 # 2. kconfig
 shutil.rmtree(out, ignore_errors=True); os.makedirs(out)
