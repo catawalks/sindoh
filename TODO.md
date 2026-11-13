@@ -117,6 +117,16 @@ the work; it is how open items survive between sessions.
      **both home.** Lost at reboot until the permanent fix: the mv61x0-upc
      driver sets bank 3 at probe (after forcing the drivers off), then a
      kernel rebuild, RAM boot, and mtd0 with the owner's OK.
+   - **Permanent fix built + RAM-boot PASS 2026-11-12** (motor session,
+     ~/SINDOH-DEV/motor branch upc-bank3-pads 7dd0f21: mv61x0-upc.c +
+     88pa6170-dp200.dts). Image m1-nandboot-bank3.uimg 7eae8600 (2814743
+     bytes; = C3 nanddsb + the bank 3 pads; modules unchanged), from the
+     4GB-SD gap (sd_raw_install/boot, CRC 8e2f514b). Boot log: "UPC pads:
+     bank 3 direction 00010040 -> 00000000", "62 set". Bank 3 reads stock
+     with no manual writes; 2 CPUs; Klipper ready. X/Y hold (owner), G28 X
+     216.0, G28 Y 5.5 - from Y parked ON its switch, so _SINDOH_HOME_Y
+     (54a8e5b) is exercised too. **mtd0 still C3 a4e0cb33** (no motion
+     after a reboot until bank3 goes to mtd0, owner's OK needed).
 0b. **(11-09, owner) PRIME_LINE lies inside big prints.** The work printer's
    test print covered X 40-160 / Y 35 (klipper/config/dp200_printer.cfg
    PRIME_LINE). Move it out of the print area. Options: (a) place it from the
