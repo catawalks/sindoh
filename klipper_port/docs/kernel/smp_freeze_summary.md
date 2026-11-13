@@ -1,8 +1,10 @@
 # Two-CPU hard freeze: fixed 2026-11-11 (history and method below)
 
+**mtd0 since 2026-11-12:** `m1-nandboot-bank3` 7eae8600 = this fix (nanddsb a4e0cb33) + the GPIO bank 3 pad setup; see [../STATUS.md](../STATUS.md).
+
 **Status, 2026-11-11:** fixed. mtd0 holds the two-CPU kernel (nanddsb a4e0cb33) and `variants/nandboot.config` now builds the same thing: two CPUs, no `maxcpus=1`, `timer_mv61x0.hang_wdt=30`. See "Candidate 3 result" and "The fix" below. The sections before them describe the state on 11-09 and are kept as history.
 
-This summary is for resuming after the weekly usage reset (2026-11-13 19:00 UTC). The kernel session's detailed log is in [nandboot_hang_analysis.md](nandboot_hang_analysis.md). Its hand-over note is `smp_freeze_resume_plan.md` in the shared side-session notes folder. The day-by-day record is in TODO.md (hangs 9 to 25).
+This summary is for resuming after the weekly usage reset (2026-11-13 19:00 UTC). The kernel session's detailed log is in [docs/history/kernel/nandboot_hang_analysis.md](../history/kernel/nandboot_hang_analysis.md). Its hand-over note is `docs/history/kernel/smp_freeze_resume_plan.md` in the shared side-session notes folder. The day-by-day record is in TODO.md (hangs 9 to 25).
 
 ## State of the dev printer on 11-09 (superseded, see "In mtd0")
 

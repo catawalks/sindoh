@@ -154,4 +154,4 @@ DRY_RUN=1 sh install/usb/unmistakable_klipper_install.sh /mnt/sd/payload
 Details: [usb_installer.md](usb_installer.md),
 [internal_firmware_plan.md](internal_firmware_plan.md),
 [touchscreen_options.md](touchscreen_options.md),
-[sd_boot_plan.md](sd_boot_plan.md), [kernel_research.md](kernel_research.md).
+[sd_boot_plan.md](sd_boot_plan.md), [docs/history/kernel_research.md](history/kernel_research.md).

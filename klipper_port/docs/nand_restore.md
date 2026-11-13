@@ -22,7 +22,7 @@ uncorrected bit errors (3 single-bit flips in the first 206 KiB against the
 ECC-corrected mtd0). It is **not** this printer's chip (2026-10-31): its only factory-marked
 block, and its own BBT, are block 3497 (0x1B520000). This printer's chip has
 block 3404 (0x1A980000) marked instead, in the marker and in the BBT
-(docs/kernel/nand_bch_plan.md, stage 2). Use it for layout and format only,
+(history/kernel/nand_bch_plan.md, stage 2). Use it for layout and format only,
 never for bad blocks.
 
 ## Restoring (from the rescue card, root on SD, NAND not mounted)

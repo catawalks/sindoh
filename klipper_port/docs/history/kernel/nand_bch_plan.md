@@ -1,5 +1,7 @@
 # NAND: stock ECC, and what reading it under mainline needs (2026-10-30)
 
+**Status: DONE** (the mainline NAND driver reads and writes with the stock ECC; our root runs from mtd6 since 2026-11-07). History only. Live facts: [../../nand_layout.md](../../nand_layout.md).
+
 ## Stock ECC: BCH, 4 bits per 512 bytes, one 2 KiB chunk
 
 The raw T48 dump (`NAND_Dump/MX30LF4G18AC@TSOP48.BIN`, 2048 + 64 bytes per page) shows, in every written page's OOB:

@@ -1,5 +1,7 @@
 # Checks that need someone at the printer
 
+**Status: HISTORY.** Folded into TODO.md, section "Owner at a printer" (2026-11-12).
+
 A running list of things that can only be confirmed at the printer itself
 (looking at the panel, touching it, being there for motion). Remove an entry
 once it's done, with its result in the matching doc.

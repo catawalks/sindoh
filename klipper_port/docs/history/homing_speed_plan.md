@@ -1,5 +1,7 @@
 # Homing closer to stock speed (draft, 2026-11-02)
 
+**Status: DONE 2026-11-02** (X/Y home at 208 mm/s + 10 mm/s; Z stays 5 mm/s). History only; the values are in klipper/config/dp200_printer.cfg.
+
 The owner, after going back to stock firmware for a while: stock homes much
 faster than our config. What we have, and what limits it:
 

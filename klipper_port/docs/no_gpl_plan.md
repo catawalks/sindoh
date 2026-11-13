@@ -6,7 +6,7 @@ Sindoh and Marvell bring nothing back. It covers two things:
 - the plan for porting a mainline 6.x kernel without vendor source.
 
 **Superseded in parts (note 2026-11-04).** The decisions in force are in
-HANDOFF.md ("Current state") and docs/end_goal_install_plan.md. Where this
+docs/history/HANDOFF_2026-10-18_to_11-04.md ("Current state") and docs/end_goal_install_plan.md. Where this
 document says otherwise, they win:
 - **NAND writes are no longer out of scope.** UBI/UBIFS writes on mtd6 and
   mtd3 rewrites from our kernel were tested 11-01 (patch 0010, guarded
@@ -73,8 +73,8 @@ New files:
 ## Status 2026-10-30: what works on the printer (RAM boot only)
 
 The images are built by `kernel/m1/build.sh`; the boot history is in
-`kernel/m1/README.md` and the logs are `docs/kernel/m1_boot1.log` ..
-`m1_boot7.log`. Linux 6.18.59 starts from U-Boot `bootm`. The image is typed
+`kernel/m1/README.md` and the logs are `docs/history/kernel/m1_boot1.log` ..
+`docs/history/kernel/m1_boot7.log`. Linux 6.18.59 starts from U-Boot `bootm`. The image is typed
 in over the serial console by `tools/uboot_upload.py` at about 111 KB/min:
 870 KB took 7:38, and the 1.86 MB Wi-Fi image takes about 17 min. Nothing
 is written to NAND or to the U-Boot environment. `reboot` and a panic
@@ -120,7 +120,7 @@ Traps found on the way, all fixed in `m1.config`/`busybox.config`:
 | 5 | **Ethernet: pin mux + PHY reset.** MDIO completes but reads ID 0, i.e. the line is held low. The stock board code sets 121 pin functions at boot (`set_pin_config` in the stock dmesg), and U-Boot, with no Ethernet driver, probably leaves the RGMII/MDIO pins unrouted. Then `reset-gpios` = GPIO 62 (low 125 ms, as the vendor does) and the PHY ID check | Recover the `set_pin_config` table from the vendor image (pin → function), then DT; after step 4 | Be present (pin mux = GPIO work); plug in a cable if a link test is wanted |
 | 6 | **I²C (DesignWare) + touch (bu21029) + backlight/PMIC** | DT, mainline drivers | Be present (the PMIC can switch power rails) |
 | 7 | **NAND** (`marvell_nand`, PXA3xx NFC at 0xf9082000), read-only partitions first | **Read-only proven 2026-10-30** (BCH run 3: mtd0/mtd3 equal the stock dumps). Next, read-only too: UBI attach `--readonly` | Read-write stays out of scope until the user decides |
-| 8 | ~~L2 cache (PL310)~~ **DDR write-buffer drain** (2026-10-29): there is no PL310 (the vendor's l2x0_init reads the SCU and GIC). 0xfa300000 is the DDR controller (U-Boot reads its CS address map at +0x100/0x110/0x130, ID "MV" at +0x10). The vendor's only effective "cache" op writes 0x01010101 to +0x530 on every mb(). Mainline: `soc_mb` hook in mach-mv61x0, DT node `marvell,88pa6170-ddr`, **on by default** since the A/B test (no measurable cost, docs/kernel/mcsync_ab_test.md) | done | — |
+| 8 | ~~L2 cache (PL310)~~ **DDR write-buffer drain** (2026-10-29): there is no PL310 (the vendor's l2x0_init reads the SCU and GIC). 0xfa300000 is the DDR controller (U-Boot reads its CS address map at +0x100/0x110/0x130, ID "MV" at +0x10). The vendor's only effective "cache" op writes 0x01010101 to +0x530 on every mb(). Mainline: `soc_mb` hook in mach-mv61x0, DT node `marvell,88pa6170-ddr`, **on by default** since the A/B test (no measurable cost, docs/history/kernel/mcsync_ab_test.md) | done | — |
 | 9 | **Persistent install** (kernel on SD or NAND) | Only after 1-8 | Explicit approval; it changes what the printer boots |
 
 ## 0. What the offline analysis found
@@ -197,7 +197,7 @@ framebuffer) need an extra layout check against the running kernel's code
 | Wanted | Why it can't be a module |
 |---|---|
 | **Swap** (also zram-as-swap, zswap, frontswap) | `CONFIG_SWAP` is core mm: the swap cache, anon-page reclaim in `vmscan.c`, swap PTE entries, `sys_swapon` (compiled to `-ENOSYS` without it). There is no hook for a module to add any of that. zram can only be a filesystem-in-RAM, which saves page cache, not anonymous memory |
-| **Thumb userspace / armhf** | `CONFIG_ARM_THUMB` changes the exception entry, signal return trampolines, `ptrace` and the ELF `HWCAP_THUMB` check. Setting the hwcap from a module would let Thumb binaries start, then crash on the first signal (kernel_research.md, "Not recommended"). qemu via binfmt_misc is the only module-level crutch |
+| **Thumb userspace / armhf** | `CONFIG_ARM_THUMB` changes the exception entry, signal return trampolines, `ptrace` and the ELF `HWCAP_THUMB` check. Setting the hwcap from a module would let Thumb binaries start, then crash on the first signal (history/kernel_research.md, "Not recommended"). qemu via binfmt_misc is the only module-level crutch |
 | **devtmpfs** | Hooked into `device_add()`/`device_del()` in the driver core, and mounted by `prepare_namespace()`; nothing is exported for it. mdev / static `/dev` stays (already done) |
 | **time64** (`clock_gettime64`, 64-bit `input_event`/V4L2 timestamps) | New syscall table entries (Linux 5.1+) and changed core ABIs. The LD_PRELOAD time32 shims stay (they work) |
 | Namespaces, seccomp, `fhandle`, AIO | `cond_syscall` stubs plus core structures (`nsproxy`, `task_struct` fields). No containers, no systemd, no Docker. Not needed |

@@ -1,5 +1,7 @@
 # 8782 Wi-Fi sometimes not coming up at boot (mainline)
 
+**Status: SOLVED 2026-11-11** (INIT_DONE read, patch 0013; reload fix usb8782_rmmod=2, patch 0028). History only. Live facts: [../../kernel/wifi_88w8782.md](../../kernel/wifi_88w8782.md).
+
 Offline analysis, 2026-11-07. Inputs:
 - the stock Marvell driver binaries (`/lib/modules/8782/mlan.ko` and
   `usb8xxx.ko`, "M2614459-GPL-(FP69)", disassembled with objdump);

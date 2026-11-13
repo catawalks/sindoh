@@ -1,5 +1,7 @@
 # Kernel research (first pass, 2026-10-20)
 
+**Status: SUPERSEDED** (first pass, 2026-10-20). We run our own mainline 6.18 kernel on the dev printer; see [../STATUS.md](../STATUS.md). History only.
+
 This is read-only research. Nothing was changed on the printer.
 The goal is to judge whether a newer or rebuilt kernel is realistic. A new
 kernel would give us:

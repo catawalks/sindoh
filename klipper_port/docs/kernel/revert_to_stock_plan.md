@@ -212,7 +212,7 @@ in the table above, with the window closed:
   `nandwrite -s 0x40000`.
 
 **A read bug found on the way.** The fix (patch 0010, section 9) is in both
-m1-debian and m1-debian-nandw. See nand_bch_plan.md, "Early UNCERR".
+m1-debian and m1-debian-nandw. See docs/history/kernel/nand_bch_plan.md, "Early UNCERR".
 
 **Not done yet:**
 - the initramfs (needed for 3e, not for 3c/3d);

@@ -26,7 +26,7 @@ on the hardware pulse engine (clear done, write CMD = 2 edges, START).
 The engines can run multi-step moves by themselves: CMD = (edges << 16) |
 mode, a fixed period (+0x58, 200 MHz ticks per edge) and a ramp mode (0x2,
 +0x54) - the stock firmware's long jumps are built that way (5000 steps in
-one command, docs/homing_speed_plan.md).
+one command, docs/history/homing_speed_plan.md).
 
 Klipper's step blocks map onto that well when `add == 0`: `count` steps at
 a constant `interval`, e.g. cruise phases. Those become **one engine move**

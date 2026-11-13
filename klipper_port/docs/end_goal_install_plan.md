@@ -1,5 +1,7 @@
 # End-goal install: the sequence (plan, 2026-11-03)
 
+NAND partitions, the boot path and the write rules: [nand_layout.md](nand_layout.md). What is installed today: [STATUS.md](STATUS.md).
+
 **Target** (internal_firmware_plan.md): our kernel in mtd0 (U-Boot block
 untouched), our root in mtd6, mtd5 recovery set and mtd4 never written, no
 U-Boot env change. Optional SD card / USB stick for storage in tiers
@@ -130,7 +132,7 @@ after the errata kernel's 82-minute soak, TODO 17).**
   failures. Klipper ready, Moonraker and Mainsail (200) answer, the
   screen app runs. Wi-Fi did not come up (command 0xa9 timeout, then
   "Card is removed"): the boot-time Wi-Fi failure, TODO 17 /
-  docs/kernel/wifi_boot_failure.md, not a NAND-root problem.
+  docs/history/kernel/wifi_boot_failure.md, not a NAND-root problem.
 - Decided the same day: `/.dp200-root` is for development and recovery
   only; an end-user card is storage, mtd6 always the root (PROJECTS 10).
 
