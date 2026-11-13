@@ -29,6 +29,8 @@ the work; it is how open items survive between sessions.
    MOTORS OFF ignored). Fixed: busy always ends (reply / error / timeout, or
    Klipper idle 5 s), outcome read from the G-code log. Root cause (why the
    reply never came) not seen from the PC: check moonraker.log for that POST.
+   Same day: TRY AGAIN now leaves the error page at once for a "Loading PLA"
+   page with its steps; homing/move errors get a plain page (OK only).
    **Not on a printer yet; deploy only together with the macro change below.**
    On the printer also run test_dp200_screen.py (needs Moonraker).
    Macro side, written 11-12 in dp200_macros.cfg (offline klippy check and
@@ -115,6 +117,24 @@ the work; it is how open items survive between sessions.
      **both home.** Lost at reboot until the permanent fix: the mv61x0-upc
      driver sets bank 3 at probe (after forcing the drivers off), then a
      kernel rebuild, RAM boot, and mtd0 with the owner's OK.
+   - **Permanent fix built + RAM-boot PASS 2026-11-12** (motor session,
+     ~/SINDOH-DEV/motor branch upc-bank3-pads 7dd0f21: mv61x0-upc.c +
+     88pa6170-dp200.dts). Image m1-nandboot-bank3.uimg 7eae8600 (2814743
+     bytes; = C3 nanddsb + the bank 3 pads; modules unchanged), from the
+     4GB-SD gap (sd_raw_install/boot, CRC 8e2f514b). Boot log: "UPC pads:
+     bank 3 direction 00010040 -> 00000000", "62 set". Bank 3 reads stock
+     with no manual writes; 2 CPUs; Klipper ready. X/Y hold (owner), G28 X
+     216.0, G28 Y 5.5 - from Y parked ON its switch, so _SINDOH_HOME_Y
+     (54a8e5b) is exercised too. **mtd0 still C3 a4e0cb33** (no motion
+     after a reboot until bank3 goes to mtd0, owner's OK needed).
+   - **IN mtd0 2026-11-12 (owner's OK):** tools/mtd0_kernel_update.sh from
+     the RAM-booted bank3 kernel: KUPDATE OK, mtd0 kernel area = 7eae8600,
+     U-Boot unchanged, ecc_failures 0. Rebooted (busybox reboot) -> U-Boot
+     NAND read 0x40000 -> bank3 kernel (#1 SMP Thu Nov 12 16:41:38), "UPC
+     pads: bank 3 ... -> 00000000", 2 CPUs, ubi0 root, hang_wdt armed,
+     Wi-Fi up; Klipper ready, G28 X 216.0, G28 Y 5.5. **Motion fixed on the
+     dev printer.** Rollback: C3 a4e0cb33 on 10.10.0.68:8098. Open: merge
+     upc-bank3-pads (7dd0f21) into the kernel tree / stick payload; a soak.
 0b. **(11-09, owner) PRIME_LINE lies inside big prints.** The work printer's
    test print covered X 40-160 / Y 35 (klipper/config/dp200_printer.cfg
    PRIME_LINE). Move it out of the print area. Options: (a) place it from the

@@ -95,7 +95,7 @@ def render(name=None):
     return im
 
 def wait():
-    for _ in range(300):
+    for _ in range(500):
         if not ui.busy:
             break
         time.sleep(0.01)
@@ -189,8 +189,42 @@ check('  and says it finished', ui.msg and 'complete' in ui.msg[0] and ui.screen
 ui.screen = 'fil_error'
 tap('TRY AGAIN'); tap('YES')
 check('TRY AGAIN sends the same LOAD', sent[-1] == ('/printer/gcode/script', 'LOAD_FILAMENT MATERIAL=PLA'))
-check('  ok this time: "complete", back to FILAMENT', ui.msg and 'Load complete' in ui.msg[0]
+check('  ok this time: "complete", back to FILAMENT', ui.msg and 'Load PLA complete' in ui.msg[0]
       and ui.screen == 'filament')
+# TRY AGAIN leaves the error page at once: the running page while it runs
+ui.fil_fail = {'mode': 'load', 'msg': jam, 'script': 'LOAD_FILAMENT MATERIAL=PLA', 'label': 'Load PLA',
+               'kind': 'path'}
+ui.screen = 'fil_error'
+slow['delay'] = 1.0
+refuse['LOAD_FILAMENT'] = jam
+ui.st = status(homed='')
+ui.st['extruder'] = {'temperature': 40.0, 'target': 230.0}
+tap('TRY AGAIN'); ui.confirm = None; ui.run(labels['YES'] if 'YES' in labels else ('cancel',))
+render()
+check('TRY AGAIN: the running page at once', ui.screen == 'fil_run' and ui.busy == 'Load PLA')
+render('2_load_running')
+check('  step Homing X and Y', S.fil_phase(ui.st) == 'home')
+ui.st = status()
+ui.st['extruder'] = {'temperature': 120.0, 'target': 230.0}
+check('  then Heating the nozzle', S.fil_phase(ui.st) == 'heat')
+ui.st['extruder'] = {'temperature': 229.0, 'target': 230.0}
+check('  then Feeding', S.fil_phase(ui.st) == 'feed')
+wait()
+check('  then the new result: the error page again', ui.screen == 'fil_error'
+      and ui.fil_fail['msg'] == jam and not ui.busy)
+slow['delay'] = 0.0
+del refuse['LOAD_FILAMENT']
+ui.st = status()
+# not a filament problem (homing / endstop / move): plain, OK only
+for msg in ('Endstop stepper_y still triggered after retract', 'Must home axis first: 0.000 0.000 0.000',
+            'No trigger on y after full movement'):
+    refuse['LOAD_FILAMENT'] = msg
+    ui.screen = 'fil_mat'; ui.fil['mode'] = 'load'; tap('PLA'); tap('YES')
+    check('"%s...": plain error page, OK only' % msg[:20], ui.screen == 'fil_error'
+          and ui.fil_fail['kind'] == 'other' and [k for k in labels if k not in ('', 'BACK')] == ['OK'])
+render('2_load_failed_homing')
+del refuse['LOAD_FILAMENT']
+tap('OK'); check('  OK -> filament page', ui.screen == 'filament')
 ui.screen = 'fil_error'; tap('OK'); check('OK -> filament page', ui.screen == 'filament')
 ui.st = status(homed='')
 ui.screen = 'fil_mat'; tap('PETG'); tap('YES')
@@ -203,7 +237,7 @@ tap('LOWER BED')
 check('unhomed LOWER BED still asks about the bed', 'EMPTY?' in ui.confirm[0]
       and ui.confirm[1][1].startswith('BED_CLEAR\n_SINDOH_ENSURE_HOMED'))
 tap('NO')
-refuse['UNLOAD_FILAMENT'] = 'Homing cancelled: the bed is not confirmed empty'
+refuse['UNLOAD_FILAMENT'] = 'UNLOAD_FILAMENT stopped: the filament encoder saw no movement'
 ui.st = status()
 ui.screen = 'fil_mat'; ui.fil['mode'] = 'unload'; tap('ABS'); tap('YES')
 render('2_unload_stopped')

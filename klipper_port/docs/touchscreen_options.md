@@ -220,7 +220,18 @@ homing works again and Z homing still asks the BED_CLEAR question. LOAD
 during a pause relies on `_SINDOH_SAFE_Z` (the bed never rises toward the
 part): deploy both together.
 
-**LOAD / UNLOAD that stops.** Klipper's error (for example the jam check:
+**LOAD / UNLOAD running.** Once confirmed (also TRY AGAIN / UNLOAD from
+the error page) the screen shows "Loading PLA" with the steps (homing X
+and Y, heating the nozzle, feeding / pulling back; guessed from the
+homing and the nozzle temperature) and the time running. BACK leaves it
+running; the result shows anyway. On 11-12 a TRY AGAIN left the old error
+page up during the whole retry, so it looked as if nothing happened.
+
+**LOAD / UNLOAD that stops.** Only a filament-path stop (the jam / no-grab
+check: "encoder", "jam", "did not grab", "feeder" in the message) gets the
+red page with UNLOAD / TRY AGAIN. Anything else (homing, "Endstop ... still
+triggered", "Must home", "No trigger", the bed question) gets a plain
+"LOAD failed" page with the message and OK only. Klipper's error (for example the jam check:
 "LOAD_FILAMENT stopped: the filament encoder saw no movement ...") opens
 a red page with the whole message and UNLOAD (asks) / TRY AGAIN (asks) /
 OK. A load that works says "Load PLA complete" (plus "RESUME when ready"
