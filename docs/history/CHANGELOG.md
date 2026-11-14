@@ -5,6 +5,16 @@ one. The detail for everything up to 2026-11-12 is in
 [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md) and the other
 files in this folder; `git log` has the rest.
 
+## 2026-11-14
+- **Camera streamer: log and auto-restart** (`rc.dp200 webcam-loop`),
+  after it died on the dev printer with no trace. Deployed there (rc.dp200
+  9a605e09, old one kept as rc.dp200.bak-1114); a test kill was logged as
+  exit 139 and the stream was back in 5 s. Temporary, until the cause is
+  found (TODO 26a).
+- **Wi-Fi fallback traced** (TODO 26): the Niholedotcom access point
+  drops the printer 91 s after each association (reason 34); the
+  switch-back watchdog reads stale scan results. Not fixed.
+
 ## 2026-11-13
 - **Fork branch `dp200-clean` built** (stepping session; emulator-tested
   only). A: 25 commits reshaped into 9, diff against 289952f9 empty. B:

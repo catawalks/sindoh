@@ -90,11 +90,11 @@ Wi-Fi:
       the first: it would only re-enter the 91 s loop every 10 min.
 26a. **Camera streamer died** (dev printer, found 11-14): ustreamer was
     gone, first refused snapshot 11-14 00:28 UTC (about 22 h after boot),
-    no kernel message, and rc.dp200 keeps no log for it, so the cause is
-    unknown. Restarted by hand with output in /var/log/dp200_webcam.log
-    and `print-fatal-signals` on (until the next reboot). To do: rc.dp200
-    should log the streamer and restart it when it exits, as it does the
-    screen.
+    no trace, cause unknown. Since 11-14 rc.dp200 (`webcam-loop`) logs it
+    to /var/log/dp200_webcam.log with its exit status, restarts it after
+    5 s, and makes the kernel log where a fatal signal hit. Read the log
+    after the next exit, find the cause; owner: the log and restart can go
+    once it is fixed.
 27. Upstream submission of the 8782 fix: **tabled by the owner 11-12**.
     The patch and cover letter are ready on the build box, not sent.
 
