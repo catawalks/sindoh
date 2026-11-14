@@ -26,7 +26,10 @@ becomes the full kernel-swap test machine.
   Rollback: C3 `a4e0cb33...` on the build box (10.10.0.68:8098).
 - **Command line:** `console=ttyS0,115200n8 marvell_nand.write_window=1741,4091 panic=10 consoleblank=0 timer_mv61x0.hang_wdt=30`
 - **Wi-Fi module:** `mwifiex_usb.ko` 0028 (`6645762a`): reload-safe.
-- **UPC firmware in /opt/dp200:** fm `c313d379`, io `dbc8e40d`.
+- **Klipper on test (since 2026-11-14): fork tag `dp200-clean-c`**
+  (0607ba28): klippy from the tag, fm `cea02737`, io `8ecc88f4`. The
+  product build (`sindoh-dp200` 289952f9: fm `c313d379`, io `dbc8e40d`) is
+  kept on the printer as `klippy.cur`, `fm.bin.cur`, `io.bin.cur`.
 - **Config and screen app** (deployed 11-12): `dp200_macros.cfg` `22e88b5f`,
   `dp200_printer.cfg` `180033a5`, `dp200_screen.py` `561d5ee1`.
 - **4 GB card** is inside as storage; its gap (sector 64) holds the bank3
