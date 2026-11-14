@@ -11,6 +11,11 @@ files in this folder; `git log` has the rest.
   9a605e09, old one kept as rc.dp200.bak-1114); a test kill was logged as
   exit 139 and the stream was back in 5 s. Temporary, until the cause is
   found (TODO 26a).
+- **Wi-Fi: 2.4 GHz only** (`dp200_wifi.py` FREQS_24): every saved
+  network gets `freq_list`/`scan_freq` for channels 1-14 and 5 GHz is left
+  out of the scan list. The module (LG Innotek TWFM-M311D) has no usable
+  5 GHz antenna. Deployed on the dev printer (1143a67e; .bak-1114 kept):
+  no more 5 GHz attempts. It does not stop the AP's 91 s drops.
 - **Wi-Fi fallback traced** (TODO 26): the Niholedotcom access point
   drops the printer 91 s after each association (reason 34); the
   switch-back watchdog reads stale scan results. Not fixed.

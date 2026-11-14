@@ -75,3 +75,14 @@ fake backend (25 checks).
   - ▲/▼ buttons with a page counter replace MORE.
 - **Real test by the user:** scan, keyboard and connect to Niholedotcom
   worked; saved with priority 21.
+
+## 2.4 GHz only (2026-11-14)
+
+The WiFi module is an LG Innotek TWFM-M311D (88W8782, USB). The chip is
+dual-band and says so to access points, but the module has no antenna
+connector and no usable 5 GHz antenna: 8 ft from an access point it measured
+-29 dBm on 2.4 GHz and -78 dBm on 5 GHz, associated on 5 GHz and never got an
+address. `dp200_wifi.py` therefore gives every saved network
+`freq_list` and `scan_freq` for channels 1-14 (in the saved file and in the
+running daemon) and leaves 5 GHz networks out of the scan list. An SSID that
+exists only on 5 GHz cannot be joined.
