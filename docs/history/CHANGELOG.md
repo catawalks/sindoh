@@ -6,6 +6,13 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-13
+- **Fork branch `dp200-clean` built** (stepping session; emulator-tested
+  only). A: 25 commits reshaped into 9, diff against 289952f9 empty. B:
+  rebased onto upstream 29d4ec2d, no conflicts, kemu regression passes.
+  C: 8 commits; `stepper.c`/`sched.c` carry generic hooks
+  (HAVE_STEPPER_HW_PULSE, HAVE_STEPPER_HW_BURST, HAVE_IRQ_WAIT_TIMERS)
+  instead of UPC `#if`s, test configs and reference docs added; step
+  timing identical to B on 11 inputs. No sign-off lines.
 - **Klipper fork tidied, one home per file.** Fork: `fast-stepping`
   deleted (fully contained in `sindoh-dp200`), `master` synced to upstream
   29d4ec2d, the printer configs removed from it (da0660ea, 289952f9). Port
