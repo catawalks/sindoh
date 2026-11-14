@@ -72,10 +72,29 @@ Kernel (dev printer only):
     downloads in one test (11-07).
 
 Wi-Fi:
-26. **Saved-network priority:** after falling back to a lower-priority
-    network the printer does not rejoin the preferred one (dev printer is
-    on Fios-kVGD7 again, 11-12). Trace the watchdog/priority logic
-    (docs/network.md "Preferred network").
+26. **Wi-Fi leaves the preferred network** (traced 11-14, not fixed):
+    - Cause of the fallback: the access point that carries Niholedotcom
+      (BSSIDs ..:45:58:f7:f9:44, 2.4 GHz) disconnects the printer about
+      91 s after every association, reason code 34 (low ACK). Seen 14 times
+      in the 24 min after the 11-13 boot and again live on 11-14. Its 5 GHz
+      radio (-78 dBm) associates but gets no address. After enough failures
+      wpa_supplicant lands on the Fios-kVGD7 router, which held 27 h.
+      Power save was off. `cmd 0x23f error` (STA_CONFIGURE) shows about
+      62 s after each association on both routers, so probably unrelated.
+      Open: is it the AP (band steering / low-ACK kick) or our driver not
+      acknowledging? Compare the work printer (stock 3.2) on the same AP.
+    - Why it never goes back: `dp200_wifi.watchdog` reads cached scan
+      results, which hold only the current AP after a few minutes, so it
+      never sees the preferred network. A fresh scan alone makes
+      wpa_supplicant switch back (seen 11-14). Don't fix this half before
+      the first: it would only re-enter the 91 s loop every 10 min.
+26a. **Camera streamer died** (dev printer, found 11-14): ustreamer was
+    gone, first refused snapshot 11-14 00:28 UTC (about 22 h after boot),
+    no kernel message, and rc.dp200 keeps no log for it, so the cause is
+    unknown. Restarted by hand with output in /var/log/dp200_webcam.log
+    and `print-fatal-signals` on (until the next reboot). To do: rc.dp200
+    should log the streamer and restart it when it exits, as it does the
+    screen.
 27. Upstream submission of the 8782 fix: **tabled by the owner 11-12**.
     The patch and cover letter are ready on the build box, not sent.
 
