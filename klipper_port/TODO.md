@@ -83,6 +83,12 @@ Wi-Fi:
       62 s after each association on both routers, so probably unrelated.
       Open: is it the AP (band steering / low-ACK kick) or our driver not
       acknowledging? Compare the work printer (stock 3.2) on the same AP.
+    - 11-14: saved networks are now 2.4 GHz only (the module has no
+      usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
+      the printer is back on the AP 1 s after each drop, but the drops go
+      on (91 s and 94 s in the test). Owner will try the UniFi settings:
+      band steering, minimum RSSI, BSS transition / fast roaming, and the
+      client event log.
     - Why it never goes back: `dp200_wifi.watchdog` reads cached scan
       results, which hold only the current AP after a few minutes, so it
       never sees the preferred network. A fresh scan alone makes

@@ -22,6 +22,14 @@ CTRL = '/var/run/wpa_supplicant/mlan0'
 HEADER = ('# Saved WiFi networks (dp200_wifi.py / the touch screen).\n'
           'ctrl_interface=/var/run/wpa_supplicant\n')
 
+# 2.4 GHz only (channels 1-14). The printer's WiFi module (LG Innotek
+# TWFM-M311D, 88W8782) reports 5 GHz support but has no usable 5 GHz antenna:
+# 8 ft from an access point it measured -29 dBm on 2.4 GHz and -78 dBm on
+# 5 GHz, associated there and never got an address (2026-11-14). Every saved
+# network is limited to these frequencies, and 5 GHz is left out of the
+# scan list.
+FREQS_24 = ' '.join(str(f) for f in list(range(2412, 2473, 5)) + [2484])
+
 class WpaError(Exception):
     pass
 
@@ -95,6 +103,7 @@ def write_saved(nets, path=CONF):
             out.append('\tpsk="%s"\n\tkey_mgmt=WPA-PSK\n' % n['psk'])
         else:
             out.append('\tkey_mgmt=NONE\n')
+        out.append('\tfreq_list=%s\n\tscan_freq=%s\n' % (FREQS_24, FREQS_24))
         out.append('\tpriority=%d\n}\n' % n['priority'])
     tmp = path + '.tmp'
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -147,6 +156,8 @@ def scan_results(w):
         p = line.split('\t')
         if len(p) < 5 or not p[4]:
             continue                                   # hidden networks have no SSID
+        if int(p[1]) > 3000:
+            continue                                   # 5 GHz: see FREQS_24
         ssid = _decode_ssid(p[4])
         n = {'ssid': ssid, 'level': int(p[2]), 'freq': int(p[1]),
              'secured': any(k in p[3] for k in ('WPA', 'RSN', 'WEP')),
@@ -158,8 +169,13 @@ def scan_results(w):
 def bars(level):
     return 4 if level > -55 else 3 if level > -65 else 2 if level > -75 else 1
 
+def _only_24(w, nid):
+    for k in ('freq_list', 'scan_freq'):
+        w.cmd('SET_NETWORK %d %s %s' % (nid, k, FREQS_24))
+
 def _add(w, n):
     nid = int(w.cmd('ADD_NETWORK').strip())
+    _only_24(w, nid)
     w.ok('SET_NETWORK %d ssid %s' % (nid, n['ssid'].hex()))
     if n['psk']:
         w.ok('SET_NETWORK %d psk "%s"' % (nid, n['psk']))
@@ -179,6 +195,7 @@ def apply(w, nets):
         if connected and ssid == cur.get('ssid'):
             # keep the live connection, but give it its saved priority
             w.ok('SET_NETWORK %d priority %d' % (nid, wanted[ssid]['priority']))
+            _only_24(w, nid)
         else:
             w.ok('REMOVE_NETWORK %d' % nid)
     present = {ssid for nid, ssid, flags in list_networks(w)}
