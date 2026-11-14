@@ -6,6 +6,13 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-14
+- **`dp200-clean` tested on the dev printer** (owner present). Stage B
+  (f01effd8) and stage C (0607ba28), each: Z/X/Y homing; drift test, 100
+  zig-zags per speed (X: B -0.040 mm once at 30 mm/s then 0.000, C 0.000;
+  Y: B 0.000, C -0.020 at 100 and 10 mm/s; no-move repeatability up to
+  0.020); the 20 mm box with mesh and prime line, completed (421 s and
+  417 s). Box B measured about 20.0 x 19.8 x 10 mm. klippy's
+  `c_helper.so` was built on the printer for each stage.
 - **Camera streamer: log and auto-restart** (`rc.dp200 webcam-loop`),
   after it died on the dev printer with no trace. Deployed there (rc.dp200
   9a605e09, old one kept as rc.dp200.bak-1114); a test kill was logged as

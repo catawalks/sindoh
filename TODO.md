@@ -113,18 +113,20 @@ Motion and firmware:
 28a. **`upc-fast-step` (fork):** two untested stepping commits (fewer
     timer reads; ARM-mode step path, default off). Test, rebase onto
     `sindoh-dp200` without the merge commit, then delete the branch.
-28b. **Clean fork branch `dp200-clean`: built 2026-11-13, printer tests
-    open** (owner at the dev printer: homing, drift test, a real print).
-    Test B first, then C:
-    - B (`dp200-clean-b`, f01effd8: same code on upstream 29d4ec2d):
-      `fm-clean-b.bin` a4481759, `io-clean-b.bin` a249f6c7.
-    - C (`dp200-clean-c`, 0607ba28: no board `#if` in shared files):
-      `fm-clean-c.bin` cea02737, `io-clean-c.bin` 8ecc88f4.
-    Images on 10.10.0.68:8098. No printer-config change needed. klippy on
-    the printer must come from the same tag as the firmware (protocol
-    dictionary). After both pass: `dp200-clean` replaces `sindoh-dp200`
-    (owner's OK for the force-push or rename), bump `klipper/FORK`, and
-    copy the fork's re-wrapped `upc_hw.h` to `common/` (fork_check).
+28b. **Clean fork branch `dp200-clean`: printer tests passed 2026-11-14**
+    (B f01effd8 and C 0607ba28: homing, drift test, 20 mm box; results in
+    the changelog). The dev printer runs C. Left:
+    - `dp200-clean` replaces `sindoh-dp200` (owner's OK for the force-push
+      or rename), bump `klipper/FORK`, copy the fork's re-wrapped
+      `upc_hw.h` to `common/` (fork_check).
+    - The move to upstream 29d4ec2d changes klippy's C helper
+      (`chelper/*.c`), and the NAND root has no gcc: `c_helper.so` has to
+      be built where the root is built (for the test it was built on the
+      printer with the SD card's gcc). Check that the root build and the
+      next stick payload carry the new one.
+    - Drift test trigger points scattered by 0.02 mm (once 0.04) on both
+      stages, also with no moves; on the old code they read 0.000. Not
+      accumulating. Repeat once on the old code if it matters.
 29. **Probe settling after homing:** the first ~5 touches after G28 read
     0.015-0.02 mm high. Check BED_MESH_CALIBRATE right after homing.
 30. **Prebuilt (zig) UPC images** are untested with motion (they are the
