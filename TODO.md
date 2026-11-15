@@ -123,25 +123,21 @@ Motion and firmware:
     The two printers' `/home/klipper/klipper` are older checkouts: move
     them to the pinned fork commit with the next payload.
 28a. **`upc-fast-step` (fork):** two untested stepping commits (fewer
-    timer reads; ARM-mode step path, default off). Test, rebase onto
-    `sindoh-dp200` without the merge commit, then delete the branch.
-28b. **Clean fork branch `dp200-clean`: printer tests passed 2026-11-14**
-    (B f01effd8 and C 0607ba28: homing, drift test, 20 mm box; results in
-    the changelog). The dev printer runs C. Left:
-    - `dp200-clean` replaces `sindoh-dp200` (owner's OK for the force-push
-      or rename), bump `klipper/FORK`, copy the fork's re-wrapped
-      `upc_hw.h` to `common/` (fork_check).
-    - The move to upstream 29d4ec2d changes klippy's C helper
-      (`chelper/*.c`), and the NAND root has no gcc: `c_helper.so` has to
-      be built where the root is built (for the test it was built on the
-      printer with the SD card's gcc). Check that the root build and the
-      next stick payload carry the new one.
-    - Drift test trigger points scattered by 0.02 mm (once 0.04) on both
-      stages, also with no moves. The old code did the same (Y readings
-      5.44-5.48, docs/faster_stepping_plan.md), so it is the switches,
-      not the new code.
-    - How to switch builds and run the tests:
-      docs/dev_printer_testing.md.
+    timer reads; ARM-mode step path, default off). The branch still sits
+    on the old `sindoh-dp200` (tag `sindoh-dp200-before-clean`): rebase
+    its two commits onto the new `sindoh-dp200`, test, then delete it.
+28b. **After the fork's branch replacement (2026-11-15):**
+    `sindoh-dp200` is now the clean history (8203a7d7, on upstream
+    29d4ec2d), pinned in `klipper/FORK`. Left:
+    - The dev printer runs tag `dp200-clean-c` (0607ba28), two commits
+      behind the pin. Those two only re-wrap long lines. Rebuild fm/io
+      from 8203a7d7, install with klippy from the same commit
+      (docs/dev_printer_testing.md), check `software_version`.
+    - klippy's C helper changed with the move to upstream 29d4ec2d and
+      the NAND root has no gcc: check that the root build
+      (`install/rootfs_inside.sh`) and the next stick payload carry a
+      `c_helper.so` built from the pinned commit.
+    - The work printer still runs the old code (the 11-07 payload).
 29. **Probe: false left-right slope** (found 11-14, fixed on the dev
     printer with `[axis_twist_compensation]` in its printer.cfg, plus
     five warm-up touches before every mesh; docs/dev_printer_testing.md).

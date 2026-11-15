@@ -73,10 +73,10 @@
 #define SMOT_BASE(n)        (0xf8150000u + 0x1000u * (n))
 #define SMOT_BLOCK_EN       0x00  // stock 1; power-on 0 = no output at all
 #define SMOT_ABORT          0x04  // write 0x100 to stop a running move
-#define SMOT_CFG            0x0c  // bit0 = 1: A4982 driver disabled; stock sets bit4
+#define SMOT_CFG            0x0c  // bit0 = 1: driver disabled; stock sets bit4
 #define SMOT_SETUP10        0x10  // stock 8 (power-on 1), meaning unknown
 #define SMOT_SETUP14        0x14  // stock 4 (power-on 0), meaning unknown
-#define SMOT_PATTERN        0x2c  // stock 0xaaaaaaaa (power-on 0), output pattern?
+#define SMOT_PATTERN        0x2c  // stock 0xaaaaaaaa (power-on 0)
 #define SMOT_CTRL           0x44  // stock value 0x33224, bit4 = direction
 #define SMOT_ENABLE         0x50  // stock writes 1 before each move
 #define SMOT_RAMP_LEN       0x54
@@ -104,7 +104,7 @@
 #define PWM_BASE            0xf9304000u
 #define PWM_GLOBAL_EN       PWM_BASE
 #define PWM_BLOCK(n)        (PWM_BASE + 0x100u * (n))
-#define PWM_CTRL            0x00  // bit0 run, bit2 static level when not running
+#define PWM_CTRL            0x00  // bit0 run, bit2 static level when stopped
 #define PWM_HIGH            0x08  // ticks high
 #define PWM_LOW             0x0c  // ticks low
 #define PWM_STATUS          0x20  // bit31 + [15:0] current position

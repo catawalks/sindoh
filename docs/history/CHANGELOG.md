@@ -6,6 +6,12 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-15
+- **Fork: `sindoh-dp200` replaced by the clean history** (owner's OK):
+  force-pushed 289952f9 -> 8203a7d7 (= tested tag `dp200-clean-c` plus
+  two line-wrap commits). The old tip is kept as tag
+  `sindoh-dp200-before-clean`; the `dp200-clean` branch is deleted, its
+  tags `dp200-clean-a/b/c` stay. `klipper/FORK` pins 8203a7d7,
+  `common/upc_hw.h` synced, `tools/fork_check.sh` passes.
 - **Probe's false left-right slope found and compensated** (dev printer).
   With a mesh the first layer was too high on the left and squashed on
   the right. Paper test, mesh off, bed X 25/100/175 at Y 30: nozzle
