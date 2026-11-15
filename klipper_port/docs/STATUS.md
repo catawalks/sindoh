@@ -1,4 +1,4 @@
-# Status (overwrite in place; last updated 2026-11-12)
+# Status (overwrite in place; last updated 2026-11-15)
 
 The project: Klipper on the Sindoh DP200, on the printer's own SoC. Two
 setups exist, and they are different on purpose.
@@ -19,7 +19,7 @@ reaches the work printer at the end-goal install
 ([end_goal_install_plan.md](end_goal_install_plan.md)), when that printer
 becomes the full kernel-swap test machine.
 
-## Dev printer, as of 2026-11-12
+## Dev printer, as of 2026-11-15
 
 - **mtd0:** `m1-nandboot-bank3.uimg`, md5 `7eae8600a4872619711b3e891df129ca`
   = C3 (the SMP freeze fix) + the GPIO bank 3 pad setup (the motor fix).
@@ -30,8 +30,16 @@ becomes the full kernel-swap test machine.
   (0607ba28): klippy from the tag, fm `cea02737`, io `8ecc88f4`. The
   product build (`sindoh-dp200` 289952f9: fm `c313d379`, io `dbc8e40d`) is
   kept on the printer as `klippy.cur`, `fm.bin.cur`, `io.bin.cur`.
-- **Config and screen app** (deployed 11-12): `dp200_macros.cfg` `22e88b5f`,
-  `dp200_printer.cfg` `180033a5`, `dp200_screen.py` `561d5ee1`.
+- **Config and screen app:** `dp200_macros.cfg` `1154d13d` (11-15: five
+  warm-up touches before a mesh), `dp200_printer.cfg` `180033a5`,
+  `dp200_screen.py` `561d5ee1`. Its own `printer.cfg` has
+  `[axis_twist_compensation]` since 11-15 (the old file is
+  `printer.cfg.bak-1115` next to it).
+- **Other changes of 11-14** (old files kept with `.bak-1114`):
+  `rc.dp200` `9a605e09` logs the camera streamer and restarts it;
+  `dp200_wifi.py` `1143a67e` limits saved networks to 2.4 GHz.
+- **How to test and switch builds:**
+  [dev_printer_testing.md](dev_printer_testing.md).
 - **4 GB card** is inside as storage; its gap (sector 64) holds the bank3
   image for RAM boots. The 2 GB card is the rescue card: never write it.
 - **Works:** boot from NAND, two CPUs (10 h soak on C3), NAND root, Wi-Fi

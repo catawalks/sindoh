@@ -47,6 +47,7 @@ Rules that keep it tidy:
 | Wi-Fi and network | [wifi.md](wifi.md), [network.md](network.md), [kernel/wifi_88w8782.md](kernel/wifi_88w8782.md) |
 | Hardware facts | [hardware_notes.md](hardware_notes.md), [stock_routines.md](stock_routines.md), [kernel/6270_vs_6170.md](kernel/6270_vs_6170.md), `kernel/uboot_*.txt`, `kernel/vendor_*` |
 | Klipper code and configuration: what lives where | [../klipper/README.md](../klipper/README.md) |
+| Testing on the dev printer: rules, switching Klipper builds, the standard tests, probe calibration | [dev_printer_testing.md](dev_printer_testing.md) |
 | Motion and stepping | [faster_stepping_plan.md](faster_stepping_plan.md), [input_shaping.md](input_shaping.md), [test_print_plan.md](test_print_plan.md) |
 | Touch screen app | [touchscreen_options.md](touchscreen_options.md) |
 | Other topics | [cartridge_chip.md](cartridge_chip.md), [other_models.md](other_models.md), [sd_boot_plan.md](sd_boot_plan.md), [jtag_prep.md](jtag_prep.md), [kernel/marvell_github.md](kernel/marvell_github.md) |

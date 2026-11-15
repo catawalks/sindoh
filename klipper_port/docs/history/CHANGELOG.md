@@ -5,6 +5,23 @@ one. The detail for everything up to 2026-11-12 is in
 [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md) and the other
 files in this folder; `git log` has the rest.
 
+## 2026-11-15
+- **Probe's false left-right slope found and compensated** (dev printer).
+  With a mesh the first layer was too high on the left and squashed on
+  the right. Paper test, mesh off, bed X 25/100/175 at Y 30: nozzle
+  -0.175/-0.175/-0.150; settled probe 2.437/2.418/2.299. Added
+  `[axis_twist_compensation]` (`z_compensations: -0.061, -0.042, 0.103`)
+  to the dev printer's printer.cfg; afterwards the probe read
+  2.375/2.340/2.421.
+- **Five warm-up touches before every mesh** (`_SINDOH_MESH_WARMUP`): ten
+  touches after a deploy read 2.464 2.449 2.444 2.438 2.437 2.435 ...
+- **X/Y scale is right:** `dp200_xy_scale_150mm.gcode` (new in
+  `gen_test_prints.py`) measured X 149.60, Y 149.40, widths 14.90 and
+  9.90: PLA shrinkage, not a step error.
+- New: `docs/dev_printer_testing.md` and the scripts it uses
+  (`tools/drift_test.py`, `print_watch.py`, `probe_settle.py`,
+  `klippy_switch.sh`, `klippy_build_chelper.sh`).
+
 ## 2026-11-14
 - **`dp200-clean` tested on the dev printer** (owner present). Stage B
   (f01effd8) and stage C (0607ba28), each: Z/X/Y homing; drift test, 100
