@@ -33,7 +33,8 @@ becomes the full kernel-swap test machine.
 - **Config and screen app:** `dp200_macros.cfg` `1154d13d` (11-15: five
   warm-up touches before a mesh), `dp200_printer.cfg` `180033a5`,
   `dp200_screen.py` `561d5ee1`. Its own `printer.cfg` has
-  `[axis_twist_compensation]` since 11-15 (the old file is
+  `[axis_twist_compensation]` and probe `z_offset` 2.630 (was 2.580)
+  since 11-15 (the old file is
   `printer.cfg.bak-1115` next to it).
 - **Other changes of 11-14** (old files kept with `.bak-1114`):
   `rc.dp200` `9a605e09` logs the camera streamer and restarts it;
