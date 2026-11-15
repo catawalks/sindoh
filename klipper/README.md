@@ -45,8 +45,10 @@ image from that checkout on the printer.
 - **Upstream:** nothing has been submitted to Klipper. A submission needs
   the owner's real-name `Signed-off-by` on every commit, no board-specific
   `#if` in shared code, one minimal example config and reference docs.
-  That would be a separate branch rebuilt on current upstream; the product
-  branch stays as it is.
+  Since 2026-11-15 the product branch itself has that shape (clean
+  history on upstream 29d4ec2d, no board `#if` in shared files, no
+  sign-off lines). The history before that is the fork tag
+  `sindoh-dp200-before-clean`.
 
 History: until 2026-11-13 this folder also held a copy of `src/upc`, the
 host modules, the build configs, `install_port.sh`, `make_fork.sh` and a
