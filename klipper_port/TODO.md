@@ -146,6 +146,8 @@ Motion and firmware:
     printer with `[axis_twist_compensation]` in its printer.cfg, plus
     five warm-up touches before every mesh; docs/dev_printer_testing.md).
     Left:
+    - After the fix the owner still saw slightly more squish on the
+      right over 150 mm: the right value (0.103) may need about +0.02.
     - The center value (-0.042) is the least certain: the raw center
       reading moved 0.04 mm between runs. Redo the three-spot comparison
       once more and adjust.

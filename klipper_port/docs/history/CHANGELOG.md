@@ -13,6 +13,10 @@ files in this folder; `git log` has the rest.
   `[axis_twist_compensation]` (`z_compensations: -0.061, -0.042, 0.103`)
   to the dev printer's printer.cfg; afterwards the probe read
   2.375/2.340/2.421.
+- First-layer check with both fixes (150 mm L, owner): "much better";
+  still slightly more squish on the right. The owner needed -0.05 mm on
+  the whole layer, so the dev printer's probe `z_offset` went from 2.580
+  to 2.630 (Z_OFFSET_APPLY_PROBE, SAVE_CONFIG).
 - **Five warm-up touches before every mesh** (`_SINDOH_MESH_WARMUP`): ten
   touches after a deploy read 2.464 2.449 2.444 2.438 2.437 2.435 ...
 - **X/Y scale is right:** `dp200_xy_scale_150mm.gcode` (new in
