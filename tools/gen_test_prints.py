@@ -5,6 +5,10 @@
                            + 45-degree infill, centred on the bed
   dp200_box_20mm.gcode     20x20x10 mm open box: 2 perimeters, 3 solid
                            bottom layers, no top
+  dp200_xy_scale_150mm.gcode  L-shaped bar, 150 mm long in X and in Y and
+                           3 mm high, to tell a scale error (steps/mm) from
+                           a fixed loss. The X arm is 10 mm wide, the Y arm
+                           15 mm, so the two can't be mixed up afterwards.
 
 Both start with PRINT_START (heat, home, bed mesh, purge/wipe) and PRIME_LINE, and end with
 PRINT_END, use relative E (M83) and label the object for [exclude_object].
@@ -158,6 +162,51 @@ def box(bed, ext):
     return g
 
 
+def xy_scale(bed, ext):
+    g = G('xy_scale_150mm', bed, ext)
+    g.header(150, 150)
+    x0, y0, x1, y1 = CX - 75, CY - 75, CX + 75, CY + 75
+    wx, wy = 10.0, 15.0             # width of the X arm (in Y), of the Y arm (in X)
+    w = 0.45
+    z, n = 0.0, 0
+    while z < 3.0 - 1e-6:
+        h = 0.25 if n == 0 else 0.2
+        z += h
+        epm = e_per_mm(w, h)
+        g.layer(z, n)
+        if n == 2:
+            g.emit('M106 S255')
+        speed = 20 if n == 0 else 30
+        if n == 0:
+            # two skirt loops 3 mm outside the part: the nozzle is primed
+            # again after the travel from the prime line
+            for i in range(2):
+                d = 3.0 + i * w
+                sk = ((x0 - d, y0 - d), (x1 + d, y0 - d), (x1 + d, y0 + wx + d), (x0 + wy + d, y0 + wx + d),
+                      (x0 + wy + d, y1 + d), (x0 - d, y1 + d))
+                g.travel(*sk[0])
+                for q in sk[1:] + sk[:1]:
+                    g.extrude(q[0], q[1], epm, speed)
+        for i in range(2):
+            o = w / 2 + i * w
+            pts = ((x0 + o, y0 + o), (x1 - o, y0 + o), (x1 - o, y0 + wx - o), (x0 + wy - o, y0 + wx - o),
+                   (x0 + wy - o, y1 - o), (x0 + o, y1 - o))
+            # start in the middle of the front edge, not at a corner: the
+            # first print began at the front-left corner and did not stick
+            # there (2026-11-14)
+            mid = ((x0 + x1) / 2, y0 + o)
+            g.travel(*mid)
+            for q in pts[1:] + pts[:1] + (mid,):
+                g.extrude(q[0], q[1], epm, speed)
+        if n < 3:
+            o = 2 * w
+            g.infill(x0 + o, y0 + o, x1 - o, y0 + wx - o, w, epm, speed, flip=bool(n % 2))
+            g.infill(x0 + o, y0 + wx - o, x0 + wy - o, y1 - o, w, epm, speed, flip=bool(n % 2))
+        n += 1
+    g.footer()
+    return g
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('outdir')
@@ -166,7 +215,8 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.outdir, exist_ok=True)
     for fn, g in (('dp200_first_layer.gcode', first_layer(a.bed, a.extruder)),
-                  ('dp200_box_20mm.gcode', box(a.bed, a.extruder))):
+                  ('dp200_box_20mm.gcode', box(a.bed, a.extruder)),
+                  ('dp200_xy_scale_150mm.gcode', xy_scale(a.bed, a.extruder))):
         p = os.path.join(a.outdir, fn)
         g.save(p)
         e = sum(float(l.split('E')[1].split()[0]) for l in g.lines

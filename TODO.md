@@ -42,8 +42,20 @@ Work printer:
 11. **Wi-Fi stability on the upgraded work printer.**
 
 Either printer, longer:
-12. **Input shaping:** mounts for the FLY-ADXL345 (measure, print), then
-    SHAPER_CALIBRATE, then the payload (docs/input_shaping.md).
+12. **Print speed** (owner asked 11-15; goal: faster prints at the same
+    quality, no mechanical changes). Today: test prints at 30 mm/s,
+    `max_accel` 1500, no input shaping. X/Y are proven to 208 mm/s. In
+    this order:
+    a. **Max flow test:** extrude at rising rates until the extruder skips
+       or under-extrudes; gives the hotend's limit in mm3/s (unmeasured; a
+       hotend of this type usually manages 8-12 with PLA, i.e. about
+       110 mm/s at 0.45 x 0.2 mm).
+    b. **Input shaping:** mounts for the FLY-ADXL345 (measure, print),
+       then SHAPER_CALIBRATE (docs/input_shaping.md); raise `max_accel`
+       to what it allows (3000-5000 is usual for a bed-slinger this size).
+    c. Re-tune pressure advance at the new speeds; check part cooling.
+    d. Slicer profile with the result (expected: walls and infill
+       80-120 mm/s, travel 150-200), then the payload.
 13. **Beeper:** `[output_pin beeper] pin: io:pwm10`, pick the PWM value,
     then M300; the dryer's end signal uses it.
 14. **Retraction test** (two towers), then the slicer profiles; recheck
@@ -125,10 +137,22 @@ Motion and firmware:
       printer with the SD card's gcc). Check that the root build and the
       next stick payload carry the new one.
     - Drift test trigger points scattered by 0.02 mm (once 0.04) on both
-      stages, also with no moves; on the old code they read 0.000. Not
-      accumulating. Repeat once on the old code if it matters.
-29. **Probe settling after homing:** the first ~5 touches after G28 read
-    0.015-0.02 mm high. Check BED_MESH_CALIBRATE right after homing.
+      stages, also with no moves. The old code did the same (Y readings
+      5.44-5.48, docs/faster_stepping_plan.md), so it is the switches,
+      not the new code.
+    - How to switch builds and run the tests:
+      docs/dev_printer_testing.md.
+29. **Probe: false left-right slope** (found 11-14, fixed on the dev
+    printer with `[axis_twist_compensation]` in its printer.cfg, plus
+    five warm-up touches before every mesh; docs/dev_printer_testing.md).
+    Left:
+    - The center value (-0.042) is the least certain: the raw center
+      reading moved 0.04 mm between runs. Redo the three-spot comparison
+      once more and adjust.
+    - The comparison was made at Y 30 only. Check one more row (Y 150).
+    - The work printer needs its own values: do the same comparison
+      there, or ship without the section and tell users how.
+    - A way to do the comparison from the touch screen (wizard).
 30. **Prebuilt (zig) UPC images** are untested with motion (they are the
     fallback; the printers run the gcc builds).
 31. **Bed heat-up took 9 min to 60 C once** (11-12, cold start); look at
