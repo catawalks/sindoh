@@ -26,13 +26,14 @@ becomes the full kernel-swap test machine.
   Rollback: C3 `a4e0cb33...` on the build box (10.10.0.68:8098).
 - **Command line:** `console=ttyS0,115200n8 marvell_nand.write_window=1741,4091 panic=10 consoleblank=0 timer_mv61x0.hang_wdt=30`
 - **Wi-Fi module:** `mwifiex_usb.ko` 0028 (`6645762a`): reload-safe.
-- **Klipper:** fork tag `dp200-clean-c` (0607ba28) since 2026-11-14:
-  klippy from the tag, fm `cea02737`, io `8ecc88f4`. The fork's
-  `sindoh-dp200` branch is two line-wrap commits ahead (8203a7d7, the pin
-  in `klipper/FORK`). The build from before the branch replacement (fork
-  tag `sindoh-dp200-before-clean`, 289952f9: fm `c313d379`, io
-  `dbc8e40d`) is kept on the printer as `klippy.cur`, `fm.bin.cur`,
-  `io.bin.cur`.
+- **Klipper:** the fork's `sindoh-dp200` 8203a7d7 (the pin in
+  `klipper/FORK`), built on the printer 2026-11-15: fm `9834d57f`, io
+  `90441e04`, `c_helper.so` `7380efa1`. Klipper came up ready; no motion
+  test on this exact build yet (it differs from the tested tag
+  `dp200-clean-c` only by two line-wrap commits). The build from before
+  the branch replacement (fork tag `sindoh-dp200-before-clean`: fm
+  `c313d379`, io `dbc8e40d`) is kept on the printer as `klippy.cur`,
+  `fm.bin.cur`, `io.bin.cur`.
 - **Config and screen app:** `dp200_macros.cfg` `1154d13d` (11-15: five
   warm-up touches before a mesh), `dp200_printer.cfg` `180033a5`,
   `dp200_screen.py` `561d5ee1`. Its own `printer.cfg` has
@@ -52,11 +53,19 @@ becomes the full kernel-swap test machine.
 - **Not yet:** a long soak on the bank3 kernel; Wi-Fi cold boots (part D);
   the end-goal installer (stages 6-9).
 
-## Work printer, as of 2026-11-12
+## Work printer, as of 2026-11-15
 
-- Latest USB stick install (the 11-07 payload), stock 3.2 kernel. Printing.
-- It does **not** have the 11-12 changes (macros, prime line at Y 0, the
-  screen app's paused-print and load pages). They go in the next payload.
+- Runs the 11-07 payload (`5f3336e1`) on the stock 3.2 kernel. Printing.
+- **The USB stick holds the next payload, not installed yet:**
+  `3e5e43ce1f2c063cf28aae663bfcee91`, 84,430,492 B, build
+  `a112379 2026-11-15`. Userspace only. It carries the fork at 8203a7d7
+  (klippy, helper, fm/io as on the dev printer), the 11-12 and 11-15
+  macros, the screen app `561d5ee1`, the camera restart loop and the
+  2.4 GHz Wi-Fi limit. PC copies: the new one in
+  `D:\DP200\kernel\out\payload_20261115`, the old one in
+  `D:\DP200\backup\usb_stick_copy_20261115_before`.
+- This Klipper (on upstream 29d4ec2d) has only run on the dev printer's
+  mainline kernel, never on the stock 3.2 kernel.
 
 ## Who owns what
 
