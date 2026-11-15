@@ -33,10 +33,14 @@ Dev printer:
    or power the switch off).
 
 Work printer:
-9. **Next stick payload** (userspace only, no kernel): the 11-12 macros
-   (paused-print Z guard, jam check, EMPTY_BIN, re-prime, X/Y-only homing
-   for load), PRIME_LINE at Y 0, the screen app, the UPC load firmware.
-   Build (agent), then install and a real print (owner).
+9. **Install the 11-15 stick payload on the work printer** (owner):
+   payload `3e5e43ce` is on the stick. Install, check SYSTEM -> INFO
+   shows build `a112379 2026-11-15`, home, then a real print. It is the
+   first run of the rebased Klipper on the stock 3.2 kernel: if Klipper
+   does not come up, the old payload (`5f3336e1`) is in
+   `D:\DP200\backup\usb_stick_copy_20261115_before`. That printer has
+   no `[axis_twist_compensation]`: if wide first layers are uneven left
+   to right, do the comparison in docs/dev_printer_testing.md there.
 10. **Resume quality on real prints:** some straggler lines at the resume
     layer after a load (11-12). Tune `reprime_len` (30 mm) if needed.
 11. **Wi-Fi stability on the upgraded work printer.**
@@ -50,8 +54,11 @@ Either printer, longer:
        or under-extrudes; gives the hotend's limit in mm3/s (unmeasured; a
        hotend of this type usually manages 8-12 with PLA, i.e. about
        110 mm/s at 0.45 x 0.2 mm).
-    b. **Input shaping:** mounts for the FLY-ADXL345 (measure, print),
-       then SHAPER_CALIBRATE (docs/input_shaping.md); raise `max_accel`
+    b. **Input shaping:** mounts for the FLY-ADXL345. The drafts in
+       `install/input_shaping/mounts/` have placeholder dimensions: the
+       owner measures the print head and the board (asked 11-15), then
+       fill them in and print. OpenSCAD is not installed on the dev PC.
+       Then SHAPER_CALIBRATE (docs/input_shaping.md); raise `max_accel`
        to what it allows (3000-5000 is usual for a bed-slinger this size).
     c. Re-tune pressure advance at the new speeds; check part cooling.
     d. Slicer profile with the result (expected: walls and infill
@@ -122,22 +129,19 @@ Motion and firmware:
     tested on the PC; the first real root or payload build is the test.
     The two printers' `/home/klipper/klipper` are older checkouts: move
     them to the pinned fork commit with the next payload.
-28a. **`upc-fast-step` (fork):** two untested stepping commits (fewer
-    timer reads; ARM-mode step path, default off). The branch still sits
-    on the old `sindoh-dp200` (tag `sindoh-dp200-before-clean`): rebase
-    its two commits onto the new `sindoh-dp200`, test, then delete it.
-28b. **After the fork's branch replacement (2026-11-15):**
-    `sindoh-dp200` is now the clean history (8203a7d7, on upstream
-    29d4ec2d), pinned in `klipper/FORK`. Left:
-    - The dev printer runs tag `dp200-clean-c` (0607ba28), two commits
-      behind the pin. Those two only re-wrap long lines. Rebuild fm/io
-      from 8203a7d7, install with klippy from the same commit
-      (docs/dev_printer_testing.md), check `software_version`.
-    - klippy's C helper changed with the move to upstream 29d4ec2d and
-      the NAND root has no gcc: check that the root build
-      (`install/rootfs_inside.sh`) and the next stick payload carry a
-      `c_helper.so` built from the pinned commit.
-    - The work printer still runs the old code (the 11-07 payload).
+28a. **`upc-fast-step` (fork):** two extra stepping optimizations (fewer
+    timer reads; ARM-mode step path, default off), never run on a
+    printer and not needed at today's speeds. The stepping session
+    rebased them onto the new `sindoh-dp200` on 11-15 (local branch
+    `fast-rebase`, three commits, emulator tests pass); the force-push of
+    `upc-fast-step` is waiting for the owner's permission in that
+    session. Owner to decide: push and keep for the speed work (#12), or
+    delete the branch.
+28b. **Root build with the new fork:** klippy's C helper changed with
+    the move to upstream 29d4ec2d and the NAND root has no gcc. The stick
+    payload carries the right `c_helper.so` (built on the card). Still to
+    check: `install/rootfs_inside.sh` (a root built from scratch) builds
+    it too. Also: a drift test and a print on the 8203a7d7 build.
 29. **Probe: false left-right slope** (found 11-14, fixed on the dev
     printer with `[axis_twist_compensation]` in its printer.cfg, plus
     five warm-up touches before every mesh; docs/dev_printer_testing.md).

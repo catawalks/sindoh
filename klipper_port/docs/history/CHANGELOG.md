@@ -6,6 +6,14 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-15
+- **Dev printer on the fork's branch tip** 8203a7d7: fm `9834d57f`, io
+  `90441e04`, `c_helper.so` `7380efa1`, built on the printer with the
+  card's toolchain (`tools/fork_build_on_printer.sh`). Ready; not
+  motion-tested.
+- **Stick payload built and written to the USB stick** (userspace only):
+  `3e5e43ce`, build `a112379 2026-11-15`, verified (key files match the
+  repo, no Wi-Fi networks, no kernel). Not installed yet. The old payload
+  `5f3336e1` is saved on the PC. How: docs/dev_printer_testing.md.
 - **Fork: `sindoh-dp200` replaced by the clean history** (owner's OK):
   force-pushed 289952f9 -> 8203a7d7 (= tested tag `dp200-clean-c` plus
   two line-wrap commits). The old tip is kept as tag

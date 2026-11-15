@@ -56,6 +56,55 @@ the same fork commit: the protocol dictionary is in the firmware.
    `software_version`; `/printer/objects/query?mcu&mcu%20io` shows the
    firmware commit on both cores.
 
+## Building the fork on the printer, and the stick payload (2026-11-15)
+
+The dev printer's NAND root has no compiler, but the 4 GB SD card inside
+it is the build root (same Debian, gcc, arm-none-eabi-gcc, a git
+checkout of the fork in `/home/klipper/klipper`). All scripts are fetched
+from the PC server as described above. Run them with `sh` unless noted
+(they use `exit`, which must never reach the console shell).
+
+1. **Fork build** (`tools/fork_build_on_printer.sh`, about 5 min): on the
+   PC, pack the fork as `deploy/usb/t/klipper-tip.tgz` without the big
+   folders the build does not need: `git archive --format=tar.gz
+   --prefix=klipper/ -o klipper-tip.tgz HEAD -- .` with an
+   `:(exclude)docs` pathspec and an `:(exclude)lib/X` pathspec for every
+   `lib/X` except `lib/kconfiglib` (the whole tree does not fit the
+   printer's 64 MB /tmp). The script builds `fm.bin`, `io.bin` and
+   `c_helper.so` in `/tmp/kt` with the card's toolchain (card mounted
+   read-only). `V=<version>` sets the version string. Only one build at a
+   time: check `ps` first, a second run corrupts the first.
+2. **Install on the dev printer:** idle check, then
+   `tools/fork_build_install.sh` (this one is sourced: `. ./ktinst.sh`):
+   klippy, the helper and both images, then `rc.dp200 restart-klipper`.
+3. **Payload for the USB stick** (userspace only, never a kernel):
+   - On the PC, copy the current repo files into
+     `D:\DP200\kernel\out\deploy\usb` (the list is its `FILES`),
+     regenerate `SIZES` (`<bytes> <path>` per line) and write `BUILD`
+     (`<port commit> <date>`).
+   - `sh payload_prep.sh <fork commit>`: remounts the card read-write,
+     moves its fork checkout to that commit, copies in the build from
+     step 1, runs `get.sh` (stages the port files on the card).
+   - The card is nearly full: delete the old
+     `/mnt/sd/payload_out/dp200_klipper_payload.tar.gz*` first (keep a
+     copy of the stick's old payload on the PC), then
+     `sh /tmp/usb/make_payload.sh /mnt/sd/payload_out` (about 7 min; run
+     it with nohup in the background).
+   - `sh payload_verify.sh`: checksums of the key files inside the
+     payload, and that it holds no Wi-Fi networks, logs, G-code or
+     kernel images. Compare with `md5sum` of the repo files.
+   - Fetch it to the PC (a temporary
+     `python3 -m http.server 8088 --bind 10.10.0.147` in the folder,
+     after `ip route replace 10.10.0.85/32 dev eth0 src 10.10.0.147`),
+     check the md5, copy the three files to the stick's `_update_rodin\`,
+     run `Write-VolumeCache -DriveLetter E`, check the md5 on the stick.
+     **Do not eject the stick**: the owner does that.
+   - Stop the temporary server, remove the route, unmount the card
+     (`umount /mnt/sd/tmp /mnt/sd/dev /mnt/sd/proc /mnt/sd`).
+   The installer on the stick (`unmistakable_klipper_install.she`) only
+   needs repacking when `install/usb/unmistakable_klipper_install.sh`
+   changed.
+
 ## The standard motion tests
 
 | Test | Script | What passes |
