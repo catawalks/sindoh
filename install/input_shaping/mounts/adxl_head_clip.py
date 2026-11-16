@@ -20,7 +20,7 @@ Coordinates (mm): X across the head (left is negative, seen from the front),
 Y from the front face toward the back, Z up, Z = 0 at the head's top surface.
 
 Dimensions marked PHOTO were read from photos with a ruler (2026-11-15) and
-are good to about 1 mm; the slots are the owner's caliper readings of the
+are good to about 1 mm; the others are the owner's caliper readings of the
 same day. Print, test the fit, correct them here.
 """
 import math
@@ -28,7 +28,7 @@ import os
 import struct
 
 # ---- print head --------------------------------------------------------
-HEAD_W = 55.0        # PHOTO  width across the two side faces
+HEAD_W = 55.8        # calipers: width across the two side faces
 TOP_DEPTH = 23.0     # PHOTO  flat top: front face back to the step
 SIDE_DEPTH = 32.0    # PHOTO  side face: front to back
 # Slots in the side faces (calipers): (from the front face, length along Y,
@@ -48,12 +48,12 @@ ARM_DOWN = 9.0       # arms reach this far below the top surface
 WALL = 3.0           # bridge and arm thickness
 
 # ---- sensor board (Mellow FLY-ADXL345 USB) ------------------------------
-HOLE_PITCH = 16.5    # PHOTO  the two mounting holes, center to center
+HOLE_PITCH = 15.5    # calipers: the two mounting holes, center to center
 POST_Y = 17.0        # posts this far back from the front face; the board
                      # (about 21 x 16 mm) lies toward the front, USB-C forward
 POST_H = 3.0         # keeps the solder side clear of the bridge
-POST_OD = 5.5
-POST_ID = 2.1        # M2.5 screw cutting its own thread (board holes about 2.5 mm)
+POST_OD = 6.0
+POST_ID = 2.5        # M3 screw cutting its own thread (board holes 3.2 mm)
 
 tris = []
 

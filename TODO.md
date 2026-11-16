@@ -54,9 +54,9 @@ Either printer, longer:
        or under-extrudes; gives the hotend's limit in mm3/s (unmeasured; a
        hotend of this type usually manages 8-12 with PLA, i.e. about
        110 mm/s at 0.45 x 0.2 mm).
-    b. **Input shaping:** head mount version 2 is ready to print
+    b. **Input shaping:** head mount version 3 is ready to print
        (`install/input_shaping/mounts/adxl_head_clip.stl`; slots by
-       calipers, width and board holes from photos: docs/input_shaping.md
+       width and board holes by calipers; two depths from photos: docs/input_shaping.md
        "Mounts"). Owner prints it and reports the fit (width, both hooks,
        board holes); correct the script, reprint. The bed clamp
        (`adxl_bed_clamp.scad`) still has placeholder dimensions. Then
