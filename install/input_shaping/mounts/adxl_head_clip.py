@@ -5,10 +5,12 @@ X axis). Writes adxl_head_clip.stl next to this file; no other tools needed.
     py -3 adxl_head_clip.py            (edit the numbers below first)
 
 Shape: a bridge on the flat top of the head's front block, an arm down each
-side face, and two screw posts for the board on top. The left arm (the side
-with the side fan) has a hook for the rear slot of that side face. The part
-is a union of plain boxes and tubes that overlap each other; slicers merge
-them (Cura: "Union Overlapping Volumes", on by default).
+side face, and two screw posts for the board on top. Each arm has a hook
+with a lead-in ramp for a slot in its side face: left (the side with the
+side fan) the rear, 7 x 3 mm slot; right that side's single slot. To fit it,
+hook one side in at an angle, then press the other side down until it snaps.
+The part is a union of plain boxes, wedges and tubes that overlap each other;
+slicers merge them (Cura: "Union Overlapping Volumes", on by default).
 
 Print it standing on its FRONT face (the Y = 0 plane: "place on face" in the
 slicer), PETG or PLA, 4 walls, 40 % infill. It has to be stiff: a mount that
@@ -18,7 +20,8 @@ Coordinates (mm): X across the head (left is negative, seen from the front),
 Y from the front face toward the back, Z up, Z = 0 at the head's top surface.
 
 Dimensions marked PHOTO were read from photos with a ruler (2026-11-15) and
-are good to about 1 mm. Print, test the fit, correct them here.
+are good to about 1 mm; the slots are the owner's caliper readings of the
+same day. Print, test the fit, correct them here.
 """
 import math
 import os
@@ -28,16 +31,20 @@ import struct
 HEAD_W = 55.0        # PHOTO  width across the two side faces
 TOP_DEPTH = 23.0     # PHOTO  flat top: front face back to the step
 SIDE_DEPTH = 32.0    # PHOTO  side face: front to back
-SLOT_Y0, SLOT_Y1 = 24.0, 30.0   # PHOTO  left side, rear slot: from the front face
-SLOT_TOP = 4.0       # PHOTO  top surface down to the slot's top edge
-SLOT_H = 4.5         # PHOTO  slot height
-# (the left side's front opening, 13-20 mm back, has a spring behind it: not
-#  used. The right side has one slot; its position is not measured yet.)
+# Slots in the side faces (calipers): (from the front face, length along Y,
+# top surface down to the slot's top edge, slot height)
+SLOT_L = (20.0, 7.0, 3.8, 3.0)   # left, rear slot
+SLOT_R = (21.0, 5.0, 4.0, 6.0)   # right, its only slot
+# (the left side also has a 5 x 5 opening 12 mm back and 4.5 down, with a
+#  spring behind it: not used)
 
 # ---- fit ---------------------------------------------------------------
 FIT = 0.0            # clearance per side between arms and head; 0 = light clamp
-HOOK_IN = 1.4        # how far the hook reaches into the slot
-HOOK_T = 2.1         # hook thickness (the slot is SLOT_H high: about 1.2 mm play each way)
+HOOK_IN = 1.0        # how far the hooks reach into the slots
+HOOK_T = 2.0         # hook thickness
+HOOK_GAP = 0.4       # hook top below the slot's top edge; also the end play along Y
+RAMP = 1.6           # height of the lead-in wedge under each hook
+ARM_DOWN = 9.0       # arms reach this far below the top surface
 WALL = 3.0           # bridge and arm thickness
 
 # ---- sensor board (Mellow FLY-ADXL345 USB) ------------------------------
@@ -66,6 +73,18 @@ def box(x0, x1, y0, y1, z0, z1):
     quad(p[1], p[3], p[7], p[5])    # right (+x)
 
 
+def wedge(pts, y0, y1):
+    """Triangle pts = three (x, z) corners, extruded from y0 to y1."""
+    (ax, az), (bx, bz), (cx, cz) = pts
+    if (bx - ax) * (cz - az) - (bz - az) * (cx - ax) < 0:
+        pts = [pts[0], pts[2], pts[1]]
+    f = [(x, y0, z) for x, z in pts]; r = [(x, y1, z) for x, z in pts]
+    tris.append((f[0], f[1], f[2])); tris.append((r[0], r[2], r[1]))
+    for i in range(3):
+        j = (i + 1) % 3
+        quad(f[j], f[i], r[i], r[j])
+
+
 def tube(cx, cy, z0, z1, ro, ri, n=48):
     for i in range(n):
         a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
@@ -79,15 +98,21 @@ def tube(cx, cy, z0, z1, ro, ri, n=48):
 
 
 half = HEAD_W / 2 + FIT
-arm_z0 = -(SLOT_TOP + SLOT_H)
 # bridge on the top surface
 box(-half - WALL, half + WALL, 0, TOP_DEPTH, 0, WALL)
 # arms down both side faces (they overlap the bridge ends)
-box(-half - WALL, -half, 0, SIDE_DEPTH, arm_z0, WALL)
-box(half, half + WALL, 0, SIDE_DEPTH, arm_z0, WALL)
-# hook on the left arm, into the rear slot, centered in the slot's height
-hz = -(SLOT_TOP + SLOT_H / 2)
-box(-half - 0.5, -half + HOOK_IN, SLOT_Y0 + 0.4, SLOT_Y1 - 0.4, hz - HOOK_T / 2, hz + HOOK_T / 2)
+box(-half - WALL, -half, 0, SIDE_DEPTH, -ARM_DOWN, WALL)
+box(half, half + WALL, 0, SIDE_DEPTH, -ARM_DOWN, WALL)
+# a hook per arm: just under the slot's top edge, with a ramp below it so the
+# arm rides over the edge of the head when the clip is pressed on
+for sx, (sy, sl, stop, sh) in ((-1, SLOT_L), (1, SLOT_R)):
+    assert HOOK_T + HOOK_GAP <= sh and stop + HOOK_GAP + HOOK_T + RAMP <= ARM_DOWN
+    y0, y1 = sy + HOOK_GAP, sy + sl - HOOK_GAP
+    zt = -(stop + HOOK_GAP); zb = zt - HOOK_T
+    face = sx * half                        # the arm's inner face
+    xa, xb = sorted((face + sx * 0.5, face - sx * HOOK_IN))
+    box(xa, xb, y0, y1, zb, zt)
+    wedge([(face + sx * 0.5, zb), (face - sx * HOOK_IN, zb), (face + sx * 0.5, zb - RAMP)], y0, y1)
 # screw posts for the board (0.5 mm into the bridge so the shells overlap)
 for sx in (-1, 1):
     tube(sx * HOLE_PITCH / 2, POST_Y, WALL - 0.5, WALL + POST_H, POST_OD / 2, POST_ID / 2)
