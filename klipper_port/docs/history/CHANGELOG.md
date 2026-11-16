@@ -6,6 +6,11 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **ADXL head mount version 4:** version 3 blocked X homing (hit the
+  Bowden tube at the right end; "No trigger on stepper_x"). Front 10 mm
+  removed, posts moved to the left end, posts 5 mm high. Not printed.
+- **Mesh front limit Y 30 -> Y 5, six rows** in dp200_macros.cfg (repo
+  and dev printer). Not tested yet (TODO 15).
 - **TODO cleanup with the owner:**
   - 24 (initramfs), Ethernet MAC part: done since 11-07. init.mainline
     sets it from the U-Boot env in mtd1; the dev printer's boot log shows

@@ -46,15 +46,21 @@ Either printer, longer:
        or under-extrudes; gives the hotend's limit in mm3/s (unmeasured; a
        hotend of this type usually manages 8-12 with PLA, i.e. about
        110 mm/s at 0.45 x 0.2 mm).
-    b. **Input shaping:** head mount version 3 is printed (PLA, work
-       printer, 11-16) and snaps tightly onto the work printer's head.
-       Next: screw the FLY-ADXL345 to its posts (M3 x 6, the screws cut
-       their own thread; board fit not tried yet), fit it on the dev
-       printer's head, run SHAPER_CALIBRATE for X
-       (docs/input_shaping.md). For Y the board must ride on the bed:
-       the bed clamp (`adxl_bed_clamp.scad`) still has placeholder
-       dimensions. Then raise `max_accel` to what the result allows
-       (3000-5000 is usual for a bed-slinger this size).
+    b. **Input shaping:** head mount version 3 fits the head but blocks
+       X homing (it hits the Bowden tube at the right end; homing failed
+       11-16, nothing damaged as far as reported). Version 4 (front
+       10 mm removed, posts at the left end) is ready to print:
+       `install/input_shaping/mounts/adxl_head_clip.stl`. Owner prints
+       it, screws the board on (M3 x 6), checks by hand that the head
+       reaches the X home position with board and cable on. Then on the
+       dev printer: numpy is not installed yet
+       (`install/input_shaping/setup_numpy.sh`, needs internet);
+       /dev/ttyACM0 appears when the board is plugged in but belongs to
+       root (klippy must be able to open it); enable `dp200_adxl.cfg`;
+       SHAPER_CALIBRATE AXIS=X (docs/input_shaping.md). For Y the board
+       must ride on the bed: the bed clamp (`adxl_bed_clamp.scad`)
+       still has placeholder dimensions. Then raise `max_accel` to what
+       the result allows (3000-5000 is usual for a bed-slinger this size).
     c. Re-tune pressure advance at the new speeds; check part cooling.
     d. Slicer profile with the result (expected: walls and infill
        80-120 mm/s, travel 150-200), then the payload.
@@ -62,8 +68,13 @@ Either printer, longer:
     then M300; the dryer's end signal uses it.
 14. **Retraction test** (two towers), then the slicer profiles; recheck
     pressure advance (0.30) with dry filament.
-15. **Mesh front limit:** the front is flat to Y -2 (11-12 probe map), so
-    mesh_min Y could go below 30.
+15. **Mesh front limit:** changed 11-16 from Y 30 to Y 5, six rows
+    (`mesh_min: 18, 5`, `probe_count: 5, 6` in dp200_macros.cfg, in the
+    repo and on the dev printer; backup there `dp200_macros.cfg.bak-1116`).
+    **Not tested yet:** the homing before the first mesh failed (#12b).
+    Test with the owner present: one BED_MESH_CALIBRATE, watch the pin
+    on the front row, then a first layer at the front of the bed. Do
+    this before the next payload is built.
 16. **Homing clearance:** a few mm of Z clearance before X homing, so the
     nozzle doesn't drag across a failed print. Mind that Z homes upward.
 17. Optional: a 6-7 mm/s Z lift test (10 stalls lifting; stock is 5.05).
