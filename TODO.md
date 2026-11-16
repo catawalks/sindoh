@@ -21,9 +21,7 @@ Dev printer:
    printer.
 4. **Screen features never used on hardware:** the calibration wizards
    (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET), WiFi ->
-   SAVED (PREFER / FORGET), custom MACROS page. Canceling one object of
-   two mid-print worked (owner, 11-16); whether from the screen's OBJECTS
-   page or from Mainsail is not recorded.
+   SAVED (PREFER / FORGET), custom MACROS page.
 6. **Dryer leftovers:** STOP DRYING, PRINT_START during drying, FORCE=1
    above the 70 C sheet limit.
 7. **A real Mainsail update** from SYSTEM -> UPDATE (only CHECK NOW tried).
