@@ -52,8 +52,10 @@ Either printer, longer:
        at 44-47 Hz. Nothing saved yet. Left:
        - Choose the X shaper with a ringing test print (3hump_ei 80.8
          against mzv ~50), then put `[input_shaper]` in printer.cfg.
-       - Y: the board must ride on the bed. The bed clamp
-         (`adxl_bed_clamp.scad`) still has placeholder dimensions.
+       - Y: the bed mount is ready to print
+         (`install/input_shaping/mounts/adxl_bed_bar.stl`: a bar that
+         replaces one front grip of the build plate, same two screws).
+         Owner prints it, reports the fit, then SHAPER_CALIBRATE AXIS=Y.
        - Mount version 4 (clears the Bowden tube at X home, posts at
          the left end) is ready to print; version 3 blocks X homing.
          Repeat the X run once with it.
