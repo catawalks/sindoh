@@ -100,9 +100,17 @@ In `install/input_shaping/mounts/`:
     deep, side face 32 deep.
   Test the fit, correct the numbers at the top of the script, run it
   again.
-- `adxl_bed_clamp.scad`: a C-clamp on the front edge of the bed plate,
-  tightened by an M3 screw from below. Needed: plate thickness at the front
-  edge, the free space under it, and how far the jaws may reach in.
+- **`adxl_bed_bar.py` -> `adxl_bed_bar.stl`** (2026-11-16, not printed
+  yet): for the Y axis. The build plate has two aluminum tabs at its
+  front edge per grip, each with a threaded M3 hole; the plastic grip is
+  screwed under them from below. The bar replaces one grip, using its two
+  screws (M3 x 6): 88 x 12 mm, 4 mm thick, a rib that fills the gap
+  between the tabs, and two posts for the board on the rib. Print it
+  flat, posts up. Owner's caliper readings: screw holes 73.5 apart and
+  3.75 behind the tabs' front edge, tabs 27 wide, 34 apart, 10 out from
+  the plate edge, 2 thick; grip 5 thick at the screws. (A binder clip was
+  considered: there is no good place for one. The earlier
+  `adxl_bed_clamp.scad` draft is removed.)
 
 A mount must be stiff and tight: a loose mount measures its own wobble.
 

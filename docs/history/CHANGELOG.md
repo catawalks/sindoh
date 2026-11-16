@@ -6,6 +6,9 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **ADXL bed mount** (`adxl_bed_bar.py` writes the STL): a bar in place
+  of one front grip of the build plate, by the owner's caliper readings.
+  Replaces the `adxl_bed_clamp.scad` draft. Not printed yet.
 - **Input shaping, X axis measured** on the dev printer (FLY-ADXL345 on
   the version 3 mount): `3hump_ei` 80.8 Hz recommended, max_accel <=
   4300; X peak at 44-47 Hz. Needed: numpy by hand, `rate: 800`, port
