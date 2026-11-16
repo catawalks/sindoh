@@ -72,19 +72,22 @@ From Mainsail the same works with `SHAPER_CALIBRATE AXIS=X` /
 
 In `install/input_shaping/mounts/`:
 
-- **`adxl_head_clip.py` -> `adxl_head_clip.stl`** (2026-11-15, version 1,
+- **`adxl_head_clip.py` -> `adxl_head_clip.stl`** (2026-11-15, version 2,
   not printed yet): for the Mellow FLY-ADXL345 USB on the print head. A
   bridge on the flat top of the head's front block, an arm down each side
-  face, a hook on the left arm (the side-fan side) for that side's rear
-  slot, and two posts for M2.5 screws. The script writes the STL itself
-  (no OpenSCAD on the dev PC). Its head and board dimensions were read
-  from photos with a ruler, good to about 1 mm: width 55, flat top 23
-  deep, side face 32 deep, left rear slot 24-30 mm back and 4-8.5 mm
-  below the top, board holes 16.5 apart. Print it standing on its front
-  face, test the fit, correct the numbers at the top of the script and
-  run it again. Open: the right side has one slot whose position is not
-  measured, so the right arm has no hook yet; the left side's front
-  opening has a spring behind it and is not used.
+  face with a hook and lead-in ramp for a slot in that face, and two
+  posts for M2.5 screws. The script writes the STL itself (no OpenSCAD
+  on the dev PC). Print it standing on its front face; hook one side in
+  at an angle, press the other side down. Dimensions:
+  - Slots, by calipers (from the front face, down from the top surface):
+    left (side-fan side) rear slot 7 long x 3 high, 20 back, 3.8 down;
+    right side's only slot 5 long x 6 high, 21 back, 4 down. The left
+    side also has a 5 x 5 opening 12 back and 4.5 down with a spring
+    behind it: not used.
+  - From ruler photos, good to about 1 mm: head width 55, flat top 23
+    deep, side face 32 deep, board holes 16.5 apart and about 2.5 mm.
+  Test the fit, correct the numbers at the top of the script, run it
+  again.
 - `adxl_bed_clamp.scad`: a C-clamp on the front edge of the bed plate,
   tightened by an M3 screw from below. Needed: plate thickness at the front
   edge, the free space under it, and how far the jaws may reach in.
