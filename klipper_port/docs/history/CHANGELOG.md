@@ -6,6 +6,13 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Bank3 kernel soak done** (TODO 21): mtd0 image 7eae8600 up 3 days
+  12 h 44 min on 11-16 15:18 UTC, through the 11-14/15 test prints; no
+  freeze, no reboot.
+- **TODO 22 dropped** (the one-CPU kernel's reboot of 11-11): owner, that
+  kernel is no longer needed.
+- **Camera** (TODO 26a): no streamer exit in 57 h since the restart loop
+  went in; the loop has not had to act.
 - **Work printer updated to the 11-15 payload** (`3e5e43ce`, build
   `a112379`) from the stick by the owner; a print started on it.
 - **FLY-ADXL345 head mount, version 3** (`71d8a6b`): head width 55.8,

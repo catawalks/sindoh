@@ -49,7 +49,9 @@ becomes the full kernel-swap test machine.
 - **Works:** boot from NAND, two CPUs (10 h soak on C3), NAND root, Wi-Fi
   (6 h soak), motion, heating, a full print with pause / unload / load /
   empty bin / resume.
-- **Not yet:** a long soak on the bank3 kernel; Wi-Fi cold boots (part D);
+- **Bank3 kernel soak:** up 3 days 12 h on 11-16 (booted 11-13), with
+  about ten prints, no freeze or reboot.
+- **Not yet:** Wi-Fi cold boots (part D);
   the end-goal installer (stages 6-9).
 
 ## Work printer, as of 2026-11-16
