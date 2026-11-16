@@ -6,6 +6,21 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **TODO cleanup with the owner:**
+  - 24 (initramfs), Ethernet MAC part: done since 11-07. init.mainline
+    sets it from the U-Boot env in mtd1; the dev printer's boot log shows
+    the same MAC (..:10:13) on every boot. The log and write-window parts
+    stay open.
+  - 25: `iw` is in the root build's package list; Wi-Fi power save stays
+    off (owner).
+  - 30 (prebuilt zig UPC images untested with motion): dropped, owner;
+    the printers run the gcc builds.
+  - 31 (bed took 9 min to 60 C once, 11-12): dropped; not seen again.
+  - 32 (`map_front.py` rework): dropped; the front was mapped on 11-12
+    and the script is not in the repo.
+  - 33 (why a long LOAD request's reply never came): dropped; the screen
+    releases the busy state by itself and LOAD watches the encoder
+    (d2565c7). The cause was never seen.
 - **Work printer on the 11-15 payload confirmed** (TODO 9): build line
   `a112379 2026-11-15`, first print good, prime line in the new place.
   First run of the rebased Klipper on the stock 3.2 kernel.
