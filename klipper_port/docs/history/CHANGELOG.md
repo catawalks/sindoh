@@ -5,6 +5,13 @@ one. The detail for everything up to 2026-11-12 is in
 [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md) and the other
 files in this folder; `git log` has the rest.
 
+## 2026-11-16
+- **Work printer updated to the 11-15 payload** (`3e5e43ce`, build
+  `a112379`) from the stick by the owner; a print started on it.
+- **FLY-ADXL345 head mount, version 3** (`71d8a6b`): head width 55.8,
+  posts 15.5 apart, M3 screws (board holes 3.2), all by calipers; slots
+  by calipers since version 2. Not printed yet.
+
 ## 2026-11-15
 - **FLY-ADXL345 head mount, version 1** (`adxl_head_clip.py` writes the
   STL; replaces the placeholder `.scad`). Dimensions from the owner's
