@@ -6,6 +6,13 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Work printer on the 11-15 payload confirmed** (TODO 9): build line
+  `a112379 2026-11-15`, first print good, prime line in the new place.
+  First run of the rebased Klipper on the stock 3.2 kernel.
+- **UPC load in Mainsail's MCU panel** (TODO 5): owner watched it live
+  during that print. Done.
+- **ADXL head mount version 3 printed** (PLA) and test fitted on the
+  work printer's head: snaps on tightly. Board not screwed on yet.
 - **Bank3 kernel soak done** (TODO 21): mtd0 image 7eae8600 up 3 days
   12 h 44 min on 11-16 15:18 UTC, through the 11-14/15 test prints; no
   freeze, no reboot.

@@ -22,9 +22,6 @@ Dev printer:
 4. **Screen features never used on hardware:** the calibration wizards
    (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET), OBJECTS
    (skip one object), WiFi -> SAVED (PREFER / FORGET), custom MACROS page.
-5. **UPC load in Mainsail's MCU panel under motion.** The firmware with it
-   (fm 6cdaee5b, io f0407060) is on the 4 GB card root, not on the NAND
-   root (fm c313d379): install it there first.
 6. **Dryer leftovers:** STOP DRYING, PRINT_START during drying, FORCE=1
    above the 70 C sheet limit.
 7. **A real Mainsail update** from SYSTEM -> UPDATE (only CHECK NOW tried).
@@ -33,15 +30,9 @@ Dev printer:
    or power the switch off).
 
 Work printer:
-9. **First prints on the 11-15 payload** (installed by the owner
-   2026-11-16, payload `3e5e43ce`; a print was running when reported).
-   Still to hear from the owner: SYSTEM -> INFO shows build
-   `a112379 2026-11-15`, and how the first prints came out. It is the
-   first run of the rebased Klipper on the stock 3.2 kernel. If it
-   misbehaves, the old payload (`5f3336e1`) is in
-   `D:\DP200\backup\usb_stick_copy_20261115_before`. That printer has
-   no `[axis_twist_compensation]`: if wide first layers are uneven left
-   to right, do the comparison in docs/dev_printer_testing.md there.
+9. **Work printer has no `[axis_twist_compensation]`:** if wide first
+   layers are uneven left to right there, do the comparison in
+   docs/dev_printer_testing.md on that printer (see also #29).
 10. **Resume quality on real prints:** some straggler lines at the resume
     layer after a load (11-12). Tune `reprime_len` (30 mm) if needed.
 11. **Wi-Fi stability on the upgraded work printer.**
@@ -55,14 +46,15 @@ Either printer, longer:
        or under-extrudes; gives the hotend's limit in mm3/s (unmeasured; a
        hotend of this type usually manages 8-12 with PLA, i.e. about
        110 mm/s at 0.45 x 0.2 mm).
-    b. **Input shaping:** head mount version 3 is ready to print
-       (`install/input_shaping/mounts/adxl_head_clip.stl`; slots by
-       width and board holes by calipers; two depths from photos: docs/input_shaping.md
-       "Mounts"). Owner prints it (work printer, 11-16) and reports the
-       fit (width, both hooks, board holes); correct the script, reprint. The bed clamp
-       (`adxl_bed_clamp.scad`) still has placeholder dimensions. Then
-       SHAPER_CALIBRATE (docs/input_shaping.md); raise `max_accel`
-       to what it allows (3000-5000 is usual for a bed-slinger this size).
+    b. **Input shaping:** head mount version 3 is printed (PLA, work
+       printer, 11-16) and snaps tightly onto the work printer's head.
+       Next: screw the FLY-ADXL345 to its posts (M3 x 6, the screws cut
+       their own thread; board fit not tried yet), fit it on the dev
+       printer's head, run SHAPER_CALIBRATE for X
+       (docs/input_shaping.md). For Y the board must ride on the bed:
+       the bed clamp (`adxl_bed_clamp.scad`) still has placeholder
+       dimensions. Then raise `max_accel` to what the result allows
+       (3000-5000 is usual for a bed-slinger this size).
     c. Re-tune pressure advance at the new speeds; check part cooling.
     d. Slicer profile with the result (expected: walls and infill
        80-120 mm/s, travel 150-200), then the payload.

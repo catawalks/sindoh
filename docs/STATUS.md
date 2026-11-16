@@ -57,7 +57,7 @@ becomes the full kernel-swap test machine.
 ## Work printer, as of 2026-11-16
 
 - Runs the 11-15 payload on the stock 3.2 kernel (installed from the
-  stick by the owner on 11-16; a print was running when reported):
+  stick by the owner on 11-16):
   `3e5e43ce1f2c063cf28aae663bfcee91`, 84,430,492 B, build
   `a112379 2026-11-15`. Userspace only. It carries the fork at 8203a7d7
   (klippy, helper, fm/io: the dev printer is three firmware commits
@@ -66,8 +66,10 @@ becomes the full kernel-swap test machine.
   printer.cfg has no `[axis_twist_compensation]`. PC copies: this
   payload in `D:\DP200\kernel\out\payload_20261115`, the one before
   (`5f3336e1`, 11-07) in `D:\DP200\backup\usb_stick_copy_20261115_before`.
-  Not confirmed yet: the build line on SYSTEM -> INFO and the print's
-  result (TODO 9).
+  Confirmed by the owner 11-16: SYSTEM -> INFO shows that build, the
+  first print (the ADXL head mount, PLA) came out good, the prime line
+  is in its new place, and Mainsail's MCU panel showed the UPC load
+  live during the print.
 - 11-16 is the first time this Klipper (on upstream 29d4ec2d) runs on
   the stock 3.2 kernel; before, only on the dev printer's mainline kernel.
 

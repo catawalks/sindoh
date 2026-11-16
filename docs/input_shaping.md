@@ -73,7 +73,8 @@ From Mainsail the same works with `SHAPER_CALIBRATE AXIS=X` /
 In `install/input_shaping/mounts/`:
 
 - **`adxl_head_clip.py` -> `adxl_head_clip.stl`** (2026-11-15, version 3,
-  not printed yet): for the Mellow FLY-ADXL345 USB on the print head. A
+  printed in PLA 11-16: snaps tightly onto the head; board fit not
+  tried yet): for the Mellow FLY-ADXL345 USB on the print head. A
   bridge on the flat top of the head's front block, an arm down each side
   face with a hook and lead-in ramp for a slot in that face, and two
   posts for M3 screws. The script writes the STL itself (no OpenSCAD
