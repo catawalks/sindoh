@@ -77,12 +77,14 @@ Kernel (dev printer only):
     DTS) into the kernel tree and patch set, so the next kernel build
     has it without that branch. Not checked on 11-16 whether this was
     already done there.
-24. **Initramfs:** keep its log somewhere init.mainline's /run doesn't
-    cover; close the mtd6 window when the root isn't mtd6; Ethernet MAC
-    from mtd1; maybe refuse a root without init.mainline.
-25. **`iw` in the root build's package list** (installed by hand on the
-    dev printer). Decide Wi-Fi power save: off cut the drops but slowed
-    downloads in one test (11-07).
+24. **Initramfs** (checked 11-16; needs a new kernel image, so do it
+    with the next kernel build, before end-goal stage 6):
+    - Its own log is still lost: it is copied to /newroot/run, which
+      init.mainline's tmpfs covers (no such file on the dev printer).
+      Write it where it survives, e.g. append to /var/log/dp200-init.log.
+    - Close the mtd6 write window when the root isn't mtd6 (does not
+      matter on the dev printer today: its root is mtd6).
+    - Optional: refuse a root without init.mainline.
 
 Wi-Fi:
 26. **Wi-Fi leaves the preferred network** (traced 11-14, not fixed):
@@ -160,15 +162,6 @@ Motion and firmware:
     - The work printer needs its own values: do the same comparison
       there, or ship without the section and tell users how.
     - A way to do the comparison from the touch screen (wizard).
-30. **Prebuilt (zig) UPC images** are untested with motion (they are the
-    fallback; the printers run the gcc builds).
-31. **Bed heat-up took 9 min to 60 C once** (11-12, cold start); look at
-    the bed PID / max_power.
-32. `map_front.py`: deploy the probe once and use `_PROBE_BASE` per point.
-
-Screen app:
-33. **Why the reply to a long LOAD request never came** (11-12; the busy
-    state is fixed, the cause wasn't seen): check moonraker.log.
 
 End-goal install ([docs/end_goal_install_plan.md](docs/end_goal_install_plan.md);
 stages 1-5 done on the dev printer):
