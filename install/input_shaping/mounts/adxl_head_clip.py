@@ -12,8 +12,8 @@ hook one side in at an angle, then press the other side down until it snaps.
 The part is a union of plain boxes, wedges and tubes that overlap each other;
 slicers merge them (Cura: "Union Overlapping Volumes", on by default).
 
-Print it standing on its FRONT face (the Y = 0 plane: "place on face" in the
-slicer), PETG or PLA, 4 walls, 40 % infill. It has to be stiff: a mount that
+Print it standing on its FRONT face (the flat face nearest the posts: "place
+on face" in the slicer), PETG or PLA, 4 walls, 40 % infill. It has to be stiff: a mount that
 flexes measures its own wobble.
 
 Coordinates (mm): X across the head (left is negative, seen from the front),
@@ -31,6 +31,10 @@ import struct
 HEAD_W = 55.8        # calipers: width across the two side faces
 TOP_DEPTH = 23.0     # PHOTO  flat top: front face back to the step
 SIDE_DEPTH = 32.0    # PHOTO  side face: front to back
+FRONT_CUT = 10.0     # the clip starts this far behind the front face: at the
+                     # X home position (right end) the Bowden tube comes down
+                     # in front of the head, and the first version, which
+                     # reached the front face, hit it (2026-11-16)
 # Slots in the side faces (calipers): (from the front face, length along Y,
 # top surface down to the slot's top edge, slot height)
 SLOT_L = (20.0, 7.0, 3.8, 3.0)   # left, rear slot
@@ -49,8 +53,10 @@ WALL = 3.0           # bridge and arm thickness
 
 # ---- sensor board (Mellow FLY-ADXL345 USB) ------------------------------
 HOLE_PITCH = 15.5    # calipers: the two mounting holes, center to center
-POST_Y = 17.0        # posts this far back from the front face; the board
-                     # (about 21 x 16 mm) lies toward the front, USB-C forward
+POST_Y = 17.0        # posts this far back from the front face
+# The posts sit at the LEFT end of the bridge, the left post flush with the
+# clip's left side: at X home the head is close to the right side wall, and a
+# USB cable from a board in the middle would hit that wall (2026-11-16).
 POST_H = 3.0         # keeps the solder side clear of the bridge
 POST_OD = 6.0
 POST_ID = 2.5        # M3 screw cutting its own thread (board holes 3.2 mm)
@@ -99,10 +105,10 @@ def tube(cx, cy, z0, z1, ro, ri, n=48):
 
 half = HEAD_W / 2 + FIT
 # bridge on the top surface
-box(-half - WALL, half + WALL, 0, TOP_DEPTH, 0, WALL)
+box(-half - WALL, half + WALL, FRONT_CUT, TOP_DEPTH, 0, WALL)
 # arms down both side faces (they overlap the bridge ends)
-box(-half - WALL, -half, 0, SIDE_DEPTH, -ARM_DOWN, WALL)
-box(half, half + WALL, 0, SIDE_DEPTH, -ARM_DOWN, WALL)
+box(-half - WALL, -half, FRONT_CUT, SIDE_DEPTH, -ARM_DOWN, WALL)
+box(half, half + WALL, FRONT_CUT, SIDE_DEPTH, -ARM_DOWN, WALL)
 # a hook per arm: just under the slot's top edge, with a ramp below it so the
 # arm rides over the edge of the head when the clip is pressed on
 for sx, (sy, sl, stop, sh) in ((-1, SLOT_L), (1, SLOT_R)):
@@ -114,8 +120,10 @@ for sx, (sy, sl, stop, sh) in ((-1, SLOT_L), (1, SLOT_R)):
     box(xa, xb, y0, y1, zb, zt)
     wedge([(face + sx * 0.5, zb), (face - sx * HOOK_IN, zb), (face + sx * 0.5, zb - RAMP)], y0, y1)
 # screw posts for the board (0.5 mm into the bridge so the shells overlap)
-for sx in (-1, 1):
-    tube(sx * HOLE_PITCH / 2, POST_Y, WALL - 0.5, WALL + POST_H, POST_OD / 2, POST_ID / 2)
+assert FRONT_CUT + POST_OD / 2 <= POST_Y <= TOP_DEPTH - POST_OD / 2
+post_x = -half - WALL + POST_OD / 2
+for px in (post_x, post_x + HOLE_PITCH):
+    tube(px, POST_Y, WALL - 0.5, WALL + POST_H, POST_OD / 2, POST_ID / 2)
 
 
 def normal(a, b, c):

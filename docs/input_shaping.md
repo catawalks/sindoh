@@ -72,14 +72,21 @@ From Mainsail the same works with `SHAPER_CALIBRATE AXIS=X` /
 
 In `install/input_shaping/mounts/`:
 
-- **`adxl_head_clip.py` -> `adxl_head_clip.stl`** (2026-11-15, version 3,
-  printed in PLA 11-16: snaps tightly onto the head; board fit not
-  tried yet): for the Mellow FLY-ADXL345 USB on the print head. A
-  bridge on the flat top of the head's front block, an arm down each side
-  face with a hook and lead-in ramp for a slot in that face, and two
-  posts for M3 screws. The script writes the STL itself (no OpenSCAD
-  on the dev PC). Print it standing on its front face; hook one side in
-  at an angle, press the other side down. Dimensions:
+- **`adxl_head_clip.py` -> `adxl_head_clip.stl`** (version 4,
+  2026-11-16, not printed yet): for the Mellow FLY-ADXL345 USB on the
+  print head. A bridge on the flat top of the head's front block, an arm
+  down each side face with a hook and lead-in ramp for a slot in that
+  face, and two posts for M3 x 6 screws. The script writes the STL itself
+  (no OpenSCAD on the dev PC). Print it standing on its front face; hook
+  one side in at an angle, press the other side down.
+  - Version 3 (printed in PLA 11-16) snapped tightly onto the head, but
+    **the printer could not home X with it on**: X homes at the right
+    end, where the Bowden tube comes down in front of the head, and the
+    clip's front edge hit the tube. A USB cable from a board in the
+    middle would also have hit the right side wall. Version 4 starts
+    10 mm behind the front face and has the posts at the left end (left
+    post flush with the clip's left side); posts 5 mm high so the screws
+    don't bottom out.
   - Slots, by calipers (from the front face, down from the top surface):
     left (side-fan side) rear slot 7 long x 3 high, 20 back, 3.8 down;
     right side's only slot 5 long x 6 high, 21 back, 4 down. The left
