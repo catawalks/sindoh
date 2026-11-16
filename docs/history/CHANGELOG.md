@@ -6,6 +6,18 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-15
+- **Fork: three stepping commits merged into `sindoh-dp200`**
+  (fast-forward 8203a7d7 -> ee0c7f8e; `upc-fast-step` deleted): no timer
+  read after a step, fewer timer reads in the dispatch path, and
+  `UPC_STEP_ARM` (default off). 193 -> 138 instructions per stepped step
+  in the emulator (119 with the ARM option). Dev printer, owner present:
+  default build and ARM build each passed homing, the drift test (shifts
+  0.000 to 0.040 mm, the usual switch scatter) and the 20 mm box (420 s
+  and 419 s; box 20.0 x 19.80 x 10.0 mm); clock estimate steady.
+  `klipper/FORK` pins ee0c7f8e; the dev printer runs the default build.
+- One mesh was discarded by the reference check during these tests
+  (-0.112 mm): probe settling plus a bed still warming, not the firmware
+  (40-touch runs on both builds level off). TODO 28a.
 - **Dev printer on the fork's branch tip** 8203a7d7: fm `9834d57f`, io
   `90441e04`, `c_helper.so` `7380efa1`, built on the printer with the
   card's toolchain (`tools/fork_build_on_printer.sh`). Ready; not
