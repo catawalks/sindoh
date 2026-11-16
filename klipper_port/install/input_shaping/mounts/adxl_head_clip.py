@@ -57,7 +57,8 @@ POST_Y = 17.0        # posts this far back from the front face
 # The posts sit at the LEFT end of the bridge, the left post flush with the
 # clip's left side: at X home the head is close to the right side wall, and a
 # USB cable from a board in the middle would hit that wall (2026-11-16).
-POST_H = 3.0         # keeps the solder side clear of the bridge
+POST_H = 5.0         # solder side clear of the bridge; an M3 x 6 screw through
+                     # the 1.6 mm board must not bottom out (the bore is blind)
 POST_OD = 6.0
 POST_ID = 2.5        # M3 screw cutting its own thread (board holes 3.2 mm)
 
