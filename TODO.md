@@ -33,11 +33,12 @@ Dev printer:
    or power the switch off).
 
 Work printer:
-9. **Install the 11-15 stick payload on the work printer** (owner):
-   payload `3e5e43ce` is on the stick. Install, check SYSTEM -> INFO
-   shows build `a112379 2026-11-15`, home, then a real print. It is the
-   first run of the rebased Klipper on the stock 3.2 kernel: if Klipper
-   does not come up, the old payload (`5f3336e1`) is in
+9. **First prints on the 11-15 payload** (installed by the owner
+   2026-11-16, payload `3e5e43ce`; a print was running when reported).
+   Still to hear from the owner: SYSTEM -> INFO shows build
+   `a112379 2026-11-15`, and how the first prints came out. It is the
+   first run of the rebased Klipper on the stock 3.2 kernel. If it
+   misbehaves, the old payload (`5f3336e1`) is in
    `D:\DP200\backup\usb_stick_copy_20261115_before`. That printer has
    no `[axis_twist_compensation]`: if wide first layers are uneven left
    to right, do the comparison in docs/dev_printer_testing.md there.
@@ -57,8 +58,8 @@ Either printer, longer:
     b. **Input shaping:** head mount version 3 is ready to print
        (`install/input_shaping/mounts/adxl_head_clip.stl`; slots by
        width and board holes by calipers; two depths from photos: docs/input_shaping.md
-       "Mounts"). Owner prints it and reports the fit (width, both hooks,
-       board holes); correct the script, reprint. The bed clamp
+       "Mounts"). Owner prints it (work printer, 11-16) and reports the
+       fit (width, both hooks, board holes); correct the script, reprint. The bed clamp
        (`adxl_bed_clamp.scad`) still has placeholder dimensions. Then
        SHAPER_CALIBRATE (docs/input_shaping.md); raise `max_accel`
        to what it allows (3000-5000 is usual for a bed-slinger this size).

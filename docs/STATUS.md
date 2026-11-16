@@ -52,19 +52,22 @@ becomes the full kernel-swap test machine.
 - **Not yet:** a long soak on the bank3 kernel; Wi-Fi cold boots (part D);
   the end-goal installer (stages 6-9).
 
-## Work printer, as of 2026-11-15
+## Work printer, as of 2026-11-16
 
-- Runs the 11-07 payload (`5f3336e1`) on the stock 3.2 kernel. Printing.
-- **The USB stick holds the next payload, not installed yet:**
+- Runs the 11-15 payload on the stock 3.2 kernel (installed from the
+  stick by the owner on 11-16; a print was running when reported):
   `3e5e43ce1f2c063cf28aae663bfcee91`, 84,430,492 B, build
   `a112379 2026-11-15`. Userspace only. It carries the fork at 8203a7d7
-  (klippy, helper, fm/io as on the dev printer), the 11-12 and 11-15
-  macros, the screen app `561d5ee1`, the camera restart loop and the
-  2.4 GHz Wi-Fi limit. PC copies: the new one in
-  `D:\DP200\kernel\out\payload_20261115`, the old one in
-  `D:\DP200\backup\usb_stick_copy_20261115_before`.
-- This Klipper (on upstream 29d4ec2d) has only run on the dev printer's
-  mainline kernel, never on the stock 3.2 kernel.
+  (klippy, helper, fm/io: the dev printer is three firmware commits
+  newer, ee0c7f8e), the 11-12 and 11-15 macros, the screen app
+  `561d5ee1`, the camera restart loop and the 2.4 GHz Wi-Fi limit. Its
+  printer.cfg has no `[axis_twist_compensation]`. PC copies: this
+  payload in `D:\DP200\kernel\out\payload_20261115`, the one before
+  (`5f3336e1`, 11-07) in `D:\DP200\backup\usb_stick_copy_20261115_before`.
+  Not confirmed yet: the build line on SYSTEM -> INFO and the print's
+  result (TODO 9).
+- 11-16 is the first time this Klipper (on upstream 29d4ec2d) runs on
+  the stock 3.2 kernel; before, only on the dev printer's mainline kernel.
 
 ## Who owns what
 
