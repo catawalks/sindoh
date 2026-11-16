@@ -79,13 +79,12 @@ Either printer, longer:
 ## Agent (no owner needed)
 
 Kernel (dev printer only):
-20. **Merge the bank 3 pad fix** (motor repo `upc-bank3-pads` 7dd0f21:
-    mv61x0-upc.c + the DTS) into the kernel tree and patch set.
-21. **Soak the bank3 kernel** (7eae8600 in mtd0): so far one RAM boot and
-    one NAND boot; C3 had 10 h.
-22. **The one-CPU default rebooted by itself** ~07:20 on 11-11 (no
-    watchdog line, no pstore). Cause unknown; that kernel is no longer in
-    mtd0. Watch for it.
+20. **Bank 3 pad fix: bookkeeping only.** The fix runs in mtd0 (image
+    7eae8600, soaked: see the changelog, 11-16). Left: on the build box,
+    merge motor repo branch `upc-bank3-pads` (7dd0f21: mv61x0-upc.c + the
+    DTS) into the kernel tree and patch set, so the next kernel build
+    has it without that branch. Not checked on 11-16 whether this was
+    already done there.
 24. **Initramfs:** keep its log somewhere init.mainline's /run doesn't
     cover; close the mtd6 window when the root isn't mtd6; Ethernet MAC
     from mtd1; maybe refuse a root without init.mainline.
@@ -120,9 +119,12 @@ Wi-Fi:
     gone, first refused snapshot 11-14 00:28 UTC (about 22 h after boot),
     no trace, cause unknown. Since 11-14 rc.dp200 (`webcam-loop`) logs it
     to /var/log/dp200_webcam.log with its exit status, restarts it after
-    5 s, and makes the kernel log where a fatal signal hit. Read the log
-    after the next exit, find the cause; owner: the log and restart can go
-    once it is fixed.
+    5 s, and makes the kernel log where a fatal signal hit. Checked
+    11-16 15:18 UTC: no exit since the loop was deployed (running since
+    11-14 06:12 UTC, 57 h, same boot; the earlier death came about 22 h
+    after boot). The three exits in the log are the 11-14 deploy tests.
+    Check again after a longer run or a reboot; if it dies, read the
+    log, find the cause. Owner: the log and restart can go once fixed.
 27. Upstream submission of the 8782 fix: **tabled by the owner 11-12**.
     The patch and cover letter are ready on the build box, not sent.
 
