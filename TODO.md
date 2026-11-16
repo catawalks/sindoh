@@ -46,21 +46,25 @@ Either printer, longer:
        or under-extrudes; gives the hotend's limit in mm3/s (unmeasured; a
        hotend of this type usually manages 8-12 with PLA, i.e. about
        110 mm/s at 0.45 x 0.2 mm).
-    b. **Input shaping:** head mount version 3 fits the head but blocks
-       X homing (it hits the Bowden tube at the right end; homing failed
-       11-16, nothing damaged as far as reported). Version 4 (front
-       10 mm removed, posts at the left end) is ready to print:
-       `install/input_shaping/mounts/adxl_head_clip.stl`. Owner prints
-       it, screws the board on (M3 x 6), checks by hand that the head
-       reaches the X home position with board and cable on. Then on the
-       dev printer: numpy is not installed yet
-       (`install/input_shaping/setup_numpy.sh`, needs internet);
-       /dev/ttyACM0 appears when the board is plugged in but belongs to
-       root (klippy must be able to open it); enable `dp200_adxl.cfg`;
-       SHAPER_CALIBRATE AXIS=X (docs/input_shaping.md). For Y the board
-       must ride on the bed: the bed clamp (`adxl_bed_clamp.scad`)
-       still has placeholder dimensions. Then raise `max_accel` to what
-       the result allows (3000-5000 is usual for a bed-slinger this size).
+    b. **Input shaping:** X measured on the dev printer 11-16
+       (docs/input_shaping.md "Dev printer, 2026-11-16"): Klipper
+       recommends `3hump_ei` 80.8 Hz, max_accel <= 4300; the X peak is
+       at 44-47 Hz. Nothing saved yet. Left:
+       - Choose the X shaper with a ringing test print (3hump_ei 80.8
+         against mzv ~50), then put `[input_shaper]` in printer.cfg.
+       - Y: the board must ride on the bed. The bed clamp
+         (`adxl_bed_clamp.scad`) still has placeholder dimensions.
+       - Mount version 4 (clears the Bowden tube at X home, posts at
+         the left end) is ready to print; version 3 blocks X homing.
+         Repeat the X run once with it.
+       - rc.dp200 should set group dialout / mode 660 on /dev/ttyACM0
+         (today by hand after every Klipper restart).
+       - `setup_numpy.sh` does not work on the NAND root (no apt); the
+         dev printer got numpy by hand from the card. Decide how the
+         payload / root build ships it. The stock-kernel path (work
+         printer) is untested with a sensor.
+       - The touch screen's INPUT SHAPING page is untested.
+       Then raise `max_accel` (1500 now) toward what the shapers allow.
     c. Re-tune pressure advance at the new speeds; check part cooling.
     d. Slicer profile with the result (expected: walls and infill
        80-120 mm/s, travel 150-200), then the payload.
@@ -68,13 +72,11 @@ Either printer, longer:
     then M300; the dryer's end signal uses it.
 14. **Retraction test** (two towers), then the slicer profiles; recheck
     pressure advance (0.30) with dry filament.
-15. **Mesh front limit:** changed 11-16 from Y 30 to Y 5, six rows
-    (`mesh_min: 18, 5`, `probe_count: 5, 6` in dp200_macros.cfg, in the
-    repo and on the dev printer; backup there `dp200_macros.cfg.bak-1116`).
-    **Not tested yet:** the homing before the first mesh failed (#12b).
-    Test with the owner present: one BED_MESH_CALIBRATE, watch the pin
-    on the front row, then a first layer at the front of the bed. Do
-    this before the next payload is built.
+15. **Mesh front limit at Y 5** (was 30; six rows): a mesh ran clean
+    on the dev printer 11-16 (30 points, reference check -0.019 mm;
+    front row about 0.1 mm lower than the row behind it). Left: a first
+    layer printed at the front of the bed, before the next payload
+    carries the change to the work printer.
 16. **Homing clearance:** a few mm of Z clearance before X homing, so the
     nozzle doesn't drag across a failed print. Mind that Z homes upward.
 17. Optional: a 6-7 mm/s Z lift test (10 stalls lifting; stock is 5.05).

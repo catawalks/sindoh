@@ -49,6 +49,10 @@ becomes the full kernel-swap test machine.
 - **Works:** boot from NAND, two CPUs (10 h soak on C3), NAND root, Wi-Fi
   (6 h soak), motion, heating, a full print with pause / unload / load /
   empty bin / resume.
+- **11-16 additions on the dev printer:** numpy 2.2.4 for Klipper (copied
+  from the card, with libblas/liblapack/libgfortran); `dp200_adxl.cfg.off`
+  with `rate: 800`, `max_freq: 135`; `dp200_macros.cfg` with the mesh
+  front row at Y 5 (backup `.bak-1116`). Sensor config is off.
 - **Bank3 kernel soak:** up 3 days 12 h on 11-16 (booted 11-13), with
   about ten prints, no freeze or reboot.
 - **Not yet:** Wi-Fi cold boots (part D);

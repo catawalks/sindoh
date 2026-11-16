@@ -20,6 +20,10 @@ serial: /dev/ttyACM0
 # Resonances guide: cs_pin: adxl:gpio1, spi_bus: spi0a).
 [adxl345]
 cs_pin: adxl:gpio9
+# 800 samples/s instead of the default 3200: at 3200 the printer's CPU could
+# not keep up while stepping ("Timer too close" 34 s into the test,
+# 2026-11-16). 800 still covers 400 Hz, three times the tested range.
+rate: 800
 spi_software_sclk_pin: adxl:gpio10
 spi_software_mosi_pin: adxl:gpio11
 spi_software_miso_pin: adxl:gpio12
@@ -32,8 +36,8 @@ spi_software_miso_pin: adxl:gpio12
 accel_chip: adxl345
 # bed centre, bed 20 mm below the nozzle
 probe_points: 105, 100, 20
-# Gentler than Klipper's defaults (75 / 133 Hz -> up to ~10000 mm/s^2):
-# the A4982 drivers run at stock current and lost steps would spoil the
-# measurement. Raise if the result looks cut off at the top.
+# accel_per_hz is gentler than Klipper's default (the A4982 drivers run at
+# stock current; lost steps would spoil the measurement). max_freq 135:
+# with 100 the spectrum was still level at the cutoff (2026-11-16).
 accel_per_hz: 50
-max_freq: 100
+max_freq: 135

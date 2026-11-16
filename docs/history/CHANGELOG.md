@@ -6,6 +6,12 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Input shaping, X axis measured** on the dev printer (FLY-ADXL345 on
+  the version 3 mount): `3hump_ei` 80.8 Hz recommended, max_accel <=
+  4300; X peak at 44-47 Hz. Needed: numpy by hand, `rate: 800`, port
+  permissions. Not saved. docs/input_shaping.md.
+- **Mesh with the front row at Y 5 ran clean** on the dev printer (30
+  points). First-layer test at the front still open (TODO 15).
 - **ADXL head mount version 4:** version 3 blocked X homing (hit the
   Bowden tube at the right end; "No trigger on stepper_x"). Front 10 mm
   removed, posts moved to the left end, posts 5 mm high. Not printed.
