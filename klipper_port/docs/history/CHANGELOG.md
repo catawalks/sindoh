@@ -6,6 +6,8 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Object cancellation works on a real print:** owner printed both
+  ADXL mounts together and canceled the head mount; the bed mount went on.
 - **ADXL bed mount** (`adxl_bed_bar.py` writes the STL): a bar in place
   of one front grip of the build plate, by the owner's caliper readings.
   Replaces the `adxl_bed_clamp.scad` draft. Not printed yet.
