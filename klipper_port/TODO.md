@@ -54,11 +54,13 @@ Either printer, longer:
        or under-extrudes; gives the hotend's limit in mm3/s (unmeasured; a
        hotend of this type usually manages 8-12 with PLA, i.e. about
        110 mm/s at 0.45 x 0.2 mm).
-    b. **Input shaping:** mounts for the FLY-ADXL345. The drafts in
-       `install/input_shaping/mounts/` have placeholder dimensions: the
-       owner measures the print head and the board (asked 11-15), then
-       fill them in and print. OpenSCAD is not installed on the dev PC.
-       Then SHAPER_CALIBRATE (docs/input_shaping.md); raise `max_accel`
+    b. **Input shaping:** head mount version 1 is ready to print
+       (`install/input_shaping/mounts/adxl_head_clip.stl`, dimensions from
+       photos: docs/input_shaping.md "Mounts"). Owner prints it and
+       reports the fit (width, the left hook in its slot, where the right
+       side's slot is); correct the script, reprint. The bed clamp
+       (`adxl_bed_clamp.scad`) still has placeholder dimensions. Then
+       SHAPER_CALIBRATE (docs/input_shaping.md); raise `max_accel`
        to what it allows (3000-5000 is usual for a bed-slinger this size).
     c. Re-tune pressure advance at the new speeds; check part cooling.
     d. Slicer profile with the result (expected: walls and infill

@@ -68,15 +68,23 @@ error page has a **SENSOR OFF** button.
 From Mainsail the same works with `SHAPER_CALIBRATE AXIS=X` /
 `AXIS=Y` and `SAVE_CONFIG`, after renaming the file by hand.
 
-## Mounts (drafts, not printed yet)
+## Mounts
 
-Parametric OpenSCAD files in `install/input_shaping/mounts/`. Every
-dimension of the printer in them is a placeholder to be measured:
+In `install/input_shaping/mounts/`:
 
-- `adxl_head_clip.scad`: a bridge over the top of the print head with two
-  arms that hook into the notches near the top of each side of the head.
-  Needed: head width where the arms grip, the notch position, height and
-  depth, and the board's hole spacing.
+- **`adxl_head_clip.py` -> `adxl_head_clip.stl`** (2026-11-15, version 1,
+  not printed yet): for the Mellow FLY-ADXL345 USB on the print head. A
+  bridge on the flat top of the head's front block, an arm down each side
+  face, a hook on the left arm (the side-fan side) for that side's rear
+  slot, and two posts for M2.5 screws. The script writes the STL itself
+  (no OpenSCAD on the dev PC). Its head and board dimensions were read
+  from photos with a ruler, good to about 1 mm: width 55, flat top 23
+  deep, side face 32 deep, left rear slot 24-30 mm back and 4-8.5 mm
+  below the top, board holes 16.5 apart. Print it standing on its front
+  face, test the fit, correct the numbers at the top of the script and
+  run it again. Open: the right side has one slot whose position is not
+  measured, so the right arm has no hook yet; the left side's front
+  opening has a spring behind it and is not used.
 - `adxl_bed_clamp.scad`: a C-clamp on the front edge of the bed plate,
   tightened by an M3 screw from below. Needed: plate thickness at the front
   edge, the free space under it, and how far the jaws may reach in.

@@ -6,6 +6,9 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-15
+- **FLY-ADXL345 head mount, version 1** (`adxl_head_clip.py` writes the
+  STL; replaces the placeholder `.scad`). Dimensions from the owner's
+  ruler photos. Not printed yet.
 - **Fork: three stepping commits merged into `sindoh-dp200`**
   (fast-forward 8203a7d7 -> ee0c7f8e; `upc-fast-step` deleted): no timer
   read after a step, fewer timer reads in the dispatch path, and
