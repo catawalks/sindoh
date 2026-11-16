@@ -1,7 +1,10 @@
 # Input shaping with a USB accelerometer
 
-Status 2026-10-27: software prepared, **not yet tested with a sensor**. The
-untested parts are the USB binding (below) and the mounts.
+Status 2026-11-16: **X axis measured on the dev printer** (results at the
+end). Y is not measured (no bed mount yet). Nothing is saved to a
+printer.cfg yet. The first sections describe the stick install on the stock
+kernel and are older; "Dev printer, 2026-11-16" below is what was really
+done.
 
 Input shaping cancels the ringing (ghost echoes after corners) that limits
 print speed. Klipper measures it with an accelerometer shaken by the
@@ -134,3 +137,52 @@ A mount must be stiff and tight: a loose mount measures its own wobble.
   sources in the root) instead of the new_id line; dp200-mounts.sh creates
   ttyACM0-3 (major 166) in the chroot; dp200_adxl.cfg.off uses /dev/ttyACM0.
   Not yet run on the 4 GB card.
+
+## Dev printer, 2026-11-16: X axis measured
+
+Setup that was needed (dev printer: mainline kernel, NAND root):
+
+- **The board appears as `/dev/ttyACM0`** when plugged into the front USB
+  port (the kernel has cdc_acm). The node belongs to root with mode 600 and
+  is created again **every time Klipper restarts** (the board resets), so
+  each time: `chgrp dialout /dev/ttyACM0; chmod 660 /dev/ttyACM0`. Until
+  then klippy.log repeats "Permission denied" and Klipper stays in
+  "startup". Open: do this in rc.dp200 (TODO 12b).
+- **numpy:** `setup_numpy.sh` does not work on the NAND root (no apt).
+  Done by hand instead: numpy 2.2.4 copied from the 4 GB card's root
+  (`/usr/lib/python3/dist-packages/numpy`, 32 MB, same Python 3.13.5),
+  plus `blas/libblas.so.3*`, `lapack/liblapack.so.3*` and
+  `libgfortran.so.5*` into `/usr/lib/arm-linux-gnueabi/`, `ldconfig`, and
+  the `.pth` file as in the script. **The Klipper process must be
+  restarted** (`rc.dp200 restart-klipper`): RESTART from Mainsail keeps
+  the old Python and still says "Failed to import numpy".
+- **`rate: 800`** in `[adxl345]`: at the default 3200 the MCU shut down
+  with "Timer too close" 34 s into the test (host overloaded).
+- The printer cannot home X with the version 3 mount on (see Mounts). So:
+  home with the mount off, `G1 Z20`, `G1 X105 Y100`, clip the mount on,
+  run the test. If Klipper restarts in between (homing lost), the head is
+  still there: `SET_KINEMATIC_POSITION X=105 Y=100 Z=20`, and home
+  properly afterward with the mount off.
+
+Result, `SHAPER_CALIBRATE AXIS=X`, two runs (data in
+`D:\DP200\kernel\out\adxl\calibration_data_x_20261116_*.csv`):
+
+| Shaper | Run 1 (to 100 Hz) | Run 2 (to 135 Hz) |
+|---|---|---|
+| zv | 86.2 Hz, 38.9 % left, accel <= 29000 | 104.8 Hz, 38.2 %, <= 42800 |
+| mzv | 50.8 Hz, 8.9 %, <= 7600 | 72.2 Hz, 16.5 %, <= 15400 |
+| ei | 69.6 Hz, 12.5 %, <= 8800 | 42.2 Hz, 16.6 %, <= 3200 |
+| 2hump_ei | 63.4 Hz, 1.7 %, <= 4300 | 84.4 Hz, 5.4 %, <= 7500 |
+| 3hump_ei | 80.2 Hz, 1.6 %, <= 4300 | **80.8 Hz, 0.5 %, <= 4300** |
+
+Klipper recommends `3hump_ei` at about 80 Hz both times. Reading of the
+spectrum: one broad peak at 44-47 Hz along X (the real X resonance, not
+sharp: only about twice the level around it), a narrow peak at 85 Hz on
+the sensor's other horizontal axis (the head or the PLA mount rocking),
+and a level floor from 70 Hz to the end of the range. The level floor is
+why the simple shapers fit badly and move between runs. Candidates:
+`3hump_ei` 80.8 Hz (Klipper's pick, max_accel up to 4300) or `mzv` near
+50 Hz (less smoothing, aimed at the 45 Hz peak only). Decide with a
+ringing test print; not saved yet. The measurement used the version 3
+mount in PLA with the board in the middle; repeat it once with the
+version 4 mount.
