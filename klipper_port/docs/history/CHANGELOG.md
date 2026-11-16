@@ -6,6 +6,7 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Screen: custom MACROS page** opens and lists the macros (owner).
 - **The screen's OBJECTS page works on a real print:** owner printed both
   ADXL mounts together and canceled the head mount from the touch screen;
   the bed mount went on.

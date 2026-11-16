@@ -21,7 +21,9 @@ Dev printer:
    printer.
 4. **Screen features never used on hardware:** the calibration wizards
    (Z HEIGHT paper test, PROBE OFFSET, PID TUNE, SAVE Z OFFSET), WiFi ->
-   SAVED (PREFER / FORGET), custom MACROS page.
+   SAVED (PREFER / FORGET). The custom MACROS page opens and lists the
+   macros (owner, 11-16); adding an own macro and running one from it
+   is not tried.
 6. **Dryer leftovers:** STOP DRYING, PRINT_START during drying, FORCE=1
    above the 70 C sheet limit.
 7. **A real Mainsail update** from SYSTEM -> UPDATE (only CHECK NOW tried).
