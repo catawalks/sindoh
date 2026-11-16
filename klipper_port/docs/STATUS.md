@@ -26,14 +26,13 @@ becomes the full kernel-swap test machine.
   Rollback: C3 `a4e0cb33...` on the build box (10.10.0.68:8098).
 - **Command line:** `console=ttyS0,115200n8 marvell_nand.write_window=1741,4091 panic=10 consoleblank=0 timer_mv61x0.hang_wdt=30`
 - **Wi-Fi module:** `mwifiex_usb.ko` 0028 (`6645762a`): reload-safe.
-- **Klipper:** the fork's `sindoh-dp200` 8203a7d7 (the pin in
-  `klipper/FORK`), built on the printer 2026-11-15: fm `9834d57f`, io
-  `90441e04`, `c_helper.so` `7380efa1`. Klipper came up ready; no motion
-  test on this exact build yet (it differs from the tested tag
-  `dp200-clean-c` only by two line-wrap commits). The build from before
-  the branch replacement (fork tag `sindoh-dp200-before-clean`: fm
-  `c313d379`, io `dbc8e40d`) is kept on the printer as `klippy.cur`,
-  `fm.bin.cur`, `io.bin.cur`.
+- **Klipper:** the fork's `sindoh-dp200` ee0c7f8e (the pin in
+  `klipper/FORK`) since 2026-11-15: fm `fbc8c0db`, io `16afb0be` (built
+  on the build box, default config), klippy and `c_helper.so` `7380efa1`
+  from 8203a7d7 (the three commits since then change firmware source
+  only). Tested: homing, drift test, 20 mm box. Kept on the printer:
+  `fm.bin.tip`/`io.bin.tip` (8203a7d7) and `klippy.cur`, `fm.bin.cur`,
+  `io.bin.cur` (the build from before the branch replacement).
 - **Config and screen app:** `dp200_macros.cfg` `1154d13d` (11-15: five
   warm-up touches before a mesh), `dp200_printer.cfg` `180033a5`,
   `dp200_screen.py` `561d5ee1`. Its own `printer.cfg` has

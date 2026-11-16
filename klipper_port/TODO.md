@@ -129,19 +129,27 @@ Motion and firmware:
     tested on the PC; the first real root or payload build is the test.
     The two printers' `/home/klipper/klipper` are older checkouts: move
     them to the pinned fork commit with the next payload.
-28a. **`upc-fast-step` (fork):** two extra stepping optimizations (fewer
-    timer reads; ARM-mode step path, default off), never run on a
-    printer and not needed at today's speeds. The stepping session
-    rebased them onto the new `sindoh-dp200` on 11-15 (local branch
-    `fast-rebase`, three commits, emulator tests pass); the force-push of
-    `upc-fast-step` is waiting for the owner's permission in that
-    session. Owner to decide: push and keep for the speed work (#12), or
-    delete the branch.
+28a. **Mesh reference drift:** PRINT_START's mesh was discarded once in
+    five prints on 11-15 ("reference probe moved -0.112 mm", limit 0.1).
+    Cause: the pin keeps settling for about 25 touches after a deploy
+    (40 touches: first one +0.04 mm, then a slow fall of 0.02 mm on a
+    cool bed and 0.07 mm on a bed cooling from 60 C), and the mesh starts
+    as soon as the bed reaches temperature. Options: more warm-up touches
+    (`variable_warmup`, now 5; 25 adds about 3 min), a soak of a minute or
+    two after the bed reaches temperature, or both. Measure which helps.
+    The Z motor is not losing steps (the readings level off).
 28b. **Root build with the new fork:** klippy's C helper changed with
     the move to upstream 29d4ec2d and the NAND root has no gcc. The stick
     payload carries the right `c_helper.so` (built on the card). Still to
     check: `install/rootfs_inside.sh` (a root built from scratch) builds
-    it too. Also: a drift test and a print on the 8203a7d7 build.
+    it too.
+28c. **`UPC_STEP_ARM`** (fork, default off): the ARM-mode step path
+    passed homing, the drift test and a print on 11-15 (FM image 14068 B
+    of 16384). Turn it on in `config/dp200_fm.config` only if the speed
+    work (#12) shows the step firmware is the limit.
+28d. **The stick payload (11-15) has the firmware of 8203a7d7**, without
+    the three stepping commits merged later that day (ee0c7f8e). They go
+    into the next payload.
 29. **Probe: false left-right slope** (found 11-14, fixed on the dev
     printer with `[axis_twist_compensation]` in its printer.cfg, plus
     five warm-up touches before every mesh; docs/dev_printer_testing.md).
