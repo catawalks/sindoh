@@ -199,11 +199,11 @@ version 4 mount.
 ## Dev printer, 2026-11-16: Y axis measured
 
 Bed bar in place of a front grip, board on its posts, cable to the front
-USB port. **Homing with the bar on the bed:** the stock sequence homes Z
-with the head at the right front (X 216, Y 5.5), close to the front
-grips. To keep the head away from the sensor: `G28 X Y`,
-`G1 X105 Y150`, then `BED_CLEAR` and `G28 Z` (Z homes where the head
-stands), `G1 Z20`. The sensor read 1 g on its Z axis before the test.
+USB port. **Homing with the bar on the bed is fine** (owner, 11-16):
+the normal sequence, X and Y first and then Z, clears the sensor. (For
+this run the head was moved to X 105, Y 150 before `G28 Z` as a
+precaution; that is not needed.) The sensor read 1 g on its Z axis
+before the test.
 
 Result, `SHAPER_CALIBRATE AXIS=Y`, one run to 135 Hz (data in
 `D:\DP200\kernel\out\adxl\calibration_data_y_20261117_011419.csv`;

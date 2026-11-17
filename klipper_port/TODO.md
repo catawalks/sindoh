@@ -118,7 +118,8 @@ Wi-Fi:
       Power save was off. `cmd 0x23f error` (STA_CONFIGURE) shows about
       62 s after each association on both routers, so probably unrelated.
       Open: is it the AP (band steering / low-ACK kick) or our driver not
-      acknowledging? Compare the work printer (stock 3.2) on the same AP.
+      acknowledging? Compare with a stock system on the dev printer
+      (the work printer is at another site, not on these networks).
     - 11-14: saved networks are now 2.4 GHz only (the module has no
       usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
       the printer is back on the AP 1 s after each drop, but the drops go
