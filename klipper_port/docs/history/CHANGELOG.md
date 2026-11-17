@@ -6,6 +6,10 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Head mount version 4 printed and proven:** X homes with the board
+  and cable on. Third X run: `3hump_ei` 82.6 Hz, max_accel <= 4500, in
+  line with the first two. Unplugging the board with Klipper running
+  shuts Klipper down; recovery is in docs/input_shaping.md.
 - **Input shaping, Y axis measured** on the dev printer with the printed
   bed bar (it fits): `2hump_ei` 39.0 Hz recommended, max_accel <= 1500;
   wide Y peak at 27-40 Hz. Z was homed with the head at the back center,
