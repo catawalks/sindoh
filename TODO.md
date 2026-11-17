@@ -58,7 +58,10 @@ Either printer, longer:
        since 11-16; no print with them yet. Left:
        - Ringing test print with the saved shapers: started 11-16
          (`dp200_ringing_tower.gcode`, 1500 to 4250 in 5 mm bands);
-         result to be read by the owner. Then decide: keep
+         Y clean to 2750, X rings at sharp corners in every band.
+         Next print: `dp200_x_shaper_compare.gcode` (six X shapers in
+         10 mm bands at 2500). Also: X belt tension / drive slack
+         (owner). Then decide: keep
          them, or a lighter one (X: ei ~42; Y: ei 40 or mzv 29.4,
          which allow 2500-2900), and put the result in the shipped
          config.
