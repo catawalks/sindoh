@@ -224,3 +224,37 @@ Above 60 Hz there is almost nothing. This is the heavy bed on its belt:
 the Y axis limits the printer. With `2hump_ei` the acceleration stays at
 today's 1500; `ei` 40 Hz or `mzv` 29.4 Hz would allow 2500-2900 with more
 ringing left (about 8 %). Decide with a ringing test print; not saved.
+
+## Dev printer, 2026-11-16: X repeated with the version 4 head mount
+
+The version 4 clip (printed in PLA) lets the printer home X with the
+board and cable on: the owner checked by hand, and `G28 X Y` then ran
+with the mount fitted. Third X run, to 135 Hz (data in
+`D:\DP200\kernel\out\adxl\calibration_data_x_20261117_014840.csv`):
+
+| Shaper | Frequency | Vibration left | max_accel |
+|---|---|---|---|
+| zv | 42.8 Hz | 30.9 % | <= 7100 |
+| mzv | 33.2 Hz | 14.6 % | <= 3200 |
+| ei | 41.8 Hz | 11.6 % | <= 3200 |
+| 2hump_ei | 87.4 Hz | 7.4 % | <= 8100 |
+| **3hump_ei** | **82.6 Hz** | **1.5 %** | **<= 4500** |
+
+Klipper recommends `3hump_ei` again (80.2, 80.8, 82.6 Hz over three
+runs and two mounts): that result is solid. The spectrum changed with
+the mount: the X peak is now sharp at 38 Hz (it was wide at 44-47 Hz
+with version 3), the 80-85 Hz peak on the other horizontal axis is still
+there, and the level rises again above 110 Hz. In version 4 the board
+sits on posts at the clip's left end, so part of this is the mount
+itself; the X resonance of the head is somewhere in 38-47 Hz.
+
+**Unplugging the board while Klipper runs shuts Klipper down** ("Lost
+communication with MCU 'adxl'"), and the board then comes back as
+`/dev/ttyACM1`, because Klipper still holds the old node. Recovery
+without touching the plug: find the USB device
+(`basename $(dirname $(readlink -f /sys/class/tty/ttyACM1/device))`,
+here `1-1`), write that name to `/sys/bus/usb/drivers/usb/unbind` and
+then `.../bind`, fix the permissions on `/dev/ttyACM0`, FIRMWARE_RESTART.
+Homing is lost. With the bed untouched, Z needs no new homing:
+`G28 X Y`, then `SET_KINEMATIC_POSITION Z=20`. Better: turn the sensor
+config off (or stop Klipper) before moving the board.
