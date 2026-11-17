@@ -54,11 +54,12 @@ Either printer, longer:
        the last with head mount version 4, which homes X fine); the X
        peak is at 38-47 Hz. Y measured 11-16 with the bed bar: `2hump_ei`
        39.0 Hz, max_accel <= 1500; wide Y peak at 27-40 Hz. Y is the
-       limiting axis. Nothing saved yet. Left:
-       - Choose the shapers with a ringing test print (X: 3hump_ei
-         82 against ei ~42; Y: 2hump_ei 39 against ei 40 or mzv
-         29.4, which allow 2500-2900), then put `[input_shaper]` in
-         printer.cfg.
+       limiting axis. Both picks are in the dev printer's printer.cfg
+       since 11-16; no print with them yet. Left:
+       - Ringing test print with the saved shapers. Then decide: keep
+         them, or a lighter one (X: ei ~42; Y: ei 40 or mzv 29.4,
+         which allow 2500-2900), and put the result in the shipped
+         config.
        - A stable name for the board's port: after a replug with
          Klipper running it becomes /dev/ttyACM1 (docs/input_shaping.md
          has the recovery).

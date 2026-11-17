@@ -6,6 +6,9 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Input shaper saved on the dev printer** (owner's OK): X `3hump_ei`
+  82.6 Hz, Y `2hump_ei` 39.0 Hz in printer.cfg. `max_accel` unchanged
+  (1500). Sensor config off again. No print with it yet.
 - **Head mount version 4 printed and proven:** X homes with the board
   and cable on. Third X run: `3hump_ei` 82.6 Hz, max_accel <= 4500, in
   line with the first two. Unplugging the board with Klipper running
