@@ -34,7 +34,7 @@ spi_software_miso_pin: adxl:gpio12
 
 [resonance_tester]
 accel_chip: adxl345
-# bed centre, bed 20 mm below the nozzle
+# bed center, bed 20 mm below the nozzle
 probe_points: 105, 100, 20
 # accel_per_hz is gentler than Klipper's default (the A4982 drivers run at
 # stock current; lost steps would spoil the measurement). max_freq 135:
