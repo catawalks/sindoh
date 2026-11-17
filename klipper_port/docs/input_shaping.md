@@ -303,3 +303,22 @@ from 0: 1500 + 250 n). The wall marked X shows ringing from the X axis,
 the wall marked Y from the bed. Look for echoes after the notches and
 for the height where corners start to round or layers shift. The highest
 clean band gives `max_accel`.
+
+**Result (owner, 11-16; print took 84 min):** both walls are far better
+than before shaping.
+- Y (`2hump_ei` 39.0): good all the way up, slight ringing above the
+  6th band, so clean to 2750.
+- X (`3hump_ei` 82.6): ringing after the sharp corners from bottom to
+  top; after the softer turns only above the 5th band (clean to 2500).
+  So this shaper leaves an X resonance uncovered, most likely the
+  38-47 Hz peak, which sits at the low edge of what 3hump_ei at 82.6 Hz
+  cancels. The owner also suspects slack in the X belt or drive.
+
+**Next: `dp200_x_shaper_compare.gcode`** (same tower and slicing, made
+11-16, uploaded, not printed yet): acceleration fixed at 2500, the X
+shaper changes every 10 mm with `SET_INPUT_SHAPER` (Y stays 2hump_ei
+39.0). Bands from the bottom: 1 `3hump_ei` 82.6 (reference), 2 `ei`
+41.8, 3 `2hump_ei` 48, 4 `mzv` 38, 5 `3hump_ei` 60, 6 `2hump_ei` 87.4.
+The band with the cleanest X wall and still crisp notches wins. The
+ringing frequency can also be read off the part: ripple spacing in mm
+at 80 mm/s gives 80 / spacing in Hz.
