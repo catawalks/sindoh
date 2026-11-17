@@ -6,6 +6,12 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-17
+- **Stock holds the preferred network** (dev printer, Sindoh update
+  200730_2 applied by the owner, /app only; U-Boot and env checked
+  unchanged): 67 min on the AP that drops our kernel every 91-95 s, no
+  state change, 0 of 3600 pings lost. The Wi-Fi drops are on our side
+  (TODO 26). The factory version before the update could not join
+  (handshake timeout, reason 15).
 - **Dev printer reverted to stock for the Wi-Fi comparison** (owner's
   OK for the four writes): root saved to the PC as tar and raw image,
   card root booted, `dp200-revert.sh` root then kernel, stock boots.

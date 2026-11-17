@@ -1,4 +1,4 @@
-# Status (overwrite in place; last updated 2026-11-15)
+# Status (overwrite in place; last updated 2026-11-17)
 
 The project: Klipper on the Sindoh DP200, on the printer's own SoC. Two
 setups exist, and they are different on purpose.
@@ -30,10 +30,23 @@ NAND writes as one job (mtd0 and mtd6 to stock, later both back).
   11-17 from the card root with `dp200-revert.sh --part root` and
   `--part kernel` (the script and checks of 11-07; 0 ECC failures). Stock
   booted by itself: UIManager up, karas.db rebuilt from mtd4, Ethernet
-  10.10.0.147 with the right MAC. It is the factory version (no Sindoh
-  USB update applied).
-- **Wi-Fi on stock:** not joined; stock has no saved network. The owner
-  joins on Sindoh's screen. **11-17 morning: stock cannot join the
+  10.10.0.147 with the right MAC. 11-17 evening the owner applied Sindoh's
+  USB update 200730_2: it replaced files under /app only (kernel still
+  3.2.0-g67a8e16 #6; U-Boot block `dac6729a` and env `fdadaa34` = the
+  saved mtd1.bin, both checked after the update; the card and its
+  `/.dp200-root` untouched). The way back below is unchanged.
+- **Result, 11-17 evening: stock holds the preferred network with no
+  drops.** After the 200730_2 update the owner joined it on the screen.
+  Same AP (..:f9:44, 2.4 GHz channel 1, -20 dBm) that drops our kernel
+  every 91-95 s: stock stayed associated for 67 min without a single
+  state change (/var/log/wifimon.log), and 0 of 3600 pings from the PC
+  were lost over the last hour. So the AP is not kicking every client:
+  the drops are on our side (driver / supplicant). Differences to chase:
+  stock uses Marvell's own driver with wpa_supplicant `-Dwext` and
+  **power management on**; ours is mainline mwifiex (nl80211) with power
+  save off. TODO 26.
+- **Wi-Fi on stock before the update:** **11-17 morning: stock (factory
+  version) could not join the
   preferred network.** Every try is dropped about 3 s after association with
   "Deauthenticated (reason 0xf)" (4-way handshake timeout, the password
   step); the screen shows "saving network settings" and then no saved
