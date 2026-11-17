@@ -5,6 +5,13 @@ one. The detail for everything up to 2026-11-12 is in
 [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md) and the other
 files in this folder; `git log` has the rest.
 
+## 2026-11-17
+- **Dev printer reverted to stock for the Wi-Fi comparison** (owner's
+  OK for the four writes): root saved to the PC as tar and raw image,
+  card root booted, `dp200-revert.sh` root then kernel, stock boots.
+  Wi-Fi watcher started; stock has no saved network, the owner joins.
+  State and the way back: docs/STATUS.md, first section.
+
 ## 2026-11-16
 - **Ringing test read by the owner:** Y clean to 2750; X rings after
   sharp corners in every band, after soft turns above 2500. An X shaper
