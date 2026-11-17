@@ -6,6 +6,10 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Input shaping, Y axis measured** on the dev printer with the printed
+  bed bar (it fits): `2hump_ei` 39.0 Hz recommended, max_accel <= 1500;
+  wide Y peak at 27-40 Hz. Z was homed with the head at the back center,
+  away from the sensor. Not saved. docs/input_shaping.md.
 - **Screen: custom MACROS page** opens and lists the macros (owner).
 - **The screen's OBJECTS page works on a real print:** owner printed both
   ADXL mounts together and canceled the head mount from the touch screen;

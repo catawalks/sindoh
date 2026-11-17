@@ -51,16 +51,15 @@ Either printer, longer:
     b. **Input shaping:** X measured on the dev printer 11-16
        (docs/input_shaping.md "Dev printer, 2026-11-16"): Klipper
        recommends `3hump_ei` 80.8 Hz, max_accel <= 4300; the X peak is
-       at 44-47 Hz. Nothing saved yet. Left:
-       - Choose the X shaper with a ringing test print (3hump_ei 80.8
-         against mzv ~50), then put `[input_shaper]` in printer.cfg.
-       - Y: the bed mount is ready to print
-         (`install/input_shaping/mounts/adxl_bed_bar.stl`: a bar that
-         replaces one front grip of the build plate, same two screws).
-         Owner prints it, reports the fit, then SHAPER_CALIBRATE AXIS=Y.
-       - Mount version 4 (clears the Bowden tube at X home, posts at
-         the left end) is ready to print; version 3 blocks X homing.
-         Repeat the X run once with it.
+       at 44-47 Hz. Y measured 11-16 with the bed bar: `2hump_ei`
+       39.0 Hz, max_accel <= 1500; wide Y peak at 27-40 Hz. Y is the
+       limiting axis. Nothing saved yet. Left:
+       - Choose the shapers with a ringing test print (X: 3hump_ei
+         80.8 against mzv ~50; Y: 2hump_ei 39 against ei 40 or mzv
+         29.4, which allow 2500-2900), then put `[input_shaper]` in
+         printer.cfg.
+       - Head mount version 4 (clears the Bowden tube at X home, posts
+         at the left end) is printed; repeat the X run once with it.
        - rc.dp200 should set group dialout / mode 660 on /dev/ttyACM0
          (today by hand after every Klipper restart).
        - `setup_numpy.sh` does not work on the NAND root (no apt); the

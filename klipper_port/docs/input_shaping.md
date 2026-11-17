@@ -1,7 +1,7 @@
 # Input shaping with a USB accelerometer
 
-Status 2026-11-16: **X axis measured on the dev printer** (results at the
-end). Y is not measured (no bed mount yet). Nothing is saved to a
+Status 2026-11-16: **X and Y measured on the dev printer** (results at the
+end). Nothing is saved to a
 printer.cfg yet. The first sections describe the stick install on the stock
 kernel and are older; "Dev printer, 2026-11-16" below is what was really
 done.
@@ -100,8 +100,8 @@ In `install/input_shaping/mounts/`:
     deep, side face 32 deep.
   Test the fit, correct the numbers at the top of the script, run it
   again.
-- **`adxl_bed_bar.py` -> `adxl_bed_bar.stl`** (2026-11-16, not printed
-  yet): for the Y axis. The build plate has two aluminum tabs at its
+- **`adxl_bed_bar.py` -> `adxl_bed_bar.stl`** (2026-11-16, printed and
+  used for the Y measurement the same day; it fits): for the Y axis. The build plate has two aluminum tabs at its
   front edge per grip, each with a threaded M3 hole; the plastic grip is
   screwed under them from below. The bar replaces one grip, using its two
   screws (M3 x 6): 88 x 12 mm, 4 mm thick, a rib that fills the gap
@@ -194,3 +194,33 @@ why the simple shapers fit badly and move between runs. Candidates:
 ringing test print; not saved yet. The measurement used the version 3
 mount in PLA with the board in the middle; repeat it once with the
 version 4 mount.
+
+## Dev printer, 2026-11-16: Y axis measured
+
+Bed bar in place of a front grip, board on its posts, cable to the front
+USB port. **Homing with the bar on the bed:** the stock sequence homes Z
+with the head at the right front (X 216, Y 5.5), close to the front
+grips. To keep the head away from the sensor: `G28 X Y`,
+`G1 X105 Y150`, then `BED_CLEAR` and `G28 Z` (Z homes where the head
+stands), `G1 Z20`. The sensor read 1 g on its Z axis before the test.
+
+Result, `SHAPER_CALIBRATE AXIS=Y`, one run to 135 Hz (data in
+`D:\DP200\kernel\out\adxl\calibration_data_y_20261117_011419.csv`;
+the printer's clock is UTC):
+
+| Shaper | Frequency | Vibration left | max_accel |
+|---|---|---|---|
+| zv | 45.4 Hz | 30.4 % | <= 8000 |
+| mzv | 29.4 Hz | 7.5 % | <= 2500 |
+| ei | 40.0 Hz | 7.8 % | <= 2900 |
+| **2hump_ei** | **39.0 Hz** | **2.3 %** | **<= 1500** |
+| 3hump_ei | 48.0 Hz | 2.0 % | <= 1400 |
+
+Klipper recommends `2hump_ei` at 39.0 Hz. Reading of the spectrum: one
+wide peak along Y from about 27 to 40 Hz (top at 34.8 Hz), far stronger
+than anything on X, and a second peak at 48-52 Hz on the sensor's
+vertical axis (the plate's front edge or the bar moving up and down).
+Above 60 Hz there is almost nothing. This is the heavy bed on its belt:
+the Y axis limits the printer. With `2hump_ei` the acceleration stays at
+today's 1500; `ei` 40 Hz or `mzv` 29.4 Hz would allow 2500-2900 with more
+ringing left (about 8 %). Decide with a ringing test print; not saved.
