@@ -33,8 +33,8 @@ NAND writes as one job (mtd0 and mtd6 to stock, later both back).
   10.10.0.147 with the right MAC. It is the factory version (no Sindoh
   USB update applied).
 - **Wi-Fi on stock:** not joined; stock has no saved network. The owner
-  joins on Sindoh's screen. **11-17 morning: stock cannot join
-  Niholedotcom.** Every try is dropped about 3 s after association with
+  joins on Sindoh's screen. **11-17 morning: stock cannot join the
+  preferred network.** Every try is dropped about 3 s after association with
   "Deauthenticated (reason 0xf)" (4-way handshake timeout, the password
   step); the screen shows "saving network settings" and then no saved
   network. The AP is plain WPA2-PSK/CCMP at -20 dBm, and our kernel joins
