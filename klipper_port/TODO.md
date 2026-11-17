@@ -56,7 +56,9 @@ Either printer, longer:
        39.0 Hz, max_accel <= 1500; wide Y peak at 27-40 Hz. Y is the
        limiting axis. Both picks are in the dev printer's printer.cfg
        since 11-16; no print with them yet. Left:
-       - Ringing test print with the saved shapers. Then decide: keep
+       - Ringing test print with the saved shapers: started 11-16
+         (`dp200_ringing_tower.gcode`, 1500 to 4250 in 5 mm bands);
+         result to be read by the owner. Then decide: keep
          them, or a lighter one (X: ei ~42; Y: ei 40 or mzv 29.4,
          which allow 2500-2900), and put the result in the shipped
          config.

@@ -276,3 +276,30 @@ still 1500, which is also what the Y shaper allows. The sensor config is
 off again (`dp200_adxl.cfg` removed, `.off` kept), so the board can be
 unplugged. Next: a ringing test print to judge the result, then decide
 on a lighter Y shaper (`ei` 40 Hz allows 2900) and on `max_accel`.
+
+## Ringing test print (started 2026-11-16 on the dev printer)
+
+File `dp200_ringing_tower.gcode` (on the dev printer and in
+`D:\DP200\kernel\out\ringing\`). How it was made:
+
+- Model: Klipper's `docs/prints/ringing_tower.stl` (an L shape, two
+  120 mm walls, 60 mm tall).
+- Sliced with `prusa-slicer-console.exe`, settings taken from the
+  owner's last g-code (the config block at its end, saved as
+  `owner.ini`), with: no infill, no top layers, 2 perimeters, all
+  perimeter speeds 80 mm/s, slicer acceleration control off, slow-down
+  only below 3 s per layer, centered at 105, 100. PLA, 1 h 27 min, 11 m.
+- Added after the start g-code:
+  `SET_VELOCITY_LIMIT MINIMUM_CRUISE_RATIO=0`,
+  `SET_PRESSURE_ADVANCE ADVANCE=0`,
+  `TUNING_TOWER COMMAND=SET_VELOCITY_LIMIT PARAMETER=ACCEL START=1500 STEP_DELTA=250 STEP_HEIGHT=5`;
+  before `PRINT_END`: back to `ACCEL=1500 MINIMUM_CRUISE_RATIO=0.5` and
+  pressure advance 0.3. (If the print is canceled, these stay changed
+  until Klipper restarts.)
+
+Reading it: acceleration is 1500 for the lowest 5 mm and rises by 250
+every 5 mm, to 4250 in the top band (band n from the bottom, counting
+from 0: 1500 + 250 n). The wall marked X shows ringing from the X axis,
+the wall marked Y from the bed. Look for echoes after the notches and
+for the height where corners start to round or layers shift. The highest
+clean band gives `max_accel`.

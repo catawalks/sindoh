@@ -6,6 +6,9 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-16
+- **Ringing test print started** on the dev printer with the shapers
+  on: Klipper's ringing tower, acceleration 1500 to 4250 in 5 mm bands.
+  Recipe in docs/input_shaping.md. Result open.
 - **Input shaper saved on the dev printer** (owner's OK): X `3hump_ei`
   82.6 Hz, Y `2hump_ei` 39.0 Hz in printer.cfg. `max_accel` unchanged
   (1500). Sensor config off again. No print with it yet.
