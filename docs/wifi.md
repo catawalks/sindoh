@@ -86,3 +86,25 @@ address. `dp200_wifi.py` therefore gives every saved network
 `freq_list` and `scan_freq` for channels 1-14 (in the saved file and in the
 running daemon) and leaves 5 GHz networks out of the scan list. An SSID that
 exists only on 5 GHz cannot be joined.
+
+## How stock handles the bands (read on the dev printer, 2026-11-17)
+
+Read on the stock system (Sindoh update 200730_2) while it held the
+preferred network, read-only (`iwpriv` getters, `/proc/mwlan`, a scan):
+
+- Driver: Marvell's own `mlan` + `usb8xxx` (USB8782-14.69.12.p50,
+  "FP69"), firmware `mrvl/usb8782_uapsta.bin`, wpa_supplicant `-Dwext`.
+- `bandcfg` 31 = b/g/a/n all allowed: stock does not block 5 GHz either.
+  A scan found 15 cells, 5 of them 5 GHz (channel 40, all -77 dBm, the
+  same weak antenna). Before the update its supplicant once associated
+  on the access point's 5 GHz radio (-77 dBm) and lost it again.
+- `regioncode` 48 (0x30, ETSI/Europe); 802.11d off; `iwlist freq`
+  lists channels 1-11.
+- Power save: IEEE power management on, `deepsleep` on (100 ms),
+  `pscfg` 0 1 0 0 10 1000 1. Ours runs with power save off.
+- The screen's list showed 6 entries: named networks with a strong
+  signal, one row per access point (an SSID on two access points shows
+  twice). Hidden networks and everything at -73 dBm or weaker (all the
+  5 GHz cells and the distant neighbors) were left out. All 5 GHz
+  cells here are weak, so this does not tell whether the app filters by
+  band or by signal.
