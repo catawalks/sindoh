@@ -33,11 +33,22 @@ NAND writes as one job (mtd0 and mtd6 to stock, later both back).
   10.10.0.147 with the right MAC. It is the factory version (no Sindoh
   USB update applied).
 - **Wi-Fi on stock:** not joined; stock has no saved network. The owner
-  joins on Sindoh's screen. A watcher runs in RAM
-  (`tools/stock_wifimon.sh` as /tmp/wifimon.sh, log /tmp/wifimon.log:
-  one line per access point change, heartbeat every 10 min). It is gone
-  after a reboot: fetch it again from the PC's HTTP server
-  (`deploy/usb/t/wifimon.sh`) and start it with `sh /tmp/wifimon.sh &`.
+  joins on Sindoh's screen. **11-17 morning: stock cannot join
+  Niholedotcom.** Every try is dropped about 3 s after association with
+  "Deauthenticated (reason 0xf)" (4-way handshake timeout, the password
+  step); the screen shows "saving network settings" and then no saved
+  network. The AP is plain WPA2-PSK/CCMP at -20 dBm, and our kernel joins
+  it with the same password, so the stock screen's password entry is
+  the suspect (owner to check for symbols, spaces, capitals). Stock also
+  joined the other SSID by itself once (from settings it keeps itself),
+  and the Wi-Fi was dead after the night until a power cycle (owner).
+  Watcher: `tools/stock_wifimon.sh`, run as /tmp/wifimon.sh, logs
+  wpa_state / AP changes each second to /var/log/wifimon.log (on the
+  root, survives power cycles; the script itself does not, so start it
+  again after each boot from the PC's HTTP server,
+  `deploy/usb/t/wifimon.sh`). The stock kernel log also persists, in
+  /var/log/messages. Stock mounts the 4 GB card at /mnt/sd (journal
+  replay after each power cycle).
 - **Saved on the PC** (`D:\DP200\backup\nand_images\stock_test_20261116\`,
   never published: Wi-Fi passwords inside):
   - `dev_root_20261116.tar`, 346920960 B, md5 1d60d93b: the whole NAND
