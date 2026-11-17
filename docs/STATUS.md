@@ -49,7 +49,8 @@ becomes the full kernel-swap test machine.
 - **Works:** boot from NAND, two CPUs (10 h soak on C3), NAND root, Wi-Fi
   (6 h soak), motion, heating, a full print with pause / unload / load /
   empty bin / resume.
-- **11-16 additions on the dev printer:** numpy 2.2.4 for Klipper (copied
+- **11-16 additions on the dev printer:** `[input_shaper]` in printer.cfg
+  (X 3hump_ei 82.6, Y 2hump_ei 39.0; backup `.bak-1116-shaper`); numpy 2.2.4 for Klipper (copied
   from the card, with libblas/liblapack/libgfortran); `dp200_adxl.cfg.off`
   with `rate: 800`, `max_freq: 135`; `dp200_macros.cfg` with the mesh
   front row at Y 5 (backup `.bak-1116`). Sensor config is off.

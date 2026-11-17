@@ -1,8 +1,9 @@
 # Input shaping with a USB accelerometer
 
 Status 2026-11-16: **X and Y measured on the dev printer** (results at the
-end). Nothing is saved to a
-printer.cfg yet. The first sections describe the stick install on the stock
+end). Klipper's picks are in the dev printer's printer.cfg since
+11-16 (last section below); no print with them yet. The work printer has no shaper yet.
+The first sections describe the stick install on the stock
 kernel and are older; "Dev printer, 2026-11-16" below is what was really
 done.
 
@@ -258,3 +259,20 @@ then `.../bind`, fix the permissions on `/dev/ttyACM0`, FIRMWARE_RESTART.
 Homing is lost. With the bed untouched, Z needs no new homing:
 `G28 X Y`, then `SET_KINEMATIC_POSITION Z=20`. Better: turn the sensor
 config off (or stop Klipper) before moving the board.
+
+## Dev printer, 2026-11-16: shapers saved
+
+Owner's OK. Added to the dev printer's printer.cfg above the SAVE_CONFIG
+block (backup `printer.cfg.bak-1116-shaper`):
+
+    [input_shaper]
+    shaper_type_x: 3hump_ei
+    shaper_freq_x: 82.6
+    shaper_type_y: 2hump_ei
+    shaper_freq_y: 39.0
+
+Klipper loaded it (checked in the config it reports). `max_accel` is
+still 1500, which is also what the Y shaper allows. The sensor config is
+off again (`dp200_adxl.cfg` removed, `.off` kept), so the board can be
+unplugged. Next: a ringing test print to judge the result, then decide
+on a lighter Y shaper (`ei` 40 Hz allows 2900) and on `max_accel`.
