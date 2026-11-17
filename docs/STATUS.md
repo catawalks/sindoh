@@ -19,6 +19,50 @@ reaches the work printer at the end-goal install
 ([end_goal_install_plan.md](end_goal_install_plan.md)), when that printer
 becomes the full kernel-swap test machine.
 
+## Dev printer is on STOCK since 2026-11-17 (temporary, for the Wi-Fi test)
+
+**Read this first: the "Dev printer" section below describes the system
+that is saved on the PC, not what runs now.** Owner-approved 11-16: four
+NAND writes as one job (mtd0 and mtd6 to stock, later both back).
+
+- **Now in NAND:** stock kernel 3.2.0-g67a8e16 in mtd0 (blocks 2-63; U-Boot
+  block still `dac6729a`), factory stock root + apps in mtd6, both written
+  11-17 from the card root with `dp200-revert.sh --part root` and
+  `--part kernel` (the script and checks of 11-07; 0 ECC failures). Stock
+  booted by itself: UIManager up, karas.db rebuilt from mtd4, Ethernet
+  10.10.0.147 with the right MAC. It is the factory version (no Sindoh
+  USB update applied).
+- **Wi-Fi on stock:** not joined; stock has no saved network. The owner
+  joins on Sindoh's screen. A watcher runs in RAM
+  (`tools/stock_wifimon.sh` as /tmp/wifimon.sh, log /tmp/wifimon.log:
+  one line per access point change, heartbeat every 10 min). It is gone
+  after a reboot: fetch it again from the PC's HTTP server
+  (`deploy/usb/t/wifimon.sh`) and start it with `sh /tmp/wifimon.sh &`.
+- **Saved on the PC** (`D:\DP200\backup\nand_images\stock_test_20261116\`,
+  never published: Wi-Fi passwords inside):
+  - `dev_root_20261116.tar`, 346920960 B, md5 1d60d93b: the whole NAND
+    root as files, taken with the Klipper stack stopped (15331 entries).
+  - `mtd6_raw_oob_dev_20261116_b.bin`, 317644800 B, md5 1fc61187 (= the
+    printer's own md5): raw + OOB. The first copy (`..._20261116.bin`,
+    b6229c1e) differs in one bit of page 19956, an unstable raw bit.
+  - The kernel is `D:\DP200\kernel\out\m1-nandboot-bank3.uimg`
+    (7eae8600), and the 4 GB card's gap holds the same image (checked).
+- **The 4 GB card carries `/.dp200-root`** now, so our kernel boots the
+  card's root. The card's root differs from the saved NAND root only in
+  the two mwifiex modules (older).
+- **Way back (owner present, needs the OK that is already given):**
+  1. `tools/sd_raw_boot.sh D:/DP200/kernel/out/m1-nandboot-bank3.uimg`
+     (RAM boot from the card's gap; root = the card).
+  2. `tools/mtd0_kernel_update.sh` with the bank3 image.
+  3. mtd6: window 1741,4091, `ubiformat /dev/mtd6 -y -O 2048`,
+     `ubiattach`, `ubimkvol -N filesystem -m`, mount, untar
+     `dev_root_20261116.tar` from the PC (nc), sync, unmount, window
+     none: as end-goal stage 5 (docs/end_goal_install_plan.md).
+  4. Remove `/.dp200-root` from the card, `busybox reboot`, check
+     Klipper, the input shaper section and the mesh settings.
+  Then print `dp200_x_shaper_compare.gcode` (it is inside the tar under
+  printer_data/gcodes and in `D:\DP200\kernel\out\ringing\`).
+
 ## Dev printer, as of 2026-11-15
 
 - **mtd0:** `m1-nandboot-bank3.uimg`, md5 `7eae8600a4872619711b3e891df129ca`

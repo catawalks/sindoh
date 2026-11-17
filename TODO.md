@@ -123,6 +123,11 @@ Wi-Fi:
       Open: is it the AP (band steering / low-ACK kick) or our driver not
       acknowledging? Compare with a stock system on the dev printer
       (the work printer is at another site, not on these networks).
+      **Running: the dev printer is on stock since 11-17**
+      (docs/STATUS.md, first section). Owner joins the Wi-Fi on the
+      stock screen; then read /tmp/wifimon.log and dmesg. Seen on the
+      way: our kernel on the card root dropped the same way every
+      95 s (reason code 7 in that log).
     - 11-14: saved networks are now 2.4 GHz only (the module has no
       usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
       the printer is back on the AP 1 s after each drop, but the drops go
