@@ -19,73 +19,18 @@ reaches the work printer at the end-goal install
 ([end_goal_install_plan.md](end_goal_install_plan.md)), when that printer
 becomes the full kernel-swap test machine.
 
-## Dev printer is on STOCK since 2026-11-17 (temporary, for the Wi-Fi test)
+## Dev printer back on our system since 2026-11-17 night
 
-**Read this first: the "Dev printer" section below describes the system
-that is saved on the PC, not what runs now.** Owner-approved 11-16: four
-NAND writes as one job (mtd0 and mtd6 to stock, later both back).
-
-- **Now in NAND:** stock kernel 3.2.0-g67a8e16 in mtd0 (blocks 2-63; U-Boot
-  block still `dac6729a`), factory stock root + apps in mtd6, both written
-  11-17 from the card root with `dp200-revert.sh --part root` and
-  `--part kernel` (the script and checks of 11-07; 0 ECC failures). Stock
-  booted by itself: UIManager up, karas.db rebuilt from mtd4, Ethernet
-  10.10.0.147 with the right MAC. 11-17 evening the owner applied Sindoh's
-  USB update 200730_2: it replaced files under /app only (kernel still
-  3.2.0-g67a8e16 #6; U-Boot block `dac6729a` and env `fdadaa34` = the
-  saved mtd1.bin, both checked after the update; the card and its
-  `/.dp200-root` untouched). The way back below is unchanged.
-- **Result, 11-17 evening: stock holds the preferred network with no
-  drops.** After the 200730_2 update the owner joined it on the screen.
-  Same AP (..:f9:44, 2.4 GHz channel 1, -20 dBm) that drops our kernel
-  every 91-95 s: stock stayed associated for 67 min without a single
-  state change (/var/log/wifimon.log), and 0 of 3600 pings from the PC
-  were lost over the last hour. So the AP is not kicking every client:
-  the drops are on our side (driver / supplicant). Differences to chase:
-  stock uses Marvell's own driver with wpa_supplicant `-Dwext` and
-  **power management on**; ours is mainline mwifiex (nl80211) with power
-  save off. TODO 26.
-- **Wi-Fi on stock before the update:** **11-17 morning: stock (factory
-  version) could not join the
-  preferred network.** Every try is dropped about 3 s after association with
-  "Deauthenticated (reason 0xf)" (4-way handshake timeout, the password
-  step); the screen shows "saving network settings" and then no saved
-  network. The AP is plain WPA2-PSK/CCMP at -20 dBm, and our kernel joins
-  it with the same password, so the stock screen's password entry is
-  the suspect (owner to check for symbols, spaces, capitals). Stock also
-  joined the other SSID by itself once (from settings it keeps itself),
-  and the Wi-Fi was dead after the night until a power cycle (owner).
-  Watcher: `tools/stock_wifimon.sh`, run as /tmp/wifimon.sh, logs
-  wpa_state / AP changes each second to /var/log/wifimon.log (on the
-  root, survives power cycles; the script itself does not, so start it
-  again after each boot from the PC's HTTP server,
-  `deploy/usb/t/wifimon.sh`). The stock kernel log also persists, in
-  /var/log/messages. Stock mounts the 4 GB card at /mnt/sd (journal
-  replay after each power cycle).
-- **Saved on the PC** (`D:\DP200\backup\nand_images\stock_test_20261116\`,
-  never published: Wi-Fi passwords inside):
-  - `dev_root_20261116.tar`, 346920960 B, md5 1d60d93b: the whole NAND
-    root as files, taken with the Klipper stack stopped (15331 entries).
-  - `mtd6_raw_oob_dev_20261116_b.bin`, 317644800 B, md5 1fc61187 (= the
-    printer's own md5): raw + OOB. The first copy (`..._20261116.bin`,
-    b6229c1e) differs in one bit of page 19956, an unstable raw bit.
-  - The kernel is `D:\DP200\kernel\out\m1-nandboot-bank3.uimg`
-    (7eae8600), and the 4 GB card's gap holds the same image (checked).
-- **The 4 GB card carries `/.dp200-root`** now, so our kernel boots the
-  card's root. The card's root differs from the saved NAND root only in
-  the two mwifiex modules (older).
-- **Way back (owner present, needs the OK that is already given):**
-  1. `tools/sd_raw_boot.sh D:/DP200/kernel/out/m1-nandboot-bank3.uimg`
-     (RAM boot from the card's gap; root = the card).
-  2. `tools/mtd0_kernel_update.sh` with the bank3 image.
-  3. mtd6: window 1741,4091, `ubiformat /dev/mtd6 -y -O 2048`,
-     `ubiattach`, `ubimkvol -N filesystem -m`, mount, untar
-     `dev_root_20261116.tar` from the PC (nc), sync, unmount, window
-     none: as end-goal stage 5 (docs/end_goal_install_plan.md).
-  4. Remove `/.dp200-root` from the card, `busybox reboot`, check
-     Klipper, the input shaper section and the mesh settings.
-  Then print `dp200_x_shaper_compare.gcode` (it is inside the tar under
-  printer_data/gcodes and in `D:\DP200\kernel\out\ringing\`).
+The stock Wi-Fi test is over (result: stock held the AP for 2 h with no
+drop). Way back done 11-17 (owner-approved four-write job): RAM boot
+from the card's gap, `mtd0_kernel_update.sh` (7eae8600, KUPDATE OK),
+the saved root tar into mtd6 (md5 1d60d93b, 15331 files, 0 ECC
+failures), card marker renamed to `/.dp200-root.off`, boot from NAND:
+root ubi0:filesystem, Klipper ready with the saved shapers and mesh.
+The section below is current again (Sindoh's 200730_2 update touched
+only the stock root, which is replaced again), except that **Wi-Fi
+power save is on** (flag file /etc/dp200/wifi_power_save, TODO 26). Backups of the stock test:
+`D:\DP200\backup\nand_images\stock_test_20261116\` (never published).
 
 ## Dev printer, as of 2026-11-15
 
