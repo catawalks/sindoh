@@ -20,8 +20,10 @@ files in this folder; `git log` has the rest.
 - **Beeper heard** (owner at the dev printer): silent until GPIO bank 5
   pin 15 got its stock pad function (0x000C1001), which our kernel never
   sets; beep_test.sh now sets it and follows the stock pwm_on order. The
-  stock 250-tick period only ticks; 500 ticks is shrill; 2857 sounded
-  best. Pitch calibration is open; volume 36 % (owner).
+  stock 250-tick period only ticks. Measured with the owner's spectrum
+  analyzer: the timebase ticks at 5 MHz, not the 1 MHz stock assumes;
+  1250 ticks = 4 kHz at 36 % sounds like stock (owner). Fork
+  `upc-beeper` 9b174ab uses that period; beep_test.sh takes real Hz.
 - **TODO 20 checked** by the build-box sessions: the bank 3 fix is
   7dd0f21 on `upc-bank3-pads` in the motor clone, not pushed, not in main.
 - **Benchy corner damage is not the seam** (TODO 18): the seam was on the
