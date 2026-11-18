@@ -32,8 +32,13 @@ Dev printer:
    or power the switch off).
 
 Either printer:
-13. **Beeper:** `[output_pin beeper] pin: io:pwm10`, pick the PWM value,
-    then M300; the dryer's end signal uses it.
+13. **Beeper:** dec_pwm block 10 (`io:pwm10`) from the 10-20 reverse
+    engineering; never configured or heard. How stock drives it (period,
+    duty, volume levels) is not mapped yet: the stock app
+    (171114_4_open/marvell_lspsdk_3dp_gemstone-debug_stripped.elf) has
+    `BeepOn`, `beepDutyTable`, `setBeepLevelfromDB`, `OpBeepThread`,
+    `BeepRequestService`. Map those, then `[output_pin beeper]` and
+    M300 (the dryer's end signal uses it).
 16. **Homing clearance:** a few mm of Z clearance before X homing, so the
     nozzle doesn't drag across a failed print. Mind that Z homes upward.
 
@@ -108,9 +113,16 @@ shipped config or the slicer profiles.
     (`seam_position = aligned`) the hull's outer wall starts and ends at
     the stern corner (X 77, Y 92-95) on every layer from about 3 to 10 mm;
     the rough patch at about 5 mm is there, where the stern text and its
-    short moves and retractions begin. Try: pressure advance and
-    retraction first (12c, #14), then `seam_position = rear` or a scarf
-    seam, and compare the corner.
+    short moves and retractions begin. 11-18: rechecked in the G-code:
+    the seam is on the low-Y stern corner (front of the bed when
+    printed) only from 3 to 6.05 mm; it moves off the corner above. The
+    other stern corner has no seam or retraction at that height. The
+    owner sees the damage at the back left corner and no seam line;
+    which corner it is still has to be matched to the bed. Owner: fix
+    the cause, not hide it, so retraction (4 mm at 35 mm/s, no wipe;
+    slicer profile) and pressure advance (printer.cfg) come first
+    (12c, #14), then reprint and compare; moving the seam only if
+    needed.
 28a. **Mesh reference drift:** PRINT_START's mesh was discarded once in
     five prints on 11-15 ("reference probe moved -0.112 mm", limit 0.1).
     Cause: the pin keeps settling for about 25 touches after a deploy
@@ -205,7 +217,9 @@ Wi-Fi:
       cold boot does set power save on (iw: on after the 11-17 22:57
       boot). Open: what changed at 00:59 (2 h after association: a key
       rekey, the DHCP lease, the AP's own timers?), and the UniFi
-      client log for the printer at 00:59.
+      client log for the printer at 00:59. Owner 11-18: probably the
+      network (other IoT devices there drop about every 5 min);
+      troubleshoot the network separately first.
     - 11-14: saved networks are now 2.4 GHz only (the module has no
       usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
       the printer is back on the AP 1 s after each drop, but the drops go
