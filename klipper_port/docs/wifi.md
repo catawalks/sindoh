@@ -119,3 +119,9 @@ kernel (dp200-start.sh) turns it on too (owner: stock runs it that
 way). It had been off since 2026-11-02, after reason 15 drops on the
 dev printer, then running the stock kernel with the stick install. `/etc/dp200/wifi_power_save` holding `on` or
 `off` overrides both.
+
+**2026-11-18: it is not the fix.** The drops stopped for 2 h after the
+11-17 22:57 boot, then came back at 00:59 UTC (reason 7, every 95-125 s,
+all night) with power save still on, and a steady ping does not stop
+them. Power save stays on (stock runs that way); the cause is open
+(TODO 26).

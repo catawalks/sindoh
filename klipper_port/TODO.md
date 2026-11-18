@@ -11,8 +11,6 @@ The list as it stood before 2026-11-12, with all results:
 ## Owner at a printer
 
 Dev printer:
-1. **Wi-Fi part D:** 3 power cycles, check Wi-Fi comes up from a cold boot
-   (module 0028).
 2. **Load jam, filament held back mid-load** (optional; the empty-inlet
    case passed 11-12).
 3. **Screen app's load error pages on hardware:** the running page after
@@ -24,15 +22,14 @@ Dev printer:
    SAVED (PREFER / FORGET). The custom MACROS page opens and lists the
    macros (owner, 11-16); adding an own macro and running one from it
    is not tried.
+5. **Touch screen INPUT SHAPING page:** never tried on hardware (needs
+   the accelerometer plugged in).
 6. **Dryer leftovers:** STOP DRYING, PRINT_START during drying, FORCE=1
    above the 70 C sheet limit.
 7. **A real Mainsail update** from SYSTEM -> UPDATE (only CHECK NOW tried).
 8. **Ethernet recovery after a switch outage:** `dp200-netd.sh` restarts
    udhcpc after 30 s without an address; never exercised (pull the cable
    or power the switch off).
-
-Work printer:
-11. **Wi-Fi stability on the upgraded work printer.**
 
 Either printer:
 13. **Beeper:** `[output_pin beeper] pin: io:pwm10`, pick the PWM value,
@@ -91,16 +88,6 @@ shipped config or the slicer profiles.
          them, or a lighter one (X: ei ~42; Y: ei 40 or mzv 29.4,
          which allow 2500-2900), and put the result in the shipped
          config.
-       - A stable name for the board's port: after a replug with
-         Klipper running it becomes /dev/ttyACM1 (docs/input_shaping.md
-         has the recovery).
-       - rc.dp200 should set group dialout / mode 660 on /dev/ttyACM0
-         (today by hand after every Klipper restart).
-       - `setup_numpy.sh` does not work on the NAND root (no apt); the
-         dev printer got numpy by hand from the card. Decide how the
-         payload / root build ships it. The stock-kernel path (work
-         printer) is untested with a sensor.
-       - The touch screen's INPUT SHAPING page is untested.
        `max_accel` 2500 on the dev printer since 11-17 (owner; its printer.cfg,
        the shipped dp200_printer.cfg stays 1500 for printers without shapers).
        Next: prints at the higher speeds (12c, 12d).
@@ -149,8 +136,21 @@ shipped config or the slicer profiles.
 
 ## Agent (no owner needed)
 
+Input shaper sensor (the system behind the accelerometer):
+19. **Make the sensor setup part of the install:**
+    - A stable name for the board's port: after a replug with Klipper
+      running it becomes /dev/ttyACM1 (docs/input_shaping.md has the
+      recovery).
+    - rc.dp200 should set group dialout / mode 660 on /dev/ttyACM0
+      (today by hand after every Klipper restart).
+    - `setup_numpy.sh` does not work on the NAND root (no apt); the dev
+      printer got numpy by hand from the card. Decide how the payload /
+      root build ships it. The stock-kernel path (work printer) is
+      untested with a sensor.
+
 Kernel (dev printer only):
-20. **Bank 3 pad fix: bookkeeping only.** The fix runs in mtd0 (image
+20. **Bank 3 pad fix: bookkeeping only** (11-18: could not be checked
+    from the PC, the build box needs its own login). The fix runs in mtd0 (image
     7eae8600, soaked: see the changelog, 11-16). Left: on the build box,
     merge motor repo branch `upc-bank3-pads` (7dd0f21: mv61x0-upc.c + the
     DTS) into the kernel tree and patch set, so the next kernel build
@@ -195,8 +195,17 @@ Wi-Fi:
       stick's dp200-start.sh; deployed on the dev printer, reaches the
       work printer with the next payload).
       /etc/dp200/wifi_power_save = on/off overrides.
-      Left: a cold boot to see init.mainline set it, a longer run,
-      the next root/payload build carries it.
+      **11-18: power save did NOT fix it.** The dmesg log
+      (/var/log/wifidrop.log, `dmesg -w` since 11-17 22:59) shows no
+      drop for 2 h (22:58 to 00:59 UTC, during the comparison print and
+      the PC's 1/s ping), then reason 7 drops every 95-125 s from 00:59
+      to now (475 of them), power save still reported on. A 10 min ping
+      from the PC on 11-18 14:00 did not stop them (10 of 600 lost,
+      6 drops), so traffic is not what kept the first 2 h clean. The
+      cold boot does set power save on (iw: on after the 11-17 22:57
+      boot). Open: what changed at 00:59 (2 h after association: a key
+      rekey, the DHCP lease, the AP's own timers?), and the UniFi
+      client log for the printer at 00:59.
     - 11-14: saved networks are now 2.4 GHz only (the module has no
       usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
       the printer is back on the AP 1 s after each drop, but the drops go
@@ -208,16 +217,6 @@ Wi-Fi:
       never sees the preferred network. A fresh scan alone makes
       wpa_supplicant switch back (seen 11-14). Don't fix this half before
       the first: it would only re-enter the 91 s loop every 10 min.
-26a. **Camera streamer died** (dev printer, found 11-14): ustreamer was
-    gone, first refused snapshot 11-14 00:28 UTC (about 22 h after boot),
-    no trace, cause unknown. Since 11-14 rc.dp200 (`webcam-loop`) logs it
-    to /var/log/dp200_webcam.log with its exit status, restarts it after
-    5 s, and makes the kernel log where a fatal signal hit. Checked
-    11-16 15:18 UTC: no exit since the loop was deployed (running since
-    11-14 06:12 UTC, 57 h, same boot; the earlier death came about 22 h
-    after boot). The three exits in the log are the 11-14 deploy tests.
-    Check again after a longer run or a reboot; if it dies, read the
-    log, find the cause. Owner: the log and restart can go once fixed.
 27. Upstream submission of the 8782 fix: **tabled by the owner 11-12**.
     The patch and cover letter are ready on the build box, not sent.
 
