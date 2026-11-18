@@ -6,7 +6,7 @@
 #   rc.dp200 restart-klipper           (after editing printer.cfg firmware)
 #   rc.dp200 restart-screen            (touch UI; SCREEN_ENABLED=0 in /etc/dp200/screen.conf disables it;
 #                                       restarted if it exits, log in /var/log/dp200_screen.log)
-#   rc.dp200 restart-webcam            (restarted if it exits, log in /var/log/dp200_webcam.log;
+#   rc.dp200 restart-webcam            (restarted if it exits, exits logged in /var/log/dp200_webcam.log;
 #                                       after editing /etc/dp200/webcam.conf:
 #                                       WEBCAM_RES=640x480 WEBCAM_FPS=15 WEBCAM_ENABLED=1
 #                                       WEBCAM_CTRLS="power_line_frequency=2 sharpness=3")
@@ -155,25 +155,22 @@ screen-loop)
     done
     ;;
 webcam-loop)
-    # Keep the camera streamer running (started by start_webcam): it died on
-    # 2026-11-14 after about 22 h with no trace. Until the cause is known,
-    # keep its output and restart it 5 s after it exits. The exit status is
-    # logged: above 128 it is 128 + the signal that killed it (139 = SIGSEGV).
+    # Keep the camera streamer running (started by start_webcam): it died
+    # once, on 2026-11-14, with no trace, and never again in the 4 days of
+    # logging after (owner, 11-18: stop logging its output). Restart it 5 s
+    # after it exits; only an exit is written to the log, with its status
+    # (above 128 it is 128 + the signal, 139 = SIGSEGV).
     LOG=/var/log/dp200_webcam.log
-    # the kernel log then shows where a fatal signal hit (PC, registers)
-    echo 1 > /proc/sys/kernel/print-fatal-signals 2>/dev/null
     child=
     trap '[ -n "$child" ] && kill $child && wait $child; exit 0' TERM INT
     while :; do
-        [ -f $LOG ] && [ "$(stat -c %s $LOG)" -gt 1000000 ] && mv $LOG $LOG.old
-        echo "==== start $(date) up=$(cut -d' ' -f1 /proc/uptime)" >> $LOG
         for c in $WEBCAM_CTRLS; do
-            /usr/bin/v4l2-ctl -d /dev/video0 -c "$c" >> $LOG 2>&1 || echo "webcam: control $c failed" >> $LOG
+            /usr/bin/v4l2-ctl -d /dev/video0 -c "$c" >/dev/null 2>&1 || echo "webcam: control $c failed $(date)" >> $LOG
         done
-        $SSD --start --chuid $USER --exec /usr/bin/ustreamer --startas /usr/bin/env --             LD_PRELOAD=/usr/local/lib/v4l2_time32_shim.so /usr/bin/ustreamer             --device=/dev/video0 --format=MJPEG --encoder=HW             --resolution=$WEBCAM_RES --desired-fps=$WEBCAM_FPS             --device-timeout=5 --persistent             --host=127.0.0.1 --port=8080 >> $LOG 2>&1 &
+        $SSD --start --chuid $USER --exec /usr/bin/ustreamer --startas /usr/bin/env --             LD_PRELOAD=/usr/local/lib/v4l2_time32_shim.so /usr/bin/ustreamer             --device=/dev/video0 --format=MJPEG --encoder=HW             --resolution=$WEBCAM_RES --desired-fps=$WEBCAM_FPS             --device-timeout=5 --persistent             --host=127.0.0.1 --port=8080 >/dev/null 2>&1 &
         child=$!
         wait $child
-        echo "==== exited ($?) $(date) up=$(cut -d' ' -f1 /proc/uptime)" >> $LOG
+        echo "==== ustreamer exited ($?) $(date) up=$(cut -d' ' -f1 /proc/uptime)" >> $LOG
         child=
         sleep 5
     done

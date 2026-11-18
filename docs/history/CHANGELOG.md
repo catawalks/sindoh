@@ -5,6 +5,18 @@ one. The detail for everything up to 2026-11-12 is in
 [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md) and the other
 files in this folder; `git log` has the rest.
 
+## 2026-11-18
+- **Closed (owner):** cold-boot Wi-Fi (TODO 1: up after every boot and
+  manual reset); work-printer Wi-Fi stability (TODO 11: the stock driver
+  it runs held the AP on the dev printer, 67 min, no drop).
+- **Camera streamer closed** (TODO 26a): no exit since 11-14 over several
+  boots. rc.dp200 now logs only an exit (not ustreamer's output); deployed
+  on the dev printer (md5 22ea55e4).
+- **Wi-Fi drops are back** (TODO 26, still open): power save on held
+  the AP for 2 h only; reason 7 drops every ~95 s since 11-18 00:59 UTC.
+- **TODO:** the accelerometer setup leftovers are their own item (19);
+  the screen's INPUT SHAPING page test is owner item 5.
+
 ## 2026-11-17
 - **First fast Benchy** (12 mm3/s, accel 2500, 1h 16m): shape and bottom
   good; stringing hairs, illegible stern text, a rough stern corner
