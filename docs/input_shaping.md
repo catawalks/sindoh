@@ -339,3 +339,26 @@ Next: measure the ripple spacing; check the X belt tension, the motor
 pulley set screw and carriage play; one band with shaping off
 (`SHAPER_FREQ_X=0`) next to one with the saved shaper shows whether
 shaping does anything visible at all.
+
+**Cause and decision (owner, 11-17):** the print head has play: it is
+held only by strong magnets on a loose dovetail. The ripple spacing is
+about 4 mm, i.e. about 20 Hz at 80 mm/s, below every shaper tried and
+far below the measured 38 Hz peak, so no shaper removes it; a new
+carriage mount is a future project. Since the ripple stays either way,
+X gets the shaper that costs least speed: band 6, **`2hump_ei` 87.4 Hz**,
+set in the dev printer's printer.cfg 11-17 (backup
+`printer.cfg.bak-1117-shaper`). Klipper's own limits for the bands
+(`find_shaper_max_accel`, scv 5, computed on the printer):
+
+| Band | Shaper | max_accel | smoothing |
+|---|---|---|---|
+| 1 | 3hump_ei 82.6 | 4528 | 0.133 |
+| 2 | ei 41.8 | 3182 | 0.189 |
+| 3 | 2hump_ei 48 | 2417 | 0.246 |
+| 4 | mzv 38 | 4254 | 0.141 |
+| 5 | 3hump_ei 60 | 2368 | 0.251 |
+| 6 | **2hump_ei 87.4** | **8094** | **0.074** |
+| Y (saved) | 2hump_ei 39.0 | 1476 | 0.372 |
+
+Y is now what limits `max_accel` (1500 today). The ringing tower
+showed Y clean to 2750 and this print ran X at 2500 without trouble.

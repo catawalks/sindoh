@@ -11,10 +11,13 @@ PID=/var/run/udhcpc.$IF.pid
 LAST=/var/run/dp200-wifi.$IF.ssid
 case "$2" in
 CONNECTED)
-    # power saving off again after each (re)connection (see dp200-start.sh);
-    # on instead while etc/dp200/wifi_power_save exists (test of 2026-11-17:
-    # stock runs with it on and holds the AP that drops us every 91 s)
-    if [ -f $ROOT/etc/dp200/wifi_power_save ]; then PS=on; else PS=off; fi
+    # power saving after each (re)connection: on with our kernel (2026-11-17:
+    # off, the AP dropped us every 91 s; on, no drop in hours), off with the
+    # stock 3.2 kernel (2026-11-02: on, reason 15 drops every few minutes).
+    # etc/dp200/wifi_power_save holding "on" or "off" overrides both.
+    case "$(uname -r)" in 3.*) PS=off ;; *) PS=on ;; esac
+    PSF=$ROOT/etc/dp200/wifi_power_save
+    [ -s $PSF ] && case "$(cat $PSF)" in on|off) PS=$(cat $PSF) ;; esac
     iwconfig $IF power $PS 2>/dev/null || iw dev $IF set power_save $PS 2>/dev/null
     SSID=$(wpa_cli -i $IF status | sed -n 's/^ssid=//p')
     if grep -q "\"$IF\":{[^}]*\"mode\":\"static\"" $ROOT/etc/dp200/network.json 2>/dev/null; then

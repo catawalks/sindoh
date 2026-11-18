@@ -108,3 +108,13 @@ preferred network, read-only (`iwpriv` getters, `/proc/mwlan`, a scan):
   5 GHz cells and the distant neighbors) were left out. All 5 GHz
   cells here are weak, so this does not tell whether the app filters by
   band or by signal.
+
+## Power save on with our kernel (2026-11-17)
+
+With power save off, the access point dropped our kernel every 91-95 s;
+with it on, no drop in hours. So our kernel now runs with it on:
+init.mainline sets it at boot and dp200-wifi-action.sh after every
+connection. The stock-kernel path (dp200-start.sh, the USB stick
+install) keeps it off: there, on 2026-11-02, it caused reason 15
+drops every few minutes. `/etc/dp200/wifi_power_save` holding `on` or
+`off` overrides both.
