@@ -29,7 +29,8 @@ failures), card marker renamed to `/.dp200-root.off`, boot from NAND:
 root ubi0:filesystem, Klipper ready with the saved shapers and mesh.
 The section below is current again (Sindoh's 200730_2 update touched
 only the stock root, which is replaced again), except that **Wi-Fi
-power save is on** (flag file /etc/dp200/wifi_power_save, TODO 26). Backups of the stock test:
+power save is on** (the new default with our kernel, TODO 26) and X uses
+`2hump_ei` 87.4 Hz (docs/input_shaping.md). Backups of the stock test:
 `D:\DP200\backup\nand_images\stock_test_20261116\` (never published).
 
 ## Dev printer, as of 2026-11-15

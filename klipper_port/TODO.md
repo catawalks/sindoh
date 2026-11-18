@@ -62,8 +62,11 @@ Either printer, longer:
          `dp200_x_shaper_compare.gcode` (six X shapers in 10 mm
          bands at 2500, 11-17): no band differs, so the visible X
          ripple is not the measured 38 Hz peak (docs/input_shaping.md).
-         Next: ripple spacing off the part, X belt tension / pulley /
-         carriage play (owner), a shaping-off band. Then decide: keep
+         Cause: the head sits on magnets and a loose dovetail
+         (owner); ripple about 4 mm = about 20 Hz. X set to the
+         fastest band, `2hump_ei` 87.4 (max_accel 8094). A new
+         carriage mount is a future project. Earlier plan, kept for
+         reference: keep
          them, or a lighter one (X: ei ~42; Y: ei 40 or mzv 29.4,
          which allow 2500-2900), and put the result in the shipped
          config.
@@ -135,12 +138,14 @@ Wi-Fi:
       path in mwifiex (ACKs / TX status, firmware version).
       **11-17 night, back on our kernel: power save on fixes it.**
       Before: dropped at 73 s after boot as always. With power save
-      on (flag file /etc/dp200/wifi_power_save, read by
-      dp200-wifi-action.sh): no disconnect in 1 h 45 min, same AP;
-      the PC's ping lost one or two in a row every 5-20 min (likely
-      power-save latency, not drops). Left: make it the default
-      (init.mainline and dp200-start.sh set it off today), longer run,
-      the work printer.
+      on: no disconnect in 1 h 45 min, same AP; the PC's ping lost
+      one or two in a row every 5-20 min (likely power-save latency,
+      not drops). **Now the default with our kernel** (owner, 11-17:
+      init.mainline and dp200-wifi-action.sh; deployed on the dev
+      printer). The stock-kernel path (work printer) stays off, as
+      measured 11-02; /etc/dp200/wifi_power_save = on/off overrides.
+      Left: a cold boot to see init.mainline set it, a longer run,
+      the next root/payload build carries it.
     - 11-14: saved networks are now 2.4 GHz only (the module has no
       usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
       the printer is back on the AP 1 s after each drop, but the drops go
