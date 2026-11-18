@@ -7,6 +7,7 @@
 # Stock: control 0x18 (timebase 1, one tick taken as 1 us), period 250 = 4 kHz.
 B=0xf9304a00        # dec_pwm block 10 (0xf9304000 + 0x100 * 10)
 G=0xf9304000        # global enable, bit 9 = block 10
+TICK=5000000        # timebase 1 ticks per second, measured 11-18 (1000 ticks = 5 kHz)
 P=0xf80450bc        # pad select, GPIO bank 5 pin 15 = the beeper pad
 dm() { busybox devmem "$@"; }
 # The pad needs function 1 (stock 0x000C1001). The vendor's boot pad table
@@ -14,7 +15,7 @@ dm() { busybox devmem "$@"; }
 [ "$(dm $P 32)" = 0x000C1001 ] || dm $P 32 0x000C1001
 
 beep() {    # $1 Hz, $2 duty %, $3 ms
-    per=$((1000000 / $1)); hi=$((per * $2 / 100)); [ $hi -lt 1 ] && hi=1
+    per=$((TICK / $1)); hi=$((per * $2 / 100)); [ $hi -lt 1 ] && hi=1
     # Same order as the stock pwm_on: global bit off, configure, run, global on.
     g=$(dm $G 32); dm $G 32 $((g & ~0x200))
     dm $B 32 0x18                       # stopped, output low

@@ -36,19 +36,13 @@ Either printer:
     "Beeper"): passive piezo on dec_pwm block 10, control 0x18, volume by
     duty. **Heard 11-18 (dev printer)** once GPIO bank 5 pin 15 had its
     stock pad function (0x000C1001); our kernel leaves it a GPIO.
-    Listening results (tools/beep_test.sh, our "Hz" assumes a 1 us tick):
-    the stock 250-tick period ("4 kHz") and anything down to 333 ticks
-    ("3 kHz") only tick; 500 ticks ("2 kHz") is a tone, but shrill and
-    unlike stock; 2857 ticks ("350 Hz") sounded best, still not stock. So
-    the tick is probably shorter than 1 us here, or stock's clock differs.
-    Volume: the owner picked 36 %. Left:
-    - Calibrate the pitch: a tuner or spectrum app on a phone reading our
-      tone, and if possible a stock beep (work printer), so we can match.
+    Measured with the owner's spectrum analyzer: the timebase ticks at
+    5 MHz, so stock's 250 ticks is 20 kHz (only a tick); **1250 ticks =
+    4 kHz at 36 % duty sounds like stock** (owner's pick). Left:
     - The pad: add `5 15 0x1001` to the DTS marvell,pads list (next
       kernel build); until then something at boot must set 0xf80450bc.
-    - Then the io firmware from fork branch `upc-beeper` (8ae38c1:
-      block 10 gets control 0x18 and a period; the period must change to
-      the calibrated one; rebuild io.bin on the card root,
+    - Then the io firmware from fork branch `upc-beeper` (9b174ab:
+      block 10 gets control 0x18 and period 1250; rebuild io.bin on the card root,
       tools/fm_rebuild.sh io), `[output_pin beeper] pin: io:pwm10, pwm:
       True, hardware_pwm: True` at 36 %, an M300 macro, and the dryer's
       end signal (it already uses the pin when it exists).
