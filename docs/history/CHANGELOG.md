@@ -7,8 +7,10 @@ files in this folder; `git log` has the rest.
 
 ## 2026-11-17
 - **Wi-Fi power save is the default with our kernel** (owner):
-  init.mainline and dp200-wifi-action.sh; the stock-kernel path stays
-  off; /etc/dp200/wifi_power_save overrides. Deployed on the dev printer.
+  init.mainline and dp200-wifi-action.sh, on every printer; the
+  USB-stick install on the stock kernel stays off (dev printer
+  measurement of 11-02); /etc/dp200/wifi_power_save overrides.
+  Deployed on the dev printer.
 - **X shaper set to `2hump_ei` 87.4** on the dev printer, the fastest
   band (max_accel 8094); the X ripple (about 20 Hz) comes from play in
   the magnet/dovetail head mount and stays with any shaper.
