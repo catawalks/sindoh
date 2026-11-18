@@ -140,10 +140,14 @@ Wi-Fi:
       Before: dropped at 73 s after boot as always. With power save
       on: no disconnect in 1 h 45 min, same AP; the PC's ping lost
       one or two in a row every 5-20 min (likely power-save latency,
-      not drops). **Now the default with our kernel** (owner, 11-17:
-      init.mainline and dp200-wifi-action.sh; deployed on the dev
-      printer). The stock-kernel path (work printer) stays off, as
-      measured 11-02; /etc/dp200/wifi_power_save = on/off overrides.
+      not drops). **Now the default with our kernel on every printer**
+      (owner, 11-17: init.mainline and dp200-wifi-action.sh; deployed
+      on the dev printer). The USB-stick install on the stock kernel
+      (dp200-start.sh) still turns it off: that came from the dev
+      printer on 11-02, when it ran the stock kernel with the stick
+      install (68 reason 15 drops with it on, none in 30 min off).
+      The work printer's Wi-Fi was never measured.
+      /etc/dp200/wifi_power_save = on/off overrides.
       Left: a cold boot to see init.mainline set it, a longer run,
       the next root/payload build carries it.
     - 11-14: saved networks are now 2.4 GHz only (the module has no

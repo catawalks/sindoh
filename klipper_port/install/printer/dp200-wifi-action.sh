@@ -13,7 +13,8 @@ case "$2" in
 CONNECTED)
     # power saving after each (re)connection: on with our kernel (2026-11-17:
     # off, the AP dropped us every 91 s; on, no drop in hours), off with the
-    # stock 3.2 kernel (2026-11-02: on, reason 15 drops every few minutes).
+    # stock 3.2 kernel (USB-stick install; measured on the dev printer
+    # 2026-11-02 while it ran stock: on, reason 15 drops every few minutes).
     # etc/dp200/wifi_power_save holding "on" or "off" overrides both.
     case "$(uname -r)" in 3.*) PS=off ;; *) PS=on ;; esac
     PSF=$ROOT/etc/dp200/wifi_power_save
