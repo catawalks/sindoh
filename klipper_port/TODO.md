@@ -32,14 +32,25 @@ Dev printer:
    or power the switch off).
 
 Work printer:
+11. **Wi-Fi stability on the upgraded work printer.**
+
+Either printer:
+13. **Beeper:** `[output_pin beeper] pin: io:pwm10`, pick the PWM value,
+    then M300; the dryer's end signal uses it.
+16. **Homing clearance:** a few mm of Z clearance before X homing, so the
+    nozzle doesn't drag across a failed print. Mind that Z homes upward.
+
+## Printer tuning
+
+Print quality and speed settings, found with test prints (owner at the
+printer for each print). Results go into the printer's printer.cfg, the
+shipped config or the slicer profiles.
+
 9. **Work printer has no `[axis_twist_compensation]`:** if wide first
    layers are uneven left to right there, do the comparison in
    docs/dev_printer_testing.md on that printer (see also #29).
 10. **Resume quality on real prints:** some straggler lines at the resume
     layer after a load (11-12). Tune `reprime_len` (30 mm) if needed.
-11. **Wi-Fi stability on the upgraded work printer.**
-
-Either printer, longer:
 12. **Print speed** (owner asked 11-15; goal: faster prints at the same
     quality, no mechanical changes). Today: test prints at 30 mm/s,
     `max_accel` 1500, no input shaping. X/Y are proven to 208 mm/s. In
@@ -53,12 +64,11 @@ Either printer, longer:
        Benchy started 11-17 (`dp200_benchy_fast.gcode`: 12 mm3/s, outer
        walls 60, inner 100, infill 130, travel 180, accel 2500).
        Result 11-17 (1h 16m printing, owner's photos): hull, bow, chimney,
-       door arch and the bottom text good; fine hairs all over (stringing;
-       retraction 4 mm at 35, 205-210 C, the PLA was already noted damp
-       at the 10-28 PA tower); stern text illegible; a rough patch at
-       the back left corner about 5 mm up; roof top lines with gaps.
-       Next: dry the PLA, then a retraction/temperature test and a new
-       PA tower at the new speeds (PA is 0.30 from 10-28, slow prints).
+       door arch, roof top and the bottom text good; fine hairs all over
+       (stringing; retraction 4 mm at 35, 205-210 C; the PLA is dry: it
+       sat on the bed through the dryer test); stern text illegible; a
+       rough patch at a stern corner about 5 mm up (#18). Next: #14 and
+       12c.
     b. **Input shaping:** X measured on the dev printer 11-16
        (docs/input_shaping.md "Dev printer, 2026-11-16"): Klipper
        recommends `3hump_ei` 80-83 Hz, max_accel <= 4300 (three runs,
@@ -97,18 +107,45 @@ Either printer, longer:
     c. Re-tune pressure advance at the new speeds; check part cooling.
     d. Slicer profile with the result (expected: walls and infill
        80-120 mm/s, travel 150-200), then the payload.
-13. **Beeper:** `[output_pin beeper] pin: io:pwm10`, pick the PWM value,
-    then M300; the dryer's end signal uses it.
-14. **Retraction test** (two towers), then the slicer profiles; recheck
-    pressure advance (0.30) with dry filament.
+14. **Retraction test** (two towers; the 11-17 Benchy strung at 4 mm /
+    35 mm/s with dry PLA), maybe a temperature tower, then the slicer
+    profiles; recheck pressure advance (0.30, set 10-28 on damp PLA at
+    slow speeds) with the dry filament (12c).
 15. **Mesh front limit at Y 5** (was 30; six rows): a mesh ran clean
     on the dev printer 11-16 (30 points, reference check -0.019 mm;
     front row about 0.1 mm lower than the row behind it). Left: a first
     layer printed at the front of the bed, before the next payload
     carries the change to the work printer.
-16. **Homing clearance:** a few mm of Z clearance before X homing, so the
-    nozzle doesn't drag across a failed print. Mind that Z homes upward.
 17. Optional: a 6-7 mm/s Z lift test (10 stalls lifting; stock is 5.05).
+18. **Z seam on the Benchy's stern corner:** in `dp200_benchy_fast.gcode`
+    (`seam_position = aligned`) the hull's outer wall starts and ends at
+    the stern corner (X 77, Y 92-95) on every layer from about 3 to 10 mm;
+    the rough patch at about 5 mm is there, where the stern text and its
+    short moves and retractions begin. Try: pressure advance and
+    retraction first (12c, #14), then `seam_position = rear` or a scarf
+    seam, and compare the corner.
+28a. **Mesh reference drift:** PRINT_START's mesh was discarded once in
+    five prints on 11-15 ("reference probe moved -0.112 mm", limit 0.1).
+    Cause: the pin keeps settling for about 25 touches after a deploy
+    (40 touches: first one +0.04 mm, then a slow fall of 0.02 mm on a
+    cool bed and 0.07 mm on a bed cooling from 60 C), and the mesh starts
+    as soon as the bed reaches temperature. Options: more warm-up touches
+    (`variable_warmup`, now 5; 25 adds about 3 min), a soak of a minute or
+    two after the bed reaches temperature, or both. Measure which helps.
+    The Z motor is not losing steps (the readings level off).
+29. **Probe: false left-right slope** (found 11-14, fixed on the dev
+    printer with `[axis_twist_compensation]` in its printer.cfg, plus
+    five warm-up touches before every mesh; docs/dev_printer_testing.md).
+    Left:
+    - After the fix the owner still saw slightly more squish on the
+      right over 150 mm: the right value (0.103) may need about +0.02.
+    - The center value (-0.042) is the least certain: the raw center
+      reading moved 0.04 mm between runs. Redo the three-spot comparison
+      once more and adjust.
+    - The comparison was made at Y 30 only. Check one more row (Y 150).
+    - The work printer needs its own values: do the same comparison
+      there, or ship without the section and tell users how.
+    - A way to do the comparison from the touch screen (wizard).
 
 ## Agent (no owner needed)
 
@@ -190,15 +227,6 @@ Motion and firmware:
     tested on the PC; the first real root or payload build is the test.
     The two printers' `/home/klipper/klipper` are older checkouts: move
     them to the pinned fork commit with the next payload.
-28a. **Mesh reference drift:** PRINT_START's mesh was discarded once in
-    five prints on 11-15 ("reference probe moved -0.112 mm", limit 0.1).
-    Cause: the pin keeps settling for about 25 touches after a deploy
-    (40 touches: first one +0.04 mm, then a slow fall of 0.02 mm on a
-    cool bed and 0.07 mm on a bed cooling from 60 C), and the mesh starts
-    as soon as the bed reaches temperature. Options: more warm-up touches
-    (`variable_warmup`, now 5; 25 adds about 3 min), a soak of a minute or
-    two after the bed reaches temperature, or both. Measure which helps.
-    The Z motor is not losing steps (the readings level off).
 28b. **Root build with the new fork:** klippy's C helper changed with
     the move to upstream 29d4ec2d and the NAND root has no gcc. The stick
     payload carries the right `c_helper.so` (built on the card). Still to
@@ -211,20 +239,6 @@ Motion and firmware:
 28d. **The stick payload (11-15) has the firmware of 8203a7d7**, without
     the three stepping commits merged later that day (ee0c7f8e). They go
     into the next payload.
-29. **Probe: false left-right slope** (found 11-14, fixed on the dev
-    printer with `[axis_twist_compensation]` in its printer.cfg, plus
-    five warm-up touches before every mesh; docs/dev_printer_testing.md).
-    Left:
-    - After the fix the owner still saw slightly more squish on the
-      right over 150 mm: the right value (0.103) may need about +0.02.
-    - The center value (-0.042) is the least certain: the raw center
-      reading moved 0.04 mm between runs. Redo the three-spot comparison
-      once more and adjust.
-    - The comparison was made at Y 30 only. Check one more row (Y 150).
-    - The work printer needs its own values: do the same comparison
-      there, or ship without the section and tell users how.
-    - A way to do the comparison from the touch screen (wizard).
-
 End-goal install ([docs/end_goal_install_plan.md](docs/end_goal_install_plan.md);
 stages 1-5 done on the dev printer):
 34. **Stage 6:** installer v2 (USB stick under stock 3.2 writes mtd6, then

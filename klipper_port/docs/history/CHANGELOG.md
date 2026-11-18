@@ -7,8 +7,10 @@ files in this folder; `git log` has the rest.
 
 ## 2026-11-17
 - **First fast Benchy** (12 mm3/s, accel 2500, 1h 16m): shape and bottom
-  good; stringing hairs, illegible stern text, a rough back corner
-  (TODO 12a).
+  good; stringing hairs, illegible stern text, a rough stern corner
+  where the aligned Z seam sits (TODO 12a, 18).
+- **TODO has a Printer tuning section** (owner, 11-18): speed, pressure
+  advance, retraction, seam, mesh and probe items moved there.
 - **Max flow measured** (dev printer, PLA 205 C): clean to 14 mm3/s,
   duller at 16-18, extruder clicks at 20; slicer limit about 12 (TODO 12a).
 - **Dev printer max_accel 2500** (owner; its printer.cfg; shipped config
