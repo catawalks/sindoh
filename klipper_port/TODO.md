@@ -80,7 +80,9 @@ Either printer, longer:
          payload / root build ships it. The stock-kernel path (work
          printer) is untested with a sensor.
        - The touch screen's INPUT SHAPING page is untested.
-       Then raise `max_accel` (1500 now) toward what the shapers allow.
+       `max_accel` 2500 on the dev printer since 11-17 (owner; its printer.cfg,
+       the shipped dp200_printer.cfg stays 1500 for printers without shapers).
+       Next: prints at the higher speeds (12c, 12d).
     c. Re-tune pressure advance at the new speeds; check part cooling.
     d. Slicer profile with the result (expected: walls and infill
        80-120 mm/s, travel 150-200), then the payload.
