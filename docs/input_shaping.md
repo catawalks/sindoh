@@ -362,3 +362,15 @@ set in the dev printer's printer.cfg 11-17 (backup
 
 Y is now what limits `max_accel` (1500 today). The ringing tower
 showed Y clean to 2750 and this print ran X at 2500 without trouble.
+
+**max_accel 2500 (owner, 11-17):** set in the dev printer's printer.cfg
+(`[printer]` after `[input_shaper]`, backup `printer.cfg.bak-1117-accel`);
+the shipped `dp200_printer.cfg` keeps 1500 for printers without shapers.
+Klipper's max_accel per shaper is not a hard limit: it is the
+acceleration at which the shaper's corner smoothing reaches about
+0.12 mm. Klipper applies `max_accel` to every move, so Y moves also
+reach 2500; Y's 2hump_ei 39 then smooths corners about 2500/1476 times
+the reference, roughly 0.2 mm. The ringing tower showed Y clean to 2750.
+The X figure of 8094 is likewise a smoothing figure, not what the
+motors can do: the highest acceleration ever run on this printer is
+the tower's 4250.
