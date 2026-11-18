@@ -45,10 +45,13 @@ Either printer, longer:
     `max_accel` 1500, no input shaping. X/Y are proven to 208 mm/s. In
     this order:
     a. **Max flow:** measured 11-17 (dev printer, PLA at 205 C, into the
-       air): smooth and glossy to 14 mm3/s, thicker and duller at 16
-       and 18, extruder clicks at 20. Use about 12 mm3/s as the slicer's
-       max volumetric speed (the owner's profile has 8); 12 is about
-       145 mm/s at 0.45 x 0.2 mm. Test file `dp200_max_flow.gcode`.
+       air): normal to 14 mm3/s; 16 and 18 came out thicker (the owner
+       sees no other difference on matte gray PLA); extruder clicks at
+       20. Slicer max volumetric speed 12 for now (the owner's profile
+       has 8), 16 probably safe to try later. 12 is about 145 mm/s at
+       0.45 x 0.2 mm. Test file `dp200_max_flow.gcode`. First fast
+       Benchy started 11-17 (`dp200_benchy_fast.gcode`: 12 mm3/s, outer
+       walls 60, inner 100, infill 130, travel 180, accel 2500).
     b. **Input shaping:** X measured on the dev printer 11-16
        (docs/input_shaping.md "Dev printer, 2026-11-16"): Klipper
        recommends `3hump_ei` 80-83 Hz, max_accel <= 4300 (three runs,
