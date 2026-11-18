@@ -11,12 +11,11 @@ PID=/var/run/udhcpc.$IF.pid
 LAST=/var/run/dp200-wifi.$IF.ssid
 case "$2" in
 CONNECTED)
-    # power saving after each (re)connection: on with our kernel (2026-11-17:
-    # off, the AP dropped us every 91 s; on, no drop in hours), off with the
-    # stock 3.2 kernel (USB-stick install; measured on the dev printer
-    # 2026-11-02 while it ran stock: on, reason 15 drops every few minutes).
-    # etc/dp200/wifi_power_save holding "on" or "off" overrides both.
-    case "$(uname -r)" in 3.*) PS=off ;; *) PS=on ;; esac
+    # power saving ON after each (re)connection, on every printer and kernel
+    # (owner, 2026-11-17: stock runs with it on; with it off the AP dropped
+    # our kernel every 91 s, with it on no drop in hours).
+    # etc/dp200/wifi_power_save holding "on" or "off" overrides.
+    PS=on
     PSF=$ROOT/etc/dp200/wifi_power_save
     [ -s $PSF ] && case "$(cat $PSF)" in on|off) PS=$(cat $PSF) ;; esac
     iwconfig $IF power $PS 2>/dev/null || iw dev $IF set power_save $PS 2>/dev/null

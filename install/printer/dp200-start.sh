@@ -108,13 +108,12 @@ echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null
 
 # WiFi: joining the owner's network was the stock app's job (see dp200-wifi.sh)
 sh $ROOT/dp200/dp200-wifi.sh $ROOT
-# WiFi power saving off: with it on, the 8782 misses the access point's key
-# handshakes and is deauthenticated (reason 15) about every 5 minutes; now
-# and then that ends on another saved network (2026-11-02: 68 in 6 h with
-# power saving, none in 30 min without). dp200-wifi-action.sh re-applies it.
-# This is the stock-kernel path; our kernel runs with it on (init.mainline).
+# WiFi power saving ON, as stock runs it (owner, 2026-11-17: on every
+# printer). Was off since 2026-11-02 (dev printer on the stock kernel: 68
+# reason 15 drops in 6 h with it on); the 11-17 tests showed stock and our
+# kernel both hold the AP with it on. dp200-wifi-action.sh re-applies it.
 # etc/dp200/wifi_power_save holding "on" or "off" overrides.
-PS=off
+PS=on
 [ -s $ROOT/etc/dp200/wifi_power_save ] && case "$(cat $ROOT/etc/dp200/wifi_power_save)" in on|off) PS=$(cat $ROOT/etc/dp200/wifi_power_save) ;; esac
 iwconfig mlan0 power $PS 2>/dev/null
 # network settings from the touch screen (DHCP/static per port, Ethernet hotplug)
