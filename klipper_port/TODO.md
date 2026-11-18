@@ -52,6 +52,13 @@ Either printer, longer:
        0.45 x 0.2 mm. Test file `dp200_max_flow.gcode`. First fast
        Benchy started 11-17 (`dp200_benchy_fast.gcode`: 12 mm3/s, outer
        walls 60, inner 100, infill 130, travel 180, accel 2500).
+       Result 11-17 (1h 16m printing, owner's photos): hull, bow, chimney,
+       door arch and the bottom text good; fine hairs all over (stringing;
+       retraction 4 mm at 35, 205-210 C, the PLA was already noted damp
+       at the 10-28 PA tower); stern text illegible; a rough patch at
+       the back left corner about 5 mm up; roof top lines with gaps.
+       Next: dry the PLA, then a retraction/temperature test and a new
+       PA tower at the new speeds (PA is 0.30 from 10-28, slow prints).
     b. **Input shaping:** X measured on the dev printer 11-16
        (docs/input_shaping.md "Dev printer, 2026-11-16"): Klipper
        recommends `3hump_ei` 80-83 Hz, max_accel <= 4300 (three runs,
