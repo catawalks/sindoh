@@ -32,13 +32,18 @@ Dev printer:
    or power the switch off).
 
 Either printer:
-13. **Beeper:** dec_pwm block 10 (`io:pwm10`) from the 10-20 reverse
-    engineering; never configured or heard. How stock drives it (period,
-    duty, volume levels) is not mapped yet: the stock app
-    (171114_4_open/marvell_lspsdk_3dp_gemstone-debug_stripped.elf) has
-    `BeepOn`, `beepDutyTable`, `setBeepLevelfromDB`, `OpBeepThread`,
-    `BeepRequestService`. Map those, then `[output_pin beeper]` and
-    M300 (the dryer's end signal uses it).
+13. **Beeper:** mapped 11-18 from the stock app (docs/hardware_notes.md
+    "Beeper"): passive piezo on dec_pwm block 10, control 0x18, 250-tick
+    period (4 kHz), volume by duty 3 / 6 / 36 %. Left, owner listening:
+    - `sh tools/beep_test.sh` on the printer (through /dev/mem, no
+      Klipper or firmware change): does it beep, which volume is right?
+    - Then the io firmware from fork branch `upc-beeper` (8ae38c1:
+      block 10 gets the stock control bits and period; rebuild io.bin on
+      the card root, tools/fm_rebuild.sh io), `[output_pin beeper]
+      pin: io:pwm10, pwm: True, hardware_pwm: True`, an M300 macro, and
+      the dryer's end signal (it already uses the pin when it exists).
+    - Optional: tones (M300 S<Hz>) need the firmware to take the period
+      from Klipper's cycle_time for this block.
 16. **Homing clearance:** a few mm of Z clearance before X homing, so the
     nozzle doesn't drag across a failed print. Mind that Z homes upward.
 
@@ -109,20 +114,22 @@ shipped config or the slicer profiles.
     layer printed at the front of the bed, before the next payload
     carries the change to the work printer.
 17. Optional: a 6-7 mm/s Z lift test (10 stalls lifting; stock is 5.05).
-18. **Z seam on the Benchy's stern corner:** in `dp200_benchy_fast.gcode`
+18. **Benchy: damaged port stern corner** (not the Z seam): in `dp200_benchy_fast.gcode`
     (`seam_position = aligned`) the hull's outer wall starts and ends at
     the stern corner (X 77, Y 92-95) on every layer from about 3 to 10 mm;
     the rough patch at about 5 mm is there, where the stern text and its
-    short moves and retractions begin. 11-18: rechecked in the G-code:
-    the seam is on the low-Y stern corner (front of the bed when
-    printed) only from 3 to 6.05 mm; it moves off the corner above. The
-    other stern corner has no seam or retraction at that height. The
-    owner sees the damage at the back left corner and no seam line;
-    which corner it is still has to be matched to the bed. Owner: fix
-    the cause, not hide it, so retraction (4 mm at 35 mm/s, no wipe;
-    slicer profile) and pressure advance (printer.cfg) come first
-    (12c, #14), then reprint and compare; moving the seam only if
-    needed.
+    short moves and retractions begin. **11-18, corrected:** the damage is
+    on the port stern corner, which faced the back of the bed (high Y);
+    the seam was on the starboard one. At 3-7 mm the G-code is the same
+    at both stern corners (same speeds, same kind and number of
+    segments, no seam or retraction at the damaged one), so the cause is
+    not in the G-code. Suspects on the printer side: part cooling that
+    reaches that corner less (where does the part fan blow?), the
+    corner curling up there and the nozzle catching it, or the loose
+    head (12b). Next: note the fan direction, print a small test
+    (e.g. four 20 mm towers in the bed corners, or the Benchy turned
+    180 degrees) and see if the damage follows the bed side or the
+    model side.
 28a. **Mesh reference drift:** PRINT_START's mesh was discarded once in
     five prints on 11-15 ("reference probe moved -0.112 mm", limit 0.1).
     Cause: the pin keeps settling for about 25 touches after a deploy
