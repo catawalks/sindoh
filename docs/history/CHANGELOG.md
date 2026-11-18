@@ -14,6 +14,11 @@ files in this folder; `git log` has the rest.
   on the dev printer (md5 22ea55e4).
 - **Wi-Fi drops are back** (TODO 26, still open): power save on held
   the AP for 2 h only; reason 7 drops every ~95 s since 11-18 00:59 UTC.
+- **Beeper mapped** from the stock app (TODO 13, docs/hardware_notes.md):
+  passive piezo, block 10, 4 kHz, volume 3/6/36 %. `tools/beep_test.sh`
+  for a listening test; fork branch `upc-beeper` (8ae38c1), untested.
+- **Benchy corner damage is not the seam** (TODO 18): the seam was on the
+  other stern corner; the G-code is the same at both corners.
 - **TODO:** the accelerometer setup leftovers are their own item (19);
   the screen's INPUT SHAPING page test is owner item 5.
 
