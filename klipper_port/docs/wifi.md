@@ -114,8 +114,8 @@ preferred network, read-only (`iwpriv` getters, `/proc/mwlan`, a scan):
 With power save off, the access point dropped our kernel every 91-95 s;
 with it on, no drop in hours. So our kernel now runs with it on:
 init.mainline sets it at boot and dp200-wifi-action.sh after every
-connection, on every printer. The USB-stick install on the stock
-kernel (dp200-start.sh) keeps it off: on 2026-11-02 the dev printer,
-then running the stock kernel with that install, had reason 15 drops
-every few minutes with it on (the work printer was never measured). `/etc/dp200/wifi_power_save` holding `on` or
+connection, on every printer; the USB-stick install on the stock
+kernel (dp200-start.sh) turns it on too (owner: stock runs it that
+way). It had been off since 2026-11-02, after reason 15 drops on the
+dev printer, then running the stock kernel with the stick install. `/etc/dp200/wifi_power_save` holding `on` or
 `off` overrides both.

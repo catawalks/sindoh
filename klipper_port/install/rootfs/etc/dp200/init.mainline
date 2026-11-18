@@ -135,8 +135,8 @@ while [ ! -e /sys/class/net/mlan0 ] && [ $i -lt 45 ]; do sleep 1; i=$((i + 1)); 
 [ -e /sys/class/net/mlan0 ] || echo "no mlan0 after ${i} s: Wi-Fi not started"
 [ -e /sys/class/net/mlan0 ] && wpa_supplicant -B -D nl80211 -i mlan0 -c $CONF -P /run/wpa_supplicant.pid
 # WiFi power saving ON with our kernel (2026-11-17: with it off the access
-# point dropped us every 91 s, with it on no drop in hours; the stock kernel
-# path keeps it off, see dp200-start.sh). /etc/dp200/wifi_power_save holding
+# point dropped us every 91 s, with it on no drop in hours; on every printer,
+# owner). /etc/dp200/wifi_power_save holding
 # "on" or "off" overrides; dp200-wifi-action.sh re-applies it on every
 # connection. iw is in the root from the 2026-11-02 package list.
 PS=on
