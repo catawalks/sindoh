@@ -17,6 +17,13 @@ files in this folder; `git log` has the rest.
 - **Beeper mapped** from the stock app (TODO 13, docs/hardware_notes.md):
   passive piezo, block 10, 4 kHz, volume 3/6/36 %. `tools/beep_test.sh`
   for a listening test; fork branch `upc-beeper` (8ae38c1), untested.
+- **Beeper heard** (owner at the dev printer): silent until GPIO bank 5
+  pin 15 got its stock pad function (0x000C1001), which our kernel never
+  sets; beep_test.sh now sets it and follows the stock pwm_on order. The
+  stock 250-tick period only ticks; 500 ticks is shrill; 2857 sounded
+  best. Pitch calibration is open; volume 36 % (owner).
+- **TODO 20 checked** by the build-box sessions: the bank 3 fix is
+  7dd0f21 on `upc-bank3-pads` in the motor clone, not pushed, not in main.
 - **Benchy corner damage is not the seam** (TODO 18): the seam was on the
   other stern corner; the G-code is the same at both corners.
 - **TODO:** the accelerometer setup leftovers are their own item (19);

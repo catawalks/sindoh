@@ -33,15 +33,25 @@ Dev printer:
 
 Either printer:
 13. **Beeper:** mapped 11-18 from the stock app (docs/hardware_notes.md
-    "Beeper"): passive piezo on dec_pwm block 10, control 0x18, 250-tick
-    period (4 kHz), volume by duty 3 / 6 / 36 %. Left, owner listening:
-    - `sh tools/beep_test.sh` on the printer (through /dev/mem, no
-      Klipper or firmware change): does it beep, which volume is right?
+    "Beeper"): passive piezo on dec_pwm block 10, control 0x18, volume by
+    duty. **Heard 11-18 (dev printer)** once GPIO bank 5 pin 15 had its
+    stock pad function (0x000C1001); our kernel leaves it a GPIO.
+    Listening results (tools/beep_test.sh, our "Hz" assumes a 1 us tick):
+    the stock 250-tick period ("4 kHz") and anything down to 333 ticks
+    ("3 kHz") only tick; 500 ticks ("2 kHz") is a tone, but shrill and
+    unlike stock; 2857 ticks ("350 Hz") sounded best, still not stock. So
+    the tick is probably shorter than 1 us here, or stock's clock differs.
+    Volume: the owner picked 36 %. Left:
+    - Calibrate the pitch: a tuner or spectrum app on a phone reading our
+      tone, and if possible a stock beep (work printer), so we can match.
+    - The pad: add `5 15 0x1001` to the DTS marvell,pads list (next
+      kernel build); until then something at boot must set 0xf80450bc.
     - Then the io firmware from fork branch `upc-beeper` (8ae38c1:
-      block 10 gets the stock control bits and period; rebuild io.bin on
-      the card root, tools/fm_rebuild.sh io), `[output_pin beeper]
-      pin: io:pwm10, pwm: True, hardware_pwm: True`, an M300 macro, and
-      the dryer's end signal (it already uses the pin when it exists).
+      block 10 gets control 0x18 and a period; the period must change to
+      the calibrated one; rebuild io.bin on the card root,
+      tools/fm_rebuild.sh io), `[output_pin beeper] pin: io:pwm10, pwm:
+      True, hardware_pwm: True` at 36 %, an M300 macro, and the dryer's
+      end signal (it already uses the pin when it exists).
     - Optional: tones (M300 S<Hz>) need the firmware to take the period
       from Klipper's cycle_time for this block.
 16. **Homing clearance:** a few mm of Z clearance before X homing, so the
@@ -168,13 +178,13 @@ Input shaper sensor (the system behind the accelerometer):
       untested with a sensor.
 
 Kernel (dev printer only):
-20. **Bank 3 pad fix: bookkeeping only** (11-18: could not be checked
-    from the PC, the build box needs its own login). The fix runs in mtd0 (image
-    7eae8600, soaked: see the changelog, 11-16). Left: on the build box,
-    merge motor repo branch `upc-bank3-pads` (7dd0f21: mv61x0-upc.c + the
-    DTS) into the kernel tree and patch set, so the next kernel build
-    has it without that branch. Not checked on 11-16 whether this was
-    already done there.
+20. **Bank 3 pad fix: bookkeeping only.** The fix runs in mtd0 (image
+    7eae8600, soaked: see the changelog, 11-16). Checked 11-18 by the
+    build-box sessions: it is only on the build box, in
+    `~/SINDOH-DEV/motor` branch `upc-bank3-pads`, commit 7dd0f21
+    (mv61x0-upc.c + the DTS, on 2bc3ed0), not pushed and not in main
+    (main's copies of both files lack it). Left: merge or cherry-pick it
+    onto main and push, so the next kernel build has it.
 24. **Initramfs** (checked 11-16; needs a new kernel image, so do it
     with the next kernel build, before end-goal stage 6):
     - Its own log is still lost: it is copied to /newroot/run, which
