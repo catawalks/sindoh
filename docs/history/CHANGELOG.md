@@ -6,6 +6,13 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-17
+- **Dev printer back on our system** (mtd0 7eae8600 and the saved root in
+  mtd6, both verified, 0 ECC failures; booted from NAND, Klipper ready).
+- **Wi-Fi power save on stops the 91 s drops** on our kernel: no
+  disconnect in 1 h 45 min (before: every 91-95 s). Opt-in flag
+  /etc/dp200/wifi_power_save in `dp200-wifi-action.sh` (TODO 26).
+- **X shaper comparison print:** six shapers, no visible difference; the
+  X ripple is not the measured 38 Hz peak (docs/input_shaping.md).
 - **Stock holds the preferred network** (dev printer, Sindoh update
   200730_2 applied by the owner, /app only; U-Boot and env checked
   unchanged): 67 min on the AP that drops our kernel every 91-95 s, no

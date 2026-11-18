@@ -59,9 +59,11 @@ Either printer, longer:
        - Ringing test print with the saved shapers: started 11-16
          (`dp200_ringing_tower.gcode`, 1500 to 4250 in 5 mm bands);
          Y clean to 2750, X rings at sharp corners in every band.
-         Next print: `dp200_x_shaper_compare.gcode` (six X shapers in
-         10 mm bands at 2500). Also: X belt tension / drive slack
-         (owner). Then decide: keep
+         `dp200_x_shaper_compare.gcode` (six X shapers in 10 mm
+         bands at 2500, 11-17): no band differs, so the visible X
+         ripple is not the measured 38 Hz peak (docs/input_shaping.md).
+         Next: ripple spacing off the part, X belt tension / pulley /
+         carriage play (owner), a shaping-off band. Then decide: keep
          them, or a lighter one (X: ei ~42; Y: ei 40 or mzv 29.4,
          which allow 2500-2900), and put the result in the shipped
          config.
@@ -131,6 +133,14 @@ Wi-Fi:
       compare with stock's setup (Marvell driver, wext, power
       management on): try power save on, then the reason 34 low-ACK
       path in mwifiex (ACKs / TX status, firmware version).
+      **11-17 night, back on our kernel: power save on fixes it.**
+      Before: dropped at 73 s after boot as always. With power save
+      on (flag file /etc/dp200/wifi_power_save, read by
+      dp200-wifi-action.sh): no disconnect in 1 h 45 min, same AP;
+      the PC's ping lost one or two in a row every 5-20 min (likely
+      power-save latency, not drops). Left: make it the default
+      (init.mainline and dp200-start.sh set it off today), longer run,
+      the work printer.
     - 11-14: saved networks are now 2.4 GHz only (the module has no
       usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
       the printer is back on the AP 1 s after each drop, but the drops go

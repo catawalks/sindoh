@@ -314,11 +314,28 @@ than before shaping.
   38-47 Hz peak, which sits at the low edge of what 3hump_ei at 82.6 Hz
   cancels. The owner also suspects slack in the X belt or drive.
 
-**Next: `dp200_x_shaper_compare.gcode`** (same tower and slicing, made
-11-16, uploaded, not printed yet): acceleration fixed at 2500, the X
+**`dp200_x_shaper_compare.gcode`** (same tower and slicing, made
+11-16, printed 11-17): acceleration fixed at 2500, the X
 shaper changes every 10 mm with `SET_INPUT_SHAPER` (Y stays 2hump_ei
 39.0). Bands from the bottom: 1 `3hump_ei` 82.6 (reference), 2 `ei`
 41.8, 3 `2hump_ei` 48, 4 `mzv` 38, 5 `3hump_ei` 60, 6 `2hump_ei` 87.4.
 The band with the cleanest X wall and still crisp notches wins. The
 ringing frequency can also be read off the part: ripple spacing in mm
 at 80 mm/s gives 80 / spacing in Hz.
+
+**Result (printed 11-17 on our system, owner's photos):** no visible
+difference between the six bands. The printer's log shows every
+`SET_INPUT_SHAPER` applied at its height, so the shapers did change.
+The X ripples after the sharp corners look the same with shapers
+aimed at 38, 42, 48, 60, 83 and 87 Hz, all of which cover the
+measured 38 Hz X peak. So what is visible is not that peak:
+- either a different frequency the shapers don't cover (read it off the
+  part: ripple spacing at 80 mm/s, 80 / spacing in Hz: 2.1 mm = 38 Hz,
+  4 mm = 20 Hz, 1 mm = 80 Hz),
+- or a non-linear effect no shaper can cancel: backlash / slack in
+  the X belt, a loose pulley, play in the carriage (the owner's
+  suspicion), or extrusion at the corner (the tower runs with PA 0).
+Next: measure the ripple spacing; check the X belt tension, the motor
+pulley set screw and carriage play; one band with shaping off
+(`SHAPER_FREQ_X=0`) next to one with the saved shaper shows whether
+shaping does anything visible at all.
