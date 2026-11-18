@@ -6,6 +6,8 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-17
+- **Max flow measured** (dev printer, PLA 205 C): clean to 14 mm3/s,
+  duller at 16-18, extruder clicks at 20; slicer limit about 12 (TODO 12a).
 - **Dev printer max_accel 2500** (owner; its printer.cfg; shipped config
   stays 1500).
 - **Wi-Fi power save is on by default** (owner):
