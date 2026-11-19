@@ -51,8 +51,11 @@ Nothing here was run on those printers. It was read from the updates only
 
 - **3DWOX 1:** the DP200 work should carry over almost unchanged. It's the
   same firmware, SoC, kernel and motion firmware, with a different USB
-  folder and key. The hardware (motors, heaters, sensors) still needs
-  checking.
+  folder and key. First hardware checks by a 3DWOX 1 owner (2026-11-11,
+  [3dwox1.md](3dwox1.md)): the prebuilt probe and Klipper firmware run
+  unchanged; endstops, X/Y/Z, the part fan and both thermistor inputs
+  match the DP200. Heaters, extruder and the installer are still
+  untested there.
 - **2X, 1X, 7X:** a new platform. They use the 88PA6270 with Cortex-A53
   cores (the device tree also lists a Cortex-A15 interrupt controller) and
   Linux 4.2.8 with device trees. The stock motion firmware is "granite2"

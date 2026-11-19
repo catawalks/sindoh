@@ -24,6 +24,9 @@ files in this folder; `git log` has the rest.
   analyzer: the timebase ticks at 5 MHz, not the 1 MHz stock assumes;
   1250 ticks = 4 kHz at 36 % sounds like stock (owner). Fork
   `upc-beeper` 9b174ab uses that period; beep_test.sh takes real Hz.
+- **3DWOX 1 hardware notes** from catawalks/sindoh#1 (Fredrik Gustafsson,
+  11-11) added as docs/3dwox1.md, linked from other_models.md and the
+  docs index.
 - **TODO 20 checked** by the build-box sessions: the bank 3 fix is
   7dd0f21 on `upc-bank3-pads` in the motor clone, not pushed, not in main.
 - **Benchy corner damage is not the seam** (TODO 18): the seam was on the

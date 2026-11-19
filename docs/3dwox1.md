@@ -2,7 +2,7 @@
 
 First run of the DP200 port's tools on a Sindoh 3DWOX 1. Until now the
 3DWOX 1 was only known from its update files
-([docs/other_models.md](docs/other_models.md)). Everything here was done on
+([other_models.md](other_models.md)). Everything here was done on
 one printer in one evening, on the stock firmware, with nothing installed
 and no flash writes. A power cycle returns the printer to stock.
 
@@ -47,7 +47,7 @@ omitted).
   Ethernet (`ifplugd` on `eth0`) is unconditional.
 - **What was done instead:** on a normal boot,
   `killall UIManager; killall marvell_lspsdk_3dp_gemstone-debug_stripped.elf`
-  (the route in HANDOFF.md). The already-running `udhcpc` keeps the Wi-Fi
+  (the route in [HANDOFF](history/HANDOFF_2026-10-18_to_11-04.md)). The already-running `udhcpc` keeps the Wi-Fi
   lease. `reset_monitor.sh` looks for a different binary name and does
   nothing; there is no `/dev/watchdog`.
 - **Port 9100 stays taken.** The surviving `udhcpc` inherits the motion
