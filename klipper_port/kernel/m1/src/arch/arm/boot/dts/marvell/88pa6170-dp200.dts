@@ -431,8 +431,8 @@
 			 *
 			 * Bank 5 pin 15: the beeper (dec_pwm block 10), not in
 			 * the vendor table; stock reads 0x000c1001 once its app
-			 * runs. Heard 2026-11-18 with this value set by devmem;
-			 * not yet booted from this list.
+			 * runs. Heard 2026-11-18, set from this list (RAM boot of
+			 * m1-nandboot-beeper 232c743a: "63 set").
 			 */
 			marvell,pads-dir-clear = <3>;
 			marvell,pads = <
