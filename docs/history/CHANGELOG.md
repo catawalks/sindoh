@@ -6,6 +6,14 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-18
+- **Beeper in Klipper** (TODO 13): fork sindoh-dp200 9b174ab (klipper/FORK),
+  `[output_pin beeper]` (io:pwm10), M300 at 36 % (owner: sounds like
+  stock), the dryer's end signal on the beeper; rc.dp200 gives the pad
+  its stock function before loading the firmware. Deployed on the dev
+  printer. The DTS pad list has the pin too (not yet built).
+- **Bank 3 pad fix in main** (TODO 20 closed): 7dd0f21 from the build box
+  applied as c72b89e (mv61x0-upc.c + the DTS), so the next kernel build
+  has what mtd0 runs.
 - **Closed (owner):** cold-boot Wi-Fi (TODO 1: up after every boot and
   manual reset); work-printer Wi-Fi stability (TODO 11: the stock driver
   it runs held the AP on the dev printer, 67 min, no drop).

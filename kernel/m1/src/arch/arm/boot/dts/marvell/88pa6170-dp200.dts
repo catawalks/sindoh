@@ -428,6 +428,11 @@
 			 * the bank's direction register 0, as stock. Without
 			 * them the A4982s stay disabled (no holding torque);
 			 * values confirmed on the printer 2026-11-12.
+			 *
+			 * Bank 5 pin 15: the beeper (dec_pwm block 10), not in
+			 * the vendor table; stock reads 0x000c1001 once its app
+			 * runs. Heard 2026-11-18 with this value set by devmem;
+			 * not yet booted from this list.
 			 */
 			marvell,pads-dir-clear = <3>;
 			marvell,pads = <
@@ -441,7 +446,9 @@
 				4 24 0x1003 4 26 0x1003 5 0 0x1003 5 1 0x1003
 				5 2 0x1003 5 3 0x1003 5 6 0x1001 5 7 0x1001
 				5 8 0x1001 5 9 0x1001 5 10 0x1001 5 11 0x1001
-				5 12 0x1001 5 13 0x1001 5 14 0x1001 5 16 0x1002
+				5 12 0x1001 5 13 0x1001 5 14 0x1001
+				5 15 0x000c1001
+				5 16 0x1002
 				5 17 0x1002 5 18 0x1002 5 19 0x1002 5 20 0x1003
 				5 21 0x1003 5 22 0x1003 5 23 0x1003 5 24 0x1003
 				5 25 0x1002 5 26 0x1002 5 27 0x1002 5 28 0x1002
