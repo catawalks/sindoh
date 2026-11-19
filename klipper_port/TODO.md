@@ -38,14 +38,14 @@ Either printer:
     stock pad function (0x000C1001); our kernel leaves it a GPIO.
     Measured with the owner's spectrum analyzer: the timebase ticks at
     5 MHz, so stock's 250 ticks is 20 kHz (only a tick); **1250 ticks =
-    4 kHz at 36 % duty sounds like stock** (owner's pick). Left:
-    - The pad: add `5 15 0x1001` to the DTS marvell,pads list (next
-      kernel build); until then something at boot must set 0xf80450bc.
-    - Then the io firmware from fork branch `upc-beeper` (9b174ab:
-      block 10 gets control 0x18 and period 1250; rebuild io.bin on the card root,
-      tools/fm_rebuild.sh io), `[output_pin beeper] pin: io:pwm10, pwm:
-      True, hardware_pwm: True` at 36 %, an M300 macro, and the dryer's
-      end signal (it already uses the pin when it exists).
+    4 kHz at 36 % duty sounds like stock** (owner's pick). Done 11-18:
+    fork 9b174ab, `[output_pin beeper]`, M300 (36 %, owner: sounds like
+    stock), the dryer's end signal, rc.dp200 setting the pad. Left:
+    - The pad in the kernel: `5 15 0x000c1001` is in the DTS
+      marvell,pads list, not yet built or booted (next kernel build;
+      then rc.dp200's devmem step finds it set and does nothing).
+    - Work printer (vendor kernel 3.2): its pad state and timebase are
+      unchecked; stock assumes a 1 MHz tick, so check the pitch there.
     - Optional: tones (M300 S<Hz>) need the firmware to take the period
       from Klipper's cycle_time for this block.
 16. **Homing clearance:** a few mm of Z clearance before X homing, so the
@@ -172,13 +172,6 @@ Input shaper sensor (the system behind the accelerometer):
       untested with a sensor.
 
 Kernel (dev printer only):
-20. **Bank 3 pad fix: bookkeeping only.** The fix runs in mtd0 (image
-    7eae8600, soaked: see the changelog, 11-16). Checked 11-18 by the
-    build-box sessions: it is only on the build box, in
-    `~/SINDOH-DEV/motor` branch `upc-bank3-pads`, commit 7dd0f21
-    (mv61x0-upc.c + the DTS, on 2bc3ed0), not pushed and not in main
-    (main's copies of both files lack it). Left: merge or cherry-pick it
-    onto main and push, so the next kernel build has it.
 24. **Initramfs** (checked 11-16; needs a new kernel image, so do it
     with the next kernel build, before end-goal stage 6):
     - Its own log is still lost: it is copied to /newroot/run, which
