@@ -10,7 +10,11 @@ files in this folder; `git log` has the rest.
   `[output_pin beeper]` (io:pwm10), M300 at 36 % (owner: sounds like
   stock), the dryer's end signal on the beeper; rc.dp200 gives the pad
   its stock function before loading the firmware. Deployed on the dev
-  printer. The DTS pad list has the pin too (not yet built).
+  printer.
+- **Beeper pad from the kernel:** m1-nandboot-beeper (md5 232c743a, build
+  box 75743ea: bank3 7eae8600 + `5 15 0x000c1001`) RAM-booted from the
+  card's gap: "UPC pads: 63 set", pad 0x000C1001, M300 heard (owner).
+  rc.dp200's devmem step removed again. mtd0 still bank3.
 - **Bank 3 pad fix in main** (TODO 20 closed): 7dd0f21 from the build box
   applied as c72b89e (mv61x0-upc.c + the DTS), so the next kernel build
   has what mtd0 runs.

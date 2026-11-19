@@ -26,12 +26,6 @@ start_upc() {
         echo "missing $FW/fm.bin or io.bin - build the UPC firmware first"
         return 1
     fi
-    # Beeper pad (GPIO bank 5 pin 15, docs/hardware_notes.md "Beeper"): give it
-    # its stock function 1 when it is still the plain GPIO that U-Boot (and so
-    # our kernel) leaves. Until the kernel's pad list sets it.
-    if command -v busybox >/dev/null && [ "$(busybox devmem 0xf80450bc 32 2>/dev/null)" = 0x000C1000 ]; then
-        busybox devmem 0xf80450bc 32 0x000C1001
-    fi
     /usr/local/bin/upctool load $FW/io.bin $FW/fm.bin || return 1
     $SSD --start --background --make-pidfile --pidfile $RUN/bridge.pid \
         --exec /usr/local/bin/upctool -- bridge \
