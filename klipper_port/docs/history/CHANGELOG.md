@@ -18,7 +18,7 @@ files in this folder; `git log` has the rest.
 - **Beeper kernel in mtd0** (owner's OK): mtd0_kernel_update.sh from the
   RAM-booted kernel, KUPDATE OK (232c743a, U-Boot unchanged, ecc_failures
   0). Booted from NAND: 63 pads set, beeper pad 0x000C1001, 2 CPUs, ubi0
-  root, Wi-Fi up, Klipper ready.
+  root, Wi-Fi up, Klipper ready, M300 heard (owner).
 - **Bank 3 pad fix in main** (TODO 20 closed): 7dd0f21 from the build box
   applied as c72b89e (mv61x0-upc.c + the DTS), so the next kernel build
   has what mtd0 runs.
