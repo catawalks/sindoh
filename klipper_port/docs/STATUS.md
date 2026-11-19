@@ -35,9 +35,11 @@ power save is on** (the new default with our kernel, TODO 26) and X uses
 
 ## Dev printer, as of 2026-11-15
 
-- **mtd0:** `m1-nandboot-bank3.uimg`, md5 `7eae8600a4872619711b3e891df129ca`
-  = C3 (the SMP freeze fix) + the GPIO bank 3 pad setup (the motor fix).
-  Rollback: C3 `a4e0cb33...` on the build box (10.10.0.68:8098).
+- **mtd0 (since 2026-11-18):** `m1-nandboot-beeper.uimg`, md5
+  `232c743afa9218f26174b401eb4559de` = C3 (the SMP freeze fix) + the GPIO
+  bank 3 pad setup (the motor fix) + the beeper pad (bank 5 pin 15).
+  Before it: bank3 `7eae8600...` (soaked 3.5 days); rollback images on the
+  build box (10.10.0.68:8098).
 - **Command line:** `console=ttyS0,115200n8 marvell_nand.write_window=1741,4091 panic=10 consoleblank=0 timer_mv61x0.hang_wdt=30`
 - **Wi-Fi module:** `mwifiex_usb.ko` 0028 (`6645762a`): reload-safe.
 - **Klipper:** the fork's `sindoh-dp200` ee0c7f8e (the pin in
@@ -58,7 +60,7 @@ power save is on** (the new default with our kernel, TODO 26) and X uses
   `dp200_wifi.py` `1143a67e` limits saved networks to 2.4 GHz.
 - **How to test and switch builds:**
   [dev_printer_testing.md](dev_printer_testing.md).
-- **4 GB card** is inside as storage; its gap (sector 64) holds the bank3
+- **4 GB card** is inside as storage; its gap (sector 64) holds the beeper
   image for RAM boots. The 2 GB card is the rescue card: never write it.
 - **Works:** boot from NAND, two CPUs (10 h soak on C3), NAND root, Wi-Fi
   (6 h soak), motion, heating, a full print with pause / unload / load /
@@ -102,7 +104,7 @@ and build in their own area and report files and md5s.
 |---|---|
 | Coordination, printer access, macros and config, install, docs | this repo (`klipper_port`), dev PC |
 | Kernel and boot (SMP, NAND, build variants) | build box `~/SINDOH-DEV`, served on 10.10.0.68:8098; summary in `docs/kernel/smp_freeze_summary.md` |
-| Motor / UPC driver | build box `~/SINDOH-DEV/motor`, branch `upc-bank3-pads` (7dd0f21, not yet merged into the kernel tree) |
+| Motor / UPC driver | build box `~/SINDOH-DEV/motor`, branch `upc-bank3-pads` (75743ea, local; its two commits are in this repo's kernel/m1 as c72b89e and 94813ae) |
 | Wi-Fi (8782 driver, firmware study) | build box; `TESTPLAN.md` and `upstream/` there; facts in `docs/kernel/wifi_88w8782.md` |
 | Klipper code (UPC MCU port, stepping, host modules) | the fork `catawalks/klipper`, branch `sindoh-dp200`; the pinned commit is `klipper/FORK`; rules in `klipper/README.md`; `docs/faster_stepping_plan.md` |
 | Touch screen app | `install/display/` in this repo; `docs/touchscreen_options.md` |

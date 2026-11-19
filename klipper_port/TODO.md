@@ -41,11 +41,8 @@ Either printer:
     4 kHz at 36 % duty sounds like stock** (owner's pick). Done 11-18:
     fork 9b174ab, `[output_pin beeper]`, M300 (36 %, owner: sounds like
     stock), the dryer's end signal. The kernel sets the pad (DTS
-    `5 15 0x000c1001`): RAM-booted m1-nandboot-beeper 232c743a (= mtd0's
-    bank3 + this pad), beep heard with no devmem step. Left:
-    - mtd0: write m1-nandboot-beeper (owner's OK); until then a reboot
-      runs bank3 7eae8600, whose beeper pad stays GPIO (no sound;
-      `sh tools/beep_test.sh` sets it by hand).
+    `5 15 0x000c1001`): m1-nandboot-beeper 232c743a (= bank3 + this pad)
+    RAM-booted (beep heard, no devmem step) and in mtd0 since 11-18. Left:
     - Work printer (vendor kernel 3.2): its pad state and timebase are
       unchecked; stock assumes a 1 MHz tick, so check the pitch there.
     - Optional: tones (M300 S<Hz>) need the firmware to take the period
