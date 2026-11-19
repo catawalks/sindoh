@@ -14,7 +14,11 @@ files in this folder; `git log` has the rest.
 - **Beeper pad from the kernel:** m1-nandboot-beeper (md5 232c743a, build
   box 75743ea: bank3 7eae8600 + `5 15 0x000c1001`) RAM-booted from the
   card's gap: "UPC pads: 63 set", pad 0x000C1001, M300 heard (owner).
-  rc.dp200's devmem step removed again. mtd0 still bank3.
+  rc.dp200's devmem step removed again.
+- **Beeper kernel in mtd0** (owner's OK): mtd0_kernel_update.sh from the
+  RAM-booted kernel, KUPDATE OK (232c743a, U-Boot unchanged, ecc_failures
+  0). Booted from NAND: 63 pads set, beeper pad 0x000C1001, 2 CPUs, ubi0
+  root, Wi-Fi up, Klipper ready.
 - **Bank 3 pad fix in main** (TODO 20 closed): 7dd0f21 from the build box
   applied as c72b89e (mv61x0-upc.c + the DTS), so the next kernel build
   has what mtd0 runs.

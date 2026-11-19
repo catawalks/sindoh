@@ -1,6 +1,6 @@
 # Two-CPU hard freeze: fixed 2026-11-11 (history and method below)
 
-**mtd0 since 2026-11-12:** `m1-nandboot-bank3` 7eae8600 = this fix (nanddsb a4e0cb33) + the GPIO bank 3 pad setup; see [../STATUS.md](../STATUS.md).
+**mtd0 since 2026-11-18:** `m1-nandboot-beeper` 232c743a = this fix (nanddsb a4e0cb33) + the GPIO bank 3 pad setup + the beeper pad (bank3 7eae8600 before it); see [../STATUS.md](../STATUS.md).
 
 **Status, 2026-11-11:** fixed. mtd0 holds the two-CPU kernel (nanddsb a4e0cb33) and `variants/nandboot.config` now builds the same thing: two CPUs, no `maxcpus=1`, `timer_mv61x0.hang_wdt=30`. See "Candidate 3 result" and "The fix" below. The sections before them describe the state on 11-09 and are kept as history.
 
