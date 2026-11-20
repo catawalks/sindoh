@@ -34,6 +34,11 @@ cut only when every line is checked on the **same payload** (md5).
       version `sindoh-dp200-9b174ab-v0.1.0-...`); `c_helper.so` `7380efa1`
       (the tested one); config and screen files match the repo by md5.
       Withdrawn by the content audit below; rebuilt as the second candidate.
+      **Second candidate `0ee46f50`** (build `3940525`, same fork and
+      firmware; 84242166 bytes, unpacked 241716 KiB). Release folders and
+      `SHA256SUMS` in `kernel/out/release/v0.1.0` on the PC; copied to the
+      USB stick's `_update_rodin_KlipperInstall` / `_KlipperRemove` and
+      checked against `SHA256SUMS` (2026-11-20). Not installed anywhere yet.
 - [ ] `install/usb/release_check.sh` passes: payload, dry-run install,
       runtime check. Not possible on the dev printer since 11-11: the
       installer needs the stock 3.2 kernel (ours is in its mtd0), and the
@@ -63,18 +68,27 @@ and the build printer's `etc/dp200/recovery_info` and two
 `init.mainline.bak*`. All three now in `runtime.exclude`. Otherwise
 clean: no networks, keys or passwords; the other hits were Debian package
 scripts, the D-Bus policy `wpa_supplicant.conf`, a tornado test key and CA
-bundles.
-- [ ] No Wi-Fi networks or keys: no `wpa_supplicant.conf` with a
+bundles. It also held `opt/dp200/*.prev` (the previous firmware build),
+now excluded too.
+
+2026-11-20, second candidate `0ee46f50`: clean. Only the expected
+package files above; no Marvell or Sindoh files, no `.prev`, no
+`/etc/dp200` state. The four lines below are checked on it.
+- [x] No Wi-Fi networks or keys: no `wpa_supplicant.conf` with a
       `network=` block, no saved-network files, no network names anywhere.
-- [ ] No per-printer data: no `printer_data` logs, Moonraker database,
+- [x] No per-printer data: no `printer_data` logs, Moonraker database,
       G-code, karas.db, `dp200_machine.cfg`, serial numbers, MAC addresses,
       or `/etc/dp200` state files from the build printer.
-- [ ] No Marvell or Sindoh files: no `mrvl/*.bin` Wi-Fi firmware, nothing
+- [x] No Marvell or Sindoh files: no `mrvl/*.bin` Wi-Fi firmware, nothing
       from `/app` (SVN_GUI, upc.ko, crypto_key.dat), no NAND images.
-- [ ] No credentials: SSH host keys, root or user passwords, tokens
-      (regenerate host keys at first boot if the root carries any).
-- [ ] `cdc-acm.ko` and other binaries we ship have a note on where they
-      came from and how to rebuild them.
+- [x] No credentials: SSH host keys, root or user passwords, tokens
+      (regenerate host keys at first boot if the root carries any). None
+      found; no password set in `/etc/shadow`.
+- [x] `cdc-acm.ko` and other binaries we ship have a note on where they
+      came from and how to rebuild them: `cdc-acm.ko`
+      (`install/kernel_modules/README.md`, `build_cdc_acm.sh`), `upctool`
+      (`host/upctool.c`), fm/io/`c_helper.so` (the fork commit), the rest
+      Debian packages. `dp200/regsnap.sh` is `tools/regsnap.sh`.
 
 ## 4. Hardware tests (owner at the printer)
 

@@ -16,6 +16,16 @@ files in this folder; `git log` has the rest.
   plus the build printer's `recovery_info` and two `init.mainline.bak*`.
   `runtime.exclude` drops all three. Installer and remover `.she` packed
   and verified.
+- **v0.1.0 payload, second candidate** `0ee46f50` (build `3940525`; also
+  without `opt/dp200/*.prev`): content audit clean. Release folders and
+  `SHA256SUMS` in `kernel/out/release/v0.1.0`; on the USB stick
+  (`_update_rodin_KlipperInstall`, `_KlipperRemove`), checked by SHA-256.
+  The work printer's 11-16 install log saved to
+  `kernel/out/payload_20261115/`. Not installed yet.
+- **Model survey stick** (its own repo; not published yet):
+  a read-only stick for every Sindoh model that saves a masked hardware
+  report to the stick; local commit `44a9521` in `sindoh_model_survey/`,
+  tested on the PC only.
 - `release_check.sh`'s dry run can no longer run on the dev printer (our
   kernel in mtd0; the installer needs stock 3.2): the work printer's
   install covers it (release_checklist.md).
