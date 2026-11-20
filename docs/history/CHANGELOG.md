@@ -5,6 +5,20 @@ one. The detail for everything up to 2026-11-12 is in
 [TODO_archive_2026-11-12.md](TODO_archive_2026-11-12.md) and the other
 files in this folder; `git log` has the rest.
 
+## 2026-11-20
+- **3DWOX 1 notes credited and extended** (docs/3dwox1.md): a source section
+  (Fredrik Gustafsson's PR #1 and his klipper-sindoh repo; nothing measured
+  by us), his later findings (the 2x travel was his firmware build, per-unit
+  motor offsets of 99, a TMC2224 driver board, stock homing values, model
+  tag, Wi-Fi start timing), and "no microSD seen" no longer read as "no slot".
+- **Installer reads each printer's motor currents** from its karas.db
+  (CONF_ENGINE_PWM NO=4) into `dp200_machine.cfg`, which dp200_printer.cfg
+  includes (wildcard: no file, no error). Not yet run on a printer (TODO 38).
+  The config comment had the dev printer's Y offset as +15; it is +20.
+- **`MESH_ADAPTIVE`** (opt-in, idea from klipper-sindoh): adaptive mesh from
+  the slicer's first-layer G-code; `PRINT_START MESH=0` skips the start mesh.
+  The default (4x4 mesh, bed-empty question) is unchanged.
+
 ## 2026-11-18
 - **Beeper in Klipper** (TODO 13): fork sindoh-dp200 9b174ab (klipper/FORK),
   `[output_pin beeper]` (io:pwm10), M300 at 36 % (owner: sounds like
