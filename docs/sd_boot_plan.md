@@ -268,3 +268,35 @@ before U-Boot. If it writes only the function bits and not what 0x1002 /
 answer the ROM. That would fit the silent hang. Checkable offline: the
 values the ROM dump writes to 0xf8041080/84 and 0xf804008c-98 in mode 6. The
 file system (ext2/ext4) plays no part there: the ROM reads raw sectors 0-19.
+
+**Open lead (2026-11-20): boot table in sector 0, as on Sindoh's own SD
+card.** Sindoh's factory recovery card for the 2X r1 ([prime_sd.md](prime_sd.md)),
+which the 6270 boot ROM starts from SD, puts the boot table (`c1deed1c`)
+at the very start of **sector 0**, in the same sector as the MBR partition
+table (0x1BE-0x1FF). Its first loader (MiniLoader) follows from sector 1;
+the first partition starts at sector 1280. Our DIP test 3 put the table
+in **sector 1** and kept a plain MBR in sector 0. The ROM dump says any of
+sectors 0-19 is searched, so this may change nothing, and the pad lead
+above is the likelier cause; but it is cheap to rule out.
+
+Test (owner at the printer; nothing on the NAND is written):
+1. A **spare** SD card: not the 2GB rescue card (its gap is never
+   written) and not the 4GB working card.
+2. **Checked 2026-11-20: mtd0 bytes 0x1BE-0x1FF are not zero** (they are
+   U-Boot ELF program headers: the DP200's image starts at 0x60, right
+   after its table, where the 6270 card's MiniLoader starts at sector 1).
+   So on the DP200 the boot table and an MBR can't share sector 0, and
+   the test card has **no partition table**.
+3. Write mtd0's boot block (bytes 0-0x33800) verbatim from **sector 0**,
+   so the table sits at byte 0 and its relative offsets land where they
+   do in NAND. Read back and compare byte for byte. (A Linux root on the
+   same card would have to wait until the ROM boots it; then a table-less
+   layout with U-Boot's own `mmc read` offsets is the way.)
+4. SW1 to SD (1 OFF, 2 OFF, 3 ON), serial console on, power on. A working
+   read prints the ROM's "Authentication success" or an error after its
+   banner; the same silence as test 3 means the sector was not the cause.
+5. SW1 back to NAND (1 ON, 2 ON, 3 OFF) and power on: the printer boots
+   as before.
+
+If it prints anything new, the pad setup (above) is not the blocker, and
+the next step is U-Boot's environment on the card (sector 0x28000).
