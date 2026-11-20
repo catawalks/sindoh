@@ -22,10 +22,13 @@ files in this folder; `git log` has the rest.
   (`_update_rodin_KlipperInstall`, `_KlipperRemove`), checked by SHA-256.
   The work printer's 11-16 install log saved to
   `kernel/out/payload_20261115/`. Not installed yet.
-- **Model survey stick** (its own repo; not published yet):
-  a read-only stick for every Sindoh model that saves a masked hardware
-  report to the stick; local commit `44a9521` in `sindoh_model_survey/`,
-  tested on the PC only.
+- **Model survey stick**
+  ([catawalks/sindoh-model-survey](https://github.com/catawalks/sindoh-model-survey),
+  owner-approved for publishing 11-20): a read-only stick for every Sindoh
+  model that saves a masked hardware report to the stick. Commit `bbdebc4`
+  adds a lock and stick-mount checks, because the 1X's `media.connect` runs
+  `auto_update.sh` twice per stick. Tested on the PC only; the first run on
+  hardware is to be a 1X. Linked from other_models.md.
 - `release_check.sh`'s dry run can no longer run on the dev printer (our
   kernel in mtd0; the installer needs stock 3.2): the work printer's
   install covers it (release_checklist.md).
