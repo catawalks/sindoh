@@ -11,7 +11,8 @@ files in this folder; `git log` has the rest.
   the address to the stick. Dry-run on the PC with stand-ins; not yet run
   on the 1X. Key pair kept outside the repositories.
 - **Beeper stock pitch left as is** (owner): the work printer's beeper is
-  faulty, so it can't give the stock pitch (TODO 13).
+  faulty, so it can't give the stock pitch (TODO 13). The owner measured
+  a stock 1X's beep at 4 kHz: the same as our pick (1250 ticks).
 - **2X ("Prime") recovery SD card read** (docs/prime_sd.md), on the dev
   printer, read-only: a factory NAND recovery card for the 2X r1 (boot
   header + MiniLoader + U-Boot + recovery Linux; LUKS partition opened
