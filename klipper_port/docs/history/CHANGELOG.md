@@ -6,6 +6,29 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **v0.1.0 payload, first candidate** (`c04476d0`, build `12b9481`): fork
+  9b174ab, fm `d7e9e872` and io `2982dfc1` from the build box (the
+  printer's own build failed: Windows line endings in the fork tarball,
+  now noted in dev_printer_testing.md), `c_helper.so` `7380efa1`. Saved
+  on the PC in `kernel/out/payload_20261120_v0.1.0`. The content audit
+  withdrew it: Marvell's 8782 Wi-Fi firmware was inside (through Debian's
+  merged `/lib`; the boot scripts copy it from the stock root anyway),
+  plus the build printer's `recovery_info` and two `init.mainline.bak*`.
+  `runtime.exclude` drops all three. Installer and remover `.she` packed
+  and verified.
+- **v0.1.0 payload, second candidate** `0ee46f50` (build `3940525`; also
+  without `opt/dp200/*.prev`): content audit clean. Release folders and
+  `SHA256SUMS` in `kernel/out/release/v0.1.0`; on the USB stick
+  (`_update_rodin_KlipperInstall`, `_KlipperRemove`), checked by SHA-256.
+  The work printer's 11-16 install log saved to
+  `kernel/out/payload_20261115/`. Not installed yet.
+- **Model survey stick** (its own repo; not published yet):
+  a read-only stick for every Sindoh model that saves a masked hardware
+  report to the stick; local commit `44a9521` in `sindoh_model_survey/`,
+  tested on the PC only.
+- `release_check.sh`'s dry run can no longer run on the dev printer (our
+  kernel in mtd0; the installer needs stock 3.2): the work printer's
+  install covers it (release_checklist.md).
 - **A second 3DWOX 1 source:** the top-level dumps of catawalks/sindoh are
   Sebastian Schmidt's 3DWOX 1 (yath/sindoh, 2021, the repo it was forked
   from): the DP200's partition table exactly, gluebi for mtd7/8, 57 MB free

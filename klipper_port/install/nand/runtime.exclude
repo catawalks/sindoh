@@ -116,3 +116,13 @@
 */site-packages/*/*.pyx
 # this printer's entropy seed (dp200-entropy.py): never shipped
 ./var/lib/dp200/random-seed
+# Marvell's Wi-Fi firmware: not ours to publish. dp200-start.sh and
+# init.mainline copy it from the printer's own stock root at boot; it still
+# slipped in through Debian's merged /lib (release audit, 2026-11-20).
+./usr/lib/firmware/mrvl
+./lib/firmware/mrvl
+# the build printer's state and editor backups (release audit, 2026-11-20)
+./etc/dp200/recovery_info
+./etc/dp200/*.bak*
+# the firmware build before this one, kept by payload_prep.sh on the card
+./opt/dp200/*.prev
