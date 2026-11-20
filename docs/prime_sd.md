@@ -8,11 +8,43 @@ decrypted recovery partition stay on the owner's PC (`prime_sd/`). They
 hold Sindoh's firmware and are never published. Inferences are marked
 "(our reading)".
 
-**The board:** the owner's Prime mainboard has pads for a DIP switch, but
-no switch is fitted (2026-11-20). (our reading) Its boot source is set by
-those pads as fitted at the factory, so whether it boots from NAND or SD
-depends on the board, not a user setting. A photo of the board would show
-how the pads are strapped.
+## The board (owner's photos, 2026-11-20)
+
+Silkscreen "Sindoh RODIN-PRIME", PWB `RDPP5057A`; label `RDPP5080L`.
+Photos on the owner's PC (`Mainboard_Photos/RODIN_PRIME/`), not published.
+
+- **Storage:** Macronix **MX30LF4G18AC** NAND (U29), the same 4 Gbit chip
+  as the DP200. A **microSD socket** (near the "DAPI" connector) is fitted,
+  and this card was in it. (our reading) The recovery script's mtd7 size
+  (244.5 MB) is only an `echo`; the real mtd7 is "the rest" of the chip.
+- **SoC** under a heatsink (U2), two DDR3 chips (FBGA code `D9SDD`),
+  25 MHz crystal, CR2032 for the RTC.
+- **Boot switch:** **S1 "sLoR SET"**, an 8-position footprint (DP200: SW1,
+  4 positions), with a "nRESET/sLoR READY" LED (DS1) and an nRESET button.
+  The owner reports no switch fitted, so the boot strap bits are whatever
+  the board defaults to without it.
+- **Debug:** a 20-pin **JTAG** footprint (CN50, not fitted) and two
+  4-pin headers **PC_DEBUG1** and **PC_DEBUG2** (our reading: serial
+  consoles; the 1X's console is `ttyS0` at 115200). A "GPIOC[0] LED" (DS8).
+- **Motor drivers:** Trinamic **TMC2224-LA** (U82, U83 seen, by the
+  cartridge motor connectors), the driver Fredrik's 3DWOX 1 has, not the
+  DP200's A4982.
+- **Other chips:** ST 24C08 I2C EEPROM (U1), ULN2003A (U52), LM339
+  comparators (U37), dual op-amps (U36, U48), a 74LVC08 (U38), an analog
+  multiplexer (U88), a Marvell Ethernet PHY (U23). Several footprints are
+  empty (U3, U7, U10, U27).
+- **Connectors:** X-AXIS and X-AXIS2 motors, X-HOME and X2-HOME sensors
+  (the 2X has two X carriages), Y and Z motors, Cartridge1 and Cartridge2
+  motors, NOZZLE 1&2 (a 2x15 header), BED thermistor and heater, Solenoid,
+  main and PSU fans, a pressure-release sensor, UICC (a flex connector;
+  our reading: the cartridge chip), DAPI, USB (mini-B and four type-A
+  footprints), RJ45, and the main power input.
+
+(our reading) A Prime boots from NAND in normal use: the recovery card
+stops at "touch to recover" every time, so it can't be the everyday boot.
+With no S1 fitted, the 6270 boot ROM probably tries SD before NAND when a
+bootable card is in; that would explain both how this card started and
+why the card was left in a board that came out of service.
 
 ## What it is
 

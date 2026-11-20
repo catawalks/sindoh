@@ -14,6 +14,9 @@ files in this folder; `git log` has the rest.
   -15/+20/+30/+50, the dev printer's values; the 1X's row 4 is
   -15/+40/+40/+50. Image and contents kept on the PC only. The Prime
   board has DIP switch pads but no switch. Dev printer's 4GB card back in.
+  Board photos (prime_sd.md "The board"): the DP200's NAND chip, a fitted
+  microSD socket, an unfitted 8-way "sLoR SET" switch, PC_DEBUG1/2
+  headers, a JTAG footprint and TMC2224 motor drivers.
 - **SD boot: a new lead documented** (sd_boot_plan.md): Sindoh's card has
   the boot table in sector 0, sharing it with the MBR; our DIP test 3 used
   sector 1. A five-step test for later, on a spare card. On the DP200
