@@ -19,6 +19,12 @@ Drive (FFF folder), downloaded 2026-10-27:
 Nothing here was run on those printers. It was read from the updates only
 (decrypted, unpacked, never executed).
 
+**Data from real printers:** the read-only survey stick
+[catawalks/sindoh-model-survey](https://github.com/catawalks/sindoh-model-survey)
+runs on every model above except the 30X. It saves a masked hardware and
+firmware report to the stick for owners to send in. The first run planned
+on hardware is a 1X.
+
 ## Summary
 
 | Model | SoC / motion firmware | Kernel | Storage | USB folder | `.she` cipher, key |
