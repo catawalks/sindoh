@@ -124,3 +124,5 @@
 # the build printer's state and editor backups (release audit, 2026-11-20)
 ./etc/dp200/recovery_info
 ./etc/dp200/*.bak*
+# the firmware build before this one, kept by payload_prep.sh on the card
+./opt/dp200/*.prev
