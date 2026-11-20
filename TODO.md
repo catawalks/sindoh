@@ -44,11 +44,11 @@ Either printer:
     `5 15 0x000c1001`): m1-nandboot-beeper 232c743a (= bank3 + this pad)
     RAM-booted (beep heard, no devmem step) and in mtd0 since 11-18. Left:
     - Stock pitch: **left as is** (owner, 11-20). The work printer's
-      beeper is faulty (barely audible at the highest stock setting), so
-      it can't give the stock pitch; getting it would mean reverting the
-      dev printer to stock. Check when another stock DP200 turns up. Our
-      M300 on the vendor kernel (stick install) is unchecked for the same
-      reason.
+      beeper is faulty (barely audible at the highest stock setting).
+      **The owner measured a stock 1X's beep at 4 kHz** (11-20), the same
+      as our 1250 ticks; a stock DP200 is still unmeasured (check if one
+      turns up). Our M300 on the vendor kernel (stick install) is
+      unchecked, since the work printer's beeper is faulty.
     - Optional: tones (M300 S<Hz>) need the firmware to take the period
       from Klipper's cycle_time for this block.
 16. **Homing clearance:** a few mm of Z clearance before X homing, so the
