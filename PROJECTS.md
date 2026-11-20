@@ -27,7 +27,7 @@ The numbers are stable; other documents refer to them.
 | 7 | Spaghetti / failure detection | Idea: document an external host |
 | 8 | Cartridge chip read/write | Low priority; read-only so far |
 | 9 | JTAG | Parked |
-| 10 | Before a release | Open: features, Wi-Fi priority |
+| 10 | Before a release | Open: the checklist (docs/release_checklist.md) |
 | 11 | G-code and log storage | Decided; to build with the end-goal install |
 | 12 | Wi-Fi chip firmware study | Low priority; a side session has started |
 
@@ -180,9 +180,12 @@ The CN3 header is prepared; no TAP answered (likely fused off).
 - Never publish a payload that contains Wi-Fi networks, or Marvell or
   Sindoh images.
 
-**Open before a release:** the saved-network priority bug (TODO); the next
-payload with the 2026-11-12 fixes, and a real print on it; the release
-checklist itself, which is still to be written.
+**Open before a release:** every line of
+[docs/release_checklist.md](docs/release_checklist.md) (written 2026-11-20),
+starting with its decisions. Owner, 2026-11-20: get release 1 going; the
+next payload and a real print on it come with the next work-printer
+visit. The Wi-Fi network fallback is no longer a blocker: put down to the
+dev printer's home network (owner, 2026-11-20; TODO 26).
 
 ## 11. G-code and log storage
 

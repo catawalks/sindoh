@@ -29,8 +29,8 @@ for Klipper" and error pages.
 
 ## Preferred network (2026-10-22)
 
-The printer had dropped from Niholedotcom to the second saved network,
-Fios-kVGD7, **which is a different router and subnet**: 192.168.1.204,
+The printer had dropped from the main home network to the second saved network
+**which is a different router and subnet**: 192.168.1.204,
 unreachable from 10.10.0.x. `wpa_supplicant` never leaves a working
 lower-priority network by itself. The screen app's watchdog now checks every
 10 min: if a saved network with a higher priority is in range (better than

@@ -6,6 +6,15 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **Release 1 started** (owner): [release_checklist.md](../release_checklist.md)
+  written (decisions, build, content audit, hardware tests, documents,
+  publish). TODO 26 is no longer a release blocker: the drops are put down
+  to the dev printer's home network (owner); only the watchdog's cached
+  scan is left. Home network names taken out of the current docs.
+- **3DWOX 1 partitions from the update files:** the update script is the
+  DP200's, byte for byte; the kernel is a rebuild of the same source; the
+  extra mtd7/8 are most likely gluebi. What only a real unit can tell is
+  listed in TODO 38.
 - **Each firmware line is its own target** (owner): other_models.md,
   3dwox1.md and TODO 38 no longer assume the 3DWOX 1 (RODUP_) shares the
   DP200's (RODIN_) mainboard.
@@ -247,7 +256,7 @@ files in this folder; `git log` has the rest.
   out of the scan list. The module (LG Innotek TWFM-M311D) has no usable
   5 GHz antenna. Deployed on the dev printer (1143a67e; .bak-1114 kept):
   no more 5 GHz attempts. It does not stop the AP's 91 s drops.
-- **Wi-Fi fallback traced** (TODO 26): the Niholedotcom access point
+- **Wi-Fi fallback traced** (TODO 26): the main home access point
   drops the printer 91 s after each association (reason 34); the
   switch-back watchdog reads stale scan results. Not fixed.
 

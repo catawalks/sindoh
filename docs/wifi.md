@@ -73,7 +73,7 @@ fake backend (25 checks).
   - "Hidden network…" is the last row of the network list (no HIDDEN
     button on the WiFi page);
   - ▲/▼ buttons with a page counter replace MORE.
-- **Real test by the user:** scan, keyboard and connect to Niholedotcom
+- **Real test by the user:** scan, keyboard and connect to the main home network
   worked; saved with priority 21.
 
 ## 2.4 GHz only (2026-11-14)
