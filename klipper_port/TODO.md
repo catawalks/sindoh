@@ -263,3 +263,25 @@ stages 1-5 done on the dev printer):
     and the broken-root prompt on hardware.
 36. **Stage 8:** the work printer.
 37. **Stage 9:** release checklist (PROJECTS #10).
+38. **One installer for every model** (owner 11-20: no per-model
+    releases; the installer reads the machine it is on and sets it up).
+    Model facts so far are from Fredrik Gustafsson's 3DWOX 1
+    ([docs/3dwox1.md](docs/3dwox1.md), "Later findings"), not our printers.
+    - Done 11-20, untested on a printer: the installer writes
+      `dp200_machine.cfg` with the motor currents from the printer's own
+      karas.db (CONF_ENGINE_PWM NO=4). First run: the next work-printer
+      upgrade (check the file and the BusyBox awk output; expect
+      0.425/0.6/0.65/0.75 only if its offsets equal the dev printer's).
+    - Model from the firmware tag: accept `RODUP_` (3DWOX 1) as well as
+      `RODIN_` in the installer's firmware check, `dp200-start.sh` and the
+      screen header; 3DWOX 1 sticks need `_update_rodin_up` and AES
+      packing (other_models.md), and it has 34.5 MB free on its root.
+    - Driver board: detect A4982 vs TMC2224 (GPIO bank 2 pin 0, as stock)
+      and, for a TMC2224, set it up the way stock does over its UART. First
+      settle what `/dev/ttyS2` is (power-management MCU in our
+      hardware_notes vs the TMC2224 UART in his audit).
+    - More stock values worth reading per printer (stock_routines.md has
+      the tables): the Z/E current variants (`MOTOR_PWM_ZOFFSET_DOWN`,
+      `EOFFSET_UNLOAD`), PID gains, leveling positions.
+    - `MESH_ADAPTIVE` (opt-in macro, 11-20) and `PRINT_START MESH=0`: not
+      yet run on a printer.

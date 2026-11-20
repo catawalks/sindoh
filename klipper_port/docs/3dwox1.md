@@ -1,5 +1,26 @@
 # 3DWOX 1: first hardware checks (2026-11-11)
 
+## Where this comes from
+
+**None of this was measured by us.** We have no 3DWOX 1; everything on
+this page comes from **Fredrik Gustafsson** (GitHub `jagheterfredrik`) and
+his one printer, and none of it has been repeated on our own machines
+(the dev DP200, a Stanley Model 1 converted to DP200Q, and the work
+DP200). Sources:
+
+- **Sections "The printer" to "Open on the 3DWOX 1":** his notes from
+  [catawalks/sindoh#1](https://github.com/catawalks/sindoh/pull/1)
+  (2026-11-11), brought in as his commit 8b51091. Only the file location
+  and two links were changed.
+- **"Later findings from klipper-sindoh":** read by us on 2026-11-20 from
+  his repo [jagheterfredrik/klipper-sindoh](https://github.com/jagheterfredrik/klipper-sindoh)
+  (2026-11-13: `docs/model_audit.md`, `klipper/config/3dwox1/printer.cfg`,
+  `image/stick/launch.sh`), and summarized in our words.
+- Lines marked **(our note)** are our own reading or inference from those
+  sources, not measurements.
+
+## His first checks
+
 First run of the DP200 port's tools on a Sindoh 3DWOX 1. Until now the
 3DWOX 1 was only known from its update files
 ([other_models.md](other_models.md)). Everything here was done on
@@ -21,6 +42,7 @@ port 9100, free space), plus a Z stall at 5 mm/s.
 | `/app/upc.ko` | present; `/dev/upc0`, `/dev/upc1` exist after `module_load.sh` |
 | Root | `ubi0:filesystem / ubifs`, 258.3 MB, **34.5 MB free** (DP200: 54 MB) |
 | microSD | none (`/dev/mmcblk*` absent) |
+| | **(our note)** this only says no card was seen; whether the mainboard has a slot (empty, or not fitted) is not known |
 | Network | Wi-Fi (`mlan0`); `eth0` not connected |
 
 `/proc/mtd`: mtd0-mtd6 have the DP200's names and sizes (mtd5 `0c800000`
@@ -134,3 +156,57 @@ hardware_notes.md is not tested here).
 - **Persistent Klipper boot:** the boot hook uses `/DEBUG_MACHINE`. On this
   firmware that leaves Wi-Fi without DHCP unless the hook starts `udhcpc`
   itself; check what the DP200 hook does.
+
+## Later findings from klipper-sindoh (2026-11-13)
+
+From his repo (see "Where this comes from"); his findings unless marked.
+
+- **The 11-12 "2x travel" was his own firmware build, not the printer.** He
+  built `fm.bin` from a copy of our port that had the step-batching option
+  on but not the matching `src/stepper.c` change, so every move ran at
+  twice the distance. His audit therefore marks these as **to retest at
+  1:1**: the Z stall at 5 mm/s, the "violent" X/Y homing, and the 198 mm Z
+  travel (measured by step count). The 11-11 tests above used our
+  `prebuilt/` firmware (2026-10-27), which predates that build. **(our
+  note)** Whether the 11-11 Z stall was affected is not clear from his
+  notes.
+- **Motor current per unit.** His stock karas.db has
+  `MOTOR_PWM_{X,Y,Z,E}OFFSET` = 99 on every axis, so stock drives the
+  current reference at (100 + 99) / 200 = 0.995. The 11-11 tests ran with
+  the dev DP200's values (Z 0.65, X 0.425, Y 0.575). **(our note)** Too low
+  a current is another candidate for the Z stall. Our installer now reads
+  these offsets from each printer's own karas.db (row `NO=4`, the row the
+  stock app uses: [stock_routines.md](stock_routines.md)) into
+  `dp200_machine.cfg`.
+- **A different stepper driver board.** His unit has Trinamic TMC2224
+  drivers, not the dev DP200's Allegro A4982. The stock app sets them up
+  over a UART on `/dev/ttyS2` (CHOPCONF `0x14010053` = 16 microsteps;
+  GCONF `0x141`, `I_scale_analog` set, so the VREF pin is believed to still
+  scale the current). It tells the boards apart by GPIO bank 2 pin 0.
+  Either board may be in either model. Klipper ran unchanged on his unit
+  only because the stock app had already configured the drivers; a boot
+  that skips the stock app (our NAND install, `/DEBUG_MACHINE`) leaves a
+  TMC2224 at its power-on defaults. **(our note)** Our
+  [hardware_notes.md](hardware_notes.md) has `ttyS2` as the link to the
+  power-management MCU (9600 8N1), which contradicts this; one of the two
+  needs checking on a printer.
+- **His per-unit values** (from his 3DWOX 1 `printer.cfg`, examples only):
+  Z switch height 2.725, probe `z_offset` 2.711, extruder PID
+  Kp 14.565 / Ki 1.566 / Kd 33.865 (210 C, `max_power` 0.6); bed PID not
+  calibrated. He ran gentler limits: `max_accel` 500, X/Y homing 50 mm/s,
+  `max_z_velocity` 3, Z homing 3 mm/s.
+- **Stock motion values he read:** stock backs Z off the switch at about
+  0.39 mm/s (at most 1.26 mm), so he uses `second_homing_speed` 0.5 and
+  `homing_retract_dist` 2 (ours: 2 mm/s and 5 mm); stock ramps its X/Y
+  homing seek at about 4500 mm/s2, so he raised `max_accel` to 3000 (ours:
+  1500). Not tried on our printers.
+- **Model tag:** `RODUP_` in `/snapshot_version.sh` = 3DWOX 1, `RODIN_` =
+  DP200/DP201. His start script and screen app name the model from it.
+- **Starting Klipper too early breaks stock Wi-Fi:** killing the stock app
+  about 5 s after it starts leaves the radio mid-setup (no access points in
+  scans, no Wi-Fi). Waiting until `mlan0` has an address first (up to
+  60 s) fixed it on his unit.
+- **His install route** runs Klipper from a Debian image on a USB stick
+  (loop-mounted, nothing written to the flash). **(our note)** Not our
+  direction: the end-goal installer stays on the printer, and the USB port
+  stays free for storage and the accelerometer.
