@@ -265,6 +265,8 @@ stages 1-5 done on the dev printer):
 37. **Stage 9:** release checklist (PROJECTS #10).
 38. **One installer for every model** (owner 11-20: no per-model
     releases; the installer reads the machine it is on and sets it up).
+    Each firmware line (RODIN_, RODUP_, the 6270 models) is treated as its
+    own target, possibly with its own mainboard ([docs/other_models.md](docs/other_models.md)).
     Model facts so far are from Fredrik Gustafsson's 3DWOX 1
     ([docs/3dwox1.md](docs/3dwox1.md), "Later findings"), not our printers.
     - Done 11-20, untested on a printer: the installer writes

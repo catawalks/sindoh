@@ -1,8 +1,12 @@
 # Installing Klipper on a Sindoh 3DWOX DP200
 
-> **Status: preview.** Klipper runs on the developer's printer. The one-stick
-> installer described here has been rehearsed (dry run) but not yet run end to
-> end on a printer. Read "Getting back to stock" before you start.
+> **Status: preview, no public release yet.** There is no download: the
+> first public release will be this USB stick install, once the screen app
+> and features are finished (owner, 2026-11-03; PROJECTS.md #10). Until then
+> the stick files are built by hand ("For maintainers" below). The installer
+> has run on the owner's two printers (DP200 and a DP200Q-converted Stanley
+> Model 1), on Sindoh firmware RODIN_200730_2. Read "Getting back to stock"
+> before you start.
 
 ## What you get
 
@@ -20,19 +24,23 @@
   probe, plus nozzle purge and wipe over the purge bin.
 
 What changes on the printer:
-- Klipper goes into the **internal "recovery" flash area**, which the
-  Sindoh firmware doesn't use. Its old content is saved to your USB stick
-  first.
+- Klipper goes into a `/klipper` folder on the printer's own system flash,
+  next to the Sindoh system.
+- To make room, the Sindoh touch-screen app (`/app/SVN_GUI`) and Qt WebKit
+  are removed. They are copied to your USB stick first and checked; the
+  remover puts them back.
 - One line is added to the start-up script.
 
-The Sindoh kernel and system stay installed, so you can switch back.
+The Sindoh kernel, its factory recovery area, the boot loader and the rest of
+the Sindoh system are not touched, so you can switch back.
 
 ## You need
 
 - A DP200 on Sindoh firmware **RODIN_200730_2** (the 2020 update).
   Other versions are untested.
 - A **USB stick**, FAT32, with **at least 400 MB free**. It holds the
-  installer and receives a 200 MB backup of the flash area.
+  installer (about 85 MB) and receives a backup of the Sindoh app and Qt
+  WebKit (in `dp200_stock_backup/`, one folder per printer).
 - The printer on **WiFi or Ethernet**, so you can reach the web interface.
   Find its IP on the Sindoh screen before installing, or in your router.
 
@@ -49,20 +57,23 @@ The Sindoh kernel and system stay installed, so you can switch back.
    into the printer's USB port.
 3. The screen shows **"Klipper install"** and checks the files (about a
    minute). **Touch the screen** to start.
-4. It saves the flash backup to the stick, formats the recovery area and
-   unpacks Klipper. This takes 5–20 minutes. **Do not switch the printer
-   off.**
-5. When the screen shows **"DONE - remove stick"**, remove the stick, then
-   touch the screen. The printer restarts into Klipper.
+4. It saves the Sindoh app and WebKit to the stick, removes them from the
+   printer and unpacks Klipper. This takes 5–20 minutes. **Do not switch
+   the printer off.**
+5. When the screen shows **"DONE"**, pull the stick. The printer restarts
+   into Klipper.
 6. Open `http://<printer-ip>/` in a browser. Mainsail should show
    "Printer is ready".
 
-**Keep the stick and the file `mtd5_recovery_backup.bin` on it.** You'll
-need them to restore the flash area later.
+**Keep the stick and its `dp200_stock_backup/` folder.** The remover uses
+it to put the Sindoh app back. (Without it, the remover takes the app from
+the printer's factory recovery area, an older version; Sindoh's update then
+brings it up to date.)
 
 If the screen shows **FAILED**, note the message, touch to reboot, and look at
-`_update_rodin/dp200_klipper_install.log` on the stick. Nothing has been
-changed if it failed before "Formatting NAND".
+`_update_rodin/dp200_klipper_install.log` on the stick. If it fails after
+removing the Sindoh app, it deletes the partial `/klipper` and puts the app
+back from the stick, so the Sindoh firmware starts as before.
 
 ## First-time setup (in Mainsail)
 
@@ -122,9 +133,11 @@ installer sees the existing installation and offers **UPGRADE**. Your
 ## Getting back to stock
 
 - **Back to the Sindoh firmware:** put `unmistakable_klipper_remove.she` in
-  `_update_rodin/` on a stick, together with the `mtd5_recovery_backup.bin`
-  (+ `.md5`) the installer saved. Plug it in and touch to confirm. It
-  restores the Sindoh start-up and writes the flash backup back.
+  `_update_rodin/` on the stick that has the `dp200_stock_backup/` folder.
+  Plug it in and touch to confirm. It restores the Sindoh start-up, deletes
+  `/klipper` and puts the Sindoh app and WebKit back. **`/klipper` holds
+  `printer.cfg`** (your calibration): download it from Mainsail first if you
+  want to keep it.
 - **Full factory reflash:** put the remove script next to Sindoh's own
   RODIN_200730_2 update files in `_update_rodin/`. The remove script runs
   first, then the Sindoh update reflashes the printer as usual.
