@@ -22,8 +22,8 @@ Nothing here was run on those printers. It was read from the updates only
 **Data from real printers:** the read-only survey stick
 [catawalks/sindoh-model-survey](https://github.com/catawalks/sindoh-model-survey)
 runs on every model above except the 30X. It saves a masked hardware and
-firmware report to the stick for owners to send in. The first run planned
-on hardware is a 1X.
+firmware report to the stick for owners to send in. First real data: the
+owner's 1X (2026-11-20), in [1x.md](1x.md).
 
 ## Summary
 
@@ -77,6 +77,10 @@ on hardware is a 1X.
   the Klipper UPC port is the right model. But the core type, memory map
   (ITCM/DTCM) and step/ADC peripherals must be probed again, as was done
   for the DP200 (`upc_fw/probe/`). The DTB lists a `dcmotor` block.
+  **Seen on the owner's 1X** ([1x.md](1x.md)): 4 cores, 1 GB RAM, an 8 GB
+  eMMC with an ext4 root (413 MB free) and a recovery system; `upc` is
+  loaded and started by the stock engine, next to Marvell's own stepper
+  and dcmotor kernel drivers; the same `CONF_ENGINE_PWM` motor offsets.
 - **88PA6270 references in Marvell's public code**
   (kernel/marvell_github.md):
   - Marvell's A3700-utils-marvell repo (`wtptp/`, the TIM builder and the
