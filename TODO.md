@@ -257,3 +257,8 @@ stages 1-5 done on the dev printer):
       `EOFFSET_UNLOAD`), PID gains, leveling positions.
     - `MESH_ADAPTIVE` (opt-in macro, 11-20) and `PRINT_START MESH=0`: not
       yet run on a printer.
+    - 1X (owner's, surveyed 11-20, [docs/1x.md](docs/1x.md)): the first
+      6270 data. Next for a port: the UPC memory map on the 6270, what the
+      stock engine talks to on `ttyS2`, how Marvell's stepper/dcmotor
+      drivers relate to the UPC, and heater/thermistor wiring. A serial
+      console on its `ttyS0` would help.

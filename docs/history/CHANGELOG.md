@@ -11,6 +11,10 @@ files in this folder; `git log` has the rest.
   the stock screen left it stuck at "Booting" after the hand-back (power
   cycle needed). Four 1X runs; reports in `survey_reports/` on the PC
   (not published: they come from the owner's printer).
+- **1X findings** written up in docs/1x.md: 88PA6270 with 4 x Cortex-A53,
+  1 GB, 8 GB eMMC (ext4 root, 413 MB free; recovery system in p5), UPC
+  loaded and started by the stock engine, Marvell stepper/dcmotor drivers,
+  `ttyS2` held by the engine, motor offsets -15/+15/+30/+50.
 - **v0.1.0 payload, first candidate** (`c04476d0`, build `12b9481`): fork
   9b174ab, fm `d7e9e872` and io `2982dfc1` from the build box (the
   printer's own build failed: Windows line endings in the fork tarball,
