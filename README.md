@@ -115,3 +115,18 @@ question.)
 and packs it into a `.she` USB update, with each model's update key built in. It supports the DP200 / DP201 /
 Model 1 family, the 3DWOX 1, 2X, 1X and 7X (the 30X's key is not known yet). Its README lists each model's logo
 format, update key and USB folder, found in Sindoh's own updates.
+
+## License
+
+Free and open source: everything in this repository by catawalks and its
+contributors is licensed under the **GNU General Public License, version 3
+or (at your option) any later version** ([LICENSE](LICENSE)). That covers
+`klipper_port/` (with its own exceptions, such as GPL-2.0 for the Linux
+code in `klipper_port/kernel/`), `Model_1_Converter/` and `boot_logo/`.
+
+Not covered: the original 3DWOX 1 notes and dumps by Sebastian Schmidt
+([yath/sindoh](https://github.com/yath/sindoh), 2021), which this repository
+was forked from: the first part of this README, `dmesg.txt`, `df.txt`,
+`proc_*.txt`, `update.sh`, `pack_firmware.sh` and `_update_rodin_up/`. His
+repository has no license, so they stay his. Nothing from Sindoh or Marvell
+(firmware, images, apps) is included.
