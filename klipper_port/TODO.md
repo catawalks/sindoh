@@ -181,59 +181,14 @@ Kernel (dev printer only):
     - Optional: refuse a root without init.mainline.
 
 Wi-Fi:
-26. **Wi-Fi leaves the preferred network** (traced 11-14, not fixed):
-    - Cause of the fallback: the access point that carries Niholedotcom
-      (BSSIDs ..:45:58:f7:f9:44, 2.4 GHz) disconnects the printer about
-      91 s after every association, reason code 34 (low ACK). Seen 14 times
-      in the 24 min after the 11-13 boot and again live on 11-14. Its 5 GHz
-      radio (-78 dBm) associates but gets no address. After enough failures
-      wpa_supplicant lands on the Fios-kVGD7 router, which held 27 h.
-      Power save was off. `cmd 0x23f error` (STA_CONFIGURE) shows about
-      62 s after each association on both routers, so probably unrelated.
-      Open: is it the AP (band steering / low-ACK kick) or our driver not
-      acknowledging? Compare with a stock system on the dev printer
-      (the work printer is at another site, not on these networks).
-      **Answered 11-17: it is our side.** Stock (with Sindoh's
-      200730_2 update) on the dev printer held the same AP for 67 min
-      with no drop and 0 of 3600 pings lost (docs/STATUS.md, first
-      section). Our kernel on the card root dropped the same way every
-      95 s (reason code 7 in that log). Next, back on our kernel:
-      compare with stock's setup (Marvell driver, wext, power
-      management on): try power save on, then the reason 34 low-ACK
-      path in mwifiex (ACKs / TX status, firmware version).
-      **11-17 night, back on our kernel: power save on fixes it.**
-      Before: dropped at 73 s after boot as always. With power save
-      on: no disconnect in 1 h 45 min, same AP; the PC's ping lost
-      one or two in a row every 5-20 min (likely power-save latency,
-      not drops). **Now the default on every printer, both kernels**
-      (owner, 11-17: init.mainline, dp200-wifi-action.sh and the USB
-      stick's dp200-start.sh; deployed on the dev printer, reaches the
-      work printer with the next payload).
-      /etc/dp200/wifi_power_save = on/off overrides.
-      **11-18: power save did NOT fix it.** The dmesg log
-      (/var/log/wifidrop.log, `dmesg -w` since 11-17 22:59) shows no
-      drop for 2 h (22:58 to 00:59 UTC, during the comparison print and
-      the PC's 1/s ping), then reason 7 drops every 95-125 s from 00:59
-      to now (475 of them), power save still reported on. A 10 min ping
-      from the PC on 11-18 14:00 did not stop them (10 of 600 lost,
-      6 drops), so traffic is not what kept the first 2 h clean. The
-      cold boot does set power save on (iw: on after the 11-17 22:57
-      boot). Open: what changed at 00:59 (2 h after association: a key
-      rekey, the DHCP lease, the AP's own timers?), and the UniFi
-      client log for the printer at 00:59. Owner 11-18: probably the
-      network (other IoT devices there drop about every 5 min);
-      troubleshoot the network separately first.
-    - 11-14: saved networks are now 2.4 GHz only (the module has no
-      usable 5 GHz antenna: docs/wifi.md). The 5 GHz detours are gone and
-      the printer is back on the AP 1 s after each drop, but the drops go
-      on (91 s and 94 s in the test). Owner will try the UniFi settings:
-      band steering, minimum RSSI, BSS transition / fast roaming, and the
-      client event log.
-    - Why it never goes back: `dp200_wifi.watchdog` reads cached scan
-      results, which hold only the current AP after a few minutes, so it
-      never sees the preferred network. A fresh scan alone makes
-      wpa_supplicant switch back (seen 11-14). Don't fix this half before
-      the first: it would only re-enter the 91 s loop every 10 min.
+26. **Wi-Fi watchdog never returns to the preferred network** (not a
+    release blocker). The drops that started it (one access point at the
+    dev printer's site disconnecting it every ~95 s on our kernel, not on
+    stock) are put down to that home network (owner, 2026-11-20); the
+    11-14 to 11-18 trace is in the changelog. Left: `dp200_wifi.watchdog`
+    reads cached scan results, which after a few minutes hold only the
+    current access point, so it never sees the preferred one; a fresh scan
+    makes wpa_supplicant switch back (seen 11-14).
 27. Upstream submission of the 8782 fix: **tabled by the owner 11-12**.
     The patch and cover letter are ready on the build box, not sent.
 
@@ -278,6 +233,20 @@ stages 1-5 done on the dev printer):
       `RODIN_` in the installer's firmware check, `dp200-start.sh` and the
       screen header; 3DWOX 1 sticks need `_update_rodin_up` and AES
       packing (other_models.md), and it has 34.5 MB free on its root.
+    - Partitions (checked 11-20 from the update files): the 3DWOX 1's
+      Sindoh update script is byte for byte the DP200's, with the same
+      kernel load (0x40000, 0x7C0000); its kernel is a 2018 rebuild of the
+      same 3.2.0-g67a8e16 source (same size, no driver or board string
+      differs). Its `/proc/mtd` (Fredrik) has the DP200's mtd0-6; mtd7/8
+      are most likely gluebi copies of the two attached UBI volumes, which
+      both kernels build in. The stick install writes files on the mounted
+      root, so it needs no raw partition knowledge. **Not in any update
+      file, so ask Fredrik** (read-only commands): `cat /proc/mtd`,
+      `cat /proc/cmdline`, `df /`, `du -sk /app/SVN_GUI` and the WebKit
+      files (will Klipper fit after removing them?), `ubinfo -a`,
+      `md5sum` of the first 256 KiB of `/dev/mtd0` (our mtd0 tool checks
+      the stock U-Boot block), `sqlite3 /app/nvram/karas.db 'select * from
+      CONF_ENGINE_PWM where NO=4'`, and the bank 2 pin 0 register.
     - Driver board: detect A4982 vs TMC2224 (GPIO bank 2 pin 0, as stock)
       and, for a TMC2224, set it up the way stock does over its UART. First
       settle what `/dev/ttyS2` is (power-management MCU in our

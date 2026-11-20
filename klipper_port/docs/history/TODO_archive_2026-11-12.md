@@ -295,13 +295,13 @@ still require the owner's explicit OK.
     drops on the test printer (68 deauths before the change, none over about
     a day as of 2026-11-03 08:40). **2026-11-06: 125 deauths** (reason 15)
     with power management still off, and the printer is on the
-    lower-priority Fios-kVGD7 (192.168.1.204) instead of Niholedotcom; its
+    lower-priority second home network (192.168.1.204) instead of the main home network; its
     Ethernet (10.10.0.147) is plugged in now, and 10.10.0.21 answers pings
     from another device. Separate open bug: after falling back to
     a lower-priority SSID, the printer does not rejoin a higher-priority
     SSID when it becomes available. Reproduce and trace preference/watchdog
     reconnect logic; the displayed ordering alone does not verify priority.
-    (2026-11-07: on Niholedotcom, priority 22; Fios-kVGD7 not in the scan,
+    (2026-11-07: on the main home network, priority 22; the second network not in the scan,
     so the fallback couldn't be reproduced from here.)
     Check stability on the upgraded work printer too.
 13. **Wi-Fi summary page accuracy:** SYSTEM -> NETWORK -> WIFI can show

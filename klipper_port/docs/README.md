@@ -41,6 +41,7 @@ Rules that keep it tidy:
 | Area | Document |
 |---|---|
 | Install from the USB stick (stock 3.2 kernel) | [INSTALL.md](INSTALL.md), [usb_installer.md](usb_installer.md) |
+| Before a public release | [release_checklist.md](release_checklist.md) |
 | NAND partitions, boot path, write rules | [nand_layout.md](nand_layout.md), [nand_restore.md](nand_restore.md), [kernel/nand_boot_cmdline.md](kernel/nand_boot_cmdline.md) |
 | End-goal install (our kernel + root in NAND) | [end_goal_install_plan.md](end_goal_install_plan.md), [internal_firmware_plan.md](internal_firmware_plan.md), [kernel/revert_to_stock_plan.md](kernel/revert_to_stock_plan.md) |
 | Mainline kernel | [no_gpl_plan.md](no_gpl_plan.md), [kernel/smp_freeze_summary.md](kernel/smp_freeze_summary.md), [kernel/upc_mainline_design.md](kernel/upc_mainline_design.md), [kernel/debian_root_boot.md](kernel/debian_root_boot.md), [mainline_userspace.md](mainline_userspace.md), [kernel/rtc_setup.md](kernel/rtc_setup.md), [kernel/touch_bu21029.md](kernel/touch_bu21029.md) |
