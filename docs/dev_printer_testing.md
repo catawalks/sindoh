@@ -65,7 +65,9 @@ from the PC server as described above. Run them with `sh` unless noted
 (they use `exit`, which must never reach the console shell).
 
 1. **Fork build** (`tools/fork_build_on_printer.sh`, about 5 min): on the
-   PC, pack the fork as `deploy/usb/t/klipper-tip.tgz` without the big
+   PC, pack the fork as `deploy/usb/t/klipper-tip.tgz` (with
+   `git -c core.autocrlf=false archive`: Windows line endings break
+   `scripts/check-gcc.sh`, 2026-11-20) without the big
    folders the build does not need: `git archive --format=tar.gz
    --prefix=klipper/ -o klipper-tip.tgz HEAD -- .` with an
    `:(exclude)docs` pathspec and an `:(exclude)lib/X` pathspec for every

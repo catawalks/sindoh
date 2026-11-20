@@ -28,17 +28,42 @@ cut only when every line is checked on the **same payload** (md5).
 - [ ] Payload built from the pinned fork commit (`klipper/FORK`, via
       `klipper/get_fork.sh`) and a committed port tree, with both commits
       written into the payload's version file (SYSTEM -> INFO shows them).
+      2026-11-20, first candidate `c04476d0` (build `12b9481`): fork
+      9b174ab (klippy `.version` `dp200-clean-c-7-g9b174ab`); fm `d7e9e872`
+      and io `2982dfc1` built on the build box (arm-none-eabi-gcc 14.2.1,
+      version `sindoh-dp200-9b174ab-v0.1.0-...`); `c_helper.so` `7380efa1`
+      (the tested one); config and screen files match the repo by md5.
+      Withdrawn by the content audit below; rebuilt as the second candidate.
 - [ ] `install/usb/release_check.sh` passes: payload, dry-run install,
-      runtime check.
+      runtime check. Not possible on the dev printer since 11-11: the
+      installer needs the stock 3.2 kernel (ours is in its mtd0), and the
+      card has no room for the 242 MB dry-run root. Covered instead by the
+      fresh install in section 4 on the work printer (stock 3.2).
 - [ ] Size: the unpacked runtime leaves at least 40 MB free on a stock
       RODIN_200730_2 root after the Sindoh app is removed (the installer
-      refuses below 10 MB).
-- [ ] Stick files packed with `install/usb/pack_she.sh`, then decrypted
+      refuses below 10 MB). Unpacked 242000 KiB; read `df /` on the work
+      printer after the install.
+- [x] Stick files packed with `install/usb/pack_she.sh`, then decrypted
       again the way `/app/auto_update.sh` does and compared byte for byte.
+      2026-11-20: installer and remover from the port commit of the
+      second candidate, verified by `pack_she.sh`'s own decrypt-and-compare
+      (OpenSSL 3.5 on the PC, `-md md5`).
 
 ## 3. Content audit (nothing that must not be published)
 
-On the unpacked payload, by listing and grepping, not by trust:
+On the unpacked payload, by listing and grepping, not by trust. The audit
+script reads every file name and every file under 8 MB inside the tar.gz
+(names, network names, `network={`/`psk=`, private keys, MAC-like strings,
+`/etc/shadow` passwords).
+
+2026-11-20, first candidate `c04476d0`: Marvell's
+`usr/lib/firmware/mrvl/usb8782_uapsta.bin` was in it (Debian's merged
+`/lib` let it past; the boot scripts already copy it from the stock root),
+and the build printer's `etc/dp200/recovery_info` and two
+`init.mainline.bak*`. All three now in `runtime.exclude`. Otherwise
+clean: no networks, keys or passwords; the other hits were Debian package
+scripts, the D-Bus policy `wpa_supplicant.conf`, a tornado test key and CA
+bundles.
 - [ ] No Wi-Fi networks or keys: no `wpa_supplicant.conf` with a
       `network=` block, no saved-network files, no network names anywhere.
 - [ ] No per-printer data: no `printer_data` logs, Moonraker database,
