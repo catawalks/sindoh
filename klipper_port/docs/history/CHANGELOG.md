@@ -6,6 +6,12 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **A second 3DWOX 1 source:** the top-level dumps of catawalks/sindoh are
+  Sebastian Schmidt's 3DWOX 1 (yath/sindoh, 2021, the repo it was forked
+  from): the DP200's partition table exactly, gluebi for mtd7/8, 57 MB free
+  then; credited in docs/3dwox1.md. `Model_1_Converter/` is the owner's
+  (usb_installer.md said "community"). The top level of catawalks/sindoh
+  is GPLv3 too, except Sebastian's files (no license, his).
 - **Release 1 decisions** (owner): v0.1.0; DP200 family only (RODIN_200730_2);
   pre-packed `.she` files; GPL-3.0-or-later (`LICENSE`, README "License";
   `kernel/` stays GPL-2.0). The installer now refuses a non-RODIN firmware
