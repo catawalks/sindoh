@@ -6,6 +6,11 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **Release 1 decisions** (owner): v0.1.0; DP200 family only (RODIN_200730_2);
+  pre-packed `.she` files; GPL-3.0-or-later (`LICENSE`, README "License";
+  `kernel/` stays GPL-2.0). The installer now refuses a non-RODIN firmware
+  line by name (a 3DWOX 1 passed every earlier check); syntax-checked and
+  the version parsing tested on both update files, not run on a printer.
 - **Release 1 started** (owner): [release_checklist.md](../release_checklist.md)
   written (decisions, build, content audit, hardware tests, documents,
   publish). TODO 26 is no longer a release blocker: the drops are put down
