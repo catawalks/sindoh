@@ -24,7 +24,7 @@ Nothing here was run on those printers. It was read from the updates only
 | Model | SoC / motion firmware | Kernel | Storage | USB folder | `.she` cipher, key |
 |---|---|---|---|---|---|
 | DP200 / DP201 / Model 1 | 88PA6170 "gemstone", `upc.ko` | 3.2 | NAND | `_update_rodin` | des3, `sindoh024601779` |
-| 3DWOX 1 | same as DP200 (same firmware, `RODIN_SUB=U`) | 3.2 | NAND | `_update_rodin_up` | AES, `sindoh024601779U` |
+| 3DWOX 1 | 88PA6170, `upc.ko` on the one unit checked (its own firmware line, `RODUP_`, `RODIN_SUB=U`) | 3.2 | NAND | `_update_rodin_up` | AES, `sindoh024601779U` |
 | 2X ("Prime") | 88PA6270 "granite2", `upc_6270.ko` | 4.2.8 | r1: NAND; r2: eMMC | `_update_rodin_prime` | des3, `sindoh024601779` |
 | 1X | 88PA6270 "granite2", `upc_6270.ko` | 4.2.8 | eMMC | `_update_rodin_1x` | AES, `sindoh0246017791` |
 | 7X ("Rodin H") | 88PA6270 "granite2", `upc_6270.ko` | 4.2.8 | eMMC | `_update_rodin_h` | AES, `sindoh024601779H` |
@@ -49,13 +49,20 @@ Nothing here was run on those printers. It was read from the updates only
 
 ## What this means for Klipper
 
-- **3DWOX 1:** the DP200 work should carry over almost unchanged. It's the
-  same firmware, SoC, kernel and motion firmware, with a different USB
-  folder and key. First hardware checks by a 3DWOX 1 owner (2026-11-11,
-  [3dwox1.md](3dwox1.md)): the prebuilt probe and Klipper firmware run
+- **Each firmware line is its own target.** RODIN_ (DP200, DP201), RODUP_
+  (3DWOX 1) and the others are built and shipped separately by Sindoh, so
+  each may have its own mainboard, wiring and stock values. The installer
+  tells them apart by the firmware tag and sets each up for what it is; a
+  fact checked on one line is not assumed for another.
+- **3DWOX 1 (RODUP_):** the same SoC and kernel build as the DP200 on the
+  one unit checked, by Fredrik Gustafsson, not by us
+  ([3dwox1.md](3dwox1.md)): the prebuilt probe and Klipper firmware ran
   unchanged; endstops, X/Y/Z, the part fan and both thermistor inputs
-  match the DP200. Heaters, extruder and the installer are still
-  untested there.
+  matched the DP200. Known differences: the USB folder and key, less free
+  space on the root, a TMC2224 driver board on his unit (the dev DP200 has
+  A4982s), motor offsets of 99, and what `/DEBUG_MACHINE` does to Wi-Fi.
+  Its mainboard may differ from the DP200's in ways not seen yet. Heaters,
+  extruder and the installer are untested there.
 - **2X, 1X, 7X:** a new platform. They use the 88PA6270 with Cortex-A53
   cores (the device tree also lists a Cortex-A15 interrupt controller) and
   Linux 4.2.8 with device trees. The stock motion firmware is "granite2"

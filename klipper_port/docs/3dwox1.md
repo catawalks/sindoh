@@ -183,7 +183,9 @@ From his repo (see "Where this comes from"); his findings unless marked.
   over a UART on `/dev/ttyS2` (CHOPCONF `0x14010053` = 16 microsteps;
   GCONF `0x141`, `I_scale_analog` set, so the VREF pin is believed to still
   scale the current). It tells the boards apart by GPIO bank 2 pin 0.
-  Either board may be in either model. Klipper ran unchanged on his unit
+  His audit says either board may be in either model; **(our note)** that
+  is his guess, and we treat the 3DWOX 1 (RODUP_) as its own line with
+  possibly its own mainboard. Klipper ran unchanged on his unit
   only because the stock app had already configured the drivers; a boot
   that skips the stock app (our NAND install, `/DEBUG_MACHINE`) leaves a
   TMC2224 at its power-on defaults. **(our note)** Our

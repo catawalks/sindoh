@@ -6,6 +6,13 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **Each firmware line is its own target** (owner): other_models.md,
+  3dwox1.md and TODO 38 no longer assume the 3DWOX 1 (RODUP_) shares the
+  DP200's (RODIN_) mainboard.
+- **INSTALL.md brought up to date:** no public release yet (decided
+  11-03); Klipper goes to `/klipper` on the stock root, the Sindoh app and
+  WebKit are backed up to the stick, mtd5 is untouched (it still described
+  the old mtd5 install); the remover deletes `printer.cfg` with `/klipper`.
 - **3DWOX 1 notes credited and extended** (docs/3dwox1.md): a source section
   (Fredrik Gustafsson's PR #1 and his klipper-sindoh repo; nothing measured
   by us), his later findings (the 2x travel was his firmware build, per-unit
