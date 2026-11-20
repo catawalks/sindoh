@@ -6,6 +6,11 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **Model survey v1.1 released** (catawalks/sindoh-model-survey): runs in
+  the background with no screen messages. On the owner's 1X, taking over
+  the stock screen left it stuck at "Booting" after the hand-back (power
+  cycle needed). Four 1X runs; reports in `survey_reports/` on the PC
+  (not published: they come from the owner's printer).
 - **v0.1.0 payload, first candidate** (`c04476d0`, build `12b9481`): fork
   9b174ab, fm `d7e9e872` and io `2982dfc1` from the build box (the
   printer's own build failed: Windows line endings in the fork tarball,
