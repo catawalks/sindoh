@@ -92,7 +92,8 @@ screen UI, the webcam, bed mesh with the built-in probe, filament load/unload, a
 installer for the internal NAND. Start with
 [`klipper_port/docs/INSTALL.md`](klipper_port/docs/INSTALL.md) (preview) and
 [`klipper_port/README.md`](klipper_port/README.md). The Klipper changes themselves are on the
-`sindoh-dp200` branch of [catawalks/klipper](https://github.com/catawalks/klipper/tree/sindoh-dp200).
+`sindoh-dp200` branch of [catawalks/klipper](https://github.com/catawalks/klipper/tree/sindoh-dp200). The port is free and open source under the GPL, version 3 or later
+([`klipper_port/LICENSE`](klipper_port/LICENSE)).
 
 ### Slicer profiles
 
