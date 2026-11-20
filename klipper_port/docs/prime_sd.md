@@ -8,6 +8,12 @@ decrypted recovery partition stay on the owner's PC (`prime_sd/`). They
 hold Sindoh's firmware and are never published. Inferences are marked
 "(our reading)".
 
+**The board:** the owner's Prime mainboard has pads for a DIP switch, but
+no switch is fitted (2026-11-20). (our reading) Its boot source is set by
+those pads as fitted at the factory, so whether it boots from NAND or SD
+depends on the board, not a user setting. A photo of the board would show
+how the pads are strapped.
+
 ## What it is
 
 A **NAND recovery card for the 2X r1** (88PA6270 with NAND). The 6270's

@@ -12,7 +12,13 @@ files in this folder; `git log` has the rest.
   with the board-derived key from its own script) with `PRIME_190726_2`,
   the 2X r1 mtd layout and a factory karas.db. Factory motor row NO=4 =
   -15/+20/+30/+50, the dev printer's values; the 1X's row 4 is
-  -15/+40/+40/+50. Image and contents kept on the PC only.
+  -15/+40/+40/+50. Image and contents kept on the PC only. The Prime
+  board has DIP switch pads but no switch. Dev printer's 4GB card back in.
+- **SD boot: a new lead documented** (sd_boot_plan.md): Sindoh's card has
+  the boot table in sector 0, sharing it with the MBR; our DIP test 3 used
+  sector 1. A five-step test for later, on a spare card. On the DP200
+  the two can't share the sector (mtd0 0x1BE-0x1FF is U-Boot data), so
+  the test card has no partition table.
 - **Model survey v1.1 released** (catawalks/sindoh-model-survey): runs in
   the background with no screen messages. On the owner's 1X, taking over
   the stock screen left it stuck at "Booting" after the hand-back (power
