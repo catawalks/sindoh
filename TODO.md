@@ -240,13 +240,14 @@ stages 1-5 done on the dev printer):
       differs). Its `/proc/mtd` (Fredrik) has the DP200's mtd0-6; mtd7/8
       are most likely gluebi copies of the two attached UBI volumes, which
       both kernels build in. The stick install writes files on the mounted
-      root, so it needs no raw partition knowledge. **Not in any update
-      file, so ask Fredrik** (read-only commands): `cat /proc/mtd`,
-      `cat /proc/cmdline`, `df /`, `du -sk /app/SVN_GUI` and the WebKit
-      files (will Klipper fit after removing them?), `ubinfo -a`,
-      `md5sum` of the first 256 KiB of `/dev/mtd0` (our mtd0 tool checks
-      the stock U-Boot block), `sqlite3 /app/nvram/karas.db 'select * from
-      CONF_ENGINE_PWM where NO=4'`, and the bank 2 pin 0 register.
+      root, so it needs no raw partition knowledge. **Confirmed on a real
+      unit** by Sebastian Schmidt's 2021 3DWOX 1 dumps (top of
+      catawalks/sindoh; docs/3dwox1.md): the DP200's mtdparts exactly, and
+      mtdblock7/8 = the gluebi copies of the UBI volumes. **Asked of
+      Fredrik (11-20, owner sends):** `df /`, the size of the Sindoh app
+      and WebKit (will Klipper fit?), `ubinfo -a`, the U-Boot block md5,
+      his karas.db motor row, what holds `/dev/ttyS2`, the bank 2
+      registers, a mainboard photo, and his OK for GPLv3 on his notes.
     - Driver board: detect A4982 vs TMC2224 (GPIO bank 2 pin 0, as stock)
       and, for a TMC2224, set it up the way stock does over its UART. First
       settle what `/dev/ttyS2` is (power-management MCU in our

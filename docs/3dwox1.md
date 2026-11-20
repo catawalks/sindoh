@@ -3,10 +3,11 @@
 ## Where this comes from
 
 **None of this was measured by us.** We have no 3DWOX 1; everything on
-this page comes from **Fredrik Gustafsson** (GitHub `jagheterfredrik`) and
-his one printer, and none of it has been repeated on our own machines
-(the dev DP200, a Stanley Model 1 converted to DP200Q, and the work
-DP200). Sources:
+this page comes from two other owners and their printers, and none of it
+has been repeated on our own machines (the dev DP200, a Stanley Model 1
+converted to DP200Q, and the work DP200): **Fredrik Gustafsson** (GitHub
+`jagheterfredrik`, 2026) and **Sebastian Schmidt** (GitHub `yath`, 2021).
+Sources:
 
 - **Sections "The printer" to "Open on the 3DWOX 1":** his notes from
   [catawalks/sindoh#1](https://github.com/catawalks/sindoh/pull/1)
@@ -16,6 +17,12 @@ DP200). Sources:
   his repo [jagheterfredrik/klipper-sindoh](https://github.com/jagheterfredrik/klipper-sindoh)
   (2026-11-13: `docs/model_audit.md`, `klipper/config/3dwox1/printer.cfg`,
   `image/stick/launch.sh`), and summarized in our words.
+- **"Sebastian Schmidt's 2021 dumps":** the files at the top of
+  catawalks/sindoh (`dmesg.txt`, `proc_partitions.txt`, `df.txt`,
+  `proc_version.txt`, the README's hardware notes), from his repo
+  [yath/sindoh](https://github.com/yath/sindoh), which catawalks/sindoh was
+  forked from. They are from his 3DWOX 1 (the repo is titled "Sindoh 3DWOX
+  1"), on the 2018 RODUP kernel build.
 - Lines marked **(our note)** are our own reading or inference from those
   sources, not measurements.
 
@@ -212,3 +219,31 @@ From his repo (see "Where this comes from"); his findings unless marked.
   (loop-mounted, nothing written to the flash). **(our note)** Not our
   direction: the end-goal installer stays on the printer, and the USB port
   stays free for storage and the accelerometer.
+
+## Sebastian Schmidt's 2021 dumps (a second 3DWOX 1)
+
+Read by us on 2026-11-20 from the top of catawalks/sindoh (see "Where this
+comes from"); the facts are his unit's, the comparisons ours.
+
+- **Kernel:** `3.2.0-g67a8e16 #20 SMP PREEMPT Wed Jan 24 16:15:58 KST
+  2018`, the same build as in Sindoh's RODUP_220111_1 update (the DP200's
+  is `#6`, 2016, from the same source).
+- **Partitions: the DP200's.** The kernel command line (from U-Boot's
+  environment) has exactly the DP200's `mtdparts`: kernel 8 MB, u-boot-env
+  128 KB, bbt 512 KB (read-only), boot-logo 1 MB, backup 8 MB, recovery
+  200 MB, filesystem the rest (294 MB); root `ubi0:filesystem`, and
+  `ubi1:backup` mounted on `/backup`. `/proc/partitions` lists
+  mtdblock7 (288,176 KB) and mtdblock8 (7,192 KB): **(our note)** the
+  gluebi devices of the two attached UBI volumes, so Fredrik's mtd7/mtd8
+  are the same thing and not a hardware difference.
+- **Root space then:** 264,580 KB, 57,452 KB free (on the firmware of
+  2021); Fredrik's unit on RODUP_200730_4 had 34.5 MB free.
+- **SD hosts:** the kernel registers two SDHCI controllers (`mmc0`,
+  `mmc1`, `sdhci-gogin`), with no card found. **(our note)** So the SoC's
+  SD hosts are enabled on this board too; whether a slot is fitted is
+  still not known.
+- **Serial ports:** `ttyS0`-`ttyS3` (16550A, 0xf8060000-0xf8063000), as on
+  the DP200. What is wired to `ttyS2` is still the open question above.
+- **Other hardware** (README): 800x480 panel on `/dev/fb0`, BU21029GUL
+  touch on `/dev/event0`, Wi-Fi 1286:2040, webcam 0c45:6341: all as on the
+  DP200.

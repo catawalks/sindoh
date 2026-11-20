@@ -19,7 +19,8 @@ stick, with no serial console, PC tools or Linux knowledge.
    rsync) runs if present.
 
 The OEM 2020 update (`Manufacturer_Firmware_Updates/…RODIN_200730_2.zip`) and
-the community "Model 1 converter" (`Model_1_Converter/`) both use step 3.
+the owner's "Model 1 converter" (`Model_1_Converter/` in catawalks/sindoh,
+2025) both use step 3.
 Both run in stock mode and in Klipper mode, because media.connect belongs to
 the stock kernel/BusyBox side.
 
