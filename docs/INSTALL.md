@@ -36,8 +36,10 @@ the Sindoh system are not touched, so you can switch back.
 
 ## You need
 
-- A DP200 on Sindoh firmware **RODIN_200730_2** (the 2020 update).
-  Other versions are untested.
+- A printer of the **DP200 family** (DP200, DP201, or a printer converted
+  to DP200Q) on Sindoh firmware **RODIN_200730_2** (the 2020 update).
+  Other versions and other Sindoh models (such as the 3DWOX 1) are not
+  supported yet: the installer refuses them with a message.
 - A **USB stick**, FAT32, with **at least 400 MB free**. It holds the
   installer (about 85 MB) and receives a backup of the Sindoh app and Qt
   WebKit (in `dp200_stock_backup/`, one folder per printer).
@@ -154,8 +156,8 @@ sh install/usb/pack_she.sh install/usb/unmistakable_klipper_install.sh /mnt/sda1
 `pack_she.sh` encrypts the installer the way Sindoh's update mechanism
 expects. The DP200 family's update key is built in (checked on a Sindoh
 DP200 and a Stanley Model 1); `-k crypto_key.dat` uses another printer's key
-instead. Whether to publish pre-packed `.she` files is an open
-project decision.
+instead. Releases ship the `.she` files already packed (owner,
+2026-11-20), so users only copy the folder to a stick.
 
 Rehearse an installer without touching the flash (no screen, no reboot; it
 unpacks into `/mnt/sd/dryrun_root`):

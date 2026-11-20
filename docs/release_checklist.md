@@ -8,19 +8,20 @@ is a later release with its own checklist.
 Mark each line with the date and the build it was checked on. A release is
 cut only when every line is checked on the **same payload** (md5).
 
-## 1. Decisions (owner, before the build)
+## 1. Decisions (owner, 2026-11-20)
 
-- [ ] **Version and tag:** for example `v0.1.0`, as a tag on catawalks/sindoh.
-- [ ] **Firmware lines supported:** release 1 = RODIN_ (DP200, DP201,
-      DP200Q conversions) on RODIN_200730_2. Every other line (RODUP_ 3DWOX 1,
-      the 6270 models) is refused with a clear message, not half-installed.
-      (TODO 38 has what RODUP_ still needs.)
-- [ ] **Pre-packed `.she` files in the release:** yes or no (INSTALL.md
-      "For maintainers" leaves it open). A release that people can use
-      without a Linux PC needs them.
-- [ ] **License:** neither catawalks/sindoh nor the port has a LICENSE file.
-      The fork is Klipper's GPLv3 (`COPYING`). Pick one for the port's own
-      code (scripts, screen app, configs, docs) and add the file.
+- [x] **Version and tag:** `v0.1.0`, as a tag on catawalks/sindoh.
+- [x] **Firmware lines supported:** the DP200 family only (RODIN_: DP200,
+      DP201, DP200Q conversions) on RODIN_200730_2, the only hardware we
+      have tested. The installer refuses every other line by name
+      (RODUP_ 3DWOX 1, the 6270 models). More models once we have data
+      from their owners (TODO 38).
+- [x] **Pre-packed `.she` files:** yes. The release is ready to copy to a
+      flash drive as is; no PC tools needed.
+- [x] **License:** GPL-3.0-or-later for the port's own work, like Klipper,
+      Moonraker and Mainsail (`LICENSE`, README "License"); `kernel/` stays
+      GPL-2.0 like Linux. Still to do: the OK of outside contributors for
+      their files under it (Fredrik Gustafsson, docs/3dwox1.md).
 
 ## 2. Build
 
@@ -82,6 +83,9 @@ On the release payload, on a printer that does not have it yet:
       replaces the stock heater safety.
 - [ ] Credits: Klipper, Moonraker, Mainsail; contributors (Fredrik
       Gustafsson's 3DWOX 1 notes).
+- [ ] The installer's refusal of a non-RODIN printer (2026-11-20, from
+      `/snapshot_version.sh`) checked on hardware or in a dry run with a
+      RODUP_ version file.
 
 ## 6. Publish
 

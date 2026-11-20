@@ -65,3 +65,22 @@ There are two ways it is installed today:
 
 The first bring-up notes (October 2026) are in
 [docs/history/README_bringup_2026-10.md](docs/history/README_bringup_2026-10.md).
+
+## License
+
+Free and open source. The port's own work (scripts, the touch-screen app,
+configs, `upctool`, the UPC firmware probe, tools and docs) is licensed
+under the **GNU General Public License, version 3 or (at your option) any
+later version**: see [LICENSE](LICENSE). That is the license of Klipper
+itself, and of Moonraker and Mainsail.
+
+Exceptions:
+- `kernel/`: patches and drivers for Linux, so **GPL version 2** (Linux's
+  license), as in the files' own headers.
+- The Klipper fork ([catawalks/klipper](https://github.com/catawalks/klipper),
+  branch `sindoh-dp200`) keeps Klipper's GPLv3.
+- Contributed files keep their author's credit (for example
+  [docs/3dwox1.md](docs/3dwox1.md)).
+
+Nothing from Sindoh or Marvell (firmware, images, apps, Wi-Fi firmware)
+is part of this repository or its releases.
