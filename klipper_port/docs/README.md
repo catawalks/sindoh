@@ -51,5 +51,5 @@ Rules that keep it tidy:
 | Testing on the dev printer: rules, switching Klipper builds, the standard tests, probe calibration | [dev_printer_testing.md](dev_printer_testing.md) |
 | Motion and stepping | [faster_stepping_plan.md](faster_stepping_plan.md), [input_shaping.md](input_shaping.md), [test_print_plan.md](test_print_plan.md) |
 | Touch screen app | [touchscreen_options.md](touchscreen_options.md) |
-| Other topics | [cartridge_chip.md](cartridge_chip.md), [other_models.md](other_models.md), [3dwox1.md](3dwox1.md), [1x.md](1x.md), [sd_boot_plan.md](sd_boot_plan.md), [jtag_prep.md](jtag_prep.md), [kernel/marvell_github.md](kernel/marvell_github.md) |
+| Other topics | [cartridge_chip.md](cartridge_chip.md), [other_models.md](other_models.md), [3dwox1.md](3dwox1.md), [1x.md](1x.md), [prime_sd.md](prime_sd.md), [sd_boot_plan.md](sd_boot_plan.md), [jtag_prep.md](jtag_prep.md), [kernel/marvell_github.md](kernel/marvell_github.md) |
 | History | [history/CHANGELOG.md](history/CHANGELOG.md), everything else in `history/` |

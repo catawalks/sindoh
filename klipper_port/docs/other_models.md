@@ -81,6 +81,10 @@ owner's 1X (2026-11-20), in [1x.md](1x.md).
   eMMC with an ext4 root (413 MB free) and a recovery system; `upc` is
   loaded and started by the stock engine, next to Marvell's own stepper
   and dcmotor kernel drivers; the same `CONF_ENGINE_PWM` motor offsets.
+  **A 2X r1 factory recovery SD card** ([prime_sd.md](prime_sd.md)): the
+  6270 boots it from SD (Marvell boot header, MiniLoader, U-Boot), and it
+  rewrites the NAND root with `PRIME_190726_2`; it gives the 2X r1 NAND
+  layout and Sindoh's factory motor offsets.
 - **88PA6270 references in Marvell's public code**
   (kernel/marvell_github.md):
   - Marvell's A3700-utils-marvell repo (`wtptp/`, the TIM builder and the
