@@ -111,9 +111,17 @@ while the owner homed and jogged from the stock screen.
   Klipper extruded with the stock values (2026-11-21).
 - **Two feed motors at the rear, in series** (owner, with the rear
   gear train open, 2026-11-21): engine 4 is the initial feed motor at
-  the cartridge bay, engine 3 the second-stage (rear) feed motor that
-  pushes the filament on toward the head. ("Extruder" above means this
-  rear motor.)
+  the cartridge bay; engine 3 is **the extruder motor**. It sits at the
+  rear too and pushes the filament through the tube to the head; there
+  is no motor after it.
+- **The cartridge-bay switch is GPIO 80, one signal for two things**
+  (watched live under Klipper while the owner tried each): it goes low
+  when filament is pushed in through the filament opening port, and
+  equally when its arm is lifted to the top as a cartridge does. An even
+  lower path into the feeder passes under the arm and does not trip it.
+  GPIO 76 (`gp_cartFilaSensor[0]`) never changed: by the pattern of the
+  other "[0]" signals it belongs to the 2X's other bay (our reading, and
+  the owner's), as GPIO 121 does to the other extruder.
 - **How the stock load is sequenced** (console and pin recordings):
   the first motor starts alone; check "411" passes when the
   cartridge-bay filament switch (GPIO 80) changes, within a second;
