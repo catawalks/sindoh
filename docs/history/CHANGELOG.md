@@ -6,6 +6,11 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **1X mapped live over SSH** (docs/1x.md "Live map"): two UPC cores
+  (ITCM 0xF9800000/0xF9810000, shared DTCM 0xF9880000) running small
+  helper firmware; stepping on six Marvell `stepper-mod` blocks; TMC2224
+  drivers on one single-wire UART (ttyS2) with a 3-bit motor select.
+  Read-only.
 - **Remote shell stick for the 1X** (`tools/remote_shell/`): starts the
   stock dropbear on port 2222, key login only, everything in RAM; writes
   the address to the stick. **Works on the owner's 1X** (11-20): key
