@@ -62,6 +62,9 @@ the same way, like the DP200's:
   is unused on the 1X. On the 2X each head has its own filament dump
   station and cleaning area at its own end (owner).
   Y is the bed moving front to back, and Z is the bed going up.
+- **Home sensor inputs** (found by moving the head and bed by hand):
+  X is GPIO 99, Y is GPIO 82, both high at home. Z is not found yet (the
+  bed cannot be moved by hand). Neither door has a sensor.
 - The homing moves themselves run inside the FM microcode (commands 0x1A
   to 0x1F: Z long move, Z find, Y long move, Y find, X long move, X
   find); the Linux program only starts them. After them it sets Y to
@@ -111,7 +114,14 @@ There is no deployable pin as on the DP200.
   80 °C and bed 50 °C on the screen whenever it is idle (owner). The boot
   log shows the settings going to the IO microcode: heaters 0 and 1 to
   80, heater 2 (the bed) to 50. The screen's power saving setting is the
-  stock way to let it cool.
+  stock way to let it cool: after the set time it switches off the
+  heaters, the case lights and the motors (owner).
+- **Reading the temperatures:** the microcode publishes them in
+  milli-degrees in the shared memory (offset 0xAF40: nozzle 1, nozzle 2,
+  bed). ADC mux select 1 is the nozzle thermistor, 2 and 3 both read the
+  bed, 4 is open on the 1X. The lookup tables are the DP200's with the
+  same index bases (index = 11-bit code - 110 for the nozzle, - 381 for
+  the bed).
 - **Start-up heater test:** each nozzle heater is switched fully on for a
   moment at boot ("FULL Heater 1 is Enabled as 1000", the reading climbs
   about 35 °C in 13 s). Heater 0 reports -60 (no sensor) on this 1X; the
