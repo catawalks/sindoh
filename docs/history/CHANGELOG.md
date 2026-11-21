@@ -6,6 +6,12 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **1X stock binaries studied offline** (docs/1x.md "Offline study"):
+  motion runs on the UPCs as on the DP200 (engine embeds `io`/`fm`
+  microcode, FM drives all six stepper blocks); stepper-mod register
+  names and offsets from Marvell's driver (DP200 layout + 0x28); 26 GPIOs
+  mapped (fans, filament sensors, TMC select, power key); nozzle and bed
+  thermistor tables found. Read-only; binaries kept on the PC.
 - **1X mapped live over SSH** (docs/1x.md "Live map"): two UPC cores
   (ITCM 0xF9800000/0xF9810000, shared DTCM 0xF9880000) running small
   helper firmware; stepping on six Marvell `stepper-mod` blocks; TMC2224
