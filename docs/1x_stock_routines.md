@@ -174,6 +174,24 @@ There is no deployable pin as on the DP200.
   its own cut-out ("over 270*1000mC, SAFE FUNCTION PWM = 0") and
   "Out Of Control Loop" errors.
 
+## Fans, lights and beeper (switched one at a time, 2026-11-21)
+
+| Output | What it is (owner watching, 2026-11-21) |
+|---|---|
+| PWM block 2 | part cooling fan |
+| PWM block 10 | power supply fan (80 % whenever stock is up; enable GPIO 127) |
+| PWM block 20 | back right exhaust fan |
+| GPIO 188 (`gp_En_NozzleFan[1]`) | extruder (hot end) fan, on/off |
+| GPIO 112 (`gp_En_MainFan[1]`) | back left exhaust fan, on/off |
+| PWM block 7 | case lights (static level) |
+| PWM block 19 | beeper (period 250 = 4 kHz, duty 0.36 as stock) |
+| PWM blocks 14, 22; GPIO 225 | nothing on the 1X (the 2X's second head, our reading) |
+
+- The power supply fan seems to run whenever the heaters can be on
+  (owner).
+- The fan "lock" inputs in the GPIO table of [1x.md](1x.md) are the
+  matching tach or stall signals; not checked yet.
+
 ## Nozzle cleaning, load and unload (database, this printer)
 
 X positions at 80 steps/mm, Z at 2560 steps/mm.
