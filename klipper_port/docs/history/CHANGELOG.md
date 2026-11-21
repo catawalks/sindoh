@@ -8,8 +8,10 @@ files in this folder; `git log` has the rest.
 ## 2026-11-20
 - **Remote shell stick for the 1X** (`tools/remote_shell/`): starts the
   stock dropbear on port 2222, key login only, everything in RAM; writes
-  the address to the stick. Dry-run on the PC with stand-ins; not yet run
-  on the 1X. Key pair kept outside the repositories.
+  the address to the stick. **Works on the owner's 1X** (11-20): key
+  login as root over Wi-Fi, host key matched the stick's fingerprint;
+  the stock watchdog left dropbear running and the stock app untouched.
+  Key pair kept outside the repositories.
 - **Beeper stock pitch left as is** (owner): the work printer's beeper is
   faulty, so it can't give the stock pitch (TODO 13). The owner measured
   a stock 1X's beep at 4 kHz: the same as our pick (1250 ticks).
