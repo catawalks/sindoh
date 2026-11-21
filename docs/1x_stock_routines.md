@@ -91,6 +91,15 @@ while the owner homed and jogged from the stock screen.
   first, then both run with the extruder at about twice the cartridge's
   step rate (console: "PressToOffMovedStep, E:4296, C:2062"). Engine 5
   never changed (the 2X's second set, our reading; pins 54-58).
+- **The extruder has a press and a clutch worked by the motors.** The
+  stock program has `StepperPressPositionToOn`, `StepperPressPositionToOff`,
+  `StepperPressClutchOn`, `StepperPressClutchOff`, `engine_extrPressRelease`
+  and `engine_extrPressAdjust` (with a `_flexUnload` variant), and at
+  wake-up it prints "PressToOffMovedStep, E:4296, C:2062" and
+  "PressToOnMovedStep, E:5075, C:2436" while both motors run briefly.
+  Stepping the extruder's engine without that sequence (tried under
+  Klipper: the driver counted 20000 steps) moved nothing in the head
+  and fed nothing. Not decoded yet.
 - **Filament motion encoder:** GPIO 65 and 67 pulse while filament is
   fed (about 31 changes a second at the load speed).
 - A sixth line of each axis group (GPIO 167 for X, 173 for Y, 41 for Z)
@@ -213,7 +222,8 @@ There is no deployable pin as on the DP200.
   | 28 | **bed** (heater 2) | switched on at wake-up, 95 % duty until "BD Target Reached" |
   | 25 | heater 0: the 2X's other nozzle | no sensor on the 1X (reads -60 °C), and the stock firmware leaves this output switched fully on whenever heaters are enabled. Nothing can be connected to it on a 1X. **On a 2X this is a real heater: never give it a heater without its sensor.** |
 
-  Not yet driven by Klipper.
+  Confirmed under Klipper the same day: block 5 heated only the
+  nozzle, block 28 only the bed.
 - The fan "lock" inputs in the GPIO table of [1x.md](1x.md) are the
   matching tach or stall signals; not checked yet.
 
