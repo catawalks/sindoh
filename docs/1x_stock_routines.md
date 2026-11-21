@@ -109,6 +109,10 @@ while the owner homed and jogged from the stock screen.
   0x30334; X, Y and Z use 0x33224/0x33234. With the axis value on the
   extruder engine its driver counts steps but the motor does not turn.
   Klipper extruded with the stock values (2026-11-21).
+- **Filament sensors:** GPIO 120 (`gp_extrFilaSensor[1]`) is low while
+  filament is at the extruder's entry and high when it is gone (seen
+  during a retract). From the cartridge bay to the extruder the
+  filament path is about a meter long.
 - **Filament motion encoder:** GPIO 65 and 67 pulse while filament is
   fed (about 31 changes a second at the load speed).
 - A sixth line of each axis group (GPIO 167 for X, 173 for Y, 41 for Z)
