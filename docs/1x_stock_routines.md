@@ -203,6 +203,17 @@ There is no deployable pin as on the DP200.
 
 - The power supply fan seems to run whenever the heaters can be on
   (owner).
+- **Heater outputs** (worked out 2026-11-21 from the recorded cartridge
+  load, matching each PWM block's on/off times with the console's
+  heater messages):
+
+  | PWM block | Heater | Evidence |
+  |---|---|---|
+  | 5 | **nozzle** (the stock "heater 1" / EX2) | off and on again within a second of each "N:1 ... En:0" and "N:1, T:240, En:1"; full on, then 99 % duty, on the way to 240 °C |
+  | 28 | **bed** (heater 2) | switched on at wake-up, 95 % duty until "BD Target Reached" |
+  | 25 | heater 0: the 2X's other nozzle | no sensor on the 1X (reads -60 °C), and the stock firmware leaves this output switched fully on whenever heaters are enabled. Nothing can be connected to it on a 1X. **On a 2X this is a real heater: never give it a heater without its sensor.** |
+
+  Not yet driven by Klipper.
 - The fan "lock" inputs in the GPIO table of [1x.md](1x.md) are the
   matching tach or stall signals; not checked yet.
 
