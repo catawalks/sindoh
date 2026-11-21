@@ -5,6 +5,11 @@ Release 1 is the USB stick install on the stock 3.2 kernel (`/klipper` on
 the stock root; PROJECTS.md #10). The end-goal install (our kernel in mtd0)
 is a later release with its own checklist.
 
+**v0.1.0 went out early as a beta pre-release** (owner, 2026-11-20): the
+second candidate `0ee46f50`, close to the build the work printer has run
+since 11-15, with sections 4-6 not yet done. The work printer's install
+on 11-23 is its first hardware test; v0.1.x or v0.2.0 completes the list.
+
 Mark each line with the date and the build it was checked on. A release is
 cut only when every line is checked on the **same payload** (md5).
 

@@ -27,7 +27,7 @@ The numbers are stable; other documents refer to them.
 | 7 | Spaghetti / failure detection | Idea: document an external host |
 | 8 | Cartridge chip read/write | Low priority; read-only so far |
 | 9 | JTAG | Parked |
-| 10 | Before a release | Open: the checklist (docs/release_checklist.md) |
+| 10 | Before a release | v0.1.0 beta pre-release out 11-20; open: the checklist's hardware tests (docs/release_checklist.md) |
 | 11 | G-code and log storage | Decided; to build with the end-goal install |
 | 12 | Wi-Fi chip firmware study | Low priority; a side session has started |
 

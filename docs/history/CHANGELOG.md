@@ -6,6 +6,10 @@ one. The detail for everything up to 2026-11-12 is in
 files in this folder; `git log` has the rest.
 
 ## 2026-11-20
+- **v0.1.0 released as a beta pre-release** (owner): payload `0ee46f50`
+  (build `3940525`, fork 9b174ab) on catawalks/sindoh Releases, with the
+  install and remove folders and SHA256SUMS. Not yet installed on a
+  printer in this exact build; the work printer tests it on 11-23.
 - **1X stock binaries studied offline** (docs/1x.md "Offline study"):
   motion runs on the UPCs as on the DP200 (engine embeds `io`/`fm`
   microcode, FM drives all six stepper blocks); stepper-mod register
