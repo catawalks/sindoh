@@ -62,9 +62,34 @@ the same way, like the DP200's:
   is unused on the 1X. On the 2X each head has its own filament dump
   station and cleaning area at its own end (owner).
   Y is the bed moving front to back, and Z is the bed going up.
-- **Home sensor inputs** (found by moving the head and bed by hand):
-  X is GPIO 99, Y is GPIO 82, both high at home. Z is not found yet (the
-  bed cannot be moved by hand). Neither door has a sensor.
+- **Home sensor inputs:** X is GPIO 99, Y is GPIO 82, both high at home
+  (found by moving the head and bed by hand); Z is GPIO 83 (it changes
+  once in each stock Z homing). Neither door has a sensor.
+- **Order of a stock "home all", as recorded:** Z, then Y, then X.
+
+## Motors as the stock firmware drives them (recorded 2026-11-21)
+
+Recorded read-only with `regwatch` (sindoh-klipper `host/regwatch.c`)
+while the owner homed and jogged from the stock screen.
+
+| Axis | Stepper engine | Step | Dir | Enable (our reading) | Home | Checked scale |
+|---|---|---|---|---|---|---|
+| X | 0 (0xF8150000) | GPIO 162 | 163 | 164 | 99 | 10 mm = 800 steps |
+| Y | 1 (0xF8151000) | GPIO 168 | 169 | 170 | 82 | 10 mm = 804 steps |
+| Z | 2 (0xF8152000) | GPIO 36 | 37 | 38 | 83 | 10 mm = 25600 steps |
+
+- X, Y and Z are the three hardware pulse engines, used as on the DP200
+  with every register 0x28 higher: control at +0x6C (0x33224, direction
+  is bit 4), busy in bit 8 of +0x8C, and a 24-bit edge counter at +0xA0
+  that counts two per step, up or down with the direction. The engines
+  idle at 0x444444 in the control register until the first move.
+- Engines 3 to 5 never changed. The extruder and cartridge motors are
+  driven some other way (not seen yet: no extrusion was recorded). The
+  microcode also sets up pin groups at GPIO 44-46, 50-52 and 56-58;
+  44 and 50 changed once when the leveling routine started.
+- The TMC2224 UART is GPIO 154/155, with select lines 146/147/149 and
+  152; it is used at the start of each Z homing (the Z `TPWMTHRS`).
+- The beeper is PWM block 19 (period 250, 90 high).
 - The homing moves themselves run inside the FM microcode (commands 0x1A
   to 0x1F: Z long move, Z find, Y long move, Y find, X long move, X
   find); the Linux program only starts them. After them it sets Y to
@@ -99,6 +124,23 @@ There is no deployable pin as on the DP200.
   screw. The X values are in the leveling routine's own carriage
   coordinates (-4 mm is outside the X limit above), so check them on the
   machine before using them.
+- **Seen on the machine (2026-11-21, owner ran the stock routine while
+  the pins were recorded):**
+  - **The contact input is GPIO 81** (next to the home sensors on 82 and
+    83). It changes, with some bounce, at every touch. The enable line
+    (GPIO 153) switches on just before the first approach.
+  - Each of the three points is touched **three times**, about four
+    seconds apart; the points follow each other after a re-home of X
+    and Y.
+  - It starts with a nozzle-wipe routine: the hot nozzle tip is pressed
+    into the bed's edge strip and run along several paths (the console
+    prints "ZigZag manuever Start").
+  - The nozzle is held at 150 °C for the measurement (bed about 46 °C,
+    unheated by the routine).
+  - Result screen: "Assisting Bed Leveling... Turn the screw wheels in
+    the direction of the arrow", one figure per wheel in clicks and
+    degrees. One click is 45 degrees (seen: "1 click(s) (45 degrees)"
+    left, "3 click(s) (135 degrees)" right).
 - Heights used: start 20800 steps = 8.1 mm, `Z2_lvPos` -5920 steps
   = -2.3 mm.
 - **Active leveling** is a second, optional mode: ten stored factors
