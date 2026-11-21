@@ -1,132 +1,53 @@
-# Sindoh 3DWOX 1
+# Sindoh 3DWOX printers: hardware research
 
-This repository collects information on the [Sindoh 3DWOX
-1](https://3dprinter.sindoh.com/en/product/3dwox1) 3D printer.
+Notes on how Sindoh's 3DWOX 3D printers work inside: the mainboards, the
+firmware update mechanism, and what differs between models. It is the
+reference shelf for the projects below.
 
-## Overview
+Looking for Klipper? Go to
+**[catawalks/sindoh-klipper](https://github.com/catawalks/sindoh-klipper)**.
 
-The hardware is based on a Marvell `mv61x0` (88PA6170); the CPU calls itself “PJ4B-MP ARMv7 rev 1
-(v7l)”:
+## What is here
 
-```
-# cat /proc/cpuinfo
-processor       : 0
-BogoMIPS        : 789.70
+| Path | What |
+|---|---|
+| [docs/other_models.md](docs/other_models.md) | Every model compared (DP200/DP201, 3DWOX 1, 2X, 1X, 7X, 30X): chip, kernel, storage, USB update folder and key |
+| [docs/1x.md](docs/1x.md) | The 3DWOX 1X, read from a real printer: eMMC layout, motion hardware, TMC2224 drivers, GPIOs |
+| [docs/3dwox1.md](docs/3dwox1.md) | The 3DWOX 1: Fredrik Gustafsson's tests and Sebastian Schmidt's dumps |
+| [docs/prime_sd.md](docs/prime_sd.md) | The 2X ("Prime"): its mainboard and Sindoh's factory recovery SD card |
+| [docs/nand_partition_layout.md](docs/nand_partition_layout.md) | NAND partitions of the DP200 family |
+| [docs/tli_list.txt](docs/tli_list.txt) | Model ID codes ("TLI") seen in Sindoh firmware |
+| [3dwox1_2021/](3dwox1_2021/) | Sebastian Schmidt's original 2021 notes and dumps from a 3DWOX 1, which this repository was forked from: how the printer's software fits together and how to get a root shell |
+| [Model_1_Converter/](Model_1_Converter/) | USB stick files that turn a Stanley Model 1 into a DP200Q (open filament, latest firmware) and back |
 
-processor       : 1
-BogoMIPS        : 789.70
+Each document says where its facts come from: which printer, who measured
+them, and what is only our reading.
 
-Features        : swp half fastmult vfp edsp neon vfpv3 tls
-CPU implementer : 0x56
-CPU architecture: 7
-CPU variant     : 0x2
-CPU part        : 0x584
-CPU revision    : 1
+## Related repositories
 
-Hardware        : mv61x0
-Revision        : 0021
-Serial          : 0000000000000000
-```
+| Repository | What |
+|---|---|
+| [sindoh-klipper](https://github.com/catawalks/sindoh-klipper) | Klipper, Moonraker and Mainsail on the printer's own mainboard, installed from a USB stick |
+| [klipper](https://github.com/catawalks/klipper/tree/sindoh-dp200) (branch `sindoh-dp200`) | The Klipper code for the printer's real-time cores |
+| [sindoh-kernel](https://github.com/catawalks/sindoh-kernel) | Mainline Linux for the Marvell 88PA6170 |
+| [sindoh-model-survey](https://github.com/catawalks/sindoh-model-survey) | A read-only USB stick that saves a hardware report from any model. **Own a model other than the DP200? Running it helps.** |
+| [sindoh-boot-logo](https://github.com/catawalks/sindoh-boot-logo) | Put your own picture on the boot screen |
 
-The front panel display is accessible via `/dev/fb0`, handled by the `mv61fb` driver. The
-[fbcat](https://github.com/jwilk/fbcat) utility works on it without any issues. The touch controller
-is a Rohm BU21029GUL, exposed via `evdev` on `/dev/event0` (`/sys/devices/virtual/input/input0`).
+## A warning that applies to every model
 
-Attached via USB are a “Marvell Wireless Device” (1286:2040, `usb8xxx.ko`?) and a “HD 720P Webcam”
-(0c45:6341 `uvcvideo.ko`). The device itself exports a USB gadget; “Marvell 61x0 Printer Driver
-2012”.
-
-The mass storage device is a “mv61x0\_nand”; Linux is loaded via U-Boot and a serial console is
-exposed with 115200 Baud, but I haven’t had the need yet to find it on the PCB.
-
-## Printing stuff
-
-All printing functionality (communication with the cartridge’s “security chip”, PJL and G-Code
-parsing, the actual driving of the motor GPIOs, etc.) is handled by the
-`/marvell_lspsdk_3dp_gemstone-debug_stripped.elf` binary. It listens on TCP port 9100 for print jobs
-and on port 35345 for UI commands, although it rejects non-local connections for the latter.
-
-The `/app/UIManager` binary communicates with the previous binary on port 35345. It starts
-`appBrowser`, which communicates with `UIManager` via WebSocket on port 1337.
-
-`/app/appBrowser` is a Qt application serving HTML pages from `/app/SVN_GUI/home.html`. It renders
-to the Linux framebuffer `/dev/fb0` and is controlled via touch events from `/dev/event0`.
-
-The `marvell_lspsdk_3dp_gemstone-debug_stripped.elf` uses [POSIX messages
-queues](https://man7.org/linux/man-pages/man7/mq_overview.7.html) for inter-thread and inter-process
-communication too. Persistent data is stored in a SQLite database at `/app/nvram/karas.db`.
-
-## Misc
-
-The web interface is served from `/test/web` by a lighttpd on port 80. The CGI scripts to e.g.
-cancel a job access the `karas.db` SQLite database and communicate with
-`marvell_lspsdk_3dp_gemstone-debug_stripped.elf` over the `/mq_ui_to_sys` message queue. There are
-no non-root processes.
-
-There’s an `mjpg_streamer` serving the webcam output on TCP port 8080, but it’s also opened the
-`/mq_sys_to_cam` message queue, so it may do more. An snmpd is listening on UDP port 161, v1 RO
-community is “public“.
-
-## Root
-
-tl;dr: Grab a firmware update from Sindoh and put `nc -llp 2323 -e /bin/sh` into
-`_update_rodin_up/snapshot_version.sh`. Connect with `rlwrap -S'# ' nc $PRINTER 2323` or so.
-**DO NOT** log in via telnet or ssh. The root filesystem is mounted and all
-vendor binaries are started from `/etc/profile` (which presumably gets triggered by an auto-login on
-ttyS0), so starting a login shell will cause a sort-of second boot, potentially destroying data
-(read: brick your printer).
-
-The `/app/auto_update.sh` will search for a `update.she` and `unmistakable*.she` (encrypted shell scripts) on an inserted USB
-stick in the `_update_rodin`, `_update_rodin_up` or `_update_rodin_eco` directory, based on the lone stored RODIN_SUB variable in `/etc/export_rodin_sub.sh`. These encrypted shell scripts are either decrypted from aes-256-cbc with the key (and IV == key)
-stored in `/app/crypto_key.dat` for the newer `3DWOX 1` models or decrypted from des3 with the same file on the older `DP200` based models. For the `3DWOX 1` models the 'crypto_key.dat' is encrypted with aes-256-cbc; key and IV `SINDOH` and for the `DP200` based model it is encrypted with des3 with blank password. 
-Decrypting crypto_key.dat for the `3DWOX 1` gives `sindoh024601779U` and for the `DP200` is `sindoh024601779`. Due to the older build and encryption used on the `DP200` based systems, current versions of OPENSSL cannot decrypt or encrypt the files for this machine. An older version such as 1.0.1c (version used on the embedded linux install itself) must be used for cryptography of these files. Finally, the `.she` file is
-expected to be a bzip2’ed tar archive that gets extracted to `/tmp`. See
-[`pack_firmware.sh`](pack_firmware.sh) for an example.
-
-## Klipper port (DP200)
-
-[`klipper_port/`](klipper_port/) runs [Klipper](https://www.klipper3d.org/) with Moonraker and
-Mainsail on a DP200's own hardware. The two UPC coprocessors of the 88PA6170 become the Klipper
-MCUs, and klippy, Moonraker and Mainsail run on the printer's Linux. It also includes a touch
-screen UI, the webcam, bed mesh with the built-in probe, filament load/unload, and a USB-stick
-installer for the internal NAND. Start with
-[`klipper_port/docs/INSTALL.md`](klipper_port/docs/INSTALL.md) (preview) and
-[`klipper_port/README.md`](klipper_port/README.md). The Klipper changes themselves are on the
-`sindoh-dp200` branch of [catawalks/klipper](https://github.com/catawalks/klipper/tree/sindoh-dp200). The port is free and open source under the GPL, version 3 or later
-([`klipper_port/LICENSE`](klipper_port/LICENSE)).
-
-### Slicer profiles
-
-Ready-made printer profiles for the Klipper port are in
-[`klipper_port/install/slicer/`](klipper_port/install/slicer/): PrusaSlicer
-(`DP200_Klipper_PrusaSlicer.ini`), OrcaSlicer (printer, process and PLA profiles) and Cura
-(printer and extruder definitions), plus a pressure-advance tower generator. Their start G-code
-is `PRINT_START` + `PRIME_LINE` (heat, home, bed mesh, purge and wipe). Import steps are in
-[the slicer README](klipper_port/install/slicer/README.md).
-
-Before a print: Z homes upward, so anything left on the bed gets crushed. When a print starts,
-`PRINT_START` pauses before anything moves and asks "Is the bed empty?" on the touch screen and in
-Mainsail: YES starts the print, NO cancels it. (A `BED_CLEAR` in the 5 minutes before skips the
-question.)
-
-## Custom boot logo
-
-[catawalks/sindoh-boot-logo](https://github.com/catawalks/sindoh-boot-logo) (Windows program, [download](https://github.com/catawalks/sindoh-boot-logo/releases/latest), + cross-platform script) turns your own picture into the boot logo
-and packs it into a `.she` USB update, with each model's update key built in. It supports the DP200 / DP201 /
-Model 1 family, the 3DWOX 1, 2X, 1X and 7X (the 30X's key is not known yet). Its README lists each model's logo
-format, update key and USB folder, found in Sindoh's own updates.
+Sindoh's update scripts run as root from a USB stick, which is what makes
+all of this possible, and also what can brick a printer. Never run the
+stock `/snapshot_version.sh` by hand (it rewrites boot settings), and read
+[3dwox1_2021/README.md](3dwox1_2021/README.md) before logging in to a
+stock printer.
 
 ## License
 
-Free and open source: everything in this repository by catawalks and its
-contributors is licensed under the **GNU General Public License, version 3
-or (at your option) any later version** ([LICENSE](LICENSE)). That covers
-`klipper_port/` (with its own exceptions, such as GPL-2.0 for the Linux
-code in `klipper_port/kernel/`), `Model_1_Converter/` and `boot_logo/`.
+Everything here by catawalks and contributors is free and open source
+under the **GNU General Public License, version 3 or (at your option) any
+later version** ([LICENSE](LICENSE)).
 
-Not covered: the original 3DWOX 1 notes and dumps by Sebastian Schmidt
-([yath/sindoh](https://github.com/yath/sindoh), 2021), which this repository
-was forked from: the first part of this README, `dmesg.txt`, `df.txt`,
-`proc_*.txt`, `update.sh`, `pack_firmware.sh` and `_update_rodin_up/`. His
-repository has no license, so they stay his. Nothing from Sindoh or Marvell
-(firmware, images, apps) is included.
+Not covered: `3dwox1_2021/`, the notes and dumps by Sebastian Schmidt
+([yath/sindoh](https://github.com/yath/sindoh), 2021). His repository has
+no license, so they stay his. Nothing from Sindoh or Marvell (firmware,
+images, apps) is included.
