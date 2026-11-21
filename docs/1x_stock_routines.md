@@ -59,7 +59,8 @@ the same way, like the DP200's:
   left and home is at its high end: the 1X's single head is the 2X's
   "X2" carriage. The X travel is this long because the chassis is the
   2X's, with one head parked at each end; the right-hand parking spot
-  is unused on the 1X.
+  is unused on the 1X. On the 2X each head has its own filament dump
+  station and cleaning area at its own end (owner).
   Y is the bed moving front to back, and Z is the bed going up.
 - The homing moves themselves run inside the FM microcode (commands 0x1A
   to 0x1F: Z long move, Z find, Y long move, Y find, X long move, X
