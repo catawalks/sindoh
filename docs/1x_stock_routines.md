@@ -236,6 +236,22 @@ There is no deployable pin as on the DP200.
 - The fan "lock" inputs in the GPIO table of [1x.md](1x.md) are the
   matching tach or stall signals; not checked yet.
 
+## The speaker (voice messages)
+
+Besides the beeper the 1X has a real speaker (owner, 2026-11-21: it
+speaks when buttons are pressed). Read from the running stock system:
+- It is a **USB audio device** ("CONEXANT USB AUDIO"), ALSA card 0 with
+  playback and capture (`/dev/snd/pcmC0D0p`, `pcmC0D0c`).
+- The stock app plays MP3 files with `/bin/mplayer`: about 410 files in
+  `/app/TTS/` in four languages (`eng`, `kor`, `chn`, `jpn`), named by
+  the menu or error they belong to.
+- **The amplifier has its own enable: GPIO 180** (`/app/audio_amp.sh`:
+  set = on, clear = off). Stock switches it by the "speech" settings
+  in its database (`CONF_PLAYBACK`: `SpeechEnable`, `AMPAutoTurnOFF`).
+- For Klipper this means any sound can be played from Linux (tones,
+  tunes, spoken messages) with an ALSA player and GPIO 180 high; no
+  firmware work is needed. Not tried yet.
+
 ## Nozzle cleaning, load and unload (database, this printer)
 
 X positions at 80 steps/mm, Z at 2560 steps/mm.
