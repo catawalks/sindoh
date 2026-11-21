@@ -13,6 +13,7 @@ Looking for Klipper? Go to
 |---|---|
 | [docs/other_models.md](docs/other_models.md) | Every model compared (DP200/DP201, 3DWOX 1, 2X, 1X, 7X, 30X): chip, kernel, storage, USB update folder and key |
 | [docs/1x.md](docs/1x.md) | The 3DWOX 1X, read from a real printer: eMMC layout, motion hardware, TMC2224 drivers, GPIOs |
+| [docs/1x_stock_routines.md](docs/1x_stock_routines.md) | The 1X's axes and limits, homing, nozzle-contact bed leveling, and the stock load, unload and cleaning routines |
 | [docs/3dwox1.md](docs/3dwox1.md) | The 3DWOX 1: Fredrik Gustafsson's tests and Sebastian Schmidt's dumps |
 | [docs/prime_sd.md](docs/prime_sd.md) | The 2X ("Prime"): its mainboard and Sindoh's factory recovery SD card |
 | [docs/nand_partition_layout.md](docs/nand_partition_layout.md) | NAND partitions of the DP200 family |
