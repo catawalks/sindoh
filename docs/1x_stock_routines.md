@@ -51,7 +51,15 @@ the same way, like the DP200's:
   1792 steps = 0.70 mm. The app's "Home Position" page lets the user set
   the nozzle-to-bed gap (its text: default 0.25 mm) and has buttons to
   home all axes or X, Y, Z alone.
-- Which end of X and Y the sensors sit at is not known yet.
+- **Where home is** (owner, at the printer, 2026-11-21): the head parks
+  at the **left**, the bed at the **back** and at the **top**. So X homes
+  at its low end (the cleaning and filament stations at X 231...257 mm
+  are on the right), Y is the bed moving front to back, and Z is the bed
+  going up.
+- The homing moves themselves run inside the FM microcode (commands 0x1A
+  to 0x1F: Z long move, Z find, Y long move, Y find, X long move, X
+  find); the Linux program only starts them. After them it sets Y to
+  427 steps (5.3 mm) and Z to 7936 steps (3.1 mm).
 
 ## Bed leveling: the nozzle is the probe
 
@@ -90,6 +98,23 @@ There is no deployable pin as on the DP200.
   this printer (all factors 0).
 - A print start checks that leveling has been done at least once ("Leveling
   is not executed at all, required").
+
+## Heat at idle and at start-up (seen on the machine, 2026-11-21)
+
+- **The stock firmware keeps the printer warm all the time:** nozzle
+  80 °C and bed 50 °C on the screen whenever it is idle (owner). The boot
+  log shows the settings going to the IO microcode: heaters 0 and 1 to
+  80, heater 2 (the bed) to 50. The screen's power saving setting is the
+  stock way to let it cool.
+- **Start-up heater test:** each nozzle heater is switched fully on for a
+  moment at boot ("FULL Heater 1 is Enabled as 1000", the reading climbs
+  about 35 °C in 13 s). Heater 0 reports -60 (no sensor) on this 1X; the
+  code is shared with the two-nozzle 2X. Whether the 1X's hot end has
+  one heater cartridge or two is open (owner's guess: two).
+- The microcode, not the Linux program, runs the temperature loops: it
+  goes on holding the targets when the Linux program is stopped. It has
+  its own cut-out ("over 270*1000mC, SAFE FUNCTION PWM = 0") and
+  "Out Of Control Loop" errors.
 
 ## Nozzle cleaning, load and unload (database, this printer)
 
