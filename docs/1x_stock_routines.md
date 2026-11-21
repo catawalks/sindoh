@@ -97,9 +97,18 @@ while the owner homed and jogged from the stock screen.
   and `engine_extrPressAdjust` (with a `_flexUnload` variant), and at
   wake-up it prints "PressToOffMovedStep, E:4296, C:2062" and
   "PressToOnMovedStep, E:5075, C:2436" while both motors run briefly.
-  Stepping the extruder's engine without that sequence (tried under
-  Klipper: the driver counted 20000 steps) moved nothing in the head
-  and fed nothing. Not decoded yet.
+  A normal feed does not use them (no such output changed during
+  recorded stock feeds). Decoded from the FM microcode: the press
+  clutch is GPIO 148 (argument bit 0) and GPIO 191 (bit 1); the four
+  solenoids are PWM blocks 18, 8, 24 and 26.
+- **Feeding, as recorded from stock (two 10 mm feeds, one retract):**
+  the extruder engine runs exactly 4588 steps per 10 mm (**458.8
+  steps/mm**) and the cartridge feeder about 2203 (220.35 steps/mm),
+  always together. The extruder engine's control register is 0x33024
+  for feed and 0x33034 for retract, the cartridge engine's 0x30224 and
+  0x30334; X, Y and Z use 0x33224/0x33234. With the axis value on the
+  extruder engine its driver counts steps but the motor does not turn.
+  Klipper extruded with the stock values (2026-11-21).
 - **Filament motion encoder:** GPIO 65 and 67 pulse while filament is
   fed (about 31 changes a second at the load speed).
 - A sixth line of each axis group (GPIO 167 for X, 173 for Y, 41 for Z)
