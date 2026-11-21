@@ -1,12 +1,12 @@
 # Installing Klipper on a Sindoh 3DWOX DP200
 
-> **Status: preview, no public release yet.** There is no download: the
-> first public release will be this USB stick install, once the screen app
-> and features are finished (owner, 2026-11-03; PROJECTS.md #10). Until then
-> the stick files are built by hand ("For maintainers" below). The installer
-> has run on the owner's two printers (DP200 and a DP200Q-converted Stanley
-> Model 1), on Sindoh firmware RODIN_200730_2. Read "Getting back to stock"
-> before you start.
+> **Status: v0.1.0, a beta pre-release** (2026-11-20). Download it from the
+> [Releases page](https://github.com/catawalks/sindoh/releases). Earlier
+> builds of this installer have run on the owner's two printers (DP200 and
+> a DP200Q-converted Stanley Model 1) on Sindoh firmware RODIN_200730_2;
+> this exact build has not been installed on a printer yet (see the release
+> notes). Read "Getting back to stock" before you start, and keep the
+> stick with its backup.
 
 ## What you get
 
@@ -134,8 +134,10 @@ installer sees the existing installation and offers **UPGRADE**. Your
 
 ## Getting back to stock
 
-- **Back to the Sindoh firmware:** put `unmistakable_klipper_remove.she` in
-  `_update_rodin/` on the stick that has the `dp200_stock_backup/` folder.
+- **Back to the Sindoh firmware:** put `unmistakable_klipper_remove.she`
+  (the release's remove download) in `_update_rodin/` on the stick that
+  has the `dp200_stock_backup/` folder; take the install files out of
+  that folder first.
   Plug it in and touch to confirm. It restores the Sindoh start-up, deletes
   `/klipper` and puts the Sindoh app and WebKit back. **`/klipper` holds
   `printer.cfg`** (your calibration): download it from Mainsail first if you
