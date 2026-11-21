@@ -83,10 +83,23 @@ while the owner homed and jogged from the stock screen.
   is bit 4), busy in bit 8 of +0x8C, and a 24-bit edge counter at +0xA0
   that counts two per step, up or down with the direction. The engines
   idle at 0x444444 in the control register until the first move.
-- Engines 3 to 5 never changed. The extruder and cartridge motors are
-  driven some other way (not seen yet: no extrusion was recorded). The
-  microcode also sets up pin groups at GPIO 44-46, 50-52 and 56-58;
-  44 and 50 changed once when the leveling routine started.
+- **Extruder and cartridge motors** (recorded during a stock filament
+  load from a Sindoh cartridge): the extruder is engine 3 (step GPIO 42,
+  dir 43, enable 44 by the pattern), the cartridge feeder is engine 4
+  (step GPIO 48, dir 49, enable 50). The cartridge motor feeds alone
+  first, then both run with the extruder at about twice the cartridge's
+  step rate (console: "PressToOffMovedStep, E:4296, C:2062"). Engine 5
+  never changed (the 2X's second set, our reading; pins 54-58).
+- **Filament motion encoder:** GPIO 65 and 67 pulse while filament is
+  fed (about 31 changes a second at the load speed).
+- A sixth line of each axis group (GPIO 167 for X, 173 for Y, 41 for Z)
+  carries a fast signal from the moment the axis is first used; not
+  identified.
+- **Under Klipper (2026-11-21, owner watching):** all three axes moved
+  through the same engines, 5 mm out and back. With the direction pin
+  high, X goes left (toward its home), Y comes forward (away from its
+  home at the back) and Z goes down (away from its home at the top).
+  The Z engine counted 12800 steps for 5 mm.
 - The TMC2224 UART is GPIO 154/155, with select lines 146/147/149 and
   152; it is used at the start of each Z homing (the Z `TPWMTHRS`).
 - The beeper is PWM block 19 (period 250, 90 high).
@@ -205,6 +218,11 @@ X positions at 80 steps/mm, Z at 2560 steps/mm.
 
 - Preset temperatures: PLA 210 °C first layer, 200 °C after, 150 °C
   preheat; ABS 250 / 230 / 200 °C. Bed preheat presets are 0.
+- **A cartridge load as recorded:** console "Load ext: 1, FilaType:6"
+  for a Sindoh TPU cartridge (the screen then shows "FLEX"), stages
+  "Load Pass411" to "414" and "-L0-" to "-L5-", nozzle to 240 °C. (The
+  cartridge was a DP200 one the owner modified to fit: the 1X's
+  cartridge shell is slightly different.)
 - Filament runout is watched by step counts against an encoder
   (`CONF_ENGINE_FILACHECK`), and the camera-based "object detect" check
   before a print is enabled.
