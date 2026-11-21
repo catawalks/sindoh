@@ -109,6 +109,20 @@ while the owner homed and jogged from the stock screen.
   0x30334; X, Y and Z use 0x33224/0x33234. With the axis value on the
   extruder engine its driver counts steps but the motor does not turn.
   Klipper extruded with the stock values (2026-11-21).
+- **Two feed motors at the rear, in series** (owner, with the rear
+  gear train open, 2026-11-21): engine 4 is the initial feed motor at
+  the cartridge bay, engine 3 the second-stage (rear) feed motor that
+  pushes the filament on toward the head. ("Extruder" above means this
+  rear motor.)
+- **How the stock load is sequenced** (console and pin recordings):
+  the first motor starts alone; check "411" passes when the
+  cartridge-bay filament switch (GPIO 80) changes, within a second;
+  when the filament reaches GPIO 120, about 8 s later, the rear motor
+  starts in that same second and both run on. If GPIO 80 never changes
+  (loose filament fed past the switch in open-filament mode) the
+  sequence waits at check 411, the rear motor is never started, the
+  first motor keeps pushing into a stationary gear, and the load ends
+  in a jam and "Load 411Error". The switch also reports a cartridge.
 - **Filament sensors:** GPIO 120 (`gp_extrFilaSensor[1]`) is low while
   filament is at the extruder's entry and high when it is gone (seen
   during a retract). From the cartridge bay to the extruder the
