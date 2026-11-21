@@ -63,8 +63,9 @@ the same way, like the DP200's:
   station and cleaning area at its own end (owner).
   Y is the bed moving front to back, and Z is the bed going up.
 - **Home sensor inputs:** X is GPIO 99, Y is GPIO 82, both high at home
-  (found by moving the head and bed by hand); Z is GPIO 83 (it changes
-  once in each stock Z homing). Neither door has a sensor.
+  (found by moving the head and bed by hand); Z is GPIO 83, high at
+  home too (it changes once in each stock Z homing, and Klipper homed
+  all three axes on these inputs, 2026-11-21). Neither door has a sensor.
 - **Order of a stock "home all", as recorded:** Z, then Y, then X.
 
 ## Motors as the stock firmware drives them (recorded 2026-11-21)
