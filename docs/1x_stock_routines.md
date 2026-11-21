@@ -52,10 +52,13 @@ the same way, like the DP200's:
   the nozzle-to-bed gap (its text: default 0.25 mm) and has buttons to
   home all axes or X, Y, Z alone.
 - **Where home is** (owner, at the printer, 2026-11-21): the head parks
-  at the **left**, the bed at the **back** and at the **top**. So X homes
-  at its low end (the cleaning and filament stations at X 231...257 mm
-  are on the right), Y is the bed moving front to back, and Z is the bed
-  going up.
+  at the **left**, the bed at the **back** and at the **top**; the
+  cleaning and filament stations are on the left too (owner, to be
+  double-checked). The stations sit at X 231...257 mm in the stock
+  numbers, so (our reading) the stock X coordinate grows toward the
+  left and home is at its high end: the 1X's single head is the 2X's
+  "X2" carriage. The 2X's second parking spot on the right is unused.
+  Y is the bed moving front to back, and Z is the bed going up.
 - The homing moves themselves run inside the FM microcode (commands 0x1A
   to 0x1F: Z long move, Z find, Y long move, Y find, X long move, X
   find); the Linux program only starts them. After them it sets Y to
