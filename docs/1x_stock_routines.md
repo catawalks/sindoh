@@ -138,6 +138,19 @@ while the owner homed and jogged from the stock screen.
   start of the load: "Pass411" at 0 s, "Pass412" at 0.9 s, "Pass413" at
   7.7 s ("-L3-"), "Pass414" at 12.4 s, "-L4-" and "-L5-" at 36.7 s; the
   nozzle goes to 200 °C at the start and 220 °C for the purge.
+- **The same load and an unload with the pins recorded** (PLA, open
+  filament, 2026-11-21; step-pin edges counted, two edges a step,
+  lengths from 458.8 and 220.35 steps/mm):
+  - Load: the initial feed motor alone at 59 mm/s for 7 s (412 mm)
+    until GPIO 120 trips; then both motors at 29.7 mm/s for 29 s
+    (857 mm on the extruder); a 2 s pause; then the purge, both at
+    2.0 mm/s for 30 s (60 mm); last a fast 18.6 mm retract.
+  - Unload: both motors back at 29.7 mm/s for 34 s (914 mm on the
+    extruder) until GPIO 120 releases; then the initial feed motor
+    alone at 59 mm/s for 15 s (789 mm). GPIO 80 released 11 s into
+    that, 4 s before the motor stopped.
+  - The two motors always run at the same filament speed when both run
+    (extruder 13627 steps/s, initial feed 6540 steps/s).
 - **Filament sensors:** GPIO 120 (`gp_extrFilaSensor[1]`) is low while
   filament is at the extruder's entry and high when it is gone (seen
   during a retract). From the cartridge bay to the extruder the
