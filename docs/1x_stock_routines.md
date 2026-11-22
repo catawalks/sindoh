@@ -62,20 +62,23 @@ the same way, like the DP200's:
   is unused on the 1X. On the 2X each head has its own filament dump
   station and cleaning area at its own end (owner).
   Y is the bed moving front to back, and Z is the bed going up.
-- **X home sensor and dump station, measured 2026-11-22** (stock
-  homed and parked, Klipper took over without moving, each axis stepped
-  away until its sensor released; then the owner jogging): the X sensor
-  switches on 20.3 mm before stock's home position, so at 242.4 if home
-  is 262.7 (stock's number), and stays on from there to the end. Pushed
-  by hand the head stops 1 mm short of that home position. The Y sensor
-  switches on 5.5 mm from where stock parks the bed. In these numbers:
-  dump bin center 246.5; the cleaning flap is the right-hand one, at
-  237.5, and the nozzle lets go of it at 250 moving left and at 225.5
-  moving right. The taller left flap at 253.5 is not for cleaning: the
-  nozzle never passes it going right to left in a wipe, and with the
-  head at rest it lies bent over the nozzle tip (a cap against
-  dripping, our reading). Stock's load position 256.4 is under it and
-  its wipe runs 257.3 ... 231.3: not explained yet.
+- **X home sensor and dump station, measured 2026-11-22** (X with the
+  left wall at 262.7, the program's X maximum): the home sensor
+  switches on about 20 mm before the wall (19.3 mm with the head pushed
+  to the wall by hand, 20.3 mm from where stock parks it after homing;
+  the same within the method's error) and stays on from there. The Y
+  sensor switches on 5.5 mm from where stock parks the bed. The owner,
+  jogging: dump bin center 246.5; the cleaning flap is the right-hand
+  one, at 237.5, and the nozzle lets go of it at 250 moving left and at
+  225.5 moving right. The taller left flap at 253.5 is not for
+  cleaning: it folds over under the nozzle when the head is at rest (a
+  cap against dripping, our reading).
+- **The database's X positions are in another frame** (our reading,
+  not watched on stock): its wipe ends 257.3 and 231.3 lie 6.5 mm above
+  the two points where the flap lets go. By that, the load position
+  256.4 is about 250 (over the bin, clear of the left flap) and the
+  "after the purge" position 243.4 is about 237, on the cleaning flap.
+  The pipe cleaning's 275.7 does not fit either frame.
 - **Home sensor inputs:** X is GPIO 99, Y is GPIO 82, both high at home
   (found by moving the head and bed by hand); Z is GPIO 83, high at
   home too (it changes once in each stock Z homing, and Klipper homed
