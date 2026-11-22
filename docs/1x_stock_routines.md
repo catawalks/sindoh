@@ -73,13 +73,8 @@ the same way, like the DP200's:
   225.5 moving right. The taller left flap at 253.5 is not for
   cleaning: it folds over under the nozzle when the head is at rest (a
   cap against dripping, our reading).
-- **The database's X positions are in another frame** (our reading;
-  the owner confirms that a stock load ends with the nozzle resting on
-  the cleaning flap, as it predicts): its wipe ends 257.3 and 231.3 lie 6.5 mm above
-  the two points where the flap lets go. By that, the load position
-  256.4 is about 250 (over the bin, clear of the left flap) and the
-  "after the purge" position 243.4 is about 237, on the cleaning flap.
-  The pipe cleaning's 275.7 does not fit either frame.
+- **The database's X positions** are not plain positions in this frame;
+  see the move-by-move recording below for where stock really goes.
 - **Home sensor inputs:** X is GPIO 99, Y is GPIO 82, both high at home
   (found by moving the head and bed by hand); Z is GPIO 83, high at
   home too (it changes once in each stock Z homing, and Klipper homed
@@ -315,6 +310,67 @@ speaks when buttons are pressed). Read from the running stock system:
 - For Klipper this means any sound can be played from Linux (tones,
   tunes, spoken messages) with an ALSA player and GPIO 180 high; no
   firmware work is needed. Not tried yet.
+
+## Unload, load and "clean bin" recorded move by move (2026-11-22)
+
+Recorded on the stock firmware with `movewatch` (sindoh-klipper
+`host/movewatch.c`: read-only, follows each motor's step and direction
+pins and prints one line per move) while the owner ran the three
+routines from the screen; PLA, open filament. X positions below are in
+the frame where stock's home is 262.7 (the X maximum) and the home
+sensor's edge 242.35; X grows to the left. Z is given from the bed's
+rest position after homing (stock's Z 3.1, our reading).
+
+**How stock homes.**
+- X, from on the sensor: right 35.00 mm; left until the sensor trips
+  (it runs about 4.9 mm past the edge); right 4.90 mm, which releases
+  it; left 20.35 mm (1628 steps), tripping at once. Home is therefore
+  20.35 mm past the edge, at the left wall. From off the sensor the
+  first move is left out.
+- Y: forward 10.00, back until it trips (7.28), forward 2.79, back
+  5.50: home is 5.50 mm past the edge.
+- Z: up until the sensor trips plus about 1.5 mm, then down 7.24 mm to
+  rest. The sensor is released again after the first 0.3 s of that.
+
+**Unload** (27 s of heating between positioning and the first pull).
+1. Part fan on. Home X. Home Z, then down to rest + 20.0 mm. Home X
+   again, then right 50.00 mm: the head waits at **X 212.7**, right of
+   the dump station.
+2. Extruder and feed motor pull together (5 s at 10 mm/s, then
+   29.7 mm/s) until the extruder's entry sensor releases; the extruder
+   stops 0.7 s later (913.7 mm in 34.1 s). The feed motor goes on alone
+   at 59 mm/s and stops 4.1 s after the bay switch releases (1685 mm
+   in all, 47.3 s).
+3. Part fan off. 3.3 s later PWM block 8 (a solenoid) is on for 9.9 s.
+
+**Load** (the nozzle target goes to 200 C at the start: stock feeds
+while it heats).
+1. Part fan on. Home Z, home X, then right 70.33 mm: the head waits at
+   **X 192.4**. Bed down 13.1 mm from rest.
+2. Feed motor alone at 59 mm/s until the entry sensor trips (7.7 s,
+   about 453 mm); then both for 28.8 s (extruder 854.5 mm).
+3. 10 s wait, ended by the nozzle reaching its target.
+4. **The head moves to the bin: left 60.44 mm to 252.8, then right
+   5.00 mm to 247.8.** It reaches the purge position from the left.
+5. Purge 60.0 mm in 30.3 s (1.98 mm/s), both motors. 0.5 s pause.
+   Retract 20.0 mm in 0.53 s. 3.0 s pause.
+6. Wipe: left 14.9 to the wall (262.7); right 35.9 to 226.8; left 26.0
+   to 252.8; right 26.0; left 26.0; right 5.00. It ends at **247.8**,
+   again reached from the left. Each 26 mm pass takes 0.66 s.
+7. Part fan off.
+
+**Clean bin.** Home Z; home X; right 130.35 mm to **X 132.4**; bed
+down 118.1 mm from rest. It waits for the owner. On "done": home Z,
+home Y, home X, home Y and X once more, then Z.
+
+**Against the database:** the wipe ends are `PositionX1` 257.3 and
+`PositionX2` 231.3, 4.5 mm above the recorded 252.8 and 226.8, and the
+pass count is `AutoCleaningMoveCnt` 2. The recorded waiting positions
+(212.7 unload, 192.4 load) and the purge position 247.8 are not the
+table's 256.4 and 243.4: the tables are not used as plain positions.
+The owner's readings of the same day agree with the recording: bin
+center about 246.5 to 247.5, the cleaning flap released at 250 moving
+left and 225.5 moving right.
 
 ## Nozzle cleaning, load and unload (database, this printer)
 
