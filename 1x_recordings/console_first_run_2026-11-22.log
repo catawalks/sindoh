@@ -1,0 +1,110 @@
+12:37:40 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:37:40 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:37:40 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:37:40 [IO] Fan #11 (2) PWM: 80
+12:37:40 [IO] Fan #4 (0) PWM: 0
+12:37:40 [IO] Fan #5 (1) PWM: 0
+12:37:46 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:37:46 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:37:46 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:37:46 [IO] Fan #11 (2) PWM: 80
+12:37:46 [IO] Fan #4 (0) PWM: 0
+12:37:46 [IO] Fan #5 (1) PWM: 0
+12:37:48 [IO] Fan #5 (1) PWM: 50
+12:37:58 EX2 Target Reached!
+12:37:58 BD Target Reached!
+12:37:58 (IO) T.Cfg, R:0 ,W:1 , N:1, T:80, En:1, O: 0
+12:38:03 EX2 Target Reached!
+12:38:08 Unload ext: 1, FilaType:1
+12:38:08 -U0-AccelPtr:103,103->655
+12:38:08 U-1
+12:38:08 1---0x00000700
+12:38:08 U-2:45882
+12:38:13 U-3
+12:38:41 U-4
+12:38:41 U-5:18352
+12:38:54 StopBy-U2
+12:38:54 StopCondition U1:70469, U2:52851 Move U1:76311, U2:52852
+12:38:54 U-7
+12:38:54 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:38:54 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:38:54 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:38:54 [IO] Fan #11 (2) PWM: 80
+12:38:54 [IO] Fan #4 (0) PWM: 0
+12:38:54 [IO] Fan #5 (1) PWM: 0
+12:38:58 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:38:58 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:38:58 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:38:58 [IO] Fan #11 (2) PWM: 80
+12:38:58 [IO] Fan #4 (0) PWM: 0
+12:38:58 [IO] Fan #5 (1) PWM: 0
+12:39:07 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:39:07 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:39:07 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:39:07 [IO] Fan #11 (2) PWM: 80
+12:39:07 [IO] Fan #4 (0) PWM: 0
+12:39:07 [IO] Fan #5 (1) PWM: 0
+12:39:13 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:39:13 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:39:13 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:39:13 [IO] Fan #11 (2) PWM: 80
+12:39:13 [IO] Fan #4 (0) PWM: 0
+12:39:13 [IO] Fan #5 (1) PWM: 0
+12:39:23 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:39:23 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:39:23 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:39:23 [IO] Fan #11 (2) PWM: 80
+12:39:23 [IO] Fan #4 (0) PWM: 0
+12:39:23 [IO] Fan #5 (1) PWM: 0
+12:39:23 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:39:23 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:39:23 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:39:23 [IO] Fan #11 (2) PWM: 80
+12:39:23 [IO] Fan #4 (0) PWM: 0
+12:39:23 [IO] Fan #5 (1) PWM: 0
+12:39:23 [IO] Fan #5 (1) PWM: 50
+12:39:23 (IO) T.Cfg, R:0 ,W:1 , N:1, T:200, En:1, O: 0
+12:39:34 BD Target Reached!
+12:39:34 Load ext: 1, FilaType:1
+12:39:34 -L0-EncCnt:0,0
+12:39:34 -L0-AccelPtr:103,655,103
+12:39:34 -L1-
+12:39:34 Load Pass411
+12:39:35 Load Pass412
+12:39:42 Load Pass413
+12:39:42 -L3-
+12:39:47 Load Pass414
+12:40:11 -L4-
+12:40:11 -L5-
+12:40:21 EX2 Target Reached!
+12:40:53 (IO) T.Cfg, R:1 ,W:0 , N:1, T:20, En:0, O: 0
+12:40:54 [IO] EX 1 is Changed 1 -> 0
+12:41:01 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:41:01 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:41:01 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:41:01 [IO] Fan #11 (2) PWM: 80
+12:41:01 [IO] Fan #4 (0) PWM: 0
+12:41:01 [IO] Fan #5 (1) PWM: 0
+12:41:01 [IO] EX 1 is Changed 0 -> 1
+12:41:07 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:41:07 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:41:07 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:41:07 [IO] Fan #11 (2) PWM: 80
+12:41:07 [IO] Fan #4 (0) PWM: 0
+12:41:07 [IO] Fan #5 (1) PWM: 0
+12:41:19 BD Target Reached!
+12:41:39 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:41:39 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:41:39 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:41:39 [IO] Fan #11 (2) PWM: 80
+12:41:39 [IO] Fan #4 (0) PWM: 0
+12:41:39 [IO] Fan #5 (1) PWM: 0
+12:41:51 BD Target Reached!
+12:42:32 [IO] Fan #11 (2) PWM: 80
+12:42:32 (IO) T.Cfg, R:1 ,W:0 , N:0, T:80, En:1, O: 0
+12:42:32 (IO) T.Cfg, R:1 ,W:0 , N:1, T:80, En:1, O: 0
+12:42:32 (IO) T.Cfg, R:1 ,W:0 , N:2, T:50, En:1, O: 0
+12:42:32 [IO] Fan #11 (2) PWM: 80
+12:42:32 [IO] Fan #4 (0) PWM: 0
+12:42:32 [IO] Fan #5 (1) PWM: 0
+12:42:44 BD Target Reached!
