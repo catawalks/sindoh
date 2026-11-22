@@ -131,6 +131,13 @@ while the owner homed and jogged from the stock screen.
   sequence waits at check 411, the rear motor is never started, the
   first motor keeps pushing into a stationary gear, and the load ends
   in a jam and "Load 411Error". The switch also reports a cartridge.
+- **A good open-filament load** (PLA, console log only, 2026-11-21):
+  start LOAD first, then push the filament in through the opening port.
+  Filament already in the switch before LOAD is taken for a cartridge
+  and the screen asks to remove it (owner). Console times from the
+  start of the load: "Pass411" at 0 s, "Pass412" at 0.9 s, "Pass413" at
+  7.7 s ("-L3-"), "Pass414" at 12.4 s, "-L4-" and "-L5-" at 36.7 s; the
+  nozzle goes to 200 °C at the start and 220 °C for the purge.
 - **Filament sensors:** GPIO 120 (`gp_extrFilaSensor[1]`) is low while
   filament is at the extruder's entry and high when it is gone (seen
   during a retract). From the cartridge bay to the extruder the
