@@ -62,6 +62,16 @@ the same way, like the DP200's:
   is unused on the 1X. On the 2X each head has its own filament dump
   station and cleaning area at its own end (owner).
   Y is the bed moving front to back, and Z is the bed going up.
+- **X home sensor and dump station, measured 2026-11-22** (X in stock
+  numbers; Klipper homing and the owner jogging): the home sensor
+  switches on at 243.4 and stays on to the left end of travel at 262.7
+  (19.3 mm); the Y sensor likewise switches on 5.8 mm before the back
+  end (stock's Y 5.3). Dump bin center 247.5. The cleaning flap is the
+  right-hand one, at 238.5; the nozzle lets go of it at 251 moving left
+  and at 226.5 moving right. The taller left flap at 254.5 is not for
+  cleaning: the nozzle never passes it, and with the head at rest it
+  lies bent over the nozzle tip (a cap against dripping, our reading).
+  Stock's load position 256.4 is under it.
 - **Home sensor inputs:** X is GPIO 99, Y is GPIO 82, both high at home
   (found by moving the head and bed by hand); Z is GPIO 83, high at
   home too (it changes once in each stock Z homing, and Klipper homed
