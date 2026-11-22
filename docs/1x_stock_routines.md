@@ -432,6 +432,26 @@ Notes:
   3.5 mm above the recorded 110.5 (the middle touch), 228.5 and -7.5.
 - GPIO 69 ("nozzle voltage") did not change during the whole routine.
 
+## Speed ramps and temperatures (program and database, 2026-11-22)
+
+- **Ramp tables in the program** (`XYAccelSpeedmm`, `ZAccelSpeedmm`,
+  `EAccelSpeedmm`: the speed after each step of a ramp, with the timer
+  periods in `*AccelPWM_M`): X/Y 646 steps (8.07 mm) from 2.3 to
+  197.7 mm/s, taking 0.134 s, so about 1460 mm/s2 on average (about 400
+  at the start, 2500 in the middle, 5000 at the top); Z 1669 steps
+  (0.65 mm) from 2.0 to 12.0 mm/s in 0.088 s, about 110 mm/s2; extruder
+  1365 steps (2.98 mm) from 20 to 86.7 mm/s in 0.057 s, about
+  1100 mm/s2. The maintenance routines (homing, load, bin) move at about
+  102 mm/s with ramps of about 223 mm/s2.
+- **Jerk** (`CONF_ENGINE_JERK` row 4): XY 20, Z 0.1, E 5 mm/s.
+- **Nozzle temperatures** (`CONF_ENGINE_TEMPERATURE`,
+  `MCONF_FILAMENT_TYPE`): PLA 210 first layer, 200 after; ABS 250 and
+  230; jog mode up to 260; the heater microcode cuts out above 270 C.
+  Preheat (idle) 80 C nozzle, 50 C bed for every filament type.
+- **Bed:** no print temperature or limit in the database or the program
+  text; the slicer sends it. The bed sensor table ends at 125 C.
+- Heater power: `PWM_EX_MAX` and `PWM_BD_MAX` are 1000 of 1000.
+
 ## Nozzle cleaning, load and unload (database, this printer)
 
 X positions at 80 steps/mm, Z at 2560 steps/mm.
