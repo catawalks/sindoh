@@ -73,8 +73,9 @@ the same way, like the DP200's:
   225.5 moving right. The taller left flap at 253.5 is not for
   cleaning: it folds over under the nozzle when the head is at rest (a
   cap against dripping, our reading).
-- **The database's X positions are in another frame** (our reading,
-  not watched on stock): its wipe ends 257.3 and 231.3 lie 6.5 mm above
+- **The database's X positions are in another frame** (our reading;
+  the owner confirms that a stock load ends with the nozzle resting on
+  the cleaning flap, as it predicts): its wipe ends 257.3 and 231.3 lie 6.5 mm above
   the two points where the flap lets go. By that, the load position
   256.4 is about 250 (over the bin, clear of the left flap) and the
   "after the purge" position 243.4 is about 237, on the cleaning flap.
