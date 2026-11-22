@@ -338,8 +338,11 @@ of about 223 mm/s2 at both ends. The homing seek runs at that speed and
 stops within about 4.9 mm of the sensor's edge (about 0.1 s). The slow
 4.9 mm search takes 0.48 s (10.2 mm/s), on X and on Y. The bed moves at
 7.42 mm/s both ways (118 mm in 16.4 s); Z homing takes the first trip
-at that speed, with no slow second approach. No long Y move was
-recorded.
+at that speed, with no slow second approach. **Y, from a second
+recording with the bed pulled to mid-travel:** 198.3 mm in 2.25 s and
+125.2 mm in 1.69 s, which is a top speed of about 100 mm/s with ramps
+of about 227 mm/s2, the same as X. After the Y sensor trips the bed
+runs on about 3.6 mm in 0.09 s; the head, about 4.9 mm.
 
 **Unload** (27 s of heating between positioning and the first pull).
 1. Part fan on. Home X. Home Z, then down to rest + 20.0 mm. Home X
@@ -380,6 +383,54 @@ table's 256.4 and 243.4: the tables are not used as plain positions.
 The owner's readings of the same day agree with the recording: bin
 center about 246.5 to 247.5, the cleaning flap released at 250 moving
 left and 225.5 moving right.
+
+## Bed leveling recorded move by move (2026-11-22)
+
+Same recorder, same day; the owner ran the leveling from the screen and
+turned the wheels when asked (`1x_recordings/`). X and Y in the frame of
+the section above (home X 262.7, Y 0). Z is given as millimeters ABOVE
+the position where a Z homing ends its upward move ("top": the home
+sensor has just tripped), because that is what the recording fixes.
+
+1. **Nozzle wipe, no purge.** Bed up to top. The same wipe as after a
+   load: right to 226.8, two passes to 252.8 and back, ending at 247.8.
+2. **Scrub on the bed** (owner: to get the filament off the nozzle so it
+   makes contact). Head to X 227.5, bed forward to Y 125. The bed comes
+   up 3.83 mm above top, pressing against the nozzle, and moves 60 mm
+   forward and back (Y 125 to 185) at 30 mm/s, and again with the head
+   zigzagging 2 mm in X every quarter second, at 30 and at 10 mm/s. Then
+   the same along X: 60 mm passes between X 165 and 225 at Y 184, with
+   the bed zigzagging 4 mm. Between passes the bed drops the 3.83 mm,
+   the head runs the stretch once without contact, and the bed comes up
+   again. About 85 s in all.
+3. **Sensor on:** GPIO 153 (enable) goes high and stays high; GPIO 81
+   (contact) reads high from then on. Bed down 10 mm, then Z, X and Y
+   are homed.
+4. **Three touches at each of three points.** For a touch the bed comes
+   up from top at 1.2 mm/s until GPIO 81 goes low, and drops back at
+   once. Between touches the spot shifts by 1 mm. After each point: bed
+   down 10 mm, home Z, X and Y.
+
+   | Point | X | Y | Shift | Contact above top, round 1 | Round 2 |
+   |---|---|---|---|---|---|
+   | back | 111.5 | 200.2 | X -1 mm twice | 3.35, 3.38, 3.36 | 3.34, 3.34, 3.34 |
+   | front left | 228.5 | 0.2 | Y +1 mm twice | 3.45, 3.46, 3.47 | 3.27, 3.27, 3.27 |
+   | front right | -7.5 | 0.2 | Y +1 mm twice | 3.33, 3.33, 3.33 | 3.31, 3.31, 3.30 |
+
+5. The bed comes forward to Y 200 and the screen says how far to turn
+   the two front wheels. The owner turned them (33 s), and the routine
+   homed and measured again (round 2), then homed.
+
+Notes:
+- The front left point read 0.12 mm higher than the others before the
+  adjustment and within 0.07 mm after it. Three touches at one point
+  agree to 0.03 mm.
+- The contact input bounces a few times as the bed leaves the nozzle;
+  only its first change during the slow rise counts.
+- X -7.5 is beyond the X minimum the program prints (-3.1).
+- The database's leveling points (114, 200), (232, 0) and (-4, 0) are
+  3.5 mm above the recorded 110.5 (the middle touch), 228.5 and -7.5.
+- GPIO 69 ("nozzle voltage") did not change during the whole routine.
 
 ## Nozzle cleaning, load and unload (database, this printer)
 
