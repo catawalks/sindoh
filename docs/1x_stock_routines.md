@@ -332,6 +332,15 @@ rest position after homing (stock's Z 3.1, our reading).
 - Z: up until the sensor trips plus about 1.5 mm, then down 7.24 mm to
   rest. The sensor is released again after the first 0.3 s of that.
 
+**Speeds, from the move times.** X moves of 35, 50, 70 and 130 mm took
+0.80, 0.95, 1.15 and 1.73 s: a top speed of about 102 mm/s with ramps
+of about 223 mm/s2 at both ends. The homing seek runs at that speed and
+stops within about 4.9 mm of the sensor's edge (about 0.1 s). The slow
+4.9 mm search takes 0.48 s (10.2 mm/s), on X and on Y. The bed moves at
+7.42 mm/s both ways (118 mm in 16.4 s); Z homing takes the first trip
+at that speed, with no slow second approach. No long Y move was
+recorded.
+
 **Unload** (27 s of heating between positioning and the first pull).
 1. Part fan on. Home X. Home Z, then down to rest + 20.0 mm. Home X
    again, then right 50.00 mm: the head waits at **X 212.7**, right of
