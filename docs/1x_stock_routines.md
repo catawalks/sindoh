@@ -6,7 +6,9 @@ program (`marvell_lspsdk_3dp_granite2-debug_stripped.elf`: constants and
 call order, disassembled on the PC) and from the stock touch-screen app's
 pages (`/app/SVN_GUI`, copied to the PC). Nothing was moved, heated or
 changed on the printer; **none of this has been checked by watching the
-machine**. "(our reading)" marks inferences. Hardware background:
+machine** except where a section says it was recorded or seen (the
+sections dated 2026-11-21 and 11-22 were). "(our reading)" marks
+inferences. Hardware background:
 [1x.md](1x.md).
 
 ## Axes and limits (compiled into the motion program)
@@ -451,6 +453,35 @@ Notes:
 - **Bed:** no print temperature or limit in the database or the program
   text; the slicer sends it. The bed sensor table ends at 125 C.
 - Heater power: `PWM_EX_MAX` and `PWM_BD_MAX` are 1000 of 1000.
+
+## Print files: coordinates and start code (2026-11-22)
+
+From the motion program's G0/G1 handler (`parsedData::parseGcode_G0_G1`
+and `..._calcPulse`, disassembled) and from files sliced by Sindoh's
+slicer (3DWOX Desktop: the line test in `/example/PLA/` on the printer
+and a cube the owner sliced).
+
+- **X and Y of a file are used as written.** The handler reads the
+  value, checks its range and converts the difference to the last
+  position into steps (X 0.0125 mm, Y 0.0124375 mm per step). There is
+  no offset and no mirror.
+- **Accepted X:** 0 to 228, plus exactly two values outside the bed:
+  262.7 (the home position at the left wall, where the 1X's head
+  parks) and -38.2 (the matching position past the other end: the 2X's
+  other head). Y: 0 to 200. Anything else is an error message and is
+  clamped. So X 0 is the right edge of the bed and X grows to the left.
+- **Sindoh's slicer** centers the bed at X 114, Y 100 and does not
+  mirror the model (an engraved letter reads the right way round when
+  the G-code is drawn with X to the right and Y up).
+- **Start of a sliced file:** `T0`, `M140`/`M104` without waiting,
+  `M107`, `G200` (nozzle cleaning), `G21`, `G90`, `G92 E-20`, `M190`,
+  `M109`, `G28`, `M298` ("move nozzles on bed plate"), `G0 Z3`. The
+  first extrusion runs E up from -20, which feeds the 20 mm. End: `M2`. The header carries the
+  settings as comments, a thumbnail (`;IMAGE[n/m]`, base64) and
+  `;PRINTER_MODEL`, `;DIMENSION`, `;LOCATION`, `;OPERATINGZONE`,
+  `;ESTIMATION_TIME`.
+- Slicer settings per profile: sindoh-klipper
+  `docs/1x_slicer_profiles.md`.
 
 ## Nozzle cleaning, load and unload (database, this printer)
 
