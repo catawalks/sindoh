@@ -516,15 +516,18 @@ replacement, lamp, beep, speech, energy save, language, time, network,
 cloud, security, and a service menu (`sp_*`: sensors, fans, auto
 leveling, machine Z offset, preheat, error log, stored-and-print).
 
-## What a Klipper config can take from this
+## What the Klipper config took from this
 
-- `rotation_distance` from 80 steps/mm (X), 80.4 (Y) and 2560 (Z), once
-  the microstep setting of the TMC2224s is known.
-- `position_min`/`position_max` from the limits above; Z homes toward the
+All of it, as of 2026-11-22 (sindoh-klipper `klipper/config/x1/`):
+
+- `rotation_distance` from 80 steps/mm (X), 80.4 (Y) and 2560 (Z).
+- The axis limits and the stock frame as they are (X 0 at the right
+  edge of the bed, home at 262.7 on the left). Z homes toward the
   nozzle, so the same "is the bed empty?" guard as on the DP200.
-- Bed leveling as a nozzle-contact probe: Klipper's `[probe]` with the
-  contact input as the pin and `z_offset` near 0, three points for
-  `[screws_tilt_adjust]` (the stock routine's own advice in turns), and
-  optionally a mesh. Which input carries the contact signal is still to
-  find (stage 4 of the port plan).
-- Cleaning, load and unload positions and temperatures for the macros.
+- Bed leveling by nozzle contact: `[probe]` on GPIO 81 with GPIO 153 as
+  its enable, the three stock points, and advice in wheel clicks. No
+  `[screws_tilt_adjust]`, and no mesh: the nozzle only makes contact at
+  the three notches, which are cut-outs below the print surface, so a
+  touch is good for leveling only, never for Z zero.
+- Cleaning, load, unload and bin positions, speeds and temperatures for
+  the macros, from the move-by-move recordings.

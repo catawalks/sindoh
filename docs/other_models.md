@@ -11,13 +11,17 @@ Drive (FFF folder), downloaded 2026-10-27:
 |---|---|
 | 3DWOX 1 | `RODUP_220111_1` |
 | 2X | `PRIME_210419_2` |
-| 1X | `ROD1X_190917_1` |
+| 1X | `ROD1X_190917_1` (the owner's 1X came with a newer one, `ROD1X_200916_2`, which is not in the Drive) |
 | 7X | `RODNH_210602_1` |
 | 30X | `RDSTF_220422_1` |
 | DP201 | `RODIN_200730_2`, byte for byte the DP200's update |
 
-Nothing here was run on those printers. It was read from the updates only
-(decrypted, unpacked, never executed).
+Nothing in this page was run on those printers. It was read from the
+updates only (decrypted, unpacked, never executed). What real printers
+showed is in the per-model pages: the 1X in [1x.md](1x.md) and
+[1x_stock_routines.md](1x_stock_routines.md), the 3DWOX 1 in
+[3dwox1.md](3dwox1.md), the 2X's recovery card in
+[prime_sd.md](prime_sd.md).
 
 **Data from real printers:** the read-only survey stick
 [catawalks/sindoh-model-survey](https://github.com/catawalks/sindoh-model-survey)
@@ -47,6 +51,12 @@ owner's 1X (2026-11-20), in [1x.md](1x.md).
   boards `H_r1`, `1X_r1`, `Prime_r2`, `M_P_r1` and `M_H_r1` ("Myron"
   printers, with folders `_update_myron_p` and `_update_myron_h`), plus
   `TOC`. It tells them apart by `/sys/kernel/board_name`.
+- **Board revisions:** the 1X has one board name only, `1X_r1`, in the
+  2019 update and in the 2020 firmware on the owner's printer
+  (`recovery.check.sh` there knows the same list). No second 1X
+  revision appears anywhere in Sindoh's files, so nothing has to be
+  told apart for the 1X. The 2X is the model with two: `Prime_r1`
+  (NAND) and `Prime_r2` (eMMC).
 - **Device trees:** `mv6270-{1X,H,M-H,M-P,Prime-r2,toc}.dtb`.
 - **USB auto-update:** every model's `/app/auto_update.sh` decrypts and runs
   `unmistakable*.she` from its USB folder before `update.she`, the same way
@@ -73,10 +83,11 @@ owner's 1X (2026-11-20), in [1x.md](1x.md).
   cores (the device tree also lists a Cortex-A15 interrupt controller) and
   Linux 4.2.8 with device trees. The stock motion firmware is "granite2"
   (`marvell_lspsdk_3dp_granite2-debug_stripped.elf`) and the UPC driver is
-  `upc_6270.ko`. Motion likely still runs on UPC cores, as on the DP200, so
-  the Klipper UPC port is the right model. But the core type, memory map
-  (ITCM/DTCM) and step/ADC peripherals must be probed again, as was done
-  for the DP200 (`upc_fw/probe/`). The DTB lists a `dcmotor` block.
+  `upc_6270.ko`. Motion runs on the UPC cores, as on the DP200.
+  **Klipper runs on the owner's 1X since 2026-11-21** and prints since
+  11-22, with our UPC firmware built for the 6270's memory map
+  ([sindoh-klipper: 1x_port_plan.md](https://github.com/catawalks/sindoh-klipper/blob/main/docs/1x_port_plan.md));
+  the 2X and 7X are untested. The DTB lists a `dcmotor` block.
   **Seen on the owner's 1X** ([1x.md](1x.md)): 4 cores, 1 GB RAM, an 8 GB
   eMMC with an ext4 root (413 MB free) and a recovery system; `upc` is
   loaded and started by the stock engine, next to Marvell's own stepper
