@@ -11,6 +11,30 @@ sections dated 2026-11-21 and 11-22 were). "(our reading)" marks
 inferences. Hardware background:
 [1x.md](1x.md).
 
+## The stock X frame (corrected 2026-11-23)
+
+**Stock's X is 0 at the LEFT edge of the bed and grows to the RIGHT.
+The 1X's head homes on the left at X -38.2; its home sensor's edge is
+at X -17.85.** Read from the motion program on 2026-11-23:
+`StepperAbsoluteMoveX2` (the 1X's head is the "X2" carriage) accepts
+positions from -3056 to 18600 steps = **-38.2 to 232.5 mm**, and
+`StepperHomeX2FindHome` sets the position to -1428 steps = -17.85 mm at
+the sensor's edge. The range the program prints at start-up, -3.10 to
+262.70 (table below), belongs to the other carriage, "X1", which
+exists only on the 2X and homes on the right at 262.7.
+
+Everything in this page written before that date, and the Klipper
+config until then, used a frame built on the wrong one of the two:
+"X 0 at the right edge, growing to the left, home at 262.7". **Those
+X values convert as stock X = 224.5 - old X.** The motions themselves
+were recorded and copied correctly; only the numbers and their sign
+were ours. Checks: old home 262.7 -> -38.2; old sensor edge 242.4 ->
+-17.9; old right limit -8 -> 232.5; the old leveling points 228.5 and
+-7.5 -> -4.0 and 232.0, which are exactly the database's values (the
+"other frame" this page puzzled over was the true one). The practical
+proof: a test print under the old frame came out as a mirror image
+(2026-11-23). Y (0 at home, bed at the back, to 200) and Z were right.
+
 ## Axes and limits (compiled into the motion program)
 
 The program prints these at start-up (`engine_init`); the numbers are
@@ -18,7 +42,8 @@ constants in its code.
 
 | Axis | Min | Max | Steps per mm | In steps |
 |---|---|---|---|---|
-| X | -3.10 mm | 262.70 mm | 80 | -248 ... 21016 |
+| X (as printed: the 2X's X1 carriage) | -3.10 mm | 262.70 mm | 80 | -248 ... 21016 |
+| X (the 1X's head, X2; see above) | -38.2 mm | 232.5 mm | 80 | -3056 ... 18600 |
 | Y | about -0.6 mm | 200.02 mm | 80.4 | ... 16082 |
 | Z | (not decoded) | 310.00 mm | 2560 | ... 793600 |
 
@@ -464,12 +489,14 @@ and a cube the owner sliced).
 - **X and Y of a file are used as written.** The handler reads the
   value, checks its range and converts the difference to the last
   position into steps (X 0.0125 mm, Y 0.0124375 mm per step). There is
-  no offset and no mirror.
+  no offset and no mirror, and none is needed: the file's X is the
+  stock frame's X (0 at the left edge of the bed, growing to the right;
+  "The stock X frame" above).
 - **Accepted X:** 0 to 228, plus exactly two values outside the bed:
-  262.7 (the home position at the left wall, where the 1X's head
-  parks) and -38.2 (the matching position past the other end: the 2X's
+  -38.2 (the home position at the left wall, where the 1X's head
+  parks) and 262.7 (the matching position past the right end: the 2X's
   other head). Y: 0 to 200. Anything else is an error message and is
-  clamped. So X 0 is the right edge of the bed and X grows to the left.
+  clamped.
 - **Sindoh's slicer** centers the bed at X 114, Y 100 and does not
   mirror the model (an engraved letter reads the right way round when
   the G-code is drawn with X to the right and Y up).
