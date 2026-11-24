@@ -39,6 +39,7 @@ owner's 1X (2026-11-20), in [1x.md](1x.md).
   makes room for it at the left end. Sindoh's firmware calls it
   "Rodin E" (the DP200 is "Rodin P") and tells them apart by the
   model ID: [dp200_family_models.md](dp200_family_models.md).
+  Every line's model IDs: [model_ids.md](model_ids.md).
 
 ## Summary
 
