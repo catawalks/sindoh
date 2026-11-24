@@ -65,10 +65,11 @@ microsteps come from the MS pins, which the program sets) and the
 current itself (VREF, from the motor current PWM and the database
 offsets).
 
-On the 1X, driver 3 is Z: `engine_motor_z_TPWMTHRS` re-selects driver 3
-and writes TPWMTHRS 58 again. Which driver is which motor otherwise
-(drivers 4 and 5 in SpreadCycle look like the two extruders) is our
-reading, not checked.
+On the 1X the driver numbers are X1 0, X2 1, Y 2, Z 3, E1 4, E2 5, C1 6,
+C2 7 (the cartridge feeds); a 1X has drivers at 0, 2, 3, 4 and 6
+(sindoh-klipper `tools/x1_tmc.py`, found on the machine 2026-11-21). So
+the two in SpreadCycle are the extruders. `engine_motor_z_TPWMTHRS`
+re-selects driver 3 (Z) and writes TPWMTHRS 58 again.
 
 ## For the Klipper port
 
@@ -77,9 +78,11 @@ reading, not checked.
 - **Klipper started without it** (the DP200-style NAND install on a
   3DWOX 1 TMC board, the 1X cold start): the drivers stay at their
   power-on defaults (no `pdn_disable`, `I_scale_analog` as the OTP
-  sets it, StealthChop thresholds unset). A start-up tool has to write
-  the four registers to each driver before Klipper runs: select pins
-  by sysfs GPIO, the datagrams above on `/dev/ttyS2`, the echo checked,
-  then a read of IFCNT (`0x02`) to confirm each write counted.
+  sets it, StealthChop thresholds unset). The four registers have to be
+  written to each driver before Klipper runs. For the 1X that tool
+  exists: sindoh-klipper `tools/x1_tmc.py setup --yes` (and `check`,
+  which `x1_stage4.sh` runs at every start), not yet run on a printer
+  that skipped the stock program. A 3DWOX 1 TMC board needs the same
+  with its four drivers, 2-bit select and its own pins.
 - On a 3DWOX 1, read the board-select pin first: write nothing on an
   A4982 board.
