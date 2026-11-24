@@ -198,7 +198,11 @@ From his repo (see "Where this comes from"); his findings unless marked.
   TMC2224 at its power-on defaults. **(our note)** Our
   [hardware_notes.md](https://github.com/catawalks/sindoh-klipper/blob/main/docs/hardware_notes.md) has `ttyS2` as the link to the
   power-management MCU (9600 8N1), which contradicts this; one of the two
-  needs checking on a printer.
+  needs checking on a printer. **(2026-11-24)** The stock program
+  confirms his reading for the TMC board: `/dev/ttyS2` at 115200 through
+  a driver select decoder; the full set-up (registers, values, pins) is
+  in [tmc2224_setup.md](tmc2224_setup.md). The DP200 board wires `ttyS2`
+  its own way.
 - **His per-unit values** (from his 3DWOX 1 `printer.cfg`, examples only):
   Z switch height 2.725, probe `z_offset` 2.711, extruder PID
   Kp 14.565 / Ki 1.566 / Kd 33.865 (210 C, `max_power` 0.6); bed PID not

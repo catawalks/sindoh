@@ -12,6 +12,7 @@ Looking for Klipper? Go to
 | Path | What |
 |---|---|
 | [docs/other_models.md](docs/other_models.md) | Every model compared (DP200/DP102/DP201, 3DWOX 1, 2X, 1X, 7X, 30X): chip, kernel, storage, USB update folder and key |
+| [docs/tmc2224_setup.md](docs/tmc2224_setup.md) | What the stock programs write to the TMC2224 drivers (3DWOX 1 Trinamic board, 1X, 2X, 7X), over which port and select pins |
 | [docs/model_ids.md](docs/model_ids.md) | Every model ID in every Sindoh motion program, the families they map to (including a 3DWOX 5X and OEM 2X builds), and the 3DWOX 1's two driver boards |
 | [docs/dp200_family_models.md](docs/dp200_family_models.md) | How Sindoh's firmware tells the DP200, DP102, DP201 and their variants apart (model IDs), and what changes on a DP201 |
 | [docs/1x.md](docs/1x.md) | The 3DWOX 1X, read from a real printer: eMMC layout, motion hardware, TMC2224 drivers, GPIOs |
