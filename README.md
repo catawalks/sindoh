@@ -11,7 +11,7 @@ Looking for Klipper? Go to
 
 | Path | What |
 |---|---|
-| [docs/other_models.md](docs/other_models.md) | Every model compared (DP200/DP201, 3DWOX 1, 2X, 1X, 7X, 30X): chip, kernel, storage, USB update folder and key |
+| [docs/other_models.md](docs/other_models.md) | Every model compared (DP200/DP102/DP201, 3DWOX 1, 2X, 1X, 7X, 30X): chip, kernel, storage, USB update folder and key |
 | [docs/1x.md](docs/1x.md) | The 3DWOX 1X, read from a real printer: eMMC layout, motion hardware, TMC2224 drivers, GPIOs |
 | [docs/1x_r4.md](docs/1x_r4.md) | The R4 core on PC_DEBUG2: its debug commands, and the two GPIO lines between the power board and the SoC |
 | [docs/1x_stock_routines.md](docs/1x_stock_routines.md) | The 1X's axes and limits, homing, nozzle-contact bed leveling, the stock load, unload and cleaning routines recorded move by move, and how it reads a print file |

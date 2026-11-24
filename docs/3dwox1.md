@@ -210,7 +210,7 @@ From his repo (see "Where this comes from"); his findings unless marked.
   homing seek at about 4500 mm/s2, so he raised `max_accel` to 3000 (ours:
   1500). Not tried on our printers.
 - **Model tag:** `RODUP_` in `/snapshot_version.sh` = 3DWOX 1, `RODIN_` =
-  DP200/DP201. His start script and screen app name the model from it.
+  DP200/DP102/DP201 (the DP201 has no heated bed: other_models.md). His start script and screen app name the model from it.
 - **Starting Klipper too early breaks stock Wi-Fi:** killing the stock app
   about 5 s after it starts leaves the radio mid-setup (no access points in
   scans, no Wi-Fi). Waiting until `mlan0` has an address first (up to

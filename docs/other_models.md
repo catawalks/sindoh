@@ -14,7 +14,7 @@ Drive (FFF folder), downloaded 2026-10-27:
 | 1X | `ROD1X_190917_1` (the owner's 1X came with a newer one, `ROD1X_200916_2`, which is not in the Drive) |
 | 7X | `RODNH_210602_1` |
 | 30X | `RDSTF_220422_1` |
-| DP201 | `RODIN_200730_2`, byte for byte the DP200's update |
+| DP201 | `RODIN_200730_2`, byte for byte the DP200's update (the printer differs: below) |
 
 Nothing in this page was run on those printers. It was read from the
 updates only (decrypted, unpacked, never executed). What real printers
@@ -29,11 +29,21 @@ runs on every model above except the 30X. It saves a masked hardware and
 firmware report to the stick for owners to send in. First real data: the
 owner's 1X (2026-11-20), in [1x.md](1x.md).
 
+## DP200, DP102 and DP201 (owner, 2026-11-24)
+
+- **DP102:** identical to the DP200.
+- **DP201:** the same firmware, but a different printer: designed for
+  PLA only, with **no heated bed**. Its part-cooling fan sits on the side
+  of the head, so the front of the head has a window onto the nozzle;
+  the fan uses the same pins and controls, and a recess in the case
+  makes room for it at the left end. Its model ID (TLI) is not known
+  to us; none in [tli_list.txt](tli_list.txt) names it.
+
 ## Summary
 
 | Model | SoC / motion firmware | Kernel | Storage | USB folder | `.she` cipher, key |
 |---|---|---|---|---|---|
-| DP200 / DP201 / Model 1 | 88PA6170 "gemstone", `upc.ko` | 3.2 | NAND | `_update_rodin` | des3, `sindoh024601779` |
+| DP200 / DP102 / DP201 / Model 1 | 88PA6170 "gemstone", `upc.ko` | 3.2 | NAND | `_update_rodin` | des3, `sindoh024601779` |
 | 3DWOX 1 | 88PA6170, `upc.ko` on the one unit checked (its own firmware line, `RODUP_`, `RODIN_SUB=U`) | 3.2 | NAND | `_update_rodin_up` | AES, `sindoh024601779U` |
 | 2X ("Prime") | 88PA6270 "granite2", `upc_6270.ko` | 4.2.8 | r1: NAND; r2: eMMC | `_update_rodin_prime` | des3, `sindoh024601779` |
 | 1X | 88PA6270 "granite2", `upc_6270.ko` | 4.2.8 | eMMC | `_update_rodin_1x` | AES, `sindoh0246017791` |
@@ -65,7 +75,7 @@ owner's 1X (2026-11-20), in [1x.md](1x.md).
 
 ## What this means for Klipper
 
-- **Each firmware line is its own target.** RODIN_ (DP200, DP201), RODUP_
+- **Each firmware line is its own target.** RODIN_ (DP200, DP102, DP201), RODUP_
   (3DWOX 1) and the others are built and shipped separately by Sindoh, so
   each may have its own mainboard, wiring and stock values. The installer
   tells them apart by the firmware tag and sets each up for what it is; a
