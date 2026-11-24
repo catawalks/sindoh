@@ -34,7 +34,7 @@ elsewhere).
 | `0x10000000` | Rodin PP ("Prime") | 2X | `engine_ifRodinPP` |
 | `0x20000000` | Rodin H / HH | 7X | `engine_ifRodinH`, `engine_ifRodinHH` |
 | `0x40000000` | Rodin 1X / HL | 1X on the 1X line; **5X** on the 7X line | `engine_ifRodin1X`, `engine_ifRodinHL` |
-| `0x80000000` | "Rodin L" | DP203 (`3DP203KQ`, Korea) | |
+| `0x80000000` | Rodin EH | DP203 (`3DP203KQ`, Korea): the DP201's head and Z with the DP200's bed and leveling ([dp200_family_models.md](dp200_family_models.md)) | `engine_ifRodinEH` |
 
 Variant bits (low half): `0x0100` Sindoh, `0x0200` China (ESUN),
 `0x0400` Stanley, `0x0800` Leon 3D (Spain), `0x1000` Japan (3DWOX 1),
@@ -104,7 +104,7 @@ it knows and the model code each means:
 
 | Firmware line | Names |
 |---|---|
-| DP200 (and 3DWOX 1) | `DP201` (Rodin E), `DP200` (Rodin P), `ST3DP1` (Stanley), `F1 ECO` (Yangpan), `3DWOX 1` (Rodin U), **`3DFF-222`** (`0x40001000`: Mimaki's 3DWOX 1, the Japanese `3D1JQ`/`3D1JH` IDs), `DP203` (Rodin L) |
+| DP200 (and 3DWOX 1) | `DP201` (Rodin E), `DP200` (Rodin P), `ST3DP1` (Stanley), `F1 ECO` (Yangpan), `3DWOX 1` (Rodin U), **`3DFF-222`** (`0x40001000`: Mimaki's 3DWOX 1, the Japanese `3D1JQ`/`3D1JH` IDs), `DP203` (Rodin EH) |
 | 2X | `DP201`, `DP200`, `ST3DP1`, `RIZE 2XC` (the OEM IDs `B101500`, `B101500H`, `RIZE2XCKH`) |
 | 7X | `DP201`, `DP200`, `ST3DP1`, `RIZE 7XC` (`B101501`), `REALIKA` |
 
@@ -148,8 +148,10 @@ with the Japan variant bit.
   DP200 installer takes every DP200-family ID (Sindoh, ESUN China,
   Stanley, Leon 3D) and the DP201 family (`ORAL3DQ` included). The boot
   logo is the owner's choice with the boot logo tool.
-- **Not supported, and why:** DP203 (Rodin L) and F1 ECO (Yangpan):
-  nothing is known about their hardware; the 3DWOX 1 line (Mimaki
+- **Not supported, and why:** F1 ECO (Yangpan): nothing is known about
+  its hardware; DP203 (Rodin EH): a config is easy from the table in
+  [dp200_family_models.md](dp200_family_models.md), not built (Korea
+  only, no owner known); the 3DWOX 1 line (Mimaki
   3DFF-222 included): its own firmware line, a config exists but is
   untested and must first tell its two driver boards apart.
 

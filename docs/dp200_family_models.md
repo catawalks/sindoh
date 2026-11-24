@@ -32,10 +32,11 @@ family:
 | `0x01000800` | Rodin P, Leon 3D (Spain) | `LEON3D` `LEON3DQ` |
 | `0x02000100` | **Rodin E**: DP201, DP202 | `3DP201` `3DP201K` `3DP201A` `3DP201CM` `3DP202` `3DP201J` `3DP201Q` `3DP201KQ` `3DP201AQ` `3DP201CMQ` `3DP202Q` `3DP201JQ` `ORAL3DQ`; any ID starting `RDPL` or `3DPL` |
 | `0x02000200` | Rodin E, China | `3DP201C` `3DP201CQ` |
-| `0x80000100` | "Rodin L" | `3DP203KQ` |
+| `0x80000100` | **Rodin EH**: DP203 (Korea) | `3DP203KQ` |
 | `0x02000100` | **any other ID** ("Unknown TLI!!! Set to Default!!!") | |
 
 Bit tests in the program: `engine_ifRodinE` = bit 25 (`0x02000000`);
+`engine_ifRodinEH` = bit 31 (`0x80000000`, the DP203 only);
 `engine_ifRodinYangpan` bit 26; `engine_ifRodinU` bit 27 (the 3DWOX 1's
 `RODIN_SUB=U`). The 3DWOX 1 IDs (`3D1...`), `3DP101`, `3DP103` and
 `3DF1ECOKQ` appear in `karas_pinetree_util.sh` (region and time zone)
@@ -65,6 +66,26 @@ DP200).
   factory jig ("[JIG] this machine is Rodin-E").
 - A Rodin P keeps its defaults ("(INIT) This machine is RODIN-P, No
   Adjust.").
+- Naming in the log: the DP201 branch prints "This machine is RODIN-L",
+  the DP203's "RODIN-EH".
+
+## The DP203 ("Rodin EH", `3DP203KQ`)
+
+Korea only. Read from the same program, the DP203 is the DP201's head
+and frame with the DP200's bed and leveling:
+
+| | DP200 (P) | DP201 (E) | DP203 (EH) |
+|---|---|---|---|
+| Heated bed | yes | no (`ifBedNotUsed = 1`) | **yes** (the flag is not set, and the DP201 branch skips it for `3DP203KQ` by name) |
+| Z max, Z bottom, print height | 200.6, 198.42, 195 mm | 194.6, 192.1, 189 mm | **as the DP201** (every "E or EH" test) |
+| Nozzle fan flag, print fan 100, unload temperatures, filament retraction, jerk, nozzle heater gains, pause/resume distance | stock defaults | DP201 values | **the DP201 values** |
+| Nozzle cleaning moves, resume, ready and photo positions, deceleration | | own | **as the DP201** |
+| Leveling | 3 points, Z corrected in software | 4 points, turns of the two screws shown | **as the DP200** (the DP201's leveling points and routine are tested on bit 25 only) |
+| Cooling-fan routines, factory jig | | own | as the DP200 (bit 25 only) |
+
+Both leveling routines switch the same level sensor between print and
+level mode, so all three models have the touch sensor (`(LEVEL) Sensor
+is PrintMode` / `LevelMode`).
 
 ## For the Klipper port
 
