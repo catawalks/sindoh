@@ -29,16 +29,19 @@ elsewhere).
 |---|---|---|---|
 | `0x01000000` | Rodin P | DP200, DP102 | (none: the default family on the DP200 line) |
 | `0x02000000` | Rodin E | DP201, DP202 | `engine_ifRodinE` |
-| `0x04000000` | Yangpan | ? | `engine_ifRodinYangpan` |
+| `0x04000000` | Yangpan | F1 ECO (`3DF1ECOKQ`, Korea; not in any table we have, so its own line) | `engine_ifRodinYangpan` |
 | `0x08000000` | Rodin U | 3DWOX 1 | `engine_ifRodinU` |
 | `0x10000000` | Rodin PP ("Prime") | 2X | `engine_ifRodinPP` |
 | `0x20000000` | Rodin H / HH | 7X | `engine_ifRodinH`, `engine_ifRodinHH` |
 | `0x40000000` | Rodin 1X / HL | 1X on the 1X line; **5X** on the 7X line | `engine_ifRodin1X`, `engine_ifRodinHL` |
-| `0x80000000` | "Rodin L" | `3DP203KQ` only | |
+| `0x80000000` | "Rodin L" | DP203 (`3DP203KQ`, Korea) | |
 
 Variant bits (low half): `0x0100` Sindoh, `0x0200` China (ESUN),
 `0x0400` Stanley, `0x0800` Leon 3D (Spain), `0x1000` Japan (3DWOX 1),
 `0x2000` OEM IDs (`B1015..`, `RIZE`).
+
+Rebrands (owner): Leon 3D (Spain), Mimaki (Japan) and RIZE sold Sindoh
+printers under their own names; Stanley sold the DP200 as the Model 1.
 
 ## The lists, by firmware line
 
@@ -68,7 +71,7 @@ Stanley Q, no Leon).
 
 | Code | IDs |
 |---|---|
-| `0x01000100`, `0x01000200`, `0x01000400`, `0x02000100`, `0x02000200` | the DP200/DP201 IDs as above (shorter list) and **`ST3000`** (Stanley, variant `0x0400`) |
+| `0x01000100`, `0x01000200`, `0x01000400`, `0x02000100`, `0x02000200` | the DP200/DP201 IDs as above (shorter list) and **`ST3000`** (Stanley's variant code `0x0400`, where the DP200 line has `ST3DP1`; no Stanley printer of that name is known, owner) |
 | `0x20000100` | `RDPH` |
 | `0x10000100` | `RDPR` `3D2X` `3D2XKQ` `3DP303` `3D2XA` `3D2XJ` `RDPP0000-SQ` `3D2XQ` `3D2XAQ` `3D2XJQ` `3D2XCQ` `3D2XKH` `3DP303H` `3D2XH` `3D2XAH` `3D2XCH` `3D2XJH`; **any unknown ID** |
 | `0x10000800` | `LEON3D2XQ` |
@@ -93,6 +96,37 @@ as a 2X.)
 So the 7X firmware also runs a **3DWOX 5X** ("Rodin HL"), a model we had
 no record of.
 
+## Model names in print files
+
+The stock print-file reader (`parseComment_dedicatedMachine`) checks the
+machine named in a file's header against the printer, by name. The names
+it knows and the model code each means:
+
+| Firmware line | Names |
+|---|---|
+| DP200 (and 3DWOX 1) | `DP201` (Rodin E), `DP200` (Rodin P), `ST3DP1` (Stanley), `F1 ECO` (Yangpan), `3DWOX 1` (Rodin U), **`3DFF-222`** (`0x40001000`: Mimaki's 3DWOX 1, the Japanese `3D1JQ`/`3D1JH` IDs), `DP203` (Rodin L) |
+| 2X | `DP201`, `DP200`, `ST3DP1`, `RIZE 2XC` (the OEM IDs `B101500`, `B101500H`, `RIZE2XCKH`) |
+| 7X | `DP201`, `DP200`, `ST3DP1`, `RIZE 7XC` (`B101501`), `REALIKA` |
+
+So the Mimaki 3DFF-222 is in the 3DWOX 1's firmware, as the 3DWOX 1
+with the Japan variant bit.
+
+## What differs between Sindoh and OEM models
+
+- **DP200, 3DWOX 1, 1X and 2X programs:** the motion code tests only the
+  family bits. The brand and OEM bits are never tested, so a Leon 3D, a
+  Stanley, a Mimaki or a RIZE 2XC moves, heats and homes as the Sindoh
+  model of its family. What changes with the brand is outside motion:
+  - the boot logo and the boot bar color (`karas_pinetree_util.sh`:
+    Stanley, Leon 3D, Mimaki, else Sindoh);
+  - the language, time zone and units it starts with (by market);
+  - the print-file check above (a file made for one brand's machine);
+  - a Stanley G-code check ("G-Code validation : SELLING_STANLEY").
+- **7X program:** the OEM bit is tested: the RIZE 7XC gets "High motor
+  power" (also given to single machines by serial number from
+  `/app/reworked_mach_list.txt`), and its own nozzle end check, material
+  compatibility and serial number checks.
+
 ## Other things these programs tell apart
 
 - **3DWOX 1, two driver boards:** at start-up it reads a board-select
@@ -109,6 +143,15 @@ no record of.
 - **7X and 5X share one program** (`engine_ifRodinHH` / `engine_ifRodinHL`).
 
 ## For the Klipper port
+
+- **Rebrands of a supported model need nothing of their own:** the
+  DP200 installer takes every DP200-family ID (Sindoh, ESUN China,
+  Stanley, Leon 3D) and the DP201 family (`ORAL3DQ` included). The boot
+  logo is the owner's choice with the boot logo tool.
+- **Not supported, and why:** DP203 (Rodin L) and F1 ECO (Yangpan):
+  nothing is known about their hardware; the 3DWOX 1 line (Mimaki
+  3DFF-222 included): its own firmware line, a config exists but is
+  untested and must first tell its two driver boards apart.
 
 - The model ID picks the config: the DP200 installer does this already
   (DP200 family / DP201 family; sindoh-klipper
