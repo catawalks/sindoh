@@ -36,8 +36,9 @@ owner's 1X (2026-11-20), in [1x.md](1x.md).
   PLA only, with **no heated bed**. Its part-cooling fan sits on the side
   of the head, so the front of the head has a window onto the nozzle;
   the fan uses the same pins and controls, and a recess in the case
-  makes room for it at the left end. Its model ID (TLI) is not known
-  to us; none in [tli_list.txt](tli_list.txt) names it.
+  makes room for it at the left end. Sindoh's firmware calls it
+  "Rodin E" (the DP200 is "Rodin P") and tells them apart by the
+  model ID: [dp200_family_models.md](dp200_family_models.md).
 
 ## Summary
 
