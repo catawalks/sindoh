@@ -21,6 +21,7 @@ Looking for Klipper? Go to
 | [1x_recordings/](1x_recordings/) | The raw logs behind those recordings |
 | [docs/3dwox1.md](docs/3dwox1.md) | The 3DWOX 1: Fredrik Gustafsson's tests and Sebastian Schmidt's dumps |
 | [docs/2x.md](docs/2x.md) | The 2X as a running machine: NAND boot, storage, pins that differ from the 1X (first look, 2026-11-28) |
+| [docs/2x_stock_routines.md](docs/2x_stock_routines.md) | The 2X's two heads: homing, stations, cleaning, tool change, offsets, leveling (read from the motion program, 2026-11-28) |
 | [docs/prime_sd.md](docs/prime_sd.md) | The 2X ("Prime"): its mainboard and Sindoh's factory recovery SD card |
 | [docs/nand_partition_layout.md](docs/nand_partition_layout.md) | NAND partitions of the DP200 family |
 | [docs/tli_list.txt](docs/tli_list.txt) | Model ID codes ("TLI") seen in Sindoh firmware |
